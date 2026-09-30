@@ -89,6 +89,15 @@ describe('FileTree (#815)', () => {
     await waitFor(() => expect(screen.getByText('made-by-run.ts')).toBeTruthy(), { timeout: 3_000 })
   })
 
+  test('a run starting here shows the project’s files, nothing marked, captioned so, until its checkout is there', async () => {
+    readTree.mockResolvedValue({ source: 'starting', files, changes: {} })
+    render(<FileTree projectId="p1" agentId="run-1" context={context()} />)
+    await waitFor(() => expect(screen.getByText('Starting from the project’s files')).toBeTruthy())
+    expect(screen.getByText('README.md')).toBeTruthy()
+    readTree.mockResolvedValue({ source: 'checkout', files: ['made-by-run.ts'], changes: {} })
+    await waitFor(() => expect(screen.getByText('made-by-run.ts')).toBeTruthy(), { timeout: 3_000 })
+  })
+
   test('a run whose changes are gone says so, instead of showing the project unmarked', async () => {
     readTree.mockResolvedValue({ source: 'gone' })
     render(<FileTree projectId="p1" agentId="run-1" context={context()} />)

@@ -44,6 +44,7 @@ export function AgentView({
   files,
   lost = false,
   writing = '',
+  startedWith,
   onAgentStarted,
   onDeleted,
 }: {
@@ -73,6 +74,8 @@ export function AgentView({
   lost?: boolean
   /** The message the agent is writing, as far as it has got: shown after the feed while it runs. */
   writing?: string
+  /** The prompt this page just started the agent with: shown until the agent's own prompt line arrives. */
+  startedWith?: string | undefined
   /** Jump to the agent a preset or a continuation started (#959). */
   onAgentStarted?: ((intent: string, agentId: string) => void) | undefined
   /** Leave this session after it is deleted (#1032) — back to the project home. */
@@ -166,6 +169,8 @@ export function AgentView({
     if (sending && prompts > sending.prompts) setSending(null)
   }, [sending, prompts])
   const onSending = useCallback((text: string | null) => setSending(text === null ? null : { text, prompts }), [prompts])
+  // A run just started writes its prompt line only once its record is saved and its checkout made.
+  const shownSending = sending?.text ?? (startedWith && prompts === 0 ? startedWith : undefined)
   // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
   const outcome = working ? undefined : agentOutcome(shown)
   // Until the handoff has actually loaded, a just-stopped agent keeps showing the modules' summaries
@@ -280,7 +285,8 @@ export function AgentView({
           agentId={agentId}
           lost={lost}
           writing={feedLive ? writing : ''}
-          {...(sending ? { sending: sending.text } : {})}
+          {...(shownSending !== undefined ? { sending: shownSending } : {})}
+          working={feedLive || shownSending !== undefined}
           {...(feedLive ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This agent has no events.' })}
           // A web agent's log dead-ends at the hand-off (#1265): the mirror box rides the tail of
           // the scroller, where "and then…" belongs. Self-nulling for every other target.

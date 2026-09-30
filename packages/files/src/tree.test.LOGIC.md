@@ -15,4 +15,4 @@ What the tests cover, against a real git repository with worktrees, branches and
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch.
 [2] fork point: the commit where an agent's branch left the project's default branch.
 [3] the agent's facts: what the dashboard tells a module's server part about one agent: its checkout while it has one, its record, whether it finished on this machine having changed nothing, and the commit a pull request merged as.
-- **Starting** - an agent the host does not know yet, one recorded `running` with no checkout, and one running on another machine whose branch is not here all answer pending, not gone.
+- **Starting** - an agent the host does not know yet and one recorded `running` on this machine with no checkout read the project's HEAD, its tree listed and nothing marked; one running on another machine whose branch is not here answers pending.

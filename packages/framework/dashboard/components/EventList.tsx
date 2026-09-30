@@ -1,6 +1,7 @@
 import type { ChoiceRequest, FrameworkEvent } from '../../src/index.js'
 import { formatFrameworkEvent } from '../../src/client.js'
 import { useMemo, useState, type ReactNode } from 'react'
+import { Loader2 } from 'lucide-react'
 import { eventKindLabel } from '../lib/event-labels.js'
 import { pendingChoices } from '../lib/live-state.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
@@ -275,6 +276,7 @@ export function EventList({
   events,
   writing = '',
   sending,
+  working = false,
   stick = true,
   openAt,
   tail,
@@ -289,6 +291,9 @@ export function EventList({
   /** A message just sent to an ended agent: the last prompt row, until the prompt's own line
    *  arrives and takes the same row. Being a prompt, the scroller brings it into view. */
   sending?: string | undefined
+  /** The agent is working: while it writes nothing, a spinner row closes the feed ("Starting…" when
+   *  the last row is a prompt, "Working…" after), so a quiet agent never looks stalled. */
+  working?: boolean
   stick?: boolean
   /** Where a non-following log opens; a replay opens at the outcome (#948), not page one. */
   openAt?: 'start' | 'end'
@@ -381,6 +386,13 @@ export function EventList({
                 <div className="min-w-0 flex-1">
                   <Markdown text={writing} compact />
                 </div>
+              </MessageScrollerItem>
+            )}
+            {working && !writing && (
+              <MessageScrollerItem messageId="working" className="-mx-1.5 flex items-center gap-2 rounded-sm px-1.5 text-muted-foreground">
+                <span className="w-28 shrink-0" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                <span role="status">{shown.length > 0 && isTurnBoundary(shown[shown.length - 1]!) ? 'Starting…' : 'Working…'}</span>
               </MessageScrollerItem>
             )}
             {tail}

@@ -32,3 +32,4 @@ And what the installed modules add to an agent's page:
 
 The rules for when a resume is offered belong to the composer and are covered by its own tests; the view only hands it how the agent ended.
 - **The pull request lookup is waited for** - while the branch's read says its pull request lookup is still out, and while the next read is unanswered, the bar is not ready; once the next read has the answer, it is.
+- **A run just started** - its prompt shows before any event, with "Starting…" under it, and once its own prompt line arrives it shows once, with "Working…" under the agent's first row; no spinner while the answer is being written, and none once the run has ended.

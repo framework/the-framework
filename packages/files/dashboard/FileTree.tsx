@@ -96,6 +96,7 @@ function sourceCaption(tree: AgentTree): string | undefined {
   if (tree.source === 'branch') return `From branch ${tree.branch}`
   if (tree.source === 'merge') return `From the merge of #${tree.number}`
   if (tree.source === 'unchanged') return 'This run changed no files'
+  if (tree.source === 'starting') return 'Starting from the project’s files'
   return undefined
 }
 
@@ -178,7 +179,7 @@ export function FileTree({ projectId, agentId, context }: ModulePanelProps) {
     [projectId, agentId],
   )
   // A run still starting has its checkout within seconds: asked again sooner than the poll.
-  const pending = runTree?.source === 'pending'
+  const pending = runTree?.source === 'pending' || runTree?.source === 'starting'
   useEffect(() => {
     if (!pending) return
     const timer = setInterval(reloadTree, 2_000)

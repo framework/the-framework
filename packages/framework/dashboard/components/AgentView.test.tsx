@@ -250,3 +250,24 @@ describe('what the modules add to a run’s page (#817)', () => {
     expect(screen.queryByText(/summary|details/)).toBeNull()
   })
 })
+
+// A run just started writes its prompt line seconds later: the page shows it at once, and says it is starting.
+describe('a run just started', () => {
+  test('its prompt shows before any event, with "Starting…" under it, until its own prompt line arrives', () => {
+    const { rerender } = render(view({ live: true, events: [], startedWith: 'Say hi' }))
+    expect(screen.getByText('Say hi')).toBeTruthy()
+    expect(screen.getByText('Starting…')).toBeTruthy()
+    const started = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'thought', text: 'hm' } }] as FrameworkEvent[]
+    rerender(view({ live: true, events: started, startedWith: 'Say hi' }))
+    expect(screen.getAllByText('Say hi')).toHaveLength(1)
+    expect(screen.getByText('Working…')).toBeTruthy()
+  })
+
+  test('no spinner while the answer is being written, and none once the run has ended', () => {
+    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }] as FrameworkEvent[]
+    const { rerender } = render(view({ live: true, events, writing: 'Hi th' }))
+    expect(screen.queryByRole('status')).toBeNull()
+    rerender(view({ live: false, events: [...events, { kind: 'end', ok: true }] as FrameworkEvent[] }))
+    expect(screen.queryByText(/Starting…|Working…/)).toBeNull()
+  })
+})

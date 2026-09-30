@@ -4,7 +4,7 @@ One run [1]: a checkout [2] from the `branches` package, a session from `agent-d
 
 **User story**: the user sees the run on the dashboard as it works, on its own branch; when the agent ends, the run's record on the `agent-data` branch says how it went, which branch and pull request hold the work and what it cost, with what the agent said; the checkout is gone unless something in it is not on the remote yet. When the agent stops to ask, the run reads `waiting` with the question, and the user's answer picks the same run up where it stopped. With "Post-merge cleanup" ticked in the launcher, the run's pull request stays open once the agent ends; a second run appears on the dashboard, working the same branch with `/post-merge-cleanup <the first run's id>`, and the request is merged only after that second run ends done.
 
-**Business logic story**: `run --detach` (`runner.ts`), or a scheduler's tick, writes the marker and spawns this as a detached process with the id (`runner.ts`); a person runs it from a shell with any prompt, and then the run marks itself; a person resumes an ended run with `run --resume`. The checkout is made and reclaimed by the `branches` package's rules; the record is written by the `logs` package's; the coding agent is a driver [7] from `agent-driver`, Claude Code or Codex as `runner.ts` builds it: unrestricted, and the run's id in its environment as `AGENT_ID`, so a ticket it claims names the run; the live record, the inbox and the question are `agent-driver`'s contract.
+**Business logic story**: a scheduler's tick writes the marker and spawns this as a detached process with the id (`runner.ts`); `run --detach` (`runner.ts`) spawns it with the id and has it mark itself; a person runs it from a shell with any prompt, and then the run marks itself too; a person resumes an ended run with `run --resume`. The checkout is made and reclaimed by the `branches` package's rules; the record is written by the `logs` package's; the coding agent is a driver [7] from `agent-driver`, Claude Code or Codex as `runner.ts` builds it: unrestricted, and the run's id in its environment as `AGENT_ID`, so a ticket it claims names the run; the live record, the inbox and the question are `agent-driver`'s contract.
 
 ## Glossary
 
@@ -64,7 +64,7 @@ Before anything else, the run's lock [10] is taken for the run's id with this pr
 
 #### Context
 
-**Problem**: a scheduler counts markers against its cap before it spawns, and a detached start answers the id of the marker it wrote, so a spawned run must not add a second marker; a person's run from a shell has nobody to mark it and must mark itself, so every machine sees it in flight.
+**Problem**: a scheduler counts markers against its cap before it spawns, so the run it spawns must not add a second marker; a person's run, from a shell or a detached start, has nobody else to mark it and must mark itself, so every machine sees it in flight; a detached start leaves it to the run so that its id is answered before any git work.
 
 #### Business logic
 

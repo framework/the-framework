@@ -89,7 +89,7 @@ type Command = (args: string[], io: CliIo, git: GitRunner) => Promise<unknown>
 
 const COMMANDS: Record<string, Command> = {
   async run(args, io, git) {
-    const { positionals, values } = parse(args, { id: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' }, driver: { type: 'string' }, then: { type: 'string' } }, 0, 1)
+    const { positionals, values } = parse(args, { id: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' }, mark: { type: 'boolean' }, driver: { type: 'string' }, then: { type: 'string' } }, 0, 1)
     const repo = await project(io.cwd, git)
     const driver = values.driver
     if (driver !== undefined && !isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
@@ -119,7 +119,7 @@ const COMMANDS: Record<string, Command> = {
     if (values.detach) {
       if (positionals[0] === undefined) throw new Usage('expected 1 argument(s), got 0')
       if (values.id !== undefined) throw new Usage('--detach takes no --id: the run\'s id is minted and answered')
-      const started = await detachRun(repo, { prompt: positionals[0], ...(values.model !== undefined ? { model: values.model } : {}), ...(driver !== undefined ? { driver } : {}), ...then, log: io.stderr })
+      const started = await detachRun(repo, { prompt: positionals[0], ...(values.model !== undefined ? { model: values.model } : {}), ...(driver !== undefined ? { driver } : {}), ...then })
       return { ok: true, detached: true, ...started }
     }
     if (values.resume !== undefined) {
@@ -136,6 +136,7 @@ const COMMANDS: Record<string, Command> = {
     const outcome = await runProject(repo, {
       prompt: positionals[0],
       ...(values.id !== undefined ? { id: values.id } : {}),
+      ...(values.mark ? { mark: true } : {}),
       ...(values.model !== undefined ? { model: values.model } : {}),
       ...(driver !== undefined ? { driver } : {}),
       ...then,

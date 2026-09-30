@@ -10,7 +10,7 @@ The Files module's [4] server part: the reads its browser part makes, and the gi
 ## Business logic — TL;DR
 
 - **The reads** (`server.ts`) - the project's files with their on-disk marks, an agent's tree, one file's diff, one file's contents, and a working agent's changed files; a read about an agent takes its id and reads wherever its files are now.
-- **Where an agent's files are** (`tree.ts`) - from the agent's facts [3]: its checkout, else its branch, else its pull request's merge commit, else, for an agent that changed nothing, the default branch unmarked, else gone.
+- **Where an agent's files are** (`tree.ts`) - from the agent's facts [3]: its checkout, else its branch, else its pull request's merge commit, else, for an agent that changed nothing, the default branch unmarked, else pending for an agent that is starting (not known yet, or recorded running), else gone.
 - **The file list** (`list.ts`) - every file git sees in a checkout, tracked and untracked, honoring the ignore rules, sorted.
 - **Per-file status** (`status.ts`) - the working tree's state of each changed file.
 - **Diffs and changed files** (`diff.ts`) - one file's diff and the list of changed files with their line counts.

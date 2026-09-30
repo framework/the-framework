@@ -178,7 +178,7 @@ test('a run that finished here with no checkout, no branch and no pull request c
 
 test('no checkout, no branch and no merge commit on this machine: gone', async () => {
   assert.deepEqual(await resolve(deps({ status: 'done', host: 'other-machine', branch: 'agent-never-pushed' })), { source: 'gone' }, 'a run from another machine: its branch may just not be here')
-  for (const status of ['running', 'waiting', 'stopped']) {
+  for (const status of ['waiting', 'stopped']) {
     assert.deepEqual(await resolve(deps({ status, host: 'this-machine', branch: 'agent-renamed-away' })), { source: 'gone' }, `a ${status} run: its record may not name its branch's last name`)
   }
   assert.deepEqual(await resolve(deps({ status: 'done' })), { source: 'gone' }, 'a run that names no machine')
@@ -187,6 +187,13 @@ test('no checkout, no branch and no merge commit on this machine: gone', async (
   const other = { value: [{ number: 8, url: 'u', state: 'MERGED', title: '', mergeCommit: git(root, 'rev-parse', 'HEAD') }] }
   assert.deepEqual(await resolve(deps({ ...endedHere, branch: 'agent-gone', pr: { number: 7 } }, other)), { source: 'gone' }, 'another pull request on the branch is not this run’s')
   assert.deepEqual(await readAgentTree(root, { source: 'gone' }), { source: 'gone' })
+})
+
+test('a run that is starting is pending, not gone: nothing known of it yet, or recorded running with no checkout or branch here', async () => {
+  const unknown: ModuleServerHost = { root, run: async () => undefined, mergeCommit: async () => ({ pending: false }) }
+  assert.deepEqual(await resolve(unknown), { source: 'pending' }, 'the page opened before the run wrote its record')
+  assert.deepEqual(await resolve(deps({ status: 'running', host: 'this-machine' })), { source: 'pending' }, 'recorded, its checkout not made yet')
+  assert.deepEqual(await resolve(deps({ status: 'running', host: 'other-machine', branch: 'agent-not-here' })), { source: 'pending' }, 'running elsewhere, its branch not here yet')
 })
 
 test('while the pull request is being looked up, the answer is pending', async () => {

@@ -80,6 +80,15 @@ describe('FileTree (#815)', () => {
     expect(screen.queryByText(/gone from this machine/)).toBeNull()
   })
 
+  test('a run that is starting says so, and is read again within seconds until its checkout is there', async () => {
+    readTree.mockResolvedValue({ source: 'pending' })
+    render(<FileTree projectId="p1" agentId="run-1" context={context()} />)
+    await waitFor(() => expect(screen.getByText('Looking for this run’s changes…')).toBeTruthy())
+    readTree.mockResolvedValue({ source: 'checkout', files: ['made-by-run.ts'], changes: {} })
+    // Well before the 8s poll: the starting run's own, sooner read.
+    await waitFor(() => expect(screen.getByText('made-by-run.ts')).toBeTruthy(), { timeout: 3_000 })
+  })
+
   test('a run whose changes are gone says so, instead of showing the project unmarked', async () => {
     readTree.mockResolvedValue({ source: 'gone' })
     render(<FileTree projectId="p1" agentId="run-1" context={context()} />)

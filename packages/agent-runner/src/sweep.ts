@@ -4,7 +4,7 @@ import { agentBranchName, reclaimWorktree, worktreeDirEntries, worktreePath } fr
 import { listRuns, type LogsDeps, type RunCard } from '@gemstack/skill-logs'
 import { endLiveCard, readLiveCard, readLiveDiary } from './live-card.js'
 import { lockHolder, runStderrPath } from './run-lock.js'
-import { recordRun, runnerMark } from './records.js'
+import { recordBranchGone, recordRun, runnerMark } from './records.js'
 
 /**
  * The belt (#1774): what a run's own process could not do because it died. A scheduler runs it on
@@ -63,8 +63,10 @@ export async function sweep(repo: string, deps: SweepDeps): Promise<SweepResult>
       continue
     }
     const reclaimed = await reclaimWorktree(repo, entry.path, { mayPush: true, birthBranch: agentBranchName(entry.agentId), git })
-    if (reclaimed.ok) result.reclaimed.push(card.id)
-    else result.kept.push({ id: card.id, reason: 'detail' in reclaimed && reclaimed.detail ? `${reclaimed.reason}: ${reclaimed.detail}` : reclaimed.reason })
+    if (reclaimed.ok) {
+      result.reclaimed.push(card.id)
+      await recordBranchGone(repo, card, diary, reclaimed.branchesDeleted, logs)
+    } else result.kept.push({ id: card.id, reason: 'detail' in reclaimed && reclaimed.detail ? `${reclaimed.reason}: ${reclaimed.detail}` : reclaimed.reason })
   }
 
   // Then the branch: a running card of this machine's with nothing on disk never started.

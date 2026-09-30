@@ -25,7 +25,7 @@ const NOW = new Date('2026-09-16T14:30:00.000Z')
 async function liveRun(repo: string, id: string, host: string, pid: number, status: RunCard['status'] = 'running'): Promise<RunCard> {
   const checkout = await createCheckout(repo, { agentId: id })
   const mark = { host, pid }
-  const card: RunCard = { id, startedAt: '2026-09-16T14:01:00.000Z', status, intent: '/work-queue', driver: 'fake', model: 'opus', caller: { runner: mark, pid, host, kind: 'prompt' } }
+  const card: RunCard = { id, startedAt: '2026-09-16T14:01:00.000Z', status, intent: '/work-queue', driver: 'fake', model: 'opus', branch: checkout.branch, caller: { runner: mark, pid, host, kind: 'prompt' } }
   if (status !== 'running') card.endedAt = '2026-09-16T14:20:00.000Z'
   const dir = liveDir(checkout.path)
   await mkdir(dir, { recursive: true })
@@ -76,6 +76,8 @@ test('a run that ended but whose process died before the record: recorded as it 
     assert.deepEqual(result.recorded.sort((a, b) => a.id.localeCompare(b.id)), [{ id: 'asked', status: 'waiting' }, { id: 'ended', status: 'done' }])
     assert.equal((await findRun(repo, 'ended'))?.status, 'done')
     assert.deepEqual(result.reclaimed, ['ended'])
+    assert.equal((await findRun(repo, 'ended'))?.branch, undefined, 'its branch held nothing and went with the checkout: the record names none')
+    assert.equal((await findRun(repo, 'asked'))?.branch, 'agent-asked', 'a kept checkout keeps its branch on the record')
     assert.deepEqual(result.kept, [{ id: 'asked', reason: 'waiting' }])
     assert.equal((await findRun(repo, 'asked'))?.status, 'waiting')
     assert.equal(await stat(worktreePath(repo, 'asked')).then(() => true, () => false), true, 'the answer resumes the run there')

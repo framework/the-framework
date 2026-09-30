@@ -60,3 +60,16 @@ export function withdrawMarker(repo: string, id: string, deps: LogsDeps = {}): P
 export function recordRun(repo: string, card: RunCard, diary: readonly AnyDiaryLine[], deps: LogsDeps = {}): Promise<FileBranchWrite> {
   return writeRun(repo, card, diary, deps)
 }
+
+/**
+ * Record a run again without its branch when the reclaim deleted that branch: one that held
+ * nothing goes with its checkout, and the record must not name a branch that is gone. Written
+ * after the reclaim rather than reclaiming first, so the record never says `running` with no
+ * checkout behind it. Nothing is written when the branch stayed.
+ */
+export async function recordBranchGone(repo: string, card: RunCard, diary: readonly AnyDiaryLine[], deleted: readonly string[] | undefined, deps: LogsDeps = {}): Promise<FileBranchWrite | undefined> {
+  if (card.branch === undefined || !deleted?.includes(card.branch)) return undefined
+  const branchless: RunCard = { ...card }
+  delete branchless.branch
+  return recordRun(repo, branchless, diary, deps)
+}

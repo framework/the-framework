@@ -9,7 +9,7 @@ What the tests cover, for the agent view's choice of which events to show — th
 
 It also covers when the view reads what the agent's branch holds:
 
-- **Not while saving** - while the agent's card is marked saving, the branch is not read; once the mark is gone, it is.
+- **While saving** - while the agent's card is marked saving, an empty branch is not offered, and the branch is read again once the mark is gone, then offered; a branch already pushed with commits is offered while the mark is still there.
 
 And when the action bar is told its facts are ready:
 
@@ -32,3 +32,4 @@ And what the installed modules add to an agent's page:
 
 The rules for when a resume is offered belong to the composer and are covered by its own tests; the view only hands it how the agent ended.
 - **The pull request lookup is waited for** - while the branch's read says its pull request lookup is still out, and while the next read is unanswered, the bar is not ready; once the next read has the answer, it is.
+- **A run just started** - its prompt shows before any event, with "Starting…" under it, and once its own prompt line arrives it shows once, with "Working…" under the agent's first row; no spinner while the answer is being written, and none once the run has ended.

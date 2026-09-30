@@ -44,6 +44,7 @@ export function AgentView({
   files,
   lost = false,
   writing = '',
+  startedWith,
   onAgentStarted,
   onDeleted,
 }: {
@@ -73,6 +74,8 @@ export function AgentView({
   lost?: boolean
   /** The message the agent is writing, as far as it has got: shown after the feed while it runs. */
   writing?: string
+  /** The prompt this page just started the agent with: shown until the agent's own prompt line arrives. */
+  startedWith?: string | undefined
   /** Jump to the agent a preset or a continuation started (#959). */
   onAgentStarted?: ((intent: string, agentId: string) => void) | undefined
   /** Leave this session after it is deleted (#1032) — back to the project home. */
@@ -116,10 +119,13 @@ export function AgentView({
 
   // What the branch holds (#1023), read once for both the bar and the detail it opens. Read once
   // the agent stops rather than once the process does: while it is still writing to the branch
-  // there is nothing to hand off yet, but a parked session's branch is finished work. Not while
-  // the card says saving either: the checkout is being cleaned up then, and an empty branch is
-  // deleted with it, so an Open PR offered in that window turned into "Branch gone" moments later.
-  const handoff = useAgentHandoff(projectId, agentId, live === false && !card?.saving)
+  // there is nothing to hand off yet, but a parked session's branch is finished work. While the
+  // card says saving, the checkout is being cleaned up, and an empty branch is deleted with it, so
+  // an Open PR offered then turned into "Branch gone" moments later: the answer is only shown then
+  // for a branch already on the remote with commits of its own, which the clean-up keeps.
+  const read = useAgentHandoff(projectId, agentId, live === false, card?.saving === true)
+  const kept = read.handoff !== null && read.handoff.exists && read.handoff.pushed && !read.handoff.empty
+  const handoff = card?.saving && !kept ? { ...read, handoff: null, loaded: false } : read
   const [open, setOpen] = useState(false)
   // What the installed modules add to this run's page: a summary in the bar, details under it.
   const { runSlots: mountedSlots } = useMountedModules()
@@ -166,6 +172,8 @@ export function AgentView({
     if (sending && prompts > sending.prompts) setSending(null)
   }, [sending, prompts])
   const onSending = useCallback((text: string | null) => setSending(text === null ? null : { text, prompts }), [prompts])
+  // A run just started writes its prompt line only once its record is saved and its checkout made.
+  const shownSending = sending?.text ?? (startedWith && prompts === 0 ? startedWith : undefined)
   // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
   const outcome = working ? undefined : agentOutcome(shown)
   // Until the handoff has actually loaded, a just-stopped agent keeps showing the modules' summaries
@@ -280,7 +288,8 @@ export function AgentView({
           agentId={agentId}
           lost={lost}
           writing={feedLive ? writing : ''}
-          {...(sending ? { sending: sending.text } : {})}
+          {...(shownSending !== undefined ? { sending: shownSending } : {})}
+          working={feedLive || shownSending !== undefined}
           {...(feedLive ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This agent has no events.' })}
           // A web agent's log dead-ends at the hand-off (#1265): the mirror box rides the tail of
           // the scroller, where "and then…" belongs. Self-nulling for every other target.

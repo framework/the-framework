@@ -41,7 +41,8 @@ export function markerCard(run: { id: string; startedAt: string; prompt: string;
     intent: run.prompt,
     driver: run.driver,
     ...(run.model !== undefined ? { model: run.model } : {}),
-    caller: { runner: run.mark },
+    // `host` as the run's live card has it too: a reader tells this machine's runs from another's by it.
+    caller: { runner: run.mark, host: run.mark.host },
   }
 }
 

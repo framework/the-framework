@@ -13,4 +13,6 @@ What the tests cover, for the Files tab's tree, rendered inside a fake dashboard
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout".
 [3] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root.
-- **Starting says so** - an agent that is starting shows "Looking for this run’s changes…" and its tree within seconds once it has one, well before the regular poll.
+- **Starting says so** - an agent still looked for shows "Looking for this run’s changes…", and one starting here shows the project's files captioned "Starting from the project’s files"; either shows the agent's own tree within seconds once it has one, well before the regular poll.
+- **The agent doing something** - a new event in the agent's feed reads the tree again at once, well before the regular poll.
+- **Files moving** - an agent whose tree was shown and which then answers pending keeps its tree on screen, with no "Looking…" line.

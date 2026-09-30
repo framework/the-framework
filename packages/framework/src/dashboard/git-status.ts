@@ -30,6 +30,12 @@ export interface GitStatusDeps {
   since?: string
   /** The branch's full PR history, for the {@link GitStatusDeps.since} path (default {@link cachedPrsForBranch}). */
   prs?: (cwd: string, branch: string) => Promise<LinkedPr[]>
+  /**
+   * The project's folder, for a status read in a run's checkout: the branch's PR history is looked
+   * up and cached by it, as the run's handoff reads it, so the lookup the bar made while the run
+   * worked is warm once the run ends and its Open PR is asked about.
+   */
+  prRoot?: string
 }
 
 /**
@@ -62,7 +68,7 @@ async function linkedPr(
   if (deps.pr) return { value: await deps.pr(cwd).catch(() => undefined), pending: false }
   if (deps.since === undefined) return cachedPrView(cwd, branch).catch(() => ({ value: undefined, pending: false }))
   if (deps.prs) return { value: pickAgentPr(await deps.prs(cwd, branch).catch(() => []), deps.since), pending: false }
-  return cachedPrsForBranch(cwd, branch).then(
+  return cachedPrsForBranch(deps.prRoot ?? cwd, branch).then(
     read => ({ value: pickAgentPr(read.value ?? [], deps.since), pending: read.pending }),
     () => ({ value: undefined, pending: false }),
   )

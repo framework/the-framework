@@ -38,6 +38,7 @@ export function RightRail({
   files,
   context,
   toggleContext,
+  activity,
   docsInMain = false,
 }: {
   projectId: string | null
@@ -50,6 +51,8 @@ export function RightRail({
   context: Set<string>
   /** Toggle a file path in the Context. */
   toggleContext: (path: string) => void
+  /** How many events the selected run's feed has shown, for the modules' tabs. */
+  activity?: number
   /**
    * The launcher renders Docs in its main column (#1455 item 2), so while it is the main view the
    * rail must not repeat it: the tab is withheld and the poll skipped. A session view passes false
@@ -114,7 +117,7 @@ export function RightRail({
   // The remembered tab may have just lost its content (the last doc deleted, a gate resolved), so
   // fall back to the first one that still exists rather than rendering an empty panel.
   const active: Tab = tabs.includes(tab) ? tab : tabs[0]!
-  const panelProps: ModulePanelProps = { projectId, ...(agentId ? { agentId } : {}), context: moduleContext }
+  const panelProps: ModulePanelProps = { projectId, ...(agentId ? { agentId, ...(activity !== undefined ? { activity } : {}) } : {}), context: moduleContext }
   const panelOf = (t: Tab) => panels.find(panel => panelTab(panel) === t)
   const label = (t: Tab) => panelOf(t)?.label ?? TABS[t as 'views' | 'docs'].label
   const help = (t: Tab) => panelOf(t)?.help ?? TABS[t as 'views' | 'docs'].help

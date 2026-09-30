@@ -19,3 +19,5 @@ What the tests cover, for the transcript of an agent's [1] events [2]:
 [5] view: a markdown document an agent pushes to the dashboard's right rail while it works.
 [6] pick: the answer to a gate: the option or options the user chose.
 - **The message just sent** - it shows as the last row, a "YOU" prompt of its own.
+- **The session id** - a session id update shows no row and no "resume" badge.
+- **The quota** - an `allowed` quota reading shows no row; one running low and one used up each show theirs.

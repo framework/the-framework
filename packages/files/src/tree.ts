@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { hostname } from 'node:os'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import type { MergeLookup, ModuleServerHost } from 'framework/module-server'
 import { listFiles } from './list.js'
@@ -23,7 +25,9 @@ export type AgentFilesAt =
   | { source: 'merge'; number: number; ref: string; base?: string }
   /** The run changed nothing: the project's default branch, where no path is marked. */
   | { source: 'unchanged'; ref: string }
-  /** The run is starting and has no checkout yet, or its pull request is still being looked up: a later read knows. */
+  /** The run is starting here, its checkout not made yet: the commit it will be made from, where no path is marked. */
+  | { source: 'starting'; ref: string }
+  /** The run is recorded running elsewhere, or its pull request is still being looked up: a later read knows. */
   | { source: 'pending' }
   | { source: 'gone' }
 
@@ -39,6 +43,7 @@ export type AgentTree =
   | { source: 'branch'; branch: string; files: string[]; changes: Record<string, FileMark> }
   | { source: 'merge'; number: number; files: string[]; changes: Record<string, FileMark> }
   | { source: 'unchanged'; files: string[]; changes: Record<string, FileMark> }
+  | { source: 'starting'; files: string[]; changes: Record<string, FileMark> }
   | { source: 'pending' }
   | { source: 'gone' }
 
@@ -73,18 +78,21 @@ async function forkPoint(ask: (args: string[]) => Promise<string>, tip: string):
  * default branch already contains (a true merge) shows no change, so there the merge commit is
  * preferred when this machine has it.
  */
-export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'run' | 'mergeCommit'>, agentId: string, git: GitRunner = nodeGitRunner()): Promise<AgentFilesAt> {
+export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'run' | 'mergeCommit'>, agentId: string, git: GitRunner = nodeGitRunner(), thisHost: string = hostname()): Promise<AgentFilesAt> {
   const root = host.root
   const ask = asker(git, root)
   const run = await host.run(agentId).catch(() => undefined)
-  if (run?.checkout) {
+  // A checkout listed a moment ago may have been reclaimed since, as the run ended: then it is no
+  // source, and the run is not starting either: it just ended, and its record may not say so yet.
+  const reclaimed = run?.checkout !== undefined && !existsSync(run.checkout)
+  if (run?.checkout && !reclaimed) {
     const base = await forkPoint(asker(git, run.checkout), 'HEAD')
     return { source: 'checkout', path: run.checkout, ...(base ? { base } : {}) }
   }
-  // Nothing known of the run yet: it is starting. A run writes its record, then makes its
-  // checkout, seconds after the page that started it opened.
+  // Nothing known of the run yet: it is starting. A run writes its record, then makes its checkout
+  // from the project's HEAD, seconds after the page that started it opened: those are its files.
   const record = run?.record
-  if (!record) return { source: 'pending' }
+  if (!record) return reclaimed ? { source: 'pending' } : starting(ask)
   const branch = record.branch
 
   let onBranch: AgentFilesAt | undefined
@@ -116,9 +124,16 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
     const ref = main && (await commitOf(ask, main))
     if (ref) return { source: 'unchanged', ref }
   }
-  // Recorded running, with no checkout and no branch here yet: still starting, not gone.
-  if (record.status === 'running') return { source: 'pending' }
+  // Recorded running, with no checkout and no branch here yet: still starting, not gone. Here, its
+  // checkout is being made from the project's HEAD; elsewhere, its branch is not here yet.
+  if (record.status === 'running') return record.host === thisHost && !reclaimed ? starting(ask) : { source: 'pending' }
   return { source: 'gone' }
+}
+
+/** A run starting here: the project's HEAD, which its checkout is made from; pending when there is none. */
+async function starting(ask: (args: string[]) => Promise<string>): Promise<AgentFilesAt> {
+  const ref = await commitOf(ask, 'HEAD')
+  return ref ? { source: 'starting', ref } : { source: 'pending' }
 }
 
 /** `git diff --name-status` between two commits, as marks; a rename reads as a deletion and an addition. */
@@ -167,7 +182,7 @@ export async function readAgentTree(root: string, at: AgentFilesAt, git: GitRunn
     for (const [path, status] of Object.entries(pending)) changes[path] = { status, committed: false }
     return { source: 'checkout', files: withDeleted(files, changes), changes }
   }
-  if (at.source === 'unchanged') return { source: 'unchanged', files: await treeAt(git, root, at.ref), changes: {} }
+  if (at.source === 'unchanged' || at.source === 'starting') return { source: at.source, files: await treeAt(git, root, at.ref), changes: {} }
   const [files, changes] = await Promise.all([treeAt(git, root, at.ref), at.base ? committedChanges(git, root, at.base, at.ref) : ({} as Record<string, FileMark>)])
   const tree = { files: withDeleted(files, changes), changes }
   return at.source === 'branch' ? { source: 'branch', branch: at.branch, ...tree } : { source: 'merge', number: at.number, ...tree }
@@ -180,7 +195,7 @@ export async function readAgentTree(root: string, at: AgentFilesAt, git: GitRunn
  * change. Null for a path that is unsafe or not changed there.
  */
 export async function readAgentFileDiff(root: string, at: AgentFilesAt, path: string, git: GitRunner = nodeGitRunner()): Promise<FileDiff | null> {
-  if (at.source === 'pending' || at.source === 'gone' || at.source === 'unchanged' || !safeRepoPath(path)) return null
+  if (at.source === 'pending' || at.source === 'gone' || at.source === 'unchanged' || at.source === 'starting' || !safeRepoPath(path)) return null
   if (at.source === 'checkout') {
     const pending = (await readFileStatuses(at.path, git))[path]
     if (pending) return readFileDiff(at.path, path, pending, git)

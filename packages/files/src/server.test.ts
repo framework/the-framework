@@ -59,7 +59,7 @@ test('a run’s changes are its own checkout’s; a run with none never shows th
   assert.deepEqual(await read('changes', {}, runs), [])
 })
 
-test('a tree read for a run the host does not know yet is pending: it is starting; a read naming no run is gone', async () => {
-  assert.deepEqual(await read('tree', { agentId: 'run-unknown' }), { source: 'pending' })
+test('a tree read for a run the host does not know yet is starting, from the project HEAD; a read naming no run is gone', async () => {
+  assert.equal(((await read('tree', { agentId: 'run-unknown' })) as { source: string }).source, 'starting')
   assert.deepEqual(await read('tree', {}), { source: 'gone' })
 })

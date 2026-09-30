@@ -30,7 +30,8 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 
 - **One frame for a running and a finished agent** - the same action bar, feed, notices and composer stay on screen for the agent's whole life; only their contents follow the agent's state.
 - **Which events are shown** - a running agent shows the live event stream; a finished one shows its archive, swapped in behind the events already on screen, and neither an empty nor a stale archive ever replaces what the stream shows.
-- **The message just sent** - a message sent to an ended agent is shown at once as the feed's last prompt, until the prompt line of its continuation arrives; switching agents drops it.
+- **The message just sent** - a message sent to an ended agent is shown at once as the feed's last prompt, until the prompt line of its continuation arrives; switching agents drops it. So is the prompt the page just started an agent with, until the agent's first prompt line arrives: the run writes it only once its record is saved and its checkout made.
+- **The working spinner** - while the agent works, or a message just sent is on its way, the feed is told to close with a spinner row.
 - **The message being written** - handed to the feed only while the feed is live, so a finished agent never shows one.
 - **Loading and empty states** - on a first visit the feed stays blank until the agent's own events are in, then fills in one step; a finished agent whose archive is still being read after a second says "Loading agent…"; a finished agent with no events at all says "This agent has no events."; a running agent with nothing yet simply waits for its first event.
 - **Working means running** - the agent counts as working exactly while the daemon's list says it runs; everything that asks "is there more coming?" asks this, so an agent that is not working gets its next step offered. Before the list is read, whether the agent runs is not known, and nothing that depends on it is read or offered.
@@ -95,7 +96,7 @@ The agent's name leads the bar: the label the caller passes, the same label the 
 
 An agent [1] counts as working exactly while the daemon's list of agents says it is running. Everything that asks "is there anything more coming?" asks whether the agent is working:
 
-- what the branch holds (the read in `lib/use-agent-handoff.ts`) is only read once the agent is not working and its card [3] is not marked saving: a branch still being written to has nothing to offer yet, and while the agent is saving its checkout is being cleaned up, which deletes a branch that holds nothing, so a next step offered then would be gone moments later;
+- what the branch holds (the read in `lib/use-agent-handoff.ts`) is read once the agent is not working: a branch still being written to has nothing to offer yet. While its card [3] is marked saving, its checkout is being cleaned up, which deletes a branch that holds nothing, so a next step offered then would be gone moments later: the answer is shown then only for a branch already on the remote with commits of its own, which the clean-up keeps, and the branch is read again the moment the mark is gone;
 - the bar's action slot is empty while working — an agent that is working publishes its own work — and holds the next step [9] once not working;
 - the modules' run slots [18] are told whether the agent works: the Files module reads the checkout [7] only while it does; the branch's commits and files take over once not working.
 

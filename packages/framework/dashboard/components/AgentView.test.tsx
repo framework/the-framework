@@ -126,16 +126,39 @@ describe('AgentView event source (#1026/#1383)', () => {
   })
 })
 
+/** A branch on the remote with a commit of its own and no pull request: what Open PR is offered for. */
+const PUSHED = {
+  branch: 'agent-add-hello2',
+  exists: true,
+  empty: false,
+  hasRemote: true,
+  pushed: true,
+  gitHost: true,
+  commits: [{ sha: 'abc1234', subject: 'Add hello2.txt' }],
+  files: [],
+} as Record<string, unknown>
+
 describe('AgentView branch read', () => {
-  test('what the branch holds is not read while the card says saving, and is read once it stops', async () => {
+  test('while the card says saving, an empty branch is not offered, and the branch is read again once it stops', async () => {
     // The checkout is cleaned up while saving, and an empty branch is deleted with it: an Open PR
     // offered in that window turned into "Branch gone" moments later.
     onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValue({ ...PUSHED, empty: true, pushed: false })
     const { rerender } = render(view({ card: { status: 'done', saving: true } }))
-    await waitFor(() => expect(onAgent).toHaveBeenCalled())
-    expect(onAgentHandoff).not.toHaveBeenCalled()
-    rerender(view({ card: { status: 'done' } }))
     await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledWith('p1', 'run-1'))
+    expect(screen.queryByRole('button', { name: /Open PR/ })).toBeNull()
+    const reads = onAgentHandoff.mock.calls.length
+    onAgentHandoff.mockResolvedValue(PUSHED)
+    rerender(view({ card: { status: 'done' } }))
+    await waitFor(() => expect(onAgentHandoff.mock.calls.length).toBeGreaterThan(reads))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Open PR/ })).toBeTruthy())
+  })
+
+  test('a branch already pushed with commits is offered while the card still says saving: the clean-up keeps it', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValue(PUSHED)
+    render(view({ card: { status: 'done', saving: true } }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Open PR/ })).toBeTruthy())
   })
 })
 
@@ -248,5 +271,26 @@ describe('what the modules add to a run’s page (#817)', () => {
   test('a project without the module gets none of it', () => {
     render(withSlots(view({ live: true }), ['p2']))
     expect(screen.queryByText(/summary|details/)).toBeNull()
+  })
+})
+
+// A run just started writes its prompt line seconds later: the page shows it at once, and says it is starting.
+describe('a run just started', () => {
+  test('its prompt shows before any event, with "Starting…" under it, until its own prompt line arrives', () => {
+    const { rerender } = render(view({ live: true, events: [], startedWith: 'Say hi' }))
+    expect(screen.getByText('Say hi')).toBeTruthy()
+    expect(screen.getByText('Starting…')).toBeTruthy()
+    const started = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'thought', text: 'hm' } }] as FrameworkEvent[]
+    rerender(view({ live: true, events: started, startedWith: 'Say hi' }))
+    expect(screen.getAllByText('Say hi')).toHaveLength(1)
+    expect(screen.getByText('Working…')).toBeTruthy()
+  })
+
+  test('no spinner while the answer is being written, and none once the run has ended', () => {
+    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }] as FrameworkEvent[]
+    const { rerender } = render(view({ live: true, events, writing: 'Hi th' }))
+    expect(screen.queryByRole('status')).toBeNull()
+    rerender(view({ live: false, events: [...events, { kind: 'end', ok: true }] as FrameworkEvent[] }))
+    expect(screen.queryByText(/Starting…|Working…/)).toBeNull()
   })
 })

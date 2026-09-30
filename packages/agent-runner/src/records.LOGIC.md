@@ -31,7 +31,7 @@ See `## Context`.
 
 #### Business logic
 
-Before a run's process exists, or as the first thing a person's run does, its card is written to the `agent-data` branch [2] by the `logs` package: the run's id, its start time, `status: running`, the prompt as what was asked, the driver's id, the model when the run has one, and the tool's mark [3] under `caller.runner`, with an empty diary. The write is one commit pushed straight to the branch, and its outcome says whether the commit reached origin: only a pushed marker is one another machine can see.
+Before a run's process exists, or as the first thing a person's run does, its card is written to the `agent-data` branch [2] by the `logs` package: the run's id, its start time, `status: running`, the prompt as what was asked, the driver's id, the model when the run has one, and the tool's mark [3] under `caller.runner`, with the mark's machine also as `caller.host`, where a run's live card has it and where a dashboard tells this machine's runs from another's, with an empty diary. The write is one commit pushed straight to the branch, and its outcome says whether the commit reached origin: only a pushed marker is one another machine can see.
 
 ### Reading the mark
 

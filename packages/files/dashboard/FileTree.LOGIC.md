@@ -63,14 +63,14 @@ With no agent selected, the project's files and the per-file status of the proje
 
 #### Business logic
 
-With an agent [2] selected, the tree is read for that agent from the module's server part, and read again every 8 seconds (the source rules in `src/tree.ts`). The answer is the list of files and the marks together, from one place:
+With an agent [2] selected, the tree is read for that agent from the module's server part, and read again every 8 seconds, and a moment (300 ms) after each new event in the agent's feed, since the agent may have just changed a file; a burst of events is one read (the source rules in `src/tree.ts`). The answer is the list of files and the marks together, from one place:
 
 - its checkout, while it exists: captioned "From the run’s checkout";
 - else its branch, on this machine or origin's copy of it: captioned "From branch <branch>";
 - else the commit its pull request merged as: captioned "From the merge of #<number>";
 - else, when it finished `done` or `failed` on this machine (its record names this machine and the status `done` or `failed`) and has no branch left and no pull request, it changed nothing, because it recorded its branch's last name as it ended and on this machine that branch was deleted with its checkout only once the remote had everything on it: the project's default branch, nothing marked, captioned "This run changed no files". An agent from another machine is never read so, since its branch may simply not be on this one, and neither is a `stopped` one, which may have renamed its branch without its record learning the new name.
 
-The caption sits above the tree. Until the first answer arrives, while the agent is starting (no checkout yet), or while the agent's pull request is still being looked up, the tab reads "Looking for this run’s changes…", and reads again every 2 seconds rather than every 8, so a starting agent's tree shows as soon as its checkout is made. Otherwise, when none of the three is left on this machine, the tab reads "This run’s changes are gone from this machine: its checkout was reclaimed and it left no branch or merged pull request here." instead of any tree. The project's own file list is not used for an agent.
+The caption sits above the tree. While the agent is starting on this machine (no checkout yet), the tab shows the project's files with nothing marked, captioned "Starting from the project’s files": its checkout is made from them. Until the first answer arrives, while an agent running on another machine has no branch here, or while the agent's pull request is still being looked up, the tab reads "Looking for this run’s changes…". When an agent whose tree the tab showed answers pending (its checkout reclaimed as it ends, its branch not read yet), the tab keeps showing the tree it had until the new place answers, rather than "Looking…" or an empty list. In both waits it reads again every 2 seconds rather than every 8, so the agent's own tree shows as soon as its checkout is made. Otherwise, when none of the three is left on this machine, the tab reads "This run’s changes are gone from this machine: its checkout was reclaimed and it left no branch or merged pull request here." instead of any tree. The project's own file list is not used for an agent.
 
 ### Filtering
 

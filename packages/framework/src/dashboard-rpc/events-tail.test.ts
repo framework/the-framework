@@ -4,7 +4,7 @@ import { appendFile, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { FrameworkEvent } from '../events.js'
-import { partialReader, tailEvents, tailAgentEvents } from './events-tail.js'
+import { partialReader, tailEvents, tailAgentEvents, type TailTarget } from './events-tail.js'
 
 const line = (message: string): string => JSON.stringify({ kind: 'log', message } satisfies FrameworkEvent) + '\n'
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
@@ -332,6 +332,44 @@ test('tailAgentEvents reads the message being written beside the diary: each cha
     await rm(live)
     await sleep(1400)
     assert.deepEqual(partials, ['Rivers car', 'Rivers carve valleys.', ''])
+  } finally {
+    stop()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('tailAgentEvents keeps asking after a run finished: a resume is followed from its first new line, and its end too', async () => {
+  const cwd = await tmpWorkspace()
+  const diary = join(cwd, 'r1.jsonl')
+  const leg1 = [{ kind: 'log', message: 'one' }, { kind: 'log', message: 'two' }] as FrameworkEvent[]
+  let answer: TailTarget<FrameworkEvent> = { finished: leg1 }
+  const asks: (boolean | undefined)[] = []
+  const seen: string[] = []
+  const stop = tailAgentEvents<FrameworkEvent>(
+    async opts => {
+      asks.push(opts?.cached)
+      return answer
+    },
+    e => void (e.kind === 'log' && seen.push(e.message)),
+  )
+  try {
+    await sleep(1300)
+    assert.deepEqual(seen, ['one', 'two'])
+    // Resumed: its checkout's diary starts with the lines the feed has, then the new leg.
+    await writeFile(diary, line('one') + line('two') + line('three'))
+    answer = { file: diary }
+    await sleep(1400)
+    assert.deepEqual(seen, ['one', 'two', 'three'])
+    await appendFile(diary, line('four'))
+    await sleep(1400)
+    assert.deepEqual(seen, ['one', 'two', 'three', 'four'])
+    // Ended again: recorded, the checkout reclaimed.
+    answer = { finished: [...leg1, { kind: 'log', message: 'three' }, { kind: 'log', message: 'four' }, { kind: 'log', message: 'five' }] as FrameworkEvent[] }
+    await rm(diary)
+    await sleep(1400)
+    assert.deepEqual(seen, ['one', 'two', 'three', 'four', 'five'])
+    // A finished run is asked about from cached reads only.
+    assert.equal(asks[1], true)
   } finally {
     stop()
     await rm(cwd, { recursive: true, force: true })

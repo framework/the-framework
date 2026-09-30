@@ -22,6 +22,16 @@ afterEach(cleanup)
 // The conversation view: the user's prompt is its own YOU row, the agent's reply is AGENT and
 // renders as Markdown, and a long message collapses to its first line (#1035 follow-up).
 describe('EventList conversation rows', () => {
+  test('a message just sent shows at once as the last prompt, a YOU row of its own', () => {
+    const events: FrameworkEvent[] = [
+      { kind: 'driver', event: { type: 'start', prompt: 'first' } },
+      { kind: 'driver', event: { type: 'text', text: 'done' } },
+    ]
+    render(<EventList events={events} sending="second" stick={false} />)
+    expect(screen.getByText('second')).toBeTruthy()
+    expect(screen.getAllByText('you')).toHaveLength(2)
+  })
+
   test('a prompt reads YOU and a reply reads AGENT', () => {
     const events: FrameworkEvent[] = [
       { kind: 'driver', event: { type: 'start', prompt: 'what is your name?' } },

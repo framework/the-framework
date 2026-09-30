@@ -44,7 +44,7 @@ See `## Context`.
 #### Business logic
 
 - No agent id [2], or an id that is not path-safe, has no diary to tail.
-- While the branches provider [6] lists a checkout for the agent (asked once more fresh on a miss, as above), the diary is `<agent id>.jsonl` under that checkout's `.the-framework/`, whether or not the file is there yet.
+- While the branches provider [6] lists a checkout for the agent (asked once more fresh on a miss, as above, unless the reader asks from cached reads only: a feed waiting on a finished agent, asking for as long as it is open whether the agent was resumed), the diary is `<agent id>.jsonl` under that checkout's `.the-framework/`, whether or not the file is there yet.
 - With no checkout, the finished agent's diary, every line, is the answer when the runs provider [5] has the agent finished (the lookup in `agent-store.ts`).
 - With neither, the diary is nowhere yet: the agent was started a moment ago and its checkout is not made, even if its record already says `running`. The answer says so ("pending"), and the tail asks again on its own cadence until the diary has a home (`../dashboard-rpc/events-tail.ts`). A project with no runs provider answers the same for a finished agent, where nothing more comes.
 

@@ -9,11 +9,11 @@ import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
  * none for the id. The provider's list is shared for a few seconds; a run that is not in it may
  * have started a moment ago, so a miss asks once more, fresh (`branches.ts` bounds how fresh).
  */
-export async function findCheckout(projectCwd: string, agentId: string, branches: BranchesFor): Promise<Checkout | undefined> {
+export async function findCheckout(projectCwd: string, agentId: string, branches: BranchesFor, opts: { cached?: boolean } = {}): Promise<Checkout | undefined> {
   const source = await branches(projectCwd).catch(() => undefined)
   if (!source) return undefined
   const known = (await source.list().catch(() => [])).find(checkout => checkout.id === agentId)
-  if (known) return known
+  if (known || opts.cached) return known
   return (await source.list({ fresh: true }).catch(() => [])).find(checkout => checkout.id === agentId)
 }
 
@@ -49,6 +49,9 @@ export type AgentDiarySource = { file: string } | { finished: AnyDiaryLine[] } |
  * nowhere yet, and the tail asks again (`../dashboard-rpc/events-tail.ts`). A project with no
  * runs provider answers the same for a finished run: nowhere, where nothing more comes.
  *
+ * `cached` answers from the shared lists only, never asking the checkouts fresh on a miss: for a
+ * reader that asks about a finished run for as long as it is open, in case it is resumed.
+ *
  * Only the events tails resolve here; every other run-addressed surface keeps
  * {@link resolveAgentCheckout}'s root fallback, where the project's own state is the sane
  * thing to act on.
@@ -58,9 +61,10 @@ export async function resolveAgentDiary(
   agentId: string | undefined,
   runs: RunsFor = projectRuns,
   branches: BranchesFor = projectBranches,
+  opts: { cached?: boolean } = {},
 ): Promise<AgentDiarySource | undefined> {
   if (!agentId || !isRunId(agentId)) return undefined
-  const checkout = await findCheckout(projectCwd, agentId, branches)
+  const checkout = await findCheckout(projectCwd, agentId, branches, opts)
   if (checkout) return { file: join(checkout.path, THE_FRAMEWORK_DIR, `${agentId}.jsonl`) }
   const finished = await readFinishedDiary(projectCwd, agentId, runs)
   return finished ? { finished } : { pending: true }

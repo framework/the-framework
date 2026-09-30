@@ -44,6 +44,20 @@ test('resolveAgentCheckout: a run missing from the shared list is asked for once
   assert.deepEqual(asks, [false, true], 'the shared read first, then one fresh read')
 })
 
+test('resolveAgentDiary, cached: a run missing from the shared list is not asked for fresh', async () => {
+  // A finished run's feed asks for as long as it is open, in case the run is resumed: shared reads only.
+  const asks: boolean[] = []
+  const branches: BranchesFor = async () => ({
+    ...(await withCheckout()(CWD))!,
+    async list(opts = {}) {
+      asks.push(opts.fresh === true)
+      return []
+    },
+  })
+  assert.deepEqual(await resolveAgentDiary(CWD, RUN_ID, finishedRun(), branches, { cached: true }), { finished: DIARY })
+  assert.deepEqual(asks, [false])
+})
+
 test('resolveAgentDiary: no run id, and an unsafe one, have no diary', async () => {
   assert.equal(await resolveAgentDiary(CWD, undefined, finishedRun(), withCheckout()), undefined)
   assert.equal(await resolveAgentDiary(CWD, '../escape', finishedRun(), withCheckout()), undefined)

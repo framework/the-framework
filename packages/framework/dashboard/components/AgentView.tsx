@@ -157,6 +157,15 @@ export function AgentView({
   // the composer slot, so the continuation renders (and Stop takes over from Resume) the moment
   // the first event lands rather than when the poll does.
   const feedLive = working || (feedAhead && isAgentActive(events))
+  // The message just sent to an ended run, shown at the end of the feed until its own prompt line
+  // arrives: the continuation writes that line only once its checkout is back, seconds later.
+  const [sending, setSending] = useState<{ text: string; prompts: number } | null>(null)
+  useEffect(() => setSending(null), [agentId])
+  const prompts = shown.filter(e => e.kind === 'driver' && e.event.type === 'start').length
+  useEffect(() => {
+    if (sending && prompts > sending.prompts) setSending(null)
+  }, [sending, prompts])
+  const onSending = useCallback((text: string | null) => setSending(text === null ? null : { text, prompts }), [prompts])
   // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
   const outcome = working ? undefined : agentOutcome(shown)
   // Until the handoff has actually loaded, a just-stopped agent keeps showing the modules' summaries
@@ -271,6 +280,7 @@ export function AgentView({
           agentId={agentId}
           lost={lost}
           writing={feedLive ? writing : ''}
+          {...(sending ? { sending: sending.text } : {})}
           {...(feedLive ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This agent has no events.' })}
           // A web agent's log dead-ends at the hand-off (#1265): the mirror box rides the tail of
           // the scroller, where "and then…" belongs. Self-nulling for every other target.
@@ -283,6 +293,7 @@ export function AgentView({
         live={feedLive}
         files={files}
         onAgentStarted={onAgentStarted}
+        onSending={onSending}
         outcome={outcome}
       />
     </>

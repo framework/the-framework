@@ -9,9 +9,9 @@ import { forwardStream } from './stream-forward.js'
 // out as one SSE frame. Runs, docs, and the project log come over the read-model RPCs (reads.ts).
 
 /** The diary to follow, or undefined when the project or the run is unknown. */
-async function resolveEventsDiary(projectId: string, agentId?: string): Promise<AgentDiarySource | undefined> {
+async function resolveEventsDiary(projectId: string, agentId?: string, opts: { cached?: boolean } = {}): Promise<AgentDiarySource | undefined> {
   const cwd = await resolveProjectPath(projectId)
-  return cwd ? resolveAgentDiary(cwd, agentId) : undefined
+  return cwd ? resolveAgentDiary(cwd, agentId, undefined, undefined, opts) : undefined
 }
 
 /**
@@ -66,7 +66,7 @@ export async function streamAgentEvents(
   // gets exactly the lines the move would have swallowed.
   if ((await resolveEventsDiary(projectId, agentId)) === undefined) return undefined
   return tailAgentEvents<AnyDiaryLine>(
-    () => resolveEventsDiary(projectId, agentId),
+    opts => resolveEventsDiary(projectId, agentId, opts),
     line => {
       const event = fromDiaryLine(line)
       if (event) send(event)

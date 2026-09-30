@@ -32,6 +32,7 @@ export function AgentComposer({
   live,
   files,
   onAgentStarted,
+  onSending,
   outcome,
 }: {
   projectId: string
@@ -42,6 +43,8 @@ export function AgentComposer({
   files: string[]
   /** An ended run was continued: the shell follows the same run as it goes live again. */
   onAgentStarted?: ((intent: string, agentId: string) => void) | undefined
+  /** A message is on its way to an ended run (`null`: it did not go through), so the feed shows it at once. */
+  onSending?: ((text: string | null) => void) | undefined
   /** How the agent ended (#948), so the note does not call a crash "ended". */
   outcome?: AgentOutcome | undefined
 }) {
@@ -81,11 +84,16 @@ export function AgentComposer({
   /** Say `text` to the run. Resolves whether it went through; a refusal's words are shown. */
   const say = async (text: string): Promise<boolean> => {
     const wasLive = live
+    // An ended run's continuation takes seconds to write its first line; the message shows now.
+    if (!wasLive) onSending?.(text)
     const outcome = await run(
       () => sendMessage(projectId, text, agentId),
       'Could not send. Your text is kept, try again.',
     )
-    if (!outcome.ok) return false
+    if (!outcome.ok) {
+      if (!wasLive) onSending?.(null)
+      return false
+    }
     if (wasLive) setQueued(text)
     // An ended run goes live again under the same id: tell the shell, which keeps its feed (#762).
     else onAgentStarted?.(text, agentId)

@@ -12,3 +12,4 @@ What the tests cover, against real files on disk and finished agents' lines hand
 - **A diary nowhere yet** - the boundary is reported at once with nothing to replay; the tail asks again each poll, still nowhere, then once the diary has a file it delivers that file from its first line and follows appends, the boundary reported only once.
 - **The message being written** - a change to only the live file beside the diary is read on the diary's watch; each new text is sent once, and an empty text once the file is gone.
 - **An agent already finished** - every line, then the boundary, and nothing follows.
+- **A finished agent that is resumed** - after the finished lines, the tail keeps asking from cached reads; the resumed agent's file, starting with the lines already delivered, delivers only the new ones and its appends; ended again, the extra finished lines arrive.

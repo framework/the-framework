@@ -23,8 +23,8 @@ Runs git's worktree mechanism for agents [1]: where an agent's checkout [2] live
 
 - **Where a checkout lives** - `<project>/.branches/agent-<agent id>`, the directory named as the agent id [4] and as the birth branch [5].
 - **Which directories are checkouts** - a directory under `.branches/` named as an agent branch [6] with a valid id; links and files are not, and neither is `agent-data`.
-- **Creating a checkout on a fresh branch** - a new worktree on a new branch from the project's head or a named base, refused for an unsafe id before git runs, and a git failure surfaces.
-- **Continuing an agent on an existing branch** - the worktree is checked out on the branch given; a branch gone locally comes back from the remote's copy, and one gone everywhere is recreated from the project's head.
+- **Creating a checkout on a fresh branch** - a new worktree on a new branch from origin's default branch, fetched first (5 seconds at most), or from a named base; the project's head only in a repository with no remote; no upstream set; refused for an unsafe id before git runs, and a git failure surfaces.
+- **Continuing an agent on an existing branch** - the worktree is checked out on the branch given; a branch gone locally comes back from origin's copy, and one gone everywhere is recreated where a fresh branch starts; neither sets an upstream.
 - **Telling a checkout from a directory git does not know** - a directory counts as a checkout only when git's top level is that very directory; a plain branch read in any other directory under `.branches/` would answer with the user's branch.
 - **The project a directory belongs to** - two levels up from a checkout under `.branches/`, else the checkout itself, read from the layout rather than from git's notion of the main repository.
 - **Naming the work** - the branch is renamed to `agent-<name>`, a taken name gets `-2`, `-3`, and so on, and only an agent branch is ever renamed.
@@ -60,21 +60,23 @@ A checkout on disk is a directory, not a symbolic link and not a file, directly 
 
 #### Context
 
-**User story**: the user starts an agent; it gets its own checkout on a branch of its own, branched from the commit the project's checkout is on unless the caller names another base (the `--base` option of `create`).
+**User story**: the user starts an agent while their own checkout is on a feature branch with commits they have not pushed; the agent gets its own checkout on a branch of its own, started from origin's default branch, so none of the user's unpushed work is in it and none is published when the agent's branch is pushed. The caller may name another base (the `--base` option of `create`).
+
+**Problem**: the commit the project's checkout is on is whatever the user has checked out right now, which the dashboard does not show. A branch started there carries the user's unpushed commits, and the push at the agent's end publishes them.
 
 #### Business logic
 
-The agent id [4] is checked before anything runs: an id outside its charset is rejected, so no caller can create a directory outside `.branches/`. Git then creates the worktree at the checkout's [2] path on a new branch named by the caller (the birth branch [5] `agent-<agent id>` for every checkout the package creates), starting from the base named or, with none, from the commit the project's checkout is on. Git makes the directory and any missing parent, `.branches/` included. Any git failure surfaces to the caller instead of being swallowed, since an agent [1] that wants to start needs its checkout: a branch or directory that already exists, or a base that does not resolve, is reported as git's own failure.
+The agent id [4] is checked before anything runs: an id outside its charset is rejected, so no caller can create a directory outside `.branches/`. Git then creates the worktree at the checkout's [2] path on a new branch named by the caller (the birth branch [5] `agent-<agent id>` for every checkout the package creates), starting from the base named. With none, it starts from origin's default branch: the branch origin's `HEAD` points at, else `origin/main`, else `origin/master`, whichever this clone has. That branch is fetched from origin first, so the start is current. The fetch is waited for 5 seconds at most, the same cap Claude Code puts on its own worktrees: a fetch that fails (offline) or takes longer leaves the copy the clone already has, and one still running finishes on its own. A repository with no such branch (no remote) starts from the commit the project's checkout is on, the only one there is. The new branch gets no upstream: setting one writes the repository's shared config, whose lock a coding agent's own git command in another checkout may hold at that moment. Git makes the directory and any missing parent, `.branches/` included. Any git failure surfaces to the caller instead of being swallowed, since an agent [1] that wants to start needs its checkout: a branch or directory that already exists, or a base that does not resolve, is reported as git's own failure.
 
 ### Continuing an agent on an existing branch
 
 #### Context
 
-**User story**: the user continues an agent whose checkout was reclaimed [9]; the agent must find itself on the branch its work is on, with its previous commits, rather than on a fresh branch from the project's head that strands what it did last time.
+**User story**: the user continues an agent whose checkout was reclaimed [9]; the agent must find itself on the branch its work is on, with its previous commits, rather than on a fresh branch that strands what it did last time.
 
 #### Business logic
 
-The agent id [4] is checked as above. Git then checks the branch named by the caller out into the checkout's [2] path; the branch is taken as given, a `/` in it included. A branch that is gone locally but present on the remote as `origin/<branch>` is recreated from that copy by git itself. When git refuses and the branch exists locally, the refusal surfaces, as for a branch the user's own checkout has out. When git refuses and the branch does not exist locally, the branch is created from the commit the project's checkout is on and checked out there. That fallback is sound because the only branches the package ever deletes held nothing that was not already on the remote or on the branch that stayed, so the project's head is where the agent's work was.
+The agent id [4] is checked as above. The branch named by the caller is taken as given, a `/` in it included. When this clone has it, git checks it out into the checkout's [2] path; a refusal surfaces, as for a branch the user's own checkout has out. When only origin has it, as `origin/<branch>`, it is recreated from that copy. When it is gone everywhere, it is recreated where a fresh branch starts (above): origin's default branch, fetched first. Neither recreated branch gets an upstream. Recreating a gone branch loses nothing, because the only branches the package ever deletes held nothing that was not already on the remote or on the branch that stayed; it never starts from the commit the project's checkout is on, which may carry the user's unpushed work.
 
 ### Telling a checkout from a directory git does not know
 

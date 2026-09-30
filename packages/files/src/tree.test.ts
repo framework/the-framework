@@ -189,7 +189,7 @@ test('no checkout, no branch and no merge commit on this machine: gone', async (
   assert.deepEqual(await readAgentTree(root, { source: 'gone' }), { source: 'gone' })
 })
 
-test('a run starting here reads the project HEAD its checkout is made from, nothing marked; one running elsewhere is pending', async () => {
+test('a run starting here, in a project with no remote, reads the project HEAD its checkout is made from, nothing marked; one running elsewhere is pending', async () => {
   const head = git(root, 'rev-parse', 'HEAD')
   const unknown: ModuleServerHost = { root, run: async () => undefined, mergeCommit: async () => ({ pending: false }) }
   assert.deepEqual(await resolve(unknown), { source: 'starting', ref: head }, 'the page opened before the run wrote its record')
@@ -197,6 +197,21 @@ test('a run starting here reads the project HEAD its checkout is made from, noth
   assert.deepEqual(await resolve(deps({ status: 'running', host: 'other-machine', branch: 'agent-not-here' })), { source: 'pending' }, 'running elsewhere, its branch not here yet')
   const tree = await readAgentTree(root, { source: 'starting', ref: head })
   assert.deepEqual(tree, { source: 'starting', files: git(root, 'ls-tree', '-r', '--name-only', head).split('\n'), changes: {} })
+})
+
+test('a run starting here, in a project with a remote, reads origin’s default branch, never the branch the user has out', async () => {
+  const project = join(dir, 'with-origin')
+  execFileSync('git', ['init', '-q', '-b', 'main', project])
+  git(project, 'config', 'user.email', 't@t')
+  git(project, 'config', 'user.name', 't')
+  const shared = commit(project, 'base', { 'a.txt': 'a\n' })
+  execFileSync('git', ['init', '-q', '--bare', join(dir, 'with-origin.git')])
+  git(project, 'remote', 'add', 'origin', join(dir, 'with-origin.git'))
+  git(project, 'push', '-q', 'origin', 'main')
+  git(project, 'checkout', '-q', '-b', 'my-feature')
+  commit(project, 'unpushed', { 'secret.txt': 's\n' })
+  const host: ModuleServerHost = { root: project, run: async () => undefined, mergeCommit: async () => ({ pending: false }) }
+  assert.deepEqual(await resolveAgentFiles(host, 'run-x', undefined, 'this-machine'), { source: 'starting', ref: shared })
 })
 
 test('a checkout reclaimed since it was listed is no source: its branch is read, else pending, never an empty tree or a start', async () => {

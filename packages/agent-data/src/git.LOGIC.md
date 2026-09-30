@@ -18,6 +18,7 @@ Runs git for the whole product: one runner executes `git` in a directory, resolv
 - **A timeout is its own kind of failure** - a git killed for outrunning its budget fails as a timeout, recognizable across packages, distinct from a git that rejected the operation.
 - **The line worth showing** - a failed invocation is summarized by git's own `fatal:`, `error:` or `remote:` line, else its first line, else "git failed".
 - **Inside a repository, and where its checkout starts** - whether a directory is inside a git working tree, answered "no" whenever git cannot say, and the root of the checkout a directory is in.
+- **Origin's default branch** - the remote-tracking branch origin's `HEAD` points at, else `origin/main`, else `origin/master`, read locally; none in a clone without them.
 - **Pushing a branch to origin** - one push that writes nothing to the repository's config, whose failure is reported as git's reason rather than thrown.
 
 ## Business logic
@@ -67,6 +68,16 @@ The summary of a failed invocation is git's own line beginning with `fatal:`, `e
 #### Business logic
 
 Whether a directory sits inside a git working tree is answered by git, and only a clear "yes" counts: a missing or unreadable git reads as "no repository", the conservative answer for a caller that treats a repository's failure as fatal. The root of the checkout [3] a directory is in (an agent's [1] own, from anywhere under it) is git's top-level directory for that directory; outside a repository the question fails.
+
+### Origin's default branch
+
+#### Context
+
+**Business logic story**: every new agent [1] branch starts from origin's default branch, never from what the user has checked out, and the dashboard shows those files for an agent whose checkout is still being made.
+
+#### Business logic
+
+Origin's default branch is named as this clone's remote-tracking branch (`origin/main`): the one origin's `HEAD` points at when the clone knows it, else `origin/main`, else `origin/master`, whichever the clone has. Only local refs are read, never the network. A clone with none of them (no remote, or one never fetched) has none, and the caller decides what to do without it.
 
 ### Pushing a branch to origin
 

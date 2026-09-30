@@ -165,3 +165,35 @@ describe('AgentComposer, ended (#720, #1774)', () => {
     expect(props().inAgent).toBe(true)
   })
 })
+
+// An ended run's continuation takes seconds to write its first line: the message shows at once.
+describe('AgentComposer sending to an ended run', () => {
+  test('the message is handed to the feed before the send resolves', async () => {
+    let resolve: (value: unknown) => void = () => {}
+    sendMessage.mockReturnValue(new Promise(r => (resolve = r)))
+    const onSending = vi.fn()
+    renderComposer({ live: false, onSending })
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }))
+    expect(onSending).toHaveBeenCalledWith('hello')
+    resolve(undefined)
+    await waitFor(() => expect(sendMessage).toHaveBeenCalled())
+    expect(onSending).toHaveBeenCalledTimes(1)
+  })
+
+  test('a send that fails takes the message back', async () => {
+    sendMessage.mockRejectedValue(new Error('nope'))
+    const onSending = vi.fn()
+    renderComposer({ live: false, onSending })
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }))
+    await waitFor(() => expect(onSending).toHaveBeenLastCalledWith(null))
+  })
+
+  test('a live run is not shown this way: its message waits in the inbox, under its own note', async () => {
+    sendMessage.mockResolvedValue(undefined)
+    const onSending = vi.fn()
+    renderComposer({ live: true, onSending })
+    fireEvent.click(screen.getByRole('button', { name: 'submit' }))
+    await waitFor(() => expect(sendMessage).toHaveBeenCalled())
+    expect(onSending).not.toHaveBeenCalled()
+  })
+})

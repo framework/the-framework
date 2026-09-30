@@ -11,3 +11,4 @@ What the tests cover, for the box at the bottom of an agent view:
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook.
 [2] waiting: how an agent that ended on a question reads: not working, its checkout kept, resumed by the answer or by the user's next message.
+- **A message to an ended agent** - it is handed to the feed before the send resolves, and taken back when the send fails; a message to a working agent is not.

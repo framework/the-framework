@@ -274,6 +274,7 @@ function Thought({ text }: { text: string }) {
 export function EventList({
   events,
   writing = '',
+  sending,
   stick = true,
   openAt,
   tail,
@@ -285,6 +286,9 @@ export function EventList({
    *  whole as it grows (a finished long message clamps to its first line; one being written would
    *  hide what is coming in). Never an event: its whole message's row replaces it. */
   writing?: string
+  /** A message just sent to an ended agent: the last prompt row, until the prompt's own line
+   *  arrives and takes the same row. Being a prompt, the scroller brings it into view. */
+  sending?: string | undefined
   stick?: boolean
   /** Where a non-following log opens; a replay opens at the outcome (#948), not page one. */
   openAt?: 'start' | 'end'
@@ -300,7 +304,8 @@ export function EventList({
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
   const screenRows = useMemo(() => foldScreenRows(events), [events])
-  const shown = promptFirst(events).filter(e => !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
+  const logged = promptFirst(events).filter(e => !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
+  const shown: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>
       <MessageScroller className="flex-1">

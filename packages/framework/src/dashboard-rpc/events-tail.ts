@@ -88,7 +88,7 @@ export type TailTarget<T> = { file: string } | { finished: T[] } | { pending: tr
  * with it, and a caller reads them there, on the same watch.
  */
 export function tailAgentEvents<T = unknown>(
-  resolve: () => Promise<TailTarget<T> | undefined>,
+  resolve: (opts?: { cached?: boolean }) => Promise<TailTarget<T> | undefined>,
   onEvent: (event: T) => void,
   onReplayed?: () => void,
   afterPull?: (diary: string) => Promise<void>,
@@ -104,11 +104,12 @@ export function tailAgentEvents<T = unknown>(
     delivered++
     onEvent(event)
   }
-  /** The finished run's lines the feed has not had yet; nothing follows them. */
+  /** The finished run's lines the feed has not had yet; then wait for the run to be resumed. */
   const finish = (lines: T[]): void => {
     stopFollow?.()
     stopFollow = undefined
     for (const line of lines.slice(delivered)) deliver(line)
+    awaitDiary(true)
   }
 
   const follow = (): void => {
@@ -145,10 +146,17 @@ export function tailAgentEvents<T = unknown>(
     }
   }
 
-  /** Follow `file` from its start: what is there is the replay, and appends follow. */
+  /**
+   * Follow `file` from its start: what is there is the replay, and appends follow. A resumed run's
+   * diary starts with the lines the feed already had, so as many lines as were delivered are skipped.
+   */
   const begin = (file: string, onReplayedOnce: () => void): void => {
     path = file
-    tailer = new JsonlTailer<T>(file, deliver)
+    let skip = delivered
+    tailer = new JsonlTailer<T>(file, line => {
+      if (skip > 0) skip--
+      else deliver(line)
+    })
     const replayed = (): void => {
       if (stopped) return
       onReplayedOnce()
@@ -157,19 +165,25 @@ export function tailAgentEvents<T = unknown>(
     void tailer.pull().then(replayed, replayed)
   }
 
-  /** The diary is nowhere yet: ask again after a poll, until it has a home. The boundary was already reported. */
-  const awaitDiary = (): void => {
+  /**
+   * The diary is nowhere yet, or is a finished run's: ask again after a poll, until it has a home.
+   * A finished run is asked about for as long as the feed is open, since it may be resumed: its diary
+   * is then a file in a checkout again, or, for a resumed run that already ended again, more
+   * finished lines. The boundary was already reported.
+   */
+  const awaitDiary = (finished: boolean): void => {
     if (stopped) return
     waiting = setTimeout(() => {
       waiting = undefined
-      void resolve().then(
+      // A finished run is asked about from the shared, cached reads: the question may stay open for hours.
+      void resolve({ cached: finished }).then(
         next => {
           if (stopped) return
-          if (next === undefined || 'pending' in next) return awaitDiary()
+          if (next === undefined || 'pending' in next) return awaitDiary(finished)
           if ('finished' in next) return finish(next.finished)
           begin(next.file, () => {})
         },
-        () => awaitDiary(),
+        () => awaitDiary(finished),
       )
     }, POLL_MS)
     waiting.unref?.()
@@ -190,7 +204,7 @@ export function tailAgentEvents<T = unknown>(
       }
       if ('pending' in initial) {
         onReplayed?.()
-        awaitDiary()
+        awaitDiary(false)
         return
       }
       begin(initial.file, () => onReplayed?.())

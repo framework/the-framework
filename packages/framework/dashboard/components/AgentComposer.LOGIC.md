@@ -16,7 +16,7 @@ The box at the bottom of an agent view [1]: where the user says something to tha
 
 ## Business logic — TL;DR
 
-- **One send, working or ended** - the text goes to the daemon addressed at this agent; while the agent works the box says the message is queued, and when the agent had ended the shell is told to follow the same agent as it goes on.
+- **One send, working or ended** - the text goes to the daemon addressed at this agent; while the agent works the box says the message is queued, and when the agent had ended the shell is told to follow the same agent as it goes on. A message to an ended agent is handed to the feed the moment it is sent, since its continuation takes seconds to write its first line, and taken back if the send fails.
 - **A refusal** - the daemon's reason is shown as an alert, the text stays in the box, and nothing is reported as queued or resumed.
 - **The slot: Stop, Resume, or send** - the empty box's corner holds "Stop agent" while the agent works and "Resume" once it was stopped; typing swaps in the send arrow.
 - **The line above the box** - what a send will do from here: queued, continues, resumes, or answer the question above.

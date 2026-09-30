@@ -69,7 +69,9 @@ Pushing it too was the earlier rule and was dropped: a cleanup could publish `ma
 - An `agent-*` branch whose tip is reachable from another name's remote-tracking ref, on
   any remote, holds nothing of its own: it goes with its checkout unpushed, deleted with
   `-D`: git's own merged test asks the wrong question. Its own copy does not count: any
-  remote-tracking ref whose name ends in `/<branch>`, and its upstream. Pushed means on
+  remote-tracking ref whose name ends in `/<branch>` or `/<birth branch>`. Not its
+  upstream: no push here sets one, since that writes the shared `.git/config` a running
+  agent's own git command may hold the lock on. Pushed means on
   `origin`, the only remote the package pushes to. Both reads take the local
   remote-tracking refs, never a fetch: the push that put a tip there wrote them.
 - The caller may name a pushed commit through the library, not from the command line: the

@@ -311,10 +311,10 @@ test('a branch renamed after its birth name was pushed is pushed under its new n
   const git = nodeGitRunner()
   try {
     await commitWork(path)
-    await git(['push', '-q', '--set-upstream', 'origin', 'agent-run1'], path)
+    await git(['push', '-q', 'origin', 'agent-run1'], path)
     await git(['branch', '-m', 'agent-run1', 'agent-renamed'], path)
-    // The tip is on the remote under the old name only — the branch's own tracked copy, not
-    // another name holding it. So it is not "empty": it is pushed under the name it has now.
+    // The tip is on the remote under the birth name only — the branch's own copy, not another
+    // name holding it. Pushed with no upstream, as every push here is: the birth name says so. So it is not "empty": it is pushed under the name it has now.
     assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: true })
     assert.match(await git(['show', 'refs/remotes/origin/agent-renamed:index.html'], repo), /Welcome!/, 'pushed under the new name')
     assert.equal((await git(['rev-parse', '--verify', 'refs/heads/agent-renamed'], repo)).trim().length, 40, 'and the local branch stays')

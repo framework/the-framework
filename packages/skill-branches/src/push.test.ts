@@ -51,6 +51,8 @@ test('push: a clean checkout\'s branch reaches origin; a dirty tree is refused b
     await commitWork(path)
     assert.deepEqual(await pushCheckout(path), { ok: true, branch: 'agent-a1', pushed: true })
     assert.equal(await onOrigin(repo, 'agent-a1'), (await git(['rev-parse', 'HEAD'], path)).trim())
+    // No upstream is written: that takes the shared `.git/config` lock a running agent's own git command may need.
+    assert.equal(await git(['config', '--get', 'branch.agent-a1.remote'], repo).catch(() => ''), '', 'no upstream set')
     assert.deepEqual(await pushCheckout(join(path, '..')), { ok: false, reason: 'not-a-worktree' })
   } finally {
     await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })

@@ -99,7 +99,7 @@ export async function reclaimWorktree(repo: string, path: string, opts: ReclaimO
   let emptyBranch = false
   if (opts.heldBy && (await coveredBy(path, branch, opts.heldBy, git))) {
     // A tip inside a commit the remote already has: nothing to push (#1601).
-  } else if (await branchHoldsNothing(repo, branch, git)) {
+  } else if (await branchHoldsNothing(repo, branch, opts.birthBranch, git)) {
     // A branch whose tip the remote already has under another name — an agent that committed
     // nothing (#1650). The rule is satisfied before any push: what the checkout holds *is* on
     // the remote, so the checkout goes. The branch goes with it only when it was minted for an
@@ -163,23 +163,20 @@ async function coveredBy(path: string, branch: string, anchor: string, git: GitR
  * reachable from some remote-tracking branch *other than the branch's own* — a commit `origin`
  * already has under another name, so nothing on the branch is unique to it. Its own remote copy
  * does not count: a pushed branch with a PR contains its own tip and is exactly the branch that
- * must stay. The branch's own copy is the one under its name, and the one it tracks — a branch
- * renamed after it was pushed (#1725) still tracks the remote copy under its old name, and that
- * copy holding the tip proves nothing about another name having it. Read from the local
+ * must stay. The branch's own copies are the one under its name and the one under its birth
+ * name — a branch renamed after it was pushed (#1725) left its remote copy under the old name,
+ * and that copy holding the tip proves nothing about another name having it. Read from the local
  * remote-tracking refs, which are only ever behind the remote: a tip they do not cover yet
  * answers false, and the caller falls back to the push.
  */
-async function branchHoldsNothing(repo: string, branch: string, git: GitRunner): Promise<boolean> {
-  const upstream = await git(['rev-parse', '--abbrev-ref', `${branch}@{upstream}`], repo).then(
-    out => out.trim(),
-    () => undefined,
-  )
+async function branchHoldsNothing(repo: string, branch: string, birthBranch: string | undefined, git: GitRunner): Promise<boolean> {
+  const own = [branch, birthBranch].filter(name => name !== undefined).map(name => `/${name}`)
   return git(['branch', '--remotes', '--contains', `refs/heads/${branch}`, '--format=%(refname:short)'], repo).then(
     out =>
       out
         .split('\n')
         .map(line => line.trim())
-        .some(name => name !== '' && !name.endsWith(`/${branch}`) && name !== upstream),
+        .some(name => name !== '' && !own.some(suffix => name.endsWith(suffix))),
     () => false,
   )
 }

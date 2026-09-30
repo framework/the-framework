@@ -171,14 +171,18 @@ export function gitReason(err: unknown): string {
   return lines.find(line => /^(fatal|error|remote):/i.test(line)) ?? lines[0] ?? 'git failed'
 }
 
-/** Push a branch to `origin`, setting its upstream. The failure is git's own line, not a stack. */
+/**
+ * Push a branch to `origin`. The failure is git's own line, not a stack. No upstream is set:
+ * that writes the repository's shared `.git/config`, whose lock a coding agent's own `git config`
+ * or `git push -u` in another checkout of the clone would then fail on.
+ */
 export async function pushBranch(
   repo: string,
   branch: string,
   git: GitRunner = nodeGitRunner(),
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    await git(['push', '--set-upstream', 'origin', branch], repo)
+    await git(['push', 'origin', branch], repo)
     return { ok: true }
   } catch (err) {
     return { ok: false, error: gitReason(err) }

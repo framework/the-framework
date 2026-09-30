@@ -8,7 +8,7 @@ import { GIT_READ_TIMEOUT_MS, GIT_WRITE_TIMEOUT_MS, GIT_SLOW_TIMEOUT_MS, gitTime
  */
 const BUDGETS: { args: string[]; ms: number }[] = [
   // The network and a whole checkout: the two the flat 10s budget was killing.
-  { args: ['push', '--set-upstream', 'origin', 'agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
+  { args: ['push', 'origin', 'agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
   { args: ['worktree', 'add', '-b', 'agent-1', '/wt', 'main'], ms: GIT_SLOW_TIMEOUT_MS },
   { args: ['worktree', 'add', '/wt', 'agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
   { args: ['clone', 'https://example.com/repo.git', '/dest'], ms: GIT_SLOW_TIMEOUT_MS },
@@ -61,7 +61,7 @@ test('the git budgets stay split rather than collapsing to one number (#997)', (
 
 test('gitTimeoutMs: a slow op gets far longer than a read (#997)', () => {
   assert.ok(
-    gitTimeoutMs(['push', '--set-upstream', 'origin', 'b']) > gitTimeoutMs(['rev-parse', 'HEAD']) * 2,
+    gitTimeoutMs(['push', 'origin', 'b']) > gitTimeoutMs(['rev-parse', 'HEAD']) * 2,
     'push must not run under a read budget',
   )
   assert.ok(
@@ -103,10 +103,10 @@ test('gitTimeoutMs: an inline `--opt=value` global option carries its own value'
 
 test('a failed push comes back as an error rather than throwing', async () => {
   const git: GitRunner = async () => {
-    throw new Error('no upstream configured')
+    throw new Error('no remote configured')
   }
   const result = await pushBranch('/repo', 'b', git)
-  assert.deepEqual(result, { ok: false, error: 'no upstream configured' })
+  assert.deepEqual(result, { ok: false, error: 'no remote configured' })
 })
 
 test('a timed-out push says so instead of reading like a rejected push (#997)', async () => {
@@ -118,7 +118,7 @@ test('a timed-out push says so instead of reading like a rejected push (#997)', 
   const error = result.ok === false ? result.error : ''
   // A SIGTERM'd push has empty stderr, so this used to surface as a bare 'Command failed: git push'.
   assert.match(error, /timed out after 120000ms/)
-  assert.match(error, /push --set-upstream origin b/)
+  assert.match(error, /push origin b/)
 })
 
 test('a timeout is distinguishable from a git rejection (#997)', () => {
@@ -128,7 +128,7 @@ test('a timeout is distinguishable from a git rejection (#997)', () => {
 
 test("a push failure shows git's reason, not the command echoed back", () => {
   // execFile buries the useful line under its own 'Command failed:' preamble.
-  const err = new Error("Command failed: git push --set-upstream origin b\nfatal: 'origin' does not appear to be a git repository\n")
+  const err = new Error("Command failed: git push origin b\nfatal: 'origin' does not appear to be a git repository\n")
   assert.equal(gitReason(err), "fatal: 'origin' does not appear to be a git repository")
   assert.equal(gitReason(new Error('something odd')), 'something odd')
 })

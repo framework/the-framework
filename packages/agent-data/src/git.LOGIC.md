@@ -18,7 +18,7 @@ Runs git for the whole product: one runner executes `git` in a directory, resolv
 - **A timeout is its own kind of failure** - a git killed for outrunning its budget fails as a timeout, recognizable across packages, distinct from a git that rejected the operation.
 - **The line worth showing** - a failed invocation is summarized by git's own `fatal:`, `error:` or `remote:` line, else its first line, else "git failed".
 - **Inside a repository, and where its checkout starts** - whether a directory is inside a git working tree, answered "no" whenever git cannot say, and the root of the checkout a directory is in.
-- **Pushing a branch to origin** - one push that sets the branch's upstream, whose failure is reported as git's reason rather than thrown.
+- **Pushing a branch to origin** - one push that writes nothing to the repository's config, whose failure is reported as git's reason rather than thrown.
 
 ## Business logic
 
@@ -76,4 +76,4 @@ Whether a directory sits inside a git working tree is answered by git, and only 
 
 #### Business logic
 
-A branch is pushed to `origin` with its upstream set. The result is success, or failure carrying the line worth showing; nothing is thrown. A push killed on its budget reports the timeout line, which names the command and the budget.
+A branch is pushed to `origin`, and no upstream is set: that would write the repository's shared config, whose lock a coding agent's own `git config` or `git push -u` running at that moment in another checkout of the clone would fail on. The result is success, or failure carrying the line worth showing; nothing is thrown. A push killed on its budget reports the timeout line, which names the command and the budget.

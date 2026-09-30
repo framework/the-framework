@@ -1,4 +1,4 @@
-The dashboard's right rail: a narrow column beside the main pane holding the tabs the installed modules [10] add for the project (the Files module's "Files" tab first of all), then the views [1] the selected agent [2] pushed, and the project's `PLAN`/`TODO` documents. A module's tab is always offered where the project has the module; the rail's own two panels are earned by having something in them, and a rail with no tab left is not drawn at all.
+The dashboard's right rail: a narrow column beside the main pane holding the tabs the installed modules [10] add for the project (the Files module's "Files" tab first of all), then the views [1] the selected agent [2] pushed, and the project's `PLAN`/`TODO` documents. A module's tab is given the selected agent and how many events its feed has shown, so it can read again as the agent works. A module's tab is always offered where the project has the module; the rail's own two panels are earned by having something in them, and a rail with no tab left is not drawn at all.
 
 ## Context
 

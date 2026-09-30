@@ -22,6 +22,17 @@ afterEach(cleanup)
 // The conversation view: the user's prompt is its own YOU row, the agent's reply is AGENT and
 // renders as Markdown, and a long message collapses to its first line (#1035 follow-up).
 describe('EventList conversation rows', () => {
+  test("the agent's session id is not a row: it is plumbing, read by the run's menu", () => {
+    const events: FrameworkEvent[] = [
+      { kind: 'driver', event: { type: 'start', prompt: 'hello' } },
+      { kind: 'session-update', sessionId: '88cd200f-6f76-4e3e-b694-b161ea9b5e3e' },
+      { kind: 'driver', event: { type: 'text', text: 'hi' } },
+    ]
+    render(<EventList events={events} stick={false} />)
+    expect(screen.queryByText(/88cd200f/)).toBeNull()
+    expect(screen.queryByText('resume')).toBeNull()
+  })
+
   test('a message just sent shows at once as the last prompt, a YOU row of its own', () => {
     const events: FrameworkEvent[] = [
       { kind: 'driver', event: { type: 'start', prompt: 'first' } },

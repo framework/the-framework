@@ -98,6 +98,14 @@ describe('FileTree (#815)', () => {
     await waitFor(() => expect(screen.getByText('made-by-run.ts')).toBeTruthy(), { timeout: 3_000 })
   })
 
+  test('the agent doing something reads the tree again at once, not on the next poll', async () => {
+    const { rerender } = render(<FileTree projectId="p1" agentId="run-1" activity={3} context={context()} />)
+    await waitFor(() => expect(screen.getByText('README.md')).toBeTruthy())
+    readTree.mockResolvedValue({ source: 'checkout', files: [...files, 'hello.txt'], changes: { 'hello.txt': { status: 'added', committed: false } } })
+    rerender(<FileTree projectId="p1" agentId="run-1" activity={4} context={context()} />)
+    await waitFor(() => expect(screen.getByText('hello.txt')).toBeTruthy(), { timeout: 1_500 })
+  })
+
   test('a run whose changes are gone says so, instead of showing the project unmarked', async () => {
     readTree.mockResolvedValue({ source: 'gone' })
     render(<FileTree projectId="p1" agentId="run-1" context={context()} />)

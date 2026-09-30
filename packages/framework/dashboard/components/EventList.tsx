@@ -309,7 +309,8 @@ export function EventList({
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
   const screenRows = useMemo(() => foldScreenRows(events), [events])
-  const logged = promptFirst(events).filter(e => !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
+  // The agent's session id is plumbing, not conversation: the run's ⋮ menu reads it from the events.
+  const logged = promptFirst(events).filter(e => e.kind !== 'session-update' && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
   const shown: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>

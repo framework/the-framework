@@ -127,6 +127,12 @@ export interface ModulePanelProps {
   projectId: string
   /** The run whose page this is; absent on the project's own page. */
   agentId?: string
+  /**
+   * How many events the run's feed has shown: it grows each time the agent does something, so a
+   * tab showing what the agent changes reads again then, rather than on its next poll. Absent on
+   * the project's own page.
+   */
+  activity?: number
   context: ModuleContext
 }
 

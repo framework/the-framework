@@ -421,6 +421,7 @@ export function App() {
             files={files}
             context={context}
             toggleContext={toggleContext}
+            activity={events.length}
             // The launcher shows Docs/History in its main column (#1455 items 2/3): exactly when
             // renderMain resolves to ProjectHome — a project selected, no run
             // one), on the default view. Session views keep the full rail.

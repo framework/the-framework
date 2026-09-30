@@ -45,7 +45,7 @@ The module's browser part's default export is its definition. `pages` lists the 
 
 #### Business logic
 
-`panels` lists the tabs a module adds to the side rail. Each has an `id`, unique among the module's own; a `label`; a `help`, the tab's tooltip; an optional `count`, a number shown beside the label from what the tab is given (none when absent or zero); and the `Panel` component. A tab is rendered with the project on screen (`projectId`), the agent whose page it is (`agentId`, absent on the project's own page) and `context`: the Context's [6] files as repo-relative paths, and `toggle(path)`, which adds the path to the Context or takes it out.
+`panels` lists the tabs a module adds to the side rail. Each has an `id`, unique among the module's own; a `label`; a `help`, the tab's tooltip; an optional `count`, a number shown beside the label from what the tab is given (none when absent or zero); and the `Panel` component. A tab is rendered with the project on screen (`projectId`), the agent whose page it is (`agentId`, absent on the project's own page), `activity`, how many events the agent's feed has shown (it grows each time the agent does something, so a tab showing what the agent changes reads again then rather than on its next poll; absent on the project's own page), and `context`: the Context's [6] files as repo-relative paths, and `toggle(path)`, which adds the path to the Context or takes it out.
 
 `run` holds a module's run slots [5]: an optional `summary` and an optional `details` component. Each is rendered with the project, the agent (`agentId`), `working`, true while the agent's coding agent is still working (an agent that ended or stopped on a question is not), and `expanded`, true while the action bar is open.
 

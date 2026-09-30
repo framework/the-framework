@@ -160,7 +160,7 @@ const EMPTY_MARKS: Record<string, FileMark> = {}
 
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)
 
-export function FileTree({ projectId, agentId, context }: ModulePanelProps) {
+export function FileTree({ projectId, agentId, activity, context }: ModulePanelProps) {
   const host = useModuleHost()
   const [query, setQuery] = useState('')
 
@@ -178,6 +178,13 @@ export function FileTree({ projectId, agentId, context }: ModulePanelProps) {
     8_000,
     [projectId, agentId],
   )
+  // The agent did something: its files may have changed, so they are read again now rather than on
+  // the next poll. A burst of events is one read, a moment after the last.
+  useEffect(() => {
+    if (activity === undefined) return
+    const timer = setTimeout(reloadTree, 300)
+    return () => clearTimeout(timer)
+  }, [activity, reloadTree])
   // A run still starting has its checkout within seconds: asked again sooner than the poll.
   const pending = runTree?.source === 'pending' || runTree?.source === 'starting'
   useEffect(() => {

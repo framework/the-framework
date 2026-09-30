@@ -63,7 +63,7 @@ With no agent selected, the project's files and the per-file status of the proje
 
 #### Business logic
 
-With an agent [2] selected, the tree is read for that agent from the module's server part, and read again every 8 seconds (the source rules in `src/tree.ts`). The answer is the list of files and the marks together, from one place:
+With an agent [2] selected, the tree is read for that agent from the module's server part, and read again every 8 seconds, and a moment (300 ms) after each new event in the agent's feed, since the agent may have just changed a file; a burst of events is one read (the source rules in `src/tree.ts`). The answer is the list of files and the marks together, from one place:
 
 - its checkout, while it exists: captioned "From the run’s checkout";
 - else its branch, on this machine or origin's copy of it: captioned "From branch <branch>";

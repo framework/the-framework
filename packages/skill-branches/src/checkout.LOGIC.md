@@ -19,7 +19,7 @@ Makes a checkout [1] as an agent [2] gets it, in one sequence whichever surface 
 
 ## Business logic — TL;DR
 
-- **A new agent's checkout** - a worktree on the fresh birth branch [6] `agent-<agent id>`, from the base the caller names or the project's head, then settled.
+- **A new agent's checkout** - a worktree on the fresh birth branch [6] `agent-<agent id>`, from the base the caller names or origin's default branch (`worktree.ts`), then settled.
 - **A continued agent's checkout** - a worktree on the branch the caller names, the one the agent's work is on, then settled the same way.
 - **What a checkout gets besides its files** - `.branches/` hidden from git, the user's dependency trees linked in, the `branches` skill and any further skills the caller names linked in, and the branch links reconciled, in that order.
 - **Only the worktree can fail the caller** - a checkout missing any of the rest is a worse agent, not a failed one.

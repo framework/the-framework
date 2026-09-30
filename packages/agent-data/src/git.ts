@@ -156,6 +156,20 @@ export async function isGitRepo(cwd: string, git: GitRunner = nodeGitRunner()): 
     .catch(() => false)
 }
 
+/**
+ * Origin's default branch, as this clone's remote-tracking ref (`origin/main`): what origin's HEAD
+ * points at, else `origin/main` or `origin/master`, whichever the clone has. Where every new agent
+ * branch starts. Read locally, never fetched; undefined for a clone with none (no remote).
+ */
+export async function originDefaultBranch(repo: string, git: GitRunner = nodeGitRunner()): Promise<string | undefined> {
+  const head = await git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], repo).then(out => out.trim(), () => '')
+  if (head) return head
+  for (const ref of ['origin/main', 'origin/master']) {
+    if (await git(['rev-parse', '--verify', '--quiet', `refs/remotes/${ref}`], repo).then(out => out.trim() !== '', () => false)) return ref
+  }
+  return undefined
+}
+
 /** The root of the checkout `cwd` is in — an agent's own, from anywhere under it. Rejects outside a repo. */
 export async function checkoutRoot(cwd: string, git: GitRunner = nodeGitRunner()): Promise<string> {
   return (await git(['rev-parse', '--show-toplevel'], cwd)).trim()

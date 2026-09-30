@@ -19,6 +19,7 @@ import {
   worktreePath,
   currentBranch,
   listWorktreeDirs,
+  FRESH_START_FETCH_MS,
 } from './worktree.js'
 import { agentBranchName } from './branch-names.js'
 
@@ -42,18 +43,19 @@ test('worktreePath nests the checkout under .branches/, named as its branch (#15
   assert.equal(worktreePath(REPO, '2026-07-19T10-00-00-000Z'), join(REPO, BRANCHES_DIR, 'agent-2026-07-19T10-00-00-000Z'))
 })
 
-test('addWorktree builds `worktree add -b <branch> <path>` and returns the path + branch', async () => {
+test('addWorktree builds `worktree add --no-track -b <branch> <path>` when the repo has no origin, and returns the path + branch', async () => {
   const git = recordingGit()
   const added = await addWorktree(REPO, { agentId: 'run1', branch: 'agent-run1' }, git)
   const path = worktreePath(REPO, 'run1')
   assert.deepEqual(added, { path, branch: 'agent-run1' })
-  assert.deepEqual(git.calls, [{ args: ['worktree', 'add', '-b', 'agent-run1', path], cwd: REPO }])
+  assert.deepEqual(git.calls.at(-1), { args: ['worktree', 'add', '--no-track', '-b', 'agent-run1', path], cwd: REPO })
+  assert.equal(git.calls.some(call => call.args[0] === 'fetch'), false, 'no origin, nothing to fetch')
 })
 
-test('addWorktree appends the base ref when given', async () => {
+test('addWorktree appends the base ref when given, and fetches nothing', async () => {
   const git = recordingGit()
-  await addWorktree(REPO, { agentId: 'run1', branch: 'b', base: 'origin/main' }, git)
-  assert.deepEqual(git.calls[0]?.args, ['worktree', 'add', '-b', 'b', worktreePath(REPO, 'run1'), 'origin/main'])
+  await addWorktree(REPO, { agentId: 'run1', branch: 'b', base: 'origin/feature' }, git)
+  assert.deepEqual(git.calls, [{ args: ['worktree', 'add', '--no-track', '-b', 'b', worktreePath(REPO, 'run1'), 'origin/feature'], cwd: REPO }])
 })
 
 test('addWorktree rejects an unsafe agent id before touching git (no traversal out of .branches/)', async () => {
@@ -140,9 +142,9 @@ test('add/list/remove round-trips against a real git repo', async () => {
   }
 })
 
-test('attachWorktree recreates a branch that is gone from HEAD, and still refuses one git will not attach (#1650)', async () => {
+test('attachWorktree recreates a branch that is gone, from HEAD in a repo with no remote, and still refuses one git will not attach (#1650)', async () => {
   // The only branch the package deletes held nothing past a commit the remote already had, so
-  // continuing that agent on a fresh branch from HEAD puts it exactly where it was.
+  // continuing that agent on a fresh branch loses nothing of it.
   const git = nodeGitRunner()
   const repo = await realpath(await mkdtemp(join(tmpdir(), 'worktree-')))
   try {
@@ -164,6 +166,103 @@ test('attachWorktree recreates a branch that is gone from HEAD, and still refuse
     await assert.rejects(() => attachWorktree(repo, { agentId: 'run2', branch: head }, git))
   } finally {
     await rm(repo, { recursive: true, force: true })
+  }
+})
+
+/** A repo with an origin that has `main`, the user's own checkout on `my-feature` with a commit origin lacks. */
+async function repoOnUnpushedFeature(git: GitRunner): Promise<{ repo: string; base: string; main: string; feature: string }> {
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'worktree-')))
+  const repo = join(base, 'repo')
+  await mkdir(repo)
+  await git(['init', '-q', '-b', 'main'], repo)
+  await git(['config', 'user.email', 't@t'], repo)
+  await git(['config', 'user.name', 't'], repo)
+  await writeFile(join(repo, 'README.md'), '# t\n')
+  await git(['add', '-A'], repo)
+  await git(['commit', '-q', '-m', 'init'], repo)
+  await git(['init', '-q', '--bare', join(base, 'origin.git')], base)
+  await git(['remote', 'add', 'origin', join(base, 'origin.git')], repo)
+  await git(['push', '-q', 'origin', 'main'], repo)
+  await git(['fetch', '-q', 'origin'], repo)
+  const main = (await git(['rev-parse', 'HEAD'], repo)).trim()
+  await git(['checkout', '-q', '-b', 'my-feature'], repo)
+  await writeFile(join(repo, 'secret.txt'), 'not ready\n')
+  await git(['add', '-A'], repo)
+  await git(['commit', '-q', '-m', 'unpushed work'], repo)
+  return { repo, base, main, feature: (await git(['rev-parse', 'HEAD'], repo)).trim() }
+}
+
+test('a new agent branch starts from origin’s default branch, never the branch the user has out, and sets no upstream', async () => {
+  const git = nodeGitRunner()
+  const { repo, base, main } = await repoOnUnpushedFeature(git)
+  try {
+    const { path } = await addWorktree(repo, { agentId: 'run1', branch: 'agent-run1' }, git)
+    assert.equal((await git(['rev-parse', 'HEAD'], path)).trim(), main, 'on origin/main, without the unpushed commit')
+    assert.equal(await git(['config', '--get', 'branch.agent-run1.remote'], repo).catch(() => ''), '', 'no upstream: the shared config is not written')
+  } finally {
+    await rm(base, { recursive: true, force: true })
+  }
+})
+
+test('a new agent branch starts from origin’s latest, fetched: a commit pushed from elsewhere is in it', async () => {
+  const git = nodeGitRunner()
+  const { repo, base } = await repoOnUnpushedFeature(git)
+  try {
+    // Someone else pushes to main; this clone has not fetched it.
+    const other = join(base, 'other')
+    await git(['clone', '-q', join(base, 'origin.git'), other], base)
+    await git(['config', 'user.email', 't@t'], other)
+    await git(['config', 'user.name', 't'], other)
+    await git(['commit', '-q', '--allow-empty', '-m', 'from elsewhere'], other)
+    await git(['push', '-q', 'origin', 'main'], other)
+    const latest = (await git(['rev-parse', 'HEAD'], other)).trim()
+    const { path } = await addWorktree(repo, { agentId: 'run1', branch: 'agent-run1' }, git)
+    assert.equal((await git(['rev-parse', 'HEAD'], path)).trim(), latest)
+  } finally {
+    await rm(base, { recursive: true, force: true })
+  }
+})
+
+test('a fetch that hangs holds a new agent branch back 5 seconds at most, then it starts from the copy the clone has', async () => {
+  const real = nodeGitRunner()
+  const { repo, base, main } = await repoOnUnpushedFeature(real)
+  // The network hangs: the fetch never answers.
+  const git: GitRunner = (args, cwd) => (args[0] === 'fetch' ? new Promise<string>(() => {}) : real(args, cwd))
+  try {
+    const started = Date.now()
+    const { path } = await addWorktree(repo, { agentId: 'run1', branch: 'agent-run1' }, git)
+    const waited = Date.now() - started
+    assert.ok(waited >= FRESH_START_FETCH_MS - 100 && waited < FRESH_START_FETCH_MS + 3_000, `waited ${waited}ms`)
+    assert.equal((await real(['rev-parse', 'HEAD'], path)).trim(), main)
+  } finally {
+    await rm(base, { recursive: true, force: true })
+  }
+})
+
+test('a follow-up whose branch is gone gets it back from origin’s default branch, never the branch the user has out', async () => {
+  const git = nodeGitRunner()
+  const { repo, base, main } = await repoOnUnpushedFeature(git)
+  try {
+    const { path } = await attachWorktree(repo, { agentId: 'run1', branch: 'agent-run1' }, git)
+    assert.equal(await currentBranch(path, git), 'agent-run1')
+    assert.equal((await git(['rev-parse', 'HEAD'], path)).trim(), main, 'on origin/main, without the unpushed commit')
+    assert.equal(await git(['config', '--get', 'branch.agent-run1.remote'], repo).catch(() => ''), '', 'no upstream')
+  } finally {
+    await rm(base, { recursive: true, force: true })
+  }
+})
+
+test('a follow-up whose branch only origin has gets origin’s copy, with no upstream set', async () => {
+  const git = nodeGitRunner()
+  const { repo, base, feature } = await repoOnUnpushedFeature(git)
+  try {
+    await git(['push', '-q', 'origin', 'my-feature:agent-pushed'], repo)
+    await git(['fetch', '-q', 'origin'], repo)
+    const { path } = await attachWorktree(repo, { agentId: 'run2', branch: 'agent-pushed' }, git)
+    assert.equal((await git(['rev-parse', 'HEAD'], path)).trim(), feature, 'the branch as origin has it')
+    assert.equal(await git(['config', '--get', 'branch.agent-pushed.remote'], repo).catch(() => ''), '', 'no upstream')
+  } finally {
+    await rm(base, { recursive: true, force: true })
   }
 })
 

@@ -8,9 +8,13 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The checkout
 - One checkout per agent, a git worktree of the user's repository under `.branches/`,
-  branched from the project's head unless the caller names a base. Agents run in parallel,
-  and the user's own copy is never an agent's workspace. A worktree, not a clone, so every
-  checkout shares the repository's objects and refs.
+  branched from origin's default branch, fetched first (5 seconds at most, then the local
+  copy), unless the caller names a base, as Claude Code's own worktrees do by default.
+  Agents run in parallel, and the user's own copy is never an agent's workspace. The
+  project's head was the earlier rule and was dropped: it is whatever the user has checked
+  out, so an agent built on the user's unpushed work and its push published it. A
+  repository with no remote still starts from the head: there is nothing else. A worktree,
+  not a clone, so every checkout shares the repository's objects and refs.
 - The repository's exclude file hides `.branches/` from the first checkout on: an
   untracked folder at the root would ride a sweeping `git add -A` onto a code branch, and
   `.gitignore` is tracked.
@@ -42,9 +46,9 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   push cannot land on someone else's branch. The branch the checkout carries right now,
   suffix included, is not counted.
 - Continuing an agent puts it back on the branch its work is on, even one the package did
-  not make; a branch gone locally comes back from a remote's copy when exactly one remote
-  has it (git's own guess), and one git cannot restore that way is recreated from the
-  project's head: every branch the package deletes held nothing the remote lacked.
+  not make; a branch gone locally comes back from origin's copy, and one gone everywhere is
+  recreated from origin's default branch, as a new checkout starts: every branch the
+  package deletes held nothing the remote lacked.
 - The user's installed dependencies are linked into the checkout, not copied or
   reinstalled: one link per entry of the folder, absolute, so an install in the checkout
   writes into the checkout. A scope like `@acme` is mirrored the same way one level down,

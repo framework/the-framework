@@ -1,6 +1,6 @@
 import { basename, dirname, join } from 'node:path'
 import { realpath, stat } from 'node:fs/promises'
-import { nodeGitRunner, checkoutRoot, type GitRunner, BRANCHES_DIR } from '@gemstack/agent-data'
+import { nodeGitRunner, checkoutRoot, originDefaultBranch, type GitRunner, BRANCHES_DIR } from '@gemstack/agent-data'
 import { AGENT_BRANCH_PREFIX, isSafeAgentId, isAgentBranch, agentBranchName, agentIdFromWorktreeDir } from './branch-names.js'
 import { DATA_BRANCH } from '@gemstack/agent-data/names'
 
@@ -72,7 +72,7 @@ export interface AddWorktreeOptions {
   agentId: string
   /** The branch to create for the agent. */
   branch: string
-  /** Base ref to branch from; defaults to the repo's current HEAD. */
+  /** Base ref to branch from; defaults to origin's default branch ({@link freshStart}). */
   base?: string
 }
 
@@ -82,9 +82,36 @@ export interface AddedWorktree {
   branch: string
 }
 
+/** How long a new agent branch waits for origin's default branch to be fetched: Claude Code's own cap. */
+export const FRESH_START_FETCH_MS = 5_000
+
 /**
- * Create a worktree for an agent on a fresh branch: `git worktree add -b <branch>
- * <path> [base]`. Git makes the leaf dir (and any missing parents) itself. The
+ * Where a new agent branch starts: origin's default branch, fetched first so it is current. Never
+ * the project's HEAD: that is whatever the user has checked out, unpushed work included, and a
+ * branch started there publishes that work when the agent's branch is pushed. The fetch is waited
+ * for {@link FRESH_START_FETCH_MS} at most, and one that fails (offline) or runs longer leaves the
+ * copy this clone already has; a fetch still running finishes on its own. A repository with no
+ * remote has no such branch: undefined, and git starts from HEAD, the only commit there is.
+ */
+async function freshStart(repo: string, git: GitRunner): Promise<string | undefined> {
+  const start = await originDefaultBranch(repo, git)
+  if (!start) return undefined
+  const fetched = git(['fetch', '--quiet', '--no-write-fetch-head', 'origin', start.slice('origin/'.length)], repo).catch(() => {})
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const capped = new Promise<void>(resolve => {
+    timer = setTimeout(resolve, FRESH_START_FETCH_MS)
+    timer.unref()
+  })
+  await Promise.race([fetched, capped])
+  clearTimeout(timer)
+  return start
+}
+
+/**
+ * Create a worktree for an agent on a fresh branch: `git worktree add --no-track -b <branch>
+ * <path> <base>`, the base origin's default branch unless the caller names one. No upstream:
+ * tracking writes the repository's shared `.git/config`, whose lock a running agent's own git
+ * command in another checkout may hold. Git makes the leaf dir (and any missing parents) itself. The
  * `agentId` is validated as path-safe first so a caller can never traverse out of
  * `.branches/`. Rejects on any git failure (a caller that wants a
  * run needs its checkout, so failure must surface, not be swallowed).
@@ -96,19 +123,20 @@ export async function addWorktree(
 ): Promise<AddedWorktree> {
   if (!isSafeAgentId(opts.agentId)) throw new Error(`unsafe agent id: ${opts.agentId}`)
   const path = worktreePath(repo, opts.agentId)
-  await git(['worktree', 'add', '-b', opts.branch, path, ...(opts.base ? [opts.base] : [])], repo)
+  const base = opts.base ?? (await freshStart(repo, git))
+  await git(['worktree', 'add', '--no-track', '-b', opts.branch, path, ...(base ? [base] : [])], repo)
   return { path, branch: opts.branch }
 }
 
 /**
- * Check an *existing* branch out into an agent's worktree (#762): `git worktree add <path> <branch>`,
- * no `-b`. Continuing an agent puts it back on the branch its work is already on, rather than
- * branching again from HEAD and stranding what it did last time.
- *
- * A branch that is gone is recreated from HEAD (#1650): the only branch the package deletes is
- * one that held nothing past a commit the remote already had, so HEAD is where its work was.
- * Anything else git refuses — the branch checked out elsewhere, say — still rejects, like
- * {@link addWorktree}: a continued agent needs its checkout.
+ * Check an *existing* branch out into an agent's worktree (#762). Continuing an agent puts it back
+ * on the branch its work is already on, rather than branching again and stranding what it did
+ * last time. The branch as this clone has it; else origin's copy, as a new local branch with no
+ * upstream set, as in {@link addWorktree}; else, gone everywhere, a new branch where a new agent
+ * branch starts ({@link freshStart}): the only branch the package deletes is one that held nothing
+ * past a commit the remote already had, so nothing of the agent's is lost. Anything git refuses —
+ * the branch checked out elsewhere, say — rejects, like {@link addWorktree}: a continued agent
+ * needs its checkout.
  */
 export async function attachWorktree(
   repo: string,
@@ -117,17 +145,12 @@ export async function attachWorktree(
 ): Promise<AddedWorktree> {
   if (!isSafeAgentId(opts.agentId)) throw new Error(`unsafe agent id: ${opts.agentId}`)
   const path = worktreePath(repo, opts.agentId)
-  try {
+  const has = (ref: string) => git(['rev-parse', '--verify', '--quiet', ref], repo).then(out => out.trim() !== '', () => false)
+  if (await has(`refs/heads/${opts.branch}`)) {
     await git(['worktree', 'add', path, opts.branch], repo)
-  } catch (err) {
-    // `worktree add <path> <name>` also resolves a remote-only `origin/<name>`, so the existence
-    // check comes after the attempt, not before it.
-    const exists = await git(['show-ref', '--verify', '--quiet', `refs/heads/${opts.branch}`], repo).then(
-      () => true,
-      () => false,
-    )
-    if (exists) throw err
-    await git(['worktree', 'add', '-b', opts.branch, path], repo)
+  } else {
+    const base = (await has(`refs/remotes/origin/${opts.branch}`)) ? `origin/${opts.branch}` : await freshStart(repo, git)
+    await git(['worktree', 'add', '--no-track', '-b', opts.branch, path, ...(base ? [base] : [])], repo)
   }
   return { path, branch: opts.branch }
 }

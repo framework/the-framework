@@ -24,7 +24,7 @@ Gives an agent [1] in a shell, the user, and the dashboard's server the `branche
 - **Where a command acts** - `create`, `attach`, `show`, `list`, `remove`, `prune` and `push --branch` act on the project found from the `.branches/` layout, even from inside a checkout; `name`, `status` and a bare `push` act on the checkout the command runs in.
 - **Outside a repository** - a command that needs one is refused as `not-a-repo`; only git's own "not a git repository" reads as that.
 - **An agent id is checked before anything runs** - `create`, `attach` and `remove` refuse an id outside the charset, or `data`, as `invalid-id`, before the repository is even looked for.
-- **`create`: a checkout for a new agent** - `.branches/agent-<id>` on the fresh branch `agent-<id>`, from `--base` or the project's head, fully set up.
+- **`create`: a checkout for a new agent** - `.branches/agent-<id>` on the fresh branch `agent-<id>`, from `--base` or origin's default branch, fully set up.
 - **`attach`: a checkout for a continued agent** - `.branches/agent-<id>` on the branch named, taken as given, fully set up.
 - **`name`: the agent names its work** - the branch becomes `agent-<name>`, suffixed when taken, the name got is printed, and the branch links follow at once; four refusals.
 - **`status`: where the agent is and whether it may finish** - the checkout's path, its branch, whether it is clean and whether it is on the remote; refused for a directory git does not know as a worktree.
@@ -94,7 +94,7 @@ See `## Context`.
 
 #### Business logic
 
-`create <id> [--base <ref>]` makes the checkout [2] for a new agent [1]: `.branches/agent-<id>` on the fresh branch `agent-<id>`, from `--base` when given and from the project's head otherwise, set up with the user's dependencies, the skill [3] links and the branch links [6] (the sequence is in `checkout.ts`). The result is `{"ok": true, "path": …, "branch": …}`. A branch or directory that already exists is git's own failure, `git-failed`.
+`create <id> [--base <ref>]` makes the checkout [2] for a new agent [1]: `.branches/agent-<id>` on the fresh branch `agent-<id>`, from `--base` when given and from origin's default branch otherwise (the project's head in a repository with no remote; `worktree.ts`), set up with the user's dependencies, the skill [3] links and the branch links [6] (the sequence is in `checkout.ts`). The result is `{"ok": true, "path": …, "branch": …}`. A branch or directory that already exists is git's own failure, `git-failed`.
 
 ### `attach`: a checkout for a continued agent
 
@@ -104,7 +104,7 @@ See `## Context`.
 
 #### Business logic
 
-`attach <id> <branch>` makes the checkout [2] for a continued agent [1] on the branch named, taken as given, a `/` in it included: `.branches/agent-<id>` with that branch checked out, recreated from the remote's copy when it is gone locally and from the project's head when it is gone everywhere (`worktree.ts`), then set up exactly as `create` does. The result is `{"ok": true, "path": …, "branch": …}`.
+`attach <id> <branch>` makes the checkout [2] for a continued agent [1] on the branch named, taken as given, a `/` in it included: `.branches/agent-<id>` with that branch checked out, recreated from origin's copy when it is gone locally and from origin's default branch when it is gone everywhere (`worktree.ts`), then set up exactly as `create` does. The result is `{"ok": true, "path": …, "branch": …}`.
 
 ### `name`: the agent names its work
 

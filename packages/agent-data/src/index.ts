@@ -6,6 +6,7 @@ export {
   nodeGitRunner,
   isGitRepo,
   checkoutRoot,
+  originDefaultBranch,
   gitReason,
   pushBranch,
 } from './git.js'

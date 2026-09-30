@@ -17,7 +17,7 @@ export interface CheckoutSkills {
   skills?: readonly SkillLink[]
 }
 
-/** A new agent's checkout, on a fresh `agent-<id>` branch from `base` or the project's head. */
+/** A new agent's checkout, on a fresh `agent-<id>` branch from `base` or origin's default branch. */
 export async function createCheckout(
   repo: string,
   opts: { agentId: string; base?: string } & CheckoutSkills,

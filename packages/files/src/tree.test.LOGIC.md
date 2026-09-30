@@ -6,7 +6,7 @@ What the tests cover, against a real git repository with worktrees, branches and
 - **A squash merge** - once the branch is gone, the commit the agent's pull request merged as is read, with that commit's own change marked.
 - **A true merge** - a branch the default branch already contains is read from its merge commit instead; with no merge commit to read, the branch still answers.
 - **Changed nothing** - an agent that finished `done` on this machine with no checkout, its recorded branch missing and no pull request answers the default branch's last commit: its files listed with nothing marked, a file's content as the default branch holds it, and no diff; an agent that `failed` on this machine answers the same.
-- **Gone** - with its recorded branch missing and no pull request, an agent on this machine that is `running`, `waiting` or `stopped`, an agent from another machine, and an agent whose record names no machine all answer gone; so do an agent that finished `done` on this machine whose pull request's merge commit this machine has not fetched, and one whose branch's pull request has a number that is not the agent's.
+- **Gone** - with its recorded branch missing and no pull request, an agent on this machine that is `waiting` or `stopped`, an agent from another machine, and an agent whose record names no machine all answer gone; so do an agent that finished `done` on this machine whose pull request's merge commit this machine has not fetched, and one whose branch's pull request has a number that is not the agent's.
 - **Still looking** - while the pull request lookup has not answered and there is no branch, the answer is that it is not known yet.
 - **A file deleted on disk** - has no content to show.
 
@@ -15,3 +15,4 @@ What the tests cover, against a real git repository with worktrees, branches and
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch.
 [2] fork point: the commit where an agent's branch left the project's default branch.
 [3] the agent's facts: what the dashboard tells a module's server part about one agent: its checkout while it has one, its record, whether it finished on this machine having changed nothing, and the commit a pull request merged as.
+- **Starting** - an agent the host does not know yet, one recorded `running` with no checkout, and one running on another machine whose branch is not here all answer pending, not gone.

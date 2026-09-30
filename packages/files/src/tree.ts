@@ -23,7 +23,7 @@ export type AgentFilesAt =
   | { source: 'merge'; number: number; ref: string; base?: string }
   /** The run changed nothing: the project's default branch, where no path is marked. */
   | { source: 'unchanged'; ref: string }
-  /** The run's pull request is still being looked up: the next read knows. */
+  /** The run is starting and has no checkout yet, or its pull request is still being looked up: a later read knows. */
   | { source: 'pending' }
   | { source: 'gone' }
 
@@ -77,14 +77,14 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
   const root = host.root
   const ask = asker(git, root)
   const run = await host.run(agentId).catch(() => undefined)
-  if (!run) return { source: 'gone' }
-  if (run.checkout) {
+  if (run?.checkout) {
     const base = await forkPoint(asker(git, run.checkout), 'HEAD')
     return { source: 'checkout', path: run.checkout, ...(base ? { base } : {}) }
   }
-
-  const record = run.record
-  if (!record) return { source: 'gone' }
+  // Nothing known of the run yet: it is starting. A run writes its record, then makes its
+  // checkout, seconds after the page that started it opened.
+  const record = run?.record
+  if (!record) return { source: 'pending' }
   const branch = record.branch
 
   let onBranch: AgentFilesAt | undefined
@@ -116,6 +116,8 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
     const ref = main && (await commitOf(ask, main))
     if (ref) return { source: 'unchanged', ref }
   }
+  // Recorded running, with no checkout and no branch here yet: still starting, not gone.
+  if (record.status === 'running') return { source: 'pending' }
   return { source: 'gone' }
 }
 

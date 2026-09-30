@@ -13,7 +13,7 @@ The Files module's server part: the five reads its browser part makes, each give
 ## Business logic — TL;DR
 
 - **`project`** - every file of the project's checkout, with each file changed on disk marked, all uncommitted.
-- **`tree`** - an agent's files wherever they are now, what it changed marked; gone for an input with no agent or for an agent the dashboard does not know.
+- **`tree`** - an agent's files wherever they are now, what it changed marked; pending for an agent the dashboard does not know yet (it is starting), gone for an input with no agent.
 - **`diff`** - one changed file's diff: the agent's, from the same place its tree is read; without an agent, the project checkout's uncommitted change, its status taken from git and never from the browser.
 - **`content`** - one unchanged file's contents, from the same place.
 - **`changes`** - a working agent's changed files with their line counts, from its own checkout only.

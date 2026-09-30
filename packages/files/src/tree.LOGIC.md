@@ -18,7 +18,7 @@ Reads an agent's [1] files for the Files module's side-rail tab on the agent's p
 
 ## Business logic — TL;DR
 
-- **Where the files are read from** - the checkout the agent's facts [5] name; else the branch the agent recorded, this machine's copy first, then origin's copy; else the commit the agent's recorded pull request merged as; else, for an agent that finished on this machine [4], the default branch with nothing marked; else gone. Nothing is fetched and nothing is copied.
+- **Where the files are read from** - the checkout the agent's facts [5] name; else the branch the agent recorded, this machine's copy first, then origin's copy; else the commit the agent's recorded pull request merged as; else, for an agent that finished on this machine [4], the default branch with nothing marked; else, for an agent the dashboard does not know yet or one recorded `running`, pending (it is starting: its record and its checkout come seconds after the page that started it opened); else gone. Nothing is fetched and nothing is copied.
 - **A branch already merged into the default branch** - it shows no change against the default branch, so the merge commit is read instead when this machine has it.
 - **What is marked** - in a checkout, what the agent committed since the fork point [3] and what is on disk uncommitted, apart; on a branch, what changed since the fork point; at a merge commit, that commit's own change.
 - **What is listed** - every file at the source's last state, plus the files the agent deleted.
@@ -42,7 +42,8 @@ The sources are tried in this order, and the first one that exists answers:
 2. The branch the agent recorded: this machine's branch of that name, else origin's copy of it (`origin/<branch>`) as this machine last fetched it.
 3. The commit the agent's pull request merged as. The agent must have recorded a pull request. The dashboard is asked which commit that pull request, by its number, of the agent's branch merged as, and it must name one. That commit must be on this machine: a pull request merged on the git host after this machine last fetched is not read yet.
 4. The project's default branch [3], as its last commit on this machine, when the agent finished on this machine [4]: the agent changed nothing (see "An agent that changed nothing").
-5. Gone: an agent with neither a checkout nor a record; an agent that did not finish on this machine, including one `running`, `waiting` or `stopped`, one from another machine and one whose record names no machine; an agent with a recorded pull request whose branch and merge commit are not on this machine; and an agent for which no default branch is found.
+5. Pending: an agent with neither a checkout nor a record, and one recorded `running`: it is starting, and its checkout is made seconds after its page opened (or it runs on another machine whose branch is not here yet). Asked again, a later read finds it.
+6. Gone: an agent that did not finish on this machine, including one `waiting` or `stopped`, one from another machine and one whose record names no machine; an agent with a recorded pull request whose branch and merge commit are not on this machine; and an agent for which no default branch is found.
 
 Nothing is ever fetched: the tab polls, and a fetch on every poll would be a network call. The git host is asked through the dashboard, which keeps its answers in the shared cache its other pull request reads use.
 

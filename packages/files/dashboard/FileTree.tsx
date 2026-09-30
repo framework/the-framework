@@ -1,4 +1,4 @@
-import { useMemo, useState, type ElementType, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react'
 import { Check, FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react'
 import { cn, useModuleHost, usePolled, type ModulePanelProps } from 'framework/module'
 import type { ProjectTree } from '../src/server.js'
@@ -171,12 +171,19 @@ export function FileTree({ projectId, agentId, context }: ModulePanelProps) {
     8_000,
     [projectId, agentId],
   )
-  const { value: runTree, loaded: treeLoaded } = usePolled<AgentTree | null>(
+  const { value: runTree, loaded: treeLoaded, reload: reloadTree } = usePolled<AgentTree | null>(
     agentId ? () => readTree(host, projectId, agentId) : null,
     null,
     8_000,
     [projectId, agentId],
   )
+  // A run still starting has its checkout within seconds: asked again sooner than the poll.
+  const pending = runTree?.source === 'pending'
+  useEffect(() => {
+    if (!pending) return
+    const timer = setInterval(reloadTree, 2_000)
+    return () => clearInterval(timer)
+  }, [pending, reloadTree])
   const runFiles = runTree && 'files' in runTree ? runTree : undefined
   const shown = agentId ? (runFiles?.files ?? EMPTY_FILES) : projectTree.files
   const marks = agentId ? (runFiles?.changes ?? EMPTY_MARKS) : projectTree.changes

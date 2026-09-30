@@ -1,15 +1,22 @@
 {
   "id": "2026-09-30T10-10-54-592Z",
   "startedAt": "2026-09-30T10:10:54.690Z",
-  "status": "running",
+  "endedAt": "2026-09-30T10:11:05.172Z",
+  "status": "done",
   "intent": "Create a file hello.txt containing \"hi\"",
   "driver": "claude-code",
-  "model": "opus",
+  "model": "claude-opus-5-5",
+  "branch": "agent-2026-09-30T10-10-54-592Z",
+  "cost": 0.0504248,
   "caller": {
     "runner": {
       "host": "Suleimans-MacBook-Pro.local",
       "pid": 12593
     },
-    "host": "Suleimans-MacBook-Pro.local"
+    "pid": 12593,
+    "host": "Suleimans-MacBook-Pro.local",
+    "kind": "prompt",
+    "workspace": "/Users/suleiman/Projects/gemstack/.branches/agent-2026-09-30T10-10-54-592Z",
+    "sessionId": "03f8a064-97a3-4824-981d-0dcfcbe97a53"
   }
 }

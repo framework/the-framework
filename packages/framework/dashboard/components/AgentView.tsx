@@ -119,10 +119,13 @@ export function AgentView({
 
   // What the branch holds (#1023), read once for both the bar and the detail it opens. Read once
   // the agent stops rather than once the process does: while it is still writing to the branch
-  // there is nothing to hand off yet, but a parked session's branch is finished work. Not while
-  // the card says saving either: the checkout is being cleaned up then, and an empty branch is
-  // deleted with it, so an Open PR offered in that window turned into "Branch gone" moments later.
-  const handoff = useAgentHandoff(projectId, agentId, live === false && !card?.saving)
+  // there is nothing to hand off yet, but a parked session's branch is finished work. While the
+  // card says saving, the checkout is being cleaned up, and an empty branch is deleted with it, so
+  // an Open PR offered then turned into "Branch gone" moments later: the answer is only shown then
+  // for a branch already on the remote with commits of its own, which the clean-up keeps.
+  const read = useAgentHandoff(projectId, agentId, live === false, card?.saving === true)
+  const kept = read.handoff !== null && read.handoff.exists && read.handoff.pushed && !read.handoff.empty
+  const handoff = card?.saving && !kept ? { ...read, handoff: null, loaded: false } : read
   const [open, setOpen] = useState(false)
   // What the installed modules add to this run's page: a summary in the bar, details under it.
   const { runSlots: mountedSlots } = useMountedModules()

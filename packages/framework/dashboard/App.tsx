@@ -243,6 +243,13 @@ export function App() {
   // The agent whose feed and controls are in play is simply the one in the URL; in the no-id
   // fallback there is none yet, and a null id resolves to the project root, as before.
   const { events, lost, writing } = useLiveEvents(projectId, agentId, agentStart.tick)
+  // The run's feed says it ended before the runs poll does: read the runs now, so its page stops
+  // reading as running (and its handoff is read) without waiting up to a poll for it.
+  const ends = events.filter(e => e.kind === 'end').length
+  useEffect(() => {
+    if (ends > 0) reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ends])
   // The rail's views stay scoped to the newest `session` segment even though an agent's feed no
   // longer is (a resumed session appends a second segment to the same journal). Choice gates
   // are no longer folded here: they live inline in the transcript (#1455 items 6/7), where

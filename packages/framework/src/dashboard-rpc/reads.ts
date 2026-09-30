@@ -173,7 +173,7 @@ export async function onAgentWorktree(projectId: string, agentId: string): Promi
     // but a reused pinned branch has a predecessor's PR history.
     const since = startedAtFromAgentId(agentId)
     const [status, live] = await Promise.all([
-      readGitStatus(checkout.path, since !== undefined ? { since } : {}).catch(() => undefined),
+      readGitStatus(checkout.path, { prRoot: root, ...(since !== undefined ? { since } : {}) }).catch(() => undefined),
       readLiveMetas(root).catch(() => []),
     ])
     // Size is only read for a checkout nothing is writing to: a live agent's tree changes under the

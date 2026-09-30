@@ -25,7 +25,11 @@ export type AgentHandoffState = {
  */
 export const PR_PENDING_MS = 300
 
-export function useAgentHandoff(projectId: string, agentId: string | null | undefined, enabled = true): AgentHandoffState {
+/**
+ * `saving`: the run's clean-up is still going (its card says saving); the branch is read again the
+ * moment it is done, since the clean-up may have deleted an empty branch or pushed one.
+ */
+export function useAgentHandoff(projectId: string, agentId: string | null | undefined, enabled = true, saving = false): AgentHandoffState {
   // Polled rather than read once: a push or a PR opened from here (or from a terminal) changes
   // what to offer, and `reload` makes the bar's own actions land immediately. Not read while the
   // run is live (#1026): a branch still being written to has nothing to hand off yet.
@@ -36,7 +40,7 @@ export function useAgentHandoff(projectId: string, agentId: string | null | unde
     enabled && agentId ? () => onAgentHandoff(projectId, agentId) : null,
     null,
     everyMs,
-    [projectId, agentId, enabled, everyMs],
+    [projectId, agentId, enabled, everyMs, saving],
     // Remembered per run: going back to a run shows its last answer at once while it is read
     // again, and a cadence flip (prPending 15s↔1s) keeps the answer rather than blanking the
     // summary for a beat. Another run's answer is never shown.

@@ -126,16 +126,39 @@ describe('AgentView event source (#1026/#1383)', () => {
   })
 })
 
+/** A branch on the remote with a commit of its own and no pull request: what Open PR is offered for. */
+const PUSHED = {
+  branch: 'agent-add-hello2',
+  exists: true,
+  empty: false,
+  hasRemote: true,
+  pushed: true,
+  gitHost: true,
+  commits: [{ sha: 'abc1234', subject: 'Add hello2.txt' }],
+  files: [],
+} as unknown
+
 describe('AgentView branch read', () => {
-  test('what the branch holds is not read while the card says saving, and is read once it stops', async () => {
+  test('while the card says saving, an empty branch is not offered, and the branch is read again once it stops', async () => {
     // The checkout is cleaned up while saving, and an empty branch is deleted with it: an Open PR
     // offered in that window turned into "Branch gone" moments later.
     onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValue({ ...PUSHED, empty: true, pushed: false })
     const { rerender } = render(view({ card: { status: 'done', saving: true } }))
-    await waitFor(() => expect(onAgent).toHaveBeenCalled())
-    expect(onAgentHandoff).not.toHaveBeenCalled()
-    rerender(view({ card: { status: 'done' } }))
     await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledWith('p1', 'run-1'))
+    expect(screen.queryByRole('button', { name: /Open PR/ })).toBeNull()
+    const reads = onAgentHandoff.mock.calls.length
+    onAgentHandoff.mockResolvedValue(PUSHED)
+    rerender(view({ card: { status: 'done' } }))
+    await waitFor(() => expect(onAgentHandoff.mock.calls.length).toBeGreaterThan(reads))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Open PR/ })).toBeTruthy())
+  })
+
+  test('a branch already pushed with commits is offered while the card still says saving: the clean-up keeps it', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValue(PUSHED)
+    render(view({ card: { status: 'done', saving: true } }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Open PR/ })).toBeTruthy())
   })
 })
 

@@ -9,7 +9,7 @@ What the tests cover, for the agent view's choice of which events to show — th
 
 It also covers when the view reads what the agent's branch holds:
 
-- **Not while saving** - while the agent's card is marked saving, the branch is not read; once the mark is gone, it is.
+- **While saving** - while the agent's card is marked saving, an empty branch is not offered, and the branch is read again once the mark is gone, then offered; a branch already pushed with commits is offered while the mark is still there.
 
 And when the action bar is told its facts are ready:
 

@@ -100,7 +100,7 @@ test('a due command under its cap with quota to spare is marked on the branch, t
   assert.equal(marker.status, 'running')
   assert.equal(marker.intent, '/work-queue')
   assert.equal(marker.model, 'opus')
-  assert.deepEqual(marker.caller, { runner: { host: 'this-box' } })
+  assert.deepEqual(marker.caller, { runner: { host: 'this-box' }, host: 'this-box' })
   assert.equal(marker.intent, '/work-queue')
   assert.deepEqual(seen.spawned, [{ id: marker.id, prompt: '/work-queue', model: 'opus' }])
 })
@@ -125,7 +125,7 @@ test('a command with a word after its folder name: the folder is looked up, the 
     { command: 'triage consensual', outcome: 'switched off on this machine' },
   ])
   assert.equal(seen.markers[0]!.intent, '/triage quick')
-  assert.deepEqual(seen.markers[0]!.caller, { runner: { host: 'this-box' } })
+  assert.deepEqual(seen.markers[0]!.caller, { runner: { host: 'this-box' }, host: 'this-box' })
   assert.equal(seen.markers[0]!.intent, '/triage quick')
   assert.deepEqual(seen.spawned, [{ id: '2026-09-16T14-01-00-000Z', prompt: '/triage quick', model: 'opus' }])
   assert.deepEqual(record.schedule, [

@@ -68,7 +68,7 @@ Before anything else, the run's lock [10] is taken for the run's id with this pr
 
 #### Business logic
 
-When the run was not told it is already marked, it writes its marker [3]: a running card with the prompt as the intent, the driver's id, the model and the mark, an empty diary. A marker that could not even be committed is logged as `the run's record could not be written: …` and the run goes on. When the run was told it is marked, nothing is written until the end.
+When the run was not told it is already marked, it writes its marker [3]: a running card with the prompt as the intent, the driver's id, the model and the mark, an empty diary. The marker is pushed while the checkout is made and the agent starts, not before: fetching and pushing it takes seconds, and the person watching the run waits on the agent. Writing it never touches the repository's config, so the agent's own git is never locked out by it. The run's record at its end, including the record of a checkout that could not be made, waits for the marker's write, so it always lands after. A marker that could not even be committed is logged as `the run's record could not be written: …` and the run goes on. When the run was told it is marked, nothing is written until the end.
 
 ### The checkout
 

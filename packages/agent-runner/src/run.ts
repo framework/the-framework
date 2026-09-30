@@ -127,11 +127,18 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
 
   await acquireRunLock(repo, id, { pid, isAlive: opts.isAlive ?? isPidAlive })
   try {
-    // A person's run marks itself; a scheduler's run was marked before it was spawned.
-    if (!opts.marked) {
-      const marked = await writeMarker(repo, markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), mark }), logs)
-      if (!marked.ok && !marked.committed) log(`[agent-runner] the run's record could not be written: ${marked.error}`)
-    }
+    // A person's run marks itself; a scheduler's run was marked before it was spawned. The marker
+    // is pushed while the checkout is made and the agent starts: pushing takes seconds, and the
+    // person watching the run waits on the agent. It never writes `.git/config`, so the agent's own
+    // git is never locked out by it. The run's record waits on it, so it lands after.
+    const marking = opts.marked
+      ? Promise.resolve()
+      : writeMarker(repo, markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), mark }), logs).then(
+          marked => {
+            if (!marked.ok && !marked.committed) log(`[agent-runner] the run's record could not be written: ${marked.error}`)
+          },
+          err => log(`[agent-runner] the run's record could not be written: ${errorMessage(err)}`),
+        )
 
     // The checkout: the branches package's one sequence, on a fresh branch or the one given.
     // Without one there is no run, and the record says so instead of a marker left running.
@@ -141,6 +148,7 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
     } catch (err) {
       const detail = `could not create a checkout: ${errorMessage(err)}`
       const endedAt = clock()
+      await marking
       await recordRun(repo, { ...markerCard({ id, startedAt, prompt: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), mark }), status: 'failed', endedAt }, [{ kind: 'ended', status: 'failed', detail, at: endedAt }], logs)
       return { id, status: 'failed', checkout: { reclaimed: false, reason: 'no checkout' }, detail }
     }
@@ -155,6 +163,7 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
       ...modelOf(opts.model),
       ...(opts.branchPr ? { prBefore: opts.branchPr } : {}),
       continued: false,
+      marking,
       git,
       gitHost: opts.gitHost ?? projectGitHost,
       logs,
@@ -315,6 +324,8 @@ interface SessionRun {
   /** The pull request the run's branch had before this session: its end announces only a new one. */
   prBefore?: { url: string }
   continued: boolean
+  /** The run's own marker being pushed, when it writes one: the record waits on it, so it lands after. */
+  marking?: Promise<void>
   resumeSessionId?: string
   git: GitRunner
   gitHost: GitHost
@@ -433,6 +444,7 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
   const live = driverSession?.log
   const card = (await readLiveCard(run.checkout.path, run.id)) ?? { ...run.card, status, endedAt: run.clock(), branch, ...(pr ? { pr } : {}) }
   const diary = live ? await readLiveDiary(run.checkout.path, run.id) : [...(run.priorDiary ?? []), { kind: 'ended', status, ...(detail !== undefined ? { detail } : {}), at: card.endedAt ?? run.clock() }]
+  await run.marking
   const recorded = await recordRun(repo, card, diary, run.logs)
   if (!recorded.ok && !recorded.committed) run.log(`[agent-runner] the run's record could not be written: ${recorded.error}`)
 

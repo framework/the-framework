@@ -206,6 +206,32 @@ test('a conflicting stranded commit resolves toward origin, and the op re-applie
   }
 })
 
+test('no write touches the repository config: the git config a coding agent runs in its checkout is never locked out', async () => {
+  // Adopting origin's branch, and resolving a conflict toward origin's copy, both start a branch
+  // from origin's: with tracking set up, that writes `.git/config`, and its lock fails an agent's
+  // `git config` or `git push -u` running at the same moment in another checkout of the clone.
+  const { repo, other, cleanup } = await initSyncedRepos()
+  try {
+    const config = join(repo, '.git', 'config')
+    const before = await readFile(config, 'utf8')
+    await otherMachineWrites(other, 'queue.md', '- origin view\n')
+    await ensureFileBranch(repo, BRANCH)
+    assert.equal(await readFile(config, 'utf8'), before, 'adopting origin\'s branch')
+    const wt = await fileBranchPath(repo, BRANCH)
+    await writeFile(join(wt, 'queue.md'), '- stale local view\n')
+    await git(['add', '-A'], wt)
+    await git(['commit', '-m', 'stale'], wt)
+    await otherMachineWrites(other, 'queue.md', '- newer origin view\n')
+    const result = await withFileBranch(repo, BRANCH, 'append', async dir => {
+      await writeFile(join(dir, 'queue.md'), `${await readFile(join(dir, 'queue.md'), 'utf8')}- appended\n`)
+    })
+    assert.equal(result.ok, true)
+    assert.equal(await readFile(config, 'utf8'), before, 'resolving a conflict toward origin')
+  } finally {
+    await cleanup()
+  }
+})
+
 test('a push lost to another writer re-applies the intent once, not twice', async () => {
   const { repo, bare, other, cleanup } = await initSyncedRepos()
   try {

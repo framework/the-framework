@@ -333,8 +333,9 @@ test("the Open PR button titles the request by the name the provider answers for
 test('a run changed nothing when its own tool ended it here, done or failed, with no pull request', () => {
   assert.equal(leftNothing({ status: 'done', host: 'here' }, 'here'), true)
   assert.equal(leftNothing({ status: 'failed', host: 'here' }, 'here'), true)
-  // The sweep marks a run whose process died `stopped`: its tool never recorded the branch's last name.
-  assert.equal(leftNothing({ status: 'stopped', host: 'here' }, 'here'), false)
+  // A Stop records the branch's last name; the sweep marks a dead run `stopped` only when it left no checkout.
+  assert.equal(leftNothing({ status: 'stopped', host: 'here' }, 'here'), true)
+  assert.equal(leftNothing({ status: 'waiting', host: 'here' }, 'here'), false, 'a waiting run keeps its checkout')
   assert.equal(leftNothing({ status: 'done', host: 'there' }, 'here'), false, 'another machine may hold its branch')
   assert.equal(leftNothing({ status: 'done' }, 'here'), false, 'a record that names no machine')
   assert.equal(leftNothing({ status: 'done', host: 'here', pr: { number: 7 } }, 'here'), false, 'its work is on a pull request')

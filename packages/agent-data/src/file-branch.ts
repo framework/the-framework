@@ -119,12 +119,17 @@ function serialize<T>(repo: string, branch: string, lock: CheckoutLockDeps, task
   return next
 }
 
-/** Make the branch exist locally: origin's copy when there is one, else born here, parentless. */
+/**
+ * Make the branch exist locally: origin's copy when there is one, else born here, parentless. Never
+ * tracking (`--no-track`): setting up tracking writes the repository's shared `.git/config`, whose
+ * lock a coding agent's own `git config` or `git push -u` in its checkout would then fail on.
+ * Nothing here reads the upstream: every fetch, rebase and push names `origin` and the branch.
+ */
 async function ensureBranchRef(repo: string, branch: string, git: GitRunner): Promise<void> {
   if (await refExists(repo, `refs/heads/${branch}`, git)) return
   if (await hasRemote(repo, git)) await git(['fetch', 'origin', branch], repo).catch(() => {})
   if (await refExists(repo, `refs/remotes/origin/${branch}`, git)) {
-    await git(['branch', branch, `origin/${branch}`], repo)
+    await git(['branch', '--no-track', branch, `origin/${branch}`], repo)
   } else {
     const commit = (await git(['commit-tree', EMPTY_TREE, '-m', `create the ${branch} branch`], repo)).trim()
     await git(['branch', branch, commit], repo)
@@ -215,7 +220,7 @@ async function syncCore(repo: string, branch: string, r: Resolved): Promise<void
     await r.git(['rebase', `origin/${branch}`], path)
   } catch {
     await r.git(['rebase', '--abort'], path).catch(() => {})
-    await r.git(['checkout', '--force', '-B', branch, `origin/${branch}`], path)
+    await r.git(['checkout', '--force', '--no-track', '-B', branch, `origin/${branch}`], path)
   }
 }
 

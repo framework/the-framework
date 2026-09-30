@@ -26,7 +26,7 @@ See `## Context`.
 
 #### Business logic
 
-The id must look like an agent id (letters, digits, `-` and `_`); anything else is never looked up. The checkout is the one the project's branches provider lists for the agent, asked afresh on a miss; the project's root is never given in its place. The record is the agent's as the project keeps it. "Changed nothing" is the dashboard's one rule, the same the handoff read uses (`agent-handoff.ts`): the agent ended `done` or `failed` on this machine, by its record's machine, and has no pull request. An agent with neither a checkout nor a record has no facts.
+The id must look like an agent id (letters, digits, `-` and `_`); anything else is never looked up. The checkout is the one the project's branches provider lists for the agent, asked afresh on a miss; the project's root is never given in its place. The record is the agent's as the project keeps it. "Changed nothing" is the dashboard's one rule, the same the handoff read uses (`agent-handoff.ts`): the agent ended `done`, `failed` or `stopped` on this machine, by its record's machine, and has no pull request. An agent with neither a checkout nor a record has no facts.
 
 ### A pull request's merge commit
 

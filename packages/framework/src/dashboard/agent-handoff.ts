@@ -123,14 +123,15 @@ export function agentBranchFor(agent: { id: string; branch?: string }): string |
 }
 
 /**
- * Whether a run whose branch is gone changed nothing (#1850): it ended `done` or `failed` on this
- * machine, and has no pull request. Such a run's own tool recorded the branch's last name as it
- * ended and then reclaimed the checkout, and the branches rule deletes a branch with the checkout
- * only when it holds nothing. A run another machine ran, or one whose process died before its tool
- * could record the end (the sweep marks that one `stopped`), leaves no such proof.
+ * Whether a run whose branch is gone changed nothing (#1850): it ended `done`, `failed` or
+ * `stopped` on this machine, and has no pull request. Such a run's own tool recorded the branch's
+ * last name as it ended, a Stop included, and then reclaimed the checkout, and the branches rule
+ * deletes a branch with the checkout only when it holds nothing. A run whose process died is marked
+ * `stopped` by the sweep only when it left no checkout, so it had nowhere to keep a change. A run
+ * another machine ran leaves no such proof here, and one `waiting` keeps its checkout.
  */
 export function leftNothing(agent: { status?: string; host?: string; pr?: unknown }, host: string = hostname()): boolean {
-  return !agent.pr && (agent.status === 'done' || agent.status === 'failed') && agent.host === host
+  return !agent.pr && (agent.status === 'done' || agent.status === 'failed' || agent.status === 'stopped') && agent.host === host
 }
 
 /**

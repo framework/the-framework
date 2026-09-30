@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { spawn } from 'node:child_process'
-import { Readable, Writable } from 'node:stream'
-import { AgentExitError, runCliSession, type AgentCliParser, type SpawnLike, type SpawnedProcess } from './cli-session.js'
+import { PassThrough, Readable, Writable } from 'node:stream'
+import { AgentExitError, runCliSession, type AgentCliParser, type CliIo, type SpawnLike, type SpawnedProcess } from './cli-session.js'
 import type { DriverEvent } from './types.js'
 
 test('runCliSession streams the parser events and resolves the final turn', async () => {
@@ -169,4 +169,69 @@ test('a non-zero exit sends the reason as an error event, and fails the turn wit
     return true
   })
   assert.deepEqual(events.at(-1), { type: 'error', message: "You've hit your usage limit." })
+})
+
+test('a parser that converses writes to the CLI as it reads, and stdin stays open until it ends it', async () => {
+  const stdout = new PassThrough()
+  const written: string[] = []
+  let ended = false
+  const stdin = new Writable({
+    write: (chunk, _e, cb) => (written.push(String(chunk)), cb()),
+    final: cb => ((ended = true), stdout.end(), cb()),
+  })
+  const proc: SpawnedProcess = {
+    stdout,
+    stderr: Readable.from([]),
+    stdin,
+    on(event, listener) {
+      if (event === 'close') stdout.on('end', () => setImmediate(() => (listener as (c: number | null) => void)(0)))
+      return proc
+    },
+    kill: () => undefined,
+  }
+  let io: CliIo | undefined
+  const parser: AgentCliParser = {
+    converse: given => ((io = given), given.write('hello')),
+    push: line => {
+      if (line === 'ready') io!.write('go')
+      if (line === 'done') io!.end()
+      return []
+    },
+    result: () => ({ text: 'answered' }),
+  }
+  const promise = runCliSession({ bin: 'agent', args: [], cwd: '/ws', env: {}, prompt: 'the prompt', spawn: () => proc, emit: () => {}, signals: [], driver: 'agent', parser })
+  stdout.write('ready\n')
+  await new Promise(resolve => setImmediate(resolve))
+  // Neither the prompt written whole nor stdin closed: the parser speaks for itself.
+  assert.deepEqual(written, ['hello\n', 'go\n'])
+  assert.equal(ended, false)
+  stdout.write('done\n')
+  assert.deepEqual(await promise, { text: 'answered' })
+  assert.equal(ended, true)
+})
+
+test('a turn the parser says failed fails, even when the process exits 0', async () => {
+  const run = (failure: string) => {
+    const stdout = Readable.from([])
+    const proc: SpawnedProcess = {
+      stdout,
+      stderr: Readable.from([]),
+      stdin: new Writable({ write: (_c, _e, cb) => cb() }),
+      on(event, listener) {
+        if (event === 'close') stdout.on('end', () => (listener as (c: number | null) => void)(0))
+        return proc
+      },
+      kill: () => undefined,
+    }
+    return runCliSession({ bin: 'agent', args: [], cwd: '/ws', env: {}, prompt: 'go', spawn: () => proc, emit: () => {}, signals: [], driver: 'agent', parser: { push: () => [], result: () => ({ text: 'half an answer' }), failure: () => failure } })
+  }
+  await assert.rejects(run('The model is not supported.'), (err: unknown) => {
+    assert.ok(err instanceof AgentExitError)
+    // "failed", not "exited (0)": the process ended fine, the turn did not.
+    assert.equal(err.message, 'agent failed: The model is not supported.')
+    assert.equal(err.exit, 'agent failed')
+    return true
+  })
+  // Failed without a reason: its output stopped before the turn ended. The partial text is no reason.
+  await assert.rejects(run(''), /agent failed: the turn did not finish/)
 })

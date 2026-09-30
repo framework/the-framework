@@ -7,7 +7,7 @@ Gives every driver session [1] the pieces that are not specific to any coding ag
 [3] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a thought, a tool used, the final result, a rate limit reading, an error, a notice.
 [4] stop request: the caller's signal that a driver session, or one turn of it, must end now; the product raises one when the user stops the agent.
 [5] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
-[6] framing: the standing instructions a caller gives a driver session, plus any extra instructions for one turn; the driver delivers them as the coding agent's system prompt, or ahead of the prompt when the coding agent has no system prompt flag.
+[6] framing: the standing instructions a caller gives a driver session, plus any extra instructions for one turn; the driver delivers them apart from the prompt when the coding agent takes such instructions (Claude Code's system prompt, Codex's developer instructions), or ahead of the prompt when it does not.
 [7] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
 
 ## Business logic — TL;DR

@@ -224,3 +224,45 @@ describe('useLiveEvents reconnect keeps the feed (#1383)', () => {
     await waitFor(() => expect(feed()).toBe('a,b,c'))
   })
 })
+
+// The message the agent is writing streams in as the text so far, beside the feed and never in it.
+describe('useLiveEvents message being written', () => {
+  function Writing() {
+    const { events, writing } = useLiveEvents('p1', 'run-a')
+    return (
+      <span>
+        {events.length} events, writing: [{writing}]
+      </span>
+    )
+  }
+  const said = (text: string) => ({ kind: 'driver', event: { type: 'text', text } })
+
+  test('shows the text so far, replaces it with the whole message, and ignores its pieces read a beat late', async () => {
+    const ch = fakeChannel()
+    onEvents.mockResolvedValue(ch.channel)
+    render(<Writing />)
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
+    ch.push({ kind: 'partial', text: 'Rivers car' })
+    await waitFor(() => expect(screen.getByText('0 events, writing: [Rivers car]')).toBeTruthy())
+    ch.push(said('Rivers carve valleys.'))
+    await waitFor(() => expect(screen.getByText('1 events, writing: []')).toBeTruthy())
+    // The live file read after the diary line, before the file was removed: not shown twice.
+    ch.push({ kind: 'partial', text: 'Rivers carve valleys.' })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(screen.getByText('1 events, writing: []')).toBeTruthy()
+    ch.push({ kind: 'partial', text: '' })
+    ch.push({ kind: 'partial', text: 'Next' })
+    await waitFor(() => expect(screen.getByText('1 events, writing: [Next]')).toBeTruthy())
+  })
+
+  test('a run that ends writes nothing more', async () => {
+    const ch = fakeChannel()
+    onEvents.mockResolvedValue(ch.channel)
+    render(<Writing />)
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
+    ch.push({ kind: 'partial', text: 'Half a' })
+    await waitFor(() => expect(screen.getByText('0 events, writing: [Half a]')).toBeTruthy())
+    ch.push({ kind: 'end', ok: false, stopped: true })
+    await waitFor(() => expect(screen.getByText('1 events, writing: []')).toBeTruthy())
+  })
+})

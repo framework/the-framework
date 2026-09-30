@@ -329,6 +329,12 @@ export type DriverEvent =
   /** An assistant text chunk streamed out. */
   | { type: 'text'; text: string }
   /**
+   * The message the agent is writing, as far as it has got: the whole text so far, not the newest
+   * piece. Its `text` event follows once the message is whole. Live only: a log keeps it beside the
+   * diary for a watcher to read, and never in the diary. A driver whose CLI sends no pieces sends none.
+   */
+  | { type: 'partial'; text: string }
+  /**
    * The agent used a tool: its name, and `detail`, the one argument that says what it did (the
    * command, the file, the URL, the skill), on one line and cut short. A tool whose arguments hold
    * none of those has no `detail`.

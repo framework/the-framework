@@ -22,6 +22,8 @@ export interface LiveEvents {
   lost: boolean
   /** The server closed the channel on purpose (relay stream ended, unknown run) — final. */
   done: boolean
+  /** The message the agent is writing, as far as it has got; empty when it is writing none. Never in `events`. */
+  writing: string
 }
 
 /** Retry delays for a lost stream: quick first, then settle at a slow poll. */
@@ -43,6 +45,7 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
   const [events, setEvents] = useState<FrameworkEvent[]>([])
   const [lost, setLost] = useState(false)
   const [done, setDone] = useState(false)
+  const [writing, setWriting] = useState('')
 
   // Drop the accumulated feed at a run boundary the caller knows about (a fresh Start bumps
   // `resetKey`), WITHOUT tearing down the subscription. The new run's diary appears a beat later,
@@ -51,12 +54,14 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
   // the new run instead, and the live tail streams it in as soon as its diary exists.
   useEffect(() => {
     setEvents([])
+    setWriting('')
   }, [resetKey])
 
   useEffect(() => {
     setEvents([])
     setLost(false)
     setDone(false)
+    setWriting('')
     if (!projectId) return
     let channel: EventChannel | undefined
     let cancelled = false
@@ -95,6 +100,8 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
         attempt = 0
         setLost(false)
         let buffer: FrameworkEvent[] | undefined = reconnect ? [] : undefined
+        // The whole message just arrived: its pieces, read a beat late, would show it twice.
+        let finished = ''
         const swap = () => {
           if (cancelled || buffer === undefined) return
           const replay = buffer
@@ -107,6 +114,15 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
           if (event.kind === 'stream-sync') {
             swap()
             return
+          }
+          if (event.kind === 'partial') {
+            setWriting(event.text === finished ? '' : event.text)
+            return
+          }
+          // A whole message replaces its pieces, and a run that ended writes nothing more.
+          if ((event.kind === 'driver' && event.event.type === 'text') || event.kind === 'end') {
+            finished = event.kind === 'driver' && event.event.type === 'text' ? event.event.text : ''
+            setWriting('')
           }
           if (buffer) buffer.push(event)
           else setEvents(prev => [...prev, event])
@@ -139,5 +155,5 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
   // resumed session (#762) appends to the SAME journal, where slicing is exactly wrong: it hid
   // everything before the resume for as long as the agent was live. See {@link currentAgentEvents}.
   const scoped = useMemo(() => (agentId ? events : currentAgentEvents(events)), [events, agentId])
-  return { events: scoped, lost, done }
+  return { events: scoped, lost, done, writing }
 }

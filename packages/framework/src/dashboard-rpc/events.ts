@@ -1,7 +1,7 @@
 import { fromDiaryLine, resolveAgentDiary, type AgentDiarySource, type AnyDiaryLine } from '../store/index.js'
 import { contextEventsSource, resolveProjectPath } from './context.js'
 import type { FrameworkEvent } from '../events.js'
-import { tailAgentEvents } from './events-tail.js'
+import { partialReader, tailAgentEvents } from './events-tail.js'
 import { forwardStream } from './stream-forward.js'
 
 // The live event stream behind the dashboard (#405): the selected run's diary, the file the run's
@@ -23,8 +23,15 @@ async function resolveEventsDiary(projectId: string, agentId?: string): Promise<
  */
 export type StreamSync = { kind: 'stream-sync' }
 
-/** What `onEvents` streams: the agent's events, plus the wire-only end-of-replay marker. */
-export type LiveFeedEvent = FrameworkEvent | StreamSync
+/**
+ * The message the agent is writing, as far as it has got (the run's live file, beside its diary);
+ * empty once there is none. Wire-only like {@link StreamSync}: the pieces are never in the diary,
+ * and the page shows them until the whole message's line arrives.
+ */
+export type PartialMessage = { kind: 'partial'; text: string }
+
+/** What `onEvents` streams: the agent's events, plus the wire-only end-of-replay marker and partial message. */
+export type LiveFeedEvent = FrameworkEvent | StreamSync | PartialMessage
 
 /**
  * Follow one agent's events: `send` is called per event until the returned stop function runs.
@@ -65,5 +72,6 @@ export async function streamAgentEvents(
       if (event) send(event)
     },
     () => send({ kind: 'stream-sync' }),
+    partialReader(text => send({ kind: 'partial', text })),
   )
 }

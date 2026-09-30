@@ -208,7 +208,8 @@ export class ClaudeCodeSession implements DriverSession {
   }
 
   private buildArgs(system: string, resumeId?: string): string[] {
-    const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose']
+    // `--include-partial-messages`: the reply also comes in pieces as it is written, before the whole message.
+    const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages']
     if (this.config.dangerouslySkipPermissions) args.push('--dangerously-skip-permissions')
     else args.push('--permission-mode', this.config.permissionMode ?? 'acceptEdits')
     // Resume the same conversation for a chat turn (#714). Skip the system append then:
@@ -281,6 +282,8 @@ export class StreamJsonParser {
   private assistantText = ''
   private sessionId?: string
   private usage?: DriverUsage
+  /** The text block being written, as far as its pieces have got. */
+  private partial = ''
 
   /** Feed one line; returns the events it produced (may be empty). */
   push(line: string): DriverEvent[] {
@@ -312,6 +315,7 @@ export class StreamJsonParser {
     }
 
     if (type === 'assistant') return [...announced, ...this.handleAssistant(obj)]
+    if (type === 'stream_event') return [...announced, ...this.handlePiece(obj['event'])]
     if (type === 'rate_limit_event') {
       const limit = parseRateLimit(obj)
       return limit ? [...announced, { type: 'rate-limit', limit }] : announced
@@ -324,6 +328,25 @@ export class StreamJsonParser {
       return announced // The `result` event is emitted by the runner after `close`.
     }
     return announced
+  }
+
+  /**
+   * One piece of the message being written: a text block starts empty, and each piece of it adds
+   * to the text so far. Thinking and tool input come in pieces too; they are said once whole.
+   */
+  private handlePiece(event: unknown): DriverEvent[] {
+    if (typeof event !== 'object' || event === null) return []
+    const e = event as Record<string, unknown>
+    if (e['type'] === 'content_block_start') {
+      this.partial = ''
+      return []
+    }
+    const delta = e['delta']
+    if (e['type'] !== 'content_block_delta' || typeof delta !== 'object' || delta === null) return []
+    const d = delta as Record<string, unknown>
+    if (d['type'] !== 'text_delta' || typeof d['text'] !== 'string' || d['text'] === '') return []
+    this.partial += d['text']
+    return [{ type: 'partial', text: this.partial }]
   }
 
   private handleAssistant(obj: Record<string, unknown>): DriverEvent[] {

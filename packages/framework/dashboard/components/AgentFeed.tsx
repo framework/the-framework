@@ -11,6 +11,7 @@ import { EventList } from './EventList.js'
 export function AgentFeed({
   events,
   lost = false,
+  writing = '',
   stick = true,
   openAt,
   emptyLabel = 'Waiting for the session to start…',
@@ -25,6 +26,8 @@ export function AgentFeed({
   projectId: string
   agentId?: string | null | undefined
   lost?: boolean
+  /** The message the agent is writing, as far as it has got: a row after the last, growing as it comes. */
+  writing?: string
   /** A finished log is static (#1026): it does not follow new output, and opens at its end. */
   stick?: boolean
   openAt?: 'start' | 'end'
@@ -52,6 +55,7 @@ export function AgentFeed({
       {lostBanner}
       <EventList
         events={events}
+        writing={writing}
         stick={stick}
         {...(openAt ? { openAt } : {})}
         {...(tail ? { tail } : {})}

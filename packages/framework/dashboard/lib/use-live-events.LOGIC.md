@@ -20,6 +20,7 @@ Follows one agent's [1] event stream [2] live in the browser: the dashboard asks
 - **What is followed** - the selected agent's own stream; with no agent selected, the project's stream; with no project selected, nothing.
 - **Replay then live** - every subscription sends everything already recorded before it starts sending new lines, so a live agent and a past one render identically.
 - **A reconnect never shows less than what is on screen** - the re-sent history is held back and swapped in whole, on the stream's end-of-replay marker or after a short deadline for streams that send none.
+- **The message being written** - kept beside the feed, never in it: each `partial` event replaces it, the whole message or the agent's end clears it, and a late piece equal to the message just finished is not shown again; a new subscription or a fresh start clears it.
 - **A lost stream is reported and retried** - the feed is flagged as behind reality and reconnected with a backoff that settles at one attempt every 8 seconds; an outage never clears the feed.
 - **A stream the daemon ends on purpose is final** - no retry, no alarm.
 - **Following stops** - when the selection changes or the page leaves the agent, the stream is dropped and the feed starts over.

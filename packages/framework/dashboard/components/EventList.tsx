@@ -273,6 +273,7 @@ function Thought({ text }: { text: string }) {
 
 export function EventList({
   events,
+  writing = '',
   stick = true,
   openAt,
   tail,
@@ -280,6 +281,10 @@ export function EventList({
   agentId: agentId,
 }: {
   events: FrameworkEvent[]
+  /** The message the agent is writing, as far as it has got: an AGENT row after the last, shown
+   *  whole as it grows (a finished long message clamps to its first line; one being written would
+   *  hide what is coming in). Never an event: its whole message's row replaces it. */
+  writing?: string
   stick?: boolean
   /** Where a non-following log opens; a replay opens at the outcome (#948), not page one. */
   openAt?: 'start' | 'end'
@@ -361,6 +366,18 @@ export function EventList({
                 </MessageScrollerItem>
               )
             })}
+            {writing && (
+              <MessageScrollerItem messageId="writing" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
+                <span className="w-28 shrink-0">
+                  {shown.length === 0 || rowGroup(shown[shown.length - 1]!) !== 'agent' ? (
+                    <Badge className="mt-0.5 text-[10px] uppercase text-muted-foreground">{eventKindLabel('driver')}</Badge>
+                  ) : null}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <Markdown text={writing} compact />
+                </div>
+              </MessageScrollerItem>
+            )}
             {tail}
           </MessageScrollerContent>
         </MessageScrollerViewport>

@@ -25,6 +25,7 @@ Renders an agent's [1] transcript: every event [2] the agent emitted, one row ea
 
 - **One row per event, as the terminal's line** - every event [2] is one row: a kind badge, the terminal's one-line text for that event, and, on a row that opens a group, the time its diary line was written.
 - **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown, clamped to one line beyond 100 characters and expanding in place on click.
+- **The message being written grows in place** - while the agent writes a message, it is one more agent row after the last, whole rather than clamped so the words can be seen arriving, badged "AGENT" unless the row above is already the agent's; when the whole message arrives, its own row replaces it and clamps as usual.
 - **Thinking stays folded** - a thought of the coding agent renders as one muted "💭 Thinking" line; clicking it opens the thought in place, in italics, and clicking again folds it.
 - **The first prompt opens the transcript** - the first prompt is hoisted above the rows emitted before it, so the transcript starts with what the user asked.
 - **A gate is answered where it happened** - when the transcript knows its project, an open gate [4] renders as the interactive gate panel inline, an answered one as a collapsed card that replaces its "✓ chose" line, and a gate whose agent ended unanswered stays text.

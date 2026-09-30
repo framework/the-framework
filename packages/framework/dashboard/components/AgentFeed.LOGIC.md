@@ -12,4 +12,5 @@ The feed of one agent's [1] events [2] on the agent view: the list of events (`E
 - **The empty feed** - with no events, the feed shows the caller's label, or "Waiting for the session to start…" by default: a running agent is waiting for its first event, and a finished one says it has nothing to replay.
 - **Following and where it opens** - by default the list follows new output as it arrives; a finished agent's feed is told not to follow and to open at its end, where the outcome and the final spend are.
 - **Gates stay answerable** - the feed always knows its project and agent, so a gate's [3] row is rendered as the interaction (an inline panel, or the answered card) and never downgraded to plain text, which would leave an agent parked with nothing to answer it.
+- **The message being written** - handed in by the agent view while the agent runs and passed to the list, which shows it after the last row.
 - **The tail** - content the caller hands in is rendered after the last row inside the scroller, which is where a web agent's cloud mirror box rides.

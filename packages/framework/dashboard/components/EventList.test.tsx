@@ -22,6 +22,14 @@ afterEach(cleanup)
 // The conversation view: the user's prompt is its own YOU row, the agent's reply is AGENT and
 // renders as Markdown, and a long message collapses to its first line (#1035 follow-up).
 describe('EventList conversation rows', () => {
+  test('a quota reading is a row only when the quota is running low or used up', () => {
+    const quota = (status: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'rate-limit', limit: { status, window: 'five_hour', resetsAt: Date.UTC(2026, 8, 30, 11, 30) } } })
+    render(<EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'hello' } }, quota('allowed'), quota('allowed_warning'), quota('rejected')]} stick={false} />)
+    expect(screen.queryByText(/quota allowed/)).toBeNull()
+    expect(screen.getByText(/quota running low/)).toBeTruthy()
+    expect(screen.getByText(/quota exhausted/)).toBeTruthy()
+  })
+
   test("the agent's session id is not a row: it is plumbing, read by the run's menu", () => {
     const events: FrameworkEvent[] = [
       { kind: 'driver', event: { type: 'start', prompt: 'hello' } },

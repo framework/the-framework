@@ -272,6 +272,17 @@ function Thought({ text }: { text: string }) {
   )
 }
 
+/**
+ * Whether an event is a row at all. The agent's session id is plumbing, not conversation: the
+ * run's ⋮ menu reads it from the events. A quota reading is worth a row only when the quota is
+ * running low or used up; the agent reports it after every turn, "allowed" included.
+ */
+function shownAsRow(e: FrameworkEvent): boolean {
+  if (e.kind === 'session-update') return false
+  if (e.kind === 'driver' && e.event.type === 'rate-limit') return e.event.limit.status !== 'allowed'
+  return true
+}
+
 export function EventList({
   events,
   writing = '',
@@ -309,8 +320,7 @@ export function EventList({
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
   const screenRows = useMemo(() => foldScreenRows(events), [events])
-  // The agent's session id is plumbing, not conversation: the run's ⋮ menu reads it from the events.
-  const logged = promptFirst(events).filter(e => e.kind !== 'session-update' && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
+  const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
   const shown: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>

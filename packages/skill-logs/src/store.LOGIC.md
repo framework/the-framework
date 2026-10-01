@@ -26,7 +26,7 @@ The recording program's [1] side of the runs [2]: reads and writes of `agents/<w
 - **Reading one run** - its card, its diary (empty for a run with no diary file), or its two file paths; none for a run that is not there.
 - **Recording a run** - card and diary as one commit, "logs: record run <id>", under the directory of the person the repository commits as, or where the run already sits; an unsafe id is refused before anything is touched.
 - **Patching the late facts** - the branch or the pull request onto the card, as one commit, "logs: patch run <id>"; true once committed even when the push is still owed; false for a run that is not there.
-- **Deleting a run** - both files as one commit, "logs: delete run <id>"; a run that is not there is a landed no-op.
+- **Deleting a run** - its card, its diary and every other file named after its id, as one commit, "logs: delete run <id>"; a run that is not there is a landed no-op.
 
 ## Business logic
 
@@ -88,4 +88,4 @@ The branch or the pull request is patched onto a run's [2] card [3] by rewriting
 
 #### Business logic
 
-A run [2] is deleted by removing its card [3] and its diary [4] as one commit with the message "logs: delete run <id>", through the branch's write cycle [7]; a missing diary does not stop the deletion of the card. A run that is not there is a landed no-op: nothing changes, nothing is committed, and the outcome reports success.
+A run [2] is deleted by removing, from the directory its card [3] sits in, every file whose name is the run's id followed by a dot: the card, the diary [4], and any file another package keeps beside them for that run (the `orchestration` skill's `<id>.plan.md`), so no file of a deleted run stays behind. They go as one commit with the message "logs: delete run <id>", through the branch's write cycle [7]. An id holds no dot, so no other run's file matches. A run that is not there is a landed no-op: nothing changes, nothing is committed, and the outcome reports success.

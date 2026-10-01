@@ -426,6 +426,9 @@ importers:
       '@gemstack/skill-logs':
         specifier: workspace:*
         version: link:../skill-logs
+      agent-driver:
+        specifier: workspace:*
+        version: link:../agent-driver/core
       agent-runner:
         specifier: workspace:*
         version: link:../agent-runner
@@ -433,9 +436,6 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.43
-      agent-driver:
-        specifier: workspace:*
-        version: link:../agent-driver/core
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

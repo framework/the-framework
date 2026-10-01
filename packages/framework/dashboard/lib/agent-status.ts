@@ -39,17 +39,18 @@ export function agentStatusPill(events: FrameworkEvent[], card?: AgentCardFacts,
   }
   if (outcome?.stopped) return { dot: 'bg-warning', label: 'stopped', tone: 'text-warning' }
   if (outcome?.waiting) return { dot: 'bg-warning', label: 'waiting for an answer', tone: 'text-warning' }
+  const endedClean = outcome?.ok === true
+  // Ended clean with subagents still working: the agent's own turn is over, the job is not. It is
+  // told as each one ends, so the pill says what the page waits on rather than "finished",
+  // and rather than "saving…" after each of its turns.
+  if (endedClean && subagentsRunning > 0) {
+    return { dot: 'animate-pulse bg-primary', label: `${subagentsRunning} subagent${subagentsRunning === 1 ? '' : 's'} running`, tone: 'text-muted-foreground' }
+  }
   // Ended clean, and the run's process is still saving its record and cleaning up its checkout (#1431):
   // an ending-side state like failed/stopped, so it sits above "ready for merge" (#948) — during
   // this window the saving is what is actually happening.
-  const endedClean = outcome?.ok === true
   if (endedClean && card?.saving) {
     return { dot: 'animate-pulse bg-success', label: 'saving…', tone: 'text-muted-foreground' }
-  }
-  // Ended clean with subagents still working: the agent's own turn is over, the job is not. It is
-  // told as each one ends, so the pill says what the page waits on rather than "finished".
-  if (endedClean && subagentsRunning > 0) {
-    return { dot: 'animate-pulse bg-primary', label: `${subagentsRunning} subagent${subagentsRunning === 1 ? '' : 's'} running`, tone: 'text-muted-foreground' }
   }
   if (endedClean && card?.pr) return { dot: 'bg-success', label: 'ready for merge', tone: 'text-muted-foreground' }
   // An agent only pulses "building…" while it is live (#695/U20): once its end lands the pill settles.

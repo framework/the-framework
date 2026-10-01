@@ -149,14 +149,23 @@ export function tailAgentEvents<T = unknown>(
   /**
    * Follow `file` from its start: what is there is the replay, and appends follow. A resumed run's
    * diary starts with the lines the feed already had, so as many lines as were delivered are skipped.
+   * The same holds when the file is rewritten in place: a run continued in the checkout it kept
+   * has its diary written again, whole, before the new lines, and the tailer reads a rewritten
+   * file from its top. It is one run's diary either way, so what was delivered is skipped again.
    */
   const begin = (file: string, onReplayedOnce: () => void): void => {
     path = file
     let skip = delivered
-    tailer = new JsonlTailer<T>(file, line => {
-      if (skip > 0) skip--
-      else deliver(line)
-    })
+    tailer = new JsonlTailer<T>(
+      file,
+      line => {
+        if (skip > 0) skip--
+        else deliver(line)
+      },
+      () => {
+        skip = delivered
+      },
+    )
     const replayed = (): void => {
       if (stopped) return
       onReplayedOnce()

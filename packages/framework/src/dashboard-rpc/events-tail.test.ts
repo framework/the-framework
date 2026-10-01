@@ -375,3 +375,30 @@ test('tailAgentEvents keeps asking after a run finished: a resume is followed fr
     await rm(cwd, { recursive: true, force: true })
   }
 })
+
+test('tailAgentEvents on a diary rewritten in place: a run continued in the checkout it kept sends only its new lines', async () => {
+  const cwd = await tmpWorkspace()
+  const diary = join(cwd, 'r1.jsonl')
+  await writeFile(diary, line('one') + line('two'))
+  const seen: string[] = []
+  const stop = tailAgentEvents<FrameworkEvent>(async () => ({ file: diary }), e => void (e.kind === 'log' && seen.push(e.message)))
+  try {
+    await sleep(200)
+    assert.deepEqual(seen, ['one', 'two'])
+    // The resume writes the diary again, whole: the same bytes, a newer file.
+    await sleep(20)
+    await writeFile(diary, line('one') + line('two'))
+    await sleep(1400)
+    assert.deepEqual(seen, ['one', 'two'], 'the same lines written again are not sent again')
+    await appendFile(diary, line('three'))
+    await sleep(1400)
+    assert.deepEqual(seen, ['one', 'two', 'three'])
+    // Written again and grown in one step, and then shorter than what was read: still only what is new.
+    await writeFile(diary, line('one') + line('two') + line('three') + line('four'))
+    await sleep(1400)
+    assert.deepEqual(seen, ['one', 'two', 'three', 'four'])
+  } finally {
+    stop()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})

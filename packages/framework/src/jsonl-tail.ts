@@ -18,6 +18,8 @@ export class JsonlTailer<T> {
   constructor(
     private path: string,
     private readonly onLine: (value: T) => void,
+    /** Told when the log is found rewritten, before its lines are read again from the top. */
+    private readonly onReset?: () => void,
   ) {}
 
   /**
@@ -55,6 +57,7 @@ export class JsonlTailer<T> {
       if (size < this.offset || rewritten) {
         this.offset = 0
         this.partial = ''
+        this.onReset?.()
       }
       this.lastMtimeMs = mtimeMs
       this.adoptMtime = false

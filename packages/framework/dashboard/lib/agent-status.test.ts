@@ -24,9 +24,9 @@ describe('agentStatusPill', () => {
   test('ended clean with subagents still working, it says how many: the job is not finished', () => {
     expect(agentStatusPill([said, ended({ ok: true })], card(), 2)).toMatchObject({ label: '2 subagents running' })
     expect(agentStatusPill([said, ended({ ok: true })], card({ pr }), 1)).toMatchObject({ label: '1 subagent running' })
-    // Its own state wins while it works, while it saves, and when it did not end clean.
+    // Its own state wins while it works and when it did not end clean; the subagents win over its saving.
     expect(agentStatusPill([said], card({ status: 'running' }), 2)).toMatchObject({ label: 'building…' })
-    expect(agentStatusPill([said, ended({ ok: true })], card({ saving: true }), 2)).toMatchObject({ label: 'saving…' })
+    expect(agentStatusPill([said, ended({ ok: true })], card({ saving: true }), 2)).toMatchObject({ label: '2 subagents running' })
     expect(agentStatusPill([said, ended({ ok: false })], card({ status: 'failed' }), 2)).toMatchObject({ label: 'failed' })
     expect(agentStatusPill([said, ended({ ok: false, stopped: true })], card({ status: 'stopped' }), 2)).toMatchObject({ label: 'stopped' })
     expect(agentStatusPill([said, ended({ ok: false, waiting: true })], card({ status: 'waiting' }), 2)).toMatchObject({ label: 'waiting for an answer' })

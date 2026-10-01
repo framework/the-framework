@@ -23,6 +23,9 @@ importers:
       '@gemstack/skill-logs':
         specifier: workspace:*
         version: link:packages/skill-logs
+      '@gemstack/skill-orchestration':
+        specifier: workspace:*
+        version: link:packages/skill-orchestration
       '@gemstack/skill-queue':
         specifier: workspace:*
         version: link:packages/skill-queue
@@ -411,6 +414,31 @@ importers:
   packages/skill-maintenance: {}
 
   packages/skill-market-research: {}
+
+  packages/skill-orchestration:
+    dependencies:
+      '@gemstack/agent-data':
+        specifier: workspace:*
+        version: link:../agent-data
+      '@gemstack/skill-branches':
+        specifier: workspace:*
+        version: link:../skill-branches
+      '@gemstack/skill-logs':
+        specifier: workspace:*
+        version: link:../skill-logs
+      agent-runner:
+        specifier: workspace:*
+        version: link:../agent-runner
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      agent-driver:
+        specifier: workspace:*
+        version: link:../agent-driver/core
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
 
   packages/skill-plan: {}
 

@@ -1,13 +1,15 @@
-import type { ChoiceRequest, FrameworkEvent } from '../../src/index.js'
+import type { AgentMeta, ChoiceRequest, FrameworkEvent } from '../../src/index.js'
 import { formatFrameworkEvent } from '../../src/client.js'
-import { useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { eventKindLabel } from '../lib/event-labels.js'
 import { pendingChoices } from '../lib/live-state.js'
+import { startedBefore, subagentEnd, type SubagentEnd } from '../lib/subagents.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
 import { ChoicePanel } from './ChoicePanel.js'
 import { InlineScreen, isLoopbackScreen } from './InlineScreen.js'
 import { Markdown } from './Markdown.js'
+import { SubagentLine } from './SubagentLine.js'
 import { Badge } from './ui/badge.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
@@ -31,6 +33,9 @@ import {
 //     a resolved one collapses to the AnsweredChoice ✓ card and hides its "✓ chose" line.
 //   - Screens: the newest open `screen` line at an address, before the run's end, is the live
 //     screen itself (InlineScreen); an earlier one stays its one line, and an `ended` one is hidden.
+//   - Subagents, when the log is given the run's: each has a SUBAGENT row where it was started,
+//     read off its card, so the row of a working one says what it is doing now; and the prompt
+//     that told the run a subagent ended is a SUBAGENT row too, not a YOU one.
 // The kind badge shows once per agent of same-group rows — a 200-line driver turn used to be 200
 // identical badges (#948). A driver `start` breaks out of the AGENT group so the user's turn gets
 // its own YOU badge. A row at a group boundary shows the time its diary line was written, the same
@@ -272,6 +277,11 @@ function Thought({ text }: { text: string }) {
   )
 }
 
+/** The badge word, and the grouping key, of a row about one of the run's subagents. */
+const SUBAGENT = 'subagent'
+const NO_SUBAGENTS: readonly AgentMeta[] = []
+const NOTHING_DOING: Record<string, string> = {}
+
 /**
  * Whether an event is a row at all. The agent's session id is plumbing, not conversation: the
  * run's ⋮ menu reads it from the events. A quota reading is worth a row only when the quota is
@@ -293,6 +303,9 @@ export function EventList({
   tail,
   projectId,
   agentId: agentId,
+  subagents = NO_SUBAGENTS,
+  doing = NOTHING_DOING,
+  onOpenAgent,
 }: {
   events: FrameworkEvent[]
   /** The message the agent is writing, as far as it has got: an AGENT row after the last, shown
@@ -317,11 +330,36 @@ export function EventList({
   projectId?: string | undefined
   /** Which run an inline pick resolves (#749), forwarded to the panel with projectId. */
   agentId?: string | null | undefined
+  /** The runs started for this run, oldest first: each gets a row where it was started. */
+  subagents?: readonly AgentMeta[]
+  /** What each working subagent is doing now, by id. */
+  doing?: Record<string, string>
+  /** Open another run's page: what a subagent's row does on a click. */
+  onOpenAgent?: ((agentId: string) => void) | undefined
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
   const screenRows = useMemo(() => foldScreenRows(events), [events])
   const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
   const shown: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
+  // The prompts that told this run one of its subagents ended: SUBAGENT rows, not the reader's own.
+  const ends = new Map<FrameworkEvent, SubagentEnd>()
+  for (const e of shown) {
+    const end = e.kind === 'driver' && e.event.type === 'start' ? subagentEnd(e.event.prompt, subagents) : undefined
+    if (end) ends.set(e, end)
+  }
+  const groupOf = (e: FrameworkEvent): string => (ends.has(e) ? SUBAGENT : rowGroup(e))
+  const started = startedBefore(shown, subagents)
+  const startedRows = (at: number): ReactNode =>
+    started.get(at)?.map((agent, n) => (
+      <MessageScrollerItem key={`subagent-${agent.id}`} messageId={`subagent-${agent.id}`} className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
+        <span className="w-28 shrink-0">{n === 0 && <Badge className="mt-0.5 text-[10px] uppercase text-muted-foreground">{SUBAGENT}</Badge>}</span>
+        <SubagentLine agent={agent} doing={doing[agent.id]} onOpen={onOpenAgent} />
+        <Tooltip>
+          <TooltipTrigger render={<span className="ml-auto shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground" />}>{formatTime(agent.startedAt)}</TooltipTrigger>
+          <TooltipContent>{new Date(agent.startedAt).toLocaleString()}</TooltipContent>
+        </Tooltip>
+      </MessageScrollerItem>
+    ))
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>
       <MessageScroller className="flex-1">
@@ -331,19 +369,29 @@ export function EventList({
               const message = messageText(e)
               const choiceRow = choiceRows?.rows.get(e)
               const prev = i > 0 ? rows[i - 1] : undefined
-              const chunkHead = !prev || rowGroup(prev) !== rowGroup(e)
+              const end = ends.get(e)
+              // A subagent's row above this one breaks the run of same-kind rows, so the badge shows again.
+              const chunkHead = !prev || groupOf(prev) !== groupOf(e) || started.has(i)
               const at = e.at
               return (
-                // Every row carries the same -mx/px pair so a washed row's band and a plain row's
-                // text share the exact same columns; only the background differs.
-                <MessageScrollerItem key={i} messageId={String(i)} scrollAnchor={isTurnBoundary(e)} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${rowWash(e)}`}>
+                <Fragment key={i}>
+                {startedRows(i)}
+                {/* Every row carries the same -mx/px pair so a washed row's band and a plain row's
+                    text share the exact same columns; only the background differs. */}
+                <MessageScrollerItem messageId={String(i)} scrollAnchor={isTurnBoundary(e)} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${end ? '' : rowWash(e)}`}>
                   {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("choice resolved") to sit on one line. */}
                   <span className="w-28 shrink-0">
                     {chunkHead && (
-                      <Badge className={`mt-0.5 text-[10px] uppercase ${badgeTone(e) || 'text-muted-foreground'}`}>{rowLabel(e)}</Badge>
+                      <Badge className={`mt-0.5 text-[10px] uppercase ${(end ? '' : badgeTone(e)) || 'text-muted-foreground'}`}>{end ? SUBAGENT : rowLabel(e)}</Badge>
                     )}
                   </span>
-                  {message !== null ? (
+                  {end ? (
+                    // A subagent ended: which one and how, then what the run was told about it.
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <SubagentLine agent={end.agent} end={end} onOpen={onOpenAgent} />
+                      {end.rest && <Message text={end.rest} />}
+                    </div>
+                  ) : message !== null ? (
                     // A prompt (YOU) or a reply (AGENT): compact Markdown, collapsed to its first line when long.
                     <Message text={message} />
                   ) : e.kind === 'driver' && e.event.type === 'thought' ? (
@@ -385,8 +433,10 @@ export function EventList({
                     </Tooltip>
                   )}
                 </MessageScrollerItem>
+                </Fragment>
               )
             })}
+            {startedRows(shown.length)}
             {writing && (
               <MessageScrollerItem messageId="writing" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
                 <span className="w-28 shrink-0">

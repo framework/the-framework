@@ -55,8 +55,13 @@ export function markerCard(run: { id: string; startedAt: string; prompt: string;
     driver: run.driver,
     ...(run.model !== undefined ? { model: run.model } : {}),
     // `host` as the run's live card has it too: a reader tells this machine's runs from another's by it.
-    caller: { runner: run.mark, host: run.mark.host },
+    caller: { runner: run.mark, host: run.mark.host, ...parentOf(run.mark) },
   }
+}
+
+/** The run's parent as a reader of the card finds it: beside `host`, outside this tool's mark. */
+export function parentOf(mark: Pick<RunnerMark, 'parent'>): { parent?: string } {
+  return mark.parent !== undefined ? { parent: mark.parent } : {}
 }
 
 /** Put the run's card on the branch before its agent exists. The outcome says whether it reached origin. */

@@ -1,5 +1,5 @@
 import type { BridgeBrowserStatus } from '../bridge-browser.js'
-import { findAgent, findCheckout, readLiveMetas, readAllAgents, loadAgentEvents, startedAtFromAgentId, isPidAlive, type AgentMeta, type AgentStatus, isRunId, projectBranches } from '../store/index.js'
+import { findAgent, findCheckout, readLiveMetas, readAllAgents, readDoing, loadAgentEvents, startedAtFromAgentId, isPidAlive, type AgentMeta, type AgentStatus, isRunId, projectBranches } from '../store/index.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { projectGitHost, type GitHostHome } from '../store/git-host.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
@@ -200,6 +200,13 @@ export async function onAgent(projectId: string, agentId: string): Promise<Frame
     if (!cwd) return []
     return (await loadAgentEvents(cwd, agentId).catch(() => undefined)) ?? []
   }, [])
+}
+
+/** What each of the named runs of a project is doing now, by id; a run that is not working has no entry. */
+export async function onAgentsDoing(projectId: string, agentIds: string[]): Promise<Record<string, string>> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return {}
+  return readDoing(cwd, agentIds).catch(() => ({}))
 }
 
 /** The surfaced PLAN/TODO docs at the workspace root, in sidebar order (or `[]`). */

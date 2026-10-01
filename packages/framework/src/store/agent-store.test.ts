@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { findAgent, listAgents, loadAgentEvents, readAllAgents, readFinishedDiary, readLiveMeta, readLiveMetas, type StoreFs } from './agent-store.js'
+import { findAgent, listAgents, loadAgentEvents, readAllAgents, readDoing, readFinishedDiary, readLiveMeta, readLiveMetas, type StoreFs } from './agent-store.js'
 import { agentIdFromStartedAt, startedAtFromAgentId } from '../agent-id.js'
 import { noRuns } from './runs.js'
 import { testRuns } from './test-runs.js'
@@ -188,4 +188,27 @@ test('startedAtFromAgentId inverts agentIdFromStartedAt, and refuses foreign ids
   assert.equal(startedAtFromAgentId(agentIdFromStartedAt(startedAt)), startedAt)
   assert.equal(startedAtFromAgentId('not-a-run-id'), undefined)
   assert.equal(startedAtFromAgentId(''), undefined)
+})
+
+test('readDoing says what each named working run is doing: the last tool its diary names, or the last thing it said, on one line', async () => {
+  const line = (value: object) => JSON.stringify(value) + '\n'
+  const fs = memFs({
+    [liveAt('r1', 'json')]: card('r1', 'running'),
+    [liveAt('r1', 'jsonl')]: line({ kind: 'start', prompt: 'do it' }) + line({ kind: 'action', label: 'Read', detail: 'a.ts' }) + line({ kind: 'action', label: 'Edit', detail: 'src/\n  login.ts' }) + line({ kind: 'cost', usd: 1 }),
+    [liveAt('r2', 'json')]: card('r2', 'running'),
+    [liveAt('r2', 'jsonl')]: line({ kind: 'action', label: 'Bash' }) + line({ kind: 'said', text: 'x'.repeat(200) }) + '{"kind":"action","la',
+    [liveAt('r3', 'json')]: card('r3', 'waiting'),
+    [liveAt('r3', 'jsonl')]: line({ kind: 'action', label: 'Read', detail: 'b.ts' }),
+    [liveAt('r4', 'json')]: card('r4', 'running'),
+    [liveAt('r4', 'jsonl')]: line({ kind: 'action', label: 'Read', detail: 'c.ts' }),
+    [liveAt('r5', 'json')]: card('r5', 'running'),
+    [liveAt('r6', 'json')]: card('r6', 'running'),
+    [liveAt('r6', 'jsonl')]: line({ kind: 'start', prompt: 'do it' }),
+  })
+  const branches = branchesOf(checkoutOf('r1'), checkoutOf('r2'), checkoutOf('r3'), checkoutOf('r4'), checkoutOf('r5'), checkoutOf('r6'))
+  const doing = await readDoing(CWD, ['r1', 'r2', 'r3', 'r5', 'r6', 'gone'], fs, branches)
+  assert.deepEqual(Object.keys(doing).sort(), ['r1', 'r2'], 'not a run that is not working, one not asked for, one with no diary, or one that did nothing yet')
+  assert.equal(doing['r1'], 'Edit src/ login.ts', 'the last tool, with what, on one line')
+  assert.equal(doing['r2'], 'x'.repeat(139) + '…', 'the last thing said, cut to a line; a torn last line is passed over')
+  assert.deepEqual(await readDoing(CWD, [], fs, branches), {})
 })

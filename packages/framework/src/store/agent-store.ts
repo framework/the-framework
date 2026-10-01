@@ -42,6 +42,11 @@ export interface AgentMeta {
   host?: string
   /** What this session was asked for (from the `intent` event). */
   intent?: string
+  /**
+   * The run this one was started for, by its id: this run is that run's subagent. Written on the
+   * card by the tool that started it; absent on a run a person or a schedule started.
+   */
+  parent?: string
   /** The wrapped agent (from the `session` event). */
   driver?: string
   /** The workspace the agent builds in (from the `session` event). */
@@ -281,6 +286,43 @@ export async function loadAgentEvents(cwd: string, id: string, fs: StoreFs = nod
   if (liveDiary && (await fs.exists(liveDiary))) return eventsOf(parseDiary(await fs.read(liveDiary).catch(() => '')))
   const diary = await readFinishedDiary(cwd, id, runs)
   return diary ? eventsOf(diary) : undefined
+}
+
+/** How long a line saying what a run is doing may be. */
+const DOING_MAX = 140
+
+/** One diary line as what the agent is doing, or `undefined` for a line that says nothing of it. */
+function doingOf(line: AnyDiaryLine): string | undefined {
+  const text =
+    line.kind === 'action' && typeof line['label'] === 'string'
+      ? typeof line['detail'] === 'string' ? `${line['label']} ${line['detail']}` : line['label']
+      : line.kind === 'said' && typeof line['text'] === 'string'
+        ? line['text']
+        : undefined
+  const flat = text?.replace(/\s+/g, ' ').trim()
+  if (!flat) return undefined
+  return flat.length > DOING_MAX ? flat.slice(0, DOING_MAX - 1) + '…' : flat
+}
+
+/**
+ * What each of the named runs is doing now, by id: the last thing its diary says it did (a tool
+ * it used, with what) or said, on one line. Only a run with a checkout whose card says `running`
+ * has an entry: an ended run is doing nothing, and its row says how it ended.
+ */
+export async function readDoing(cwd: string, ids: readonly string[], fs: StoreFs = nodeStoreFs(), branches: BranchesFor = projectBranches): Promise<Record<string, string>> {
+  const doing: Record<string, string> = {}
+  const live = await readLiveMetas(cwd, fs, branches).catch((): LiveAgent[] => [])
+  for (const agent of live) {
+    if (agent.status !== 'running' || !ids.includes(agent.id)) continue
+    const lines = (await fs.read(join(agent.cwd, THE_FRAMEWORK_DIR, `${agent.id}.jsonl`)).catch(() => '')).split('\n')
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const said = doingOf(parseDiary(lines[i]!)[0] ?? { kind: '' })
+      if (said === undefined) continue
+      doing[agent.id] = said
+      break
+    }
+  }
+  return doing
 }
 
 /** A {@link StoreFs} backed by `node:fs/promises`. See {@link nodeFs}. */

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { FrameworkEvent } from '../../src/index.js'
+import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
 import { TriangleAlert } from 'lucide-react'
 import { EventList } from './EventList.js'
 
@@ -20,6 +20,9 @@ export function AgentFeed({
   tail,
   projectId,
   agentId: agentId,
+  subagents,
+  doing,
+  onOpenAgent,
 }: {
   events: FrameworkEvent[]
   /** The feed's own project/run (#1455 item 6): the log's `choice` rows are the interaction
@@ -41,6 +44,10 @@ export function AgentFeed({
   emptyLabel?: string
   /** Rendered after the last log row, inside the scroller (#1265): a web agent's live mirror box. */
   tail?: ReactNode
+  /** The run's subagents, what each is doing now, and how a click on one's row opens it. */
+  subagents?: readonly AgentMeta[] | undefined
+  doing?: Record<string, string> | undefined
+  onOpenAgent?: ((agentId: string) => void) | undefined
 }) {
   const lostBanner = lost && (
     <div role="status" className="flex items-center gap-2 border-b border-border bg-warning/10 px-4 py-2 text-xs text-warning">
@@ -69,6 +76,9 @@ export function AgentFeed({
         {...(tail ? { tail } : {})}
         projectId={projectId}
         agentId={agentId}
+        {...(subagents ? { subagents } : {})}
+        {...(doing ? { doing } : {})}
+        onOpenAgent={onOpenAgent}
       />
     </>
   )

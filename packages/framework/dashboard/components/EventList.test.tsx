@@ -1,4 +1,4 @@
-import type { FrameworkEvent } from '../../src/index.js'
+import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
@@ -379,5 +379,76 @@ describe('EventList screen rows', () => {
     render(<EventList events={[{ kind: 'screen', url: 'https://example.com/', label: 'somewhere' }]} stick={false} />)
     expect(frames()).toEqual([])
     expect(screen.getByText('◆ somewhere')).toBeTruthy()
+  })
+})
+
+// A run's subagents in its chat: a row where each was started, read off the subagent's card, and
+// the prompt that told the run a subagent ended as a row of the subagent's, not the reader's.
+describe('EventList subagent rows', () => {
+  const sub = (over: Partial<AgentMeta> = {}): AgentMeta => ({
+    status: 'running',
+    id: '2026-10-01T10-01-00-000Z',
+    startedAt: '2026-10-01T10:01:00.000Z',
+    updatedAt: '2026-10-01T10:01:00.000Z',
+    parent: 'main',
+    intent: 'Validate the form\n\nYou are a subagent: another agent started you.',
+    ...over,
+  })
+  const events: FrameworkEvent[] = [
+    { kind: 'driver', event: { type: 'start', prompt: 'split the work' }, at: '2026-10-01T10:00:00.000Z' },
+    { kind: 'driver', event: { type: 'action', label: 'Bash', detail: 'npx orchestration start' }, at: '2026-10-01T10:00:59.000Z' },
+    { kind: 'driver', event: { type: 'text', text: 'I started one subagent.' }, at: '2026-10-01T10:01:05.000Z' },
+  ]
+
+  test('a working subagent has a row where it was started, saying its task and what it is doing now', () => {
+    const { container } = render(<EventList events={events} subagents={[sub()]} doing={{ '2026-10-01T10-01-00-000Z': 'Edit login.ts' }} stick={false} />)
+    expect(screen.getByText('subagent')).toBeTruthy()
+    expect(screen.getByText(/Validate the form/)).toBeTruthy()
+    expect(screen.getByText('running')).toBeTruthy()
+    expect(screen.getByText('Edit login.ts')).toBeTruthy()
+    expect(screen.queryByText(/You are a subagent/)).toBeNull()
+    // Between the command that started it and what the agent said next.
+    const text = container.textContent ?? ''
+    expect(text.indexOf('npx orchestration start')).toBeLessThan(text.indexOf('Validate the form'))
+    expect(text.indexOf('Validate the form')).toBeLessThan(text.indexOf('I started one subagent.'))
+    // The agent's reply after the row shows its badge again: the row broke the agent's run of rows.
+    expect(screen.getAllByText('agent')).toHaveLength(2)
+  })
+
+  test('the row of an ended subagent says how it ended and how long it took, and a click opens the subagent', () => {
+    const opened: string[] = []
+    render(<EventList events={events} subagents={[sub({ status: 'failed', endedAt: '2026-10-01T10:03:10.000Z' })]} doing={{ '2026-10-01T10-01-00-000Z': 'stale' }} onOpenAgent={id => opened.push(id)} stick={false} />)
+    expect(screen.getByText('failed')).toBeTruthy()
+    expect(screen.getByText('2m')).toBeTruthy()
+    expect(screen.queryByText('stale')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Open the subagent: Validate the form' }))
+    expect(opened).toEqual(['2026-10-01T10-01-00-000Z'])
+  })
+
+  test('the prompt that told the run its subagent ended is a SUBAGENT row saying how it ended, not a YOU row', () => {
+    const told: FrameworkEvent = {
+      kind: 'driver',
+      event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.\nIts work is on the branch agent-form.' },
+      at: '2026-10-01T10:04:00.000Z',
+    }
+    render(<EventList events={[...events, told]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' })]} stick={false} />)
+    expect(screen.getAllByText('you')).toHaveLength(1)
+    expect(screen.getAllByText('subagent')).toHaveLength(2)
+    expect(screen.getByText('ended done')).toBeTruthy()
+    expect(screen.getByText(/Its work is on the branch agent-form/)).toBeTruthy()
+    expect(screen.queryByText(/started for this run/)).toBeNull()
+  })
+
+  test('the same words about a run that is not a subagent of this one stay a YOU row', () => {
+    const typed: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' } }
+    render(<EventList events={[...events, typed]} stick={false} />)
+    expect(screen.getAllByText('you')).toHaveLength(2)
+    expect(screen.queryByText('subagent')).toBeNull()
+  })
+
+  test('a subagent started after the last line is the last row', () => {
+    const { container } = render(<EventList events={events} subagents={[sub({ id: 'late', startedAt: '2026-10-01T10:09:00.000Z', intent: 'Late task' })]} stick={false} />)
+    const text = container.textContent ?? ''
+    expect(text.indexOf('I started one subagent.')).toBeLessThan(text.indexOf('Late task'))
   })
 })

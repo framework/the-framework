@@ -44,6 +44,7 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 - **Failures read red, the user's turn blue** - a failed row is red on a red wash, the user's prompt blue on a blue wash (a subagent's end is not the user's and gets neither), a clean finish on a green wash; a stopped agent stays neutral.
 - **The time each line was written** - a row that opens a group shows the time its diary line was written, the same live, after a reload and once the agent has ended; a line with no time shows none.
 - **Following the newest row** - a live transcript keeps the newest row in view until the reader scrolls up and offers "Jump to latest"; a replay opens at its end or its start as the caller decides.
+- **The view never jumps back when the agent goes on** - only the newest prompt is the scroller's anchor, a row keeps its identity when another row stops being shown, and an end that is no longer a row keeps an empty place where it was.
 
 ## Business logic
 
@@ -190,7 +191,7 @@ A prompt that is the end of one of the agent's subagents (the rule in `lib/subag
 - its body is the subagent's line for an end (`SubagentLine.tsx`): the subagent's task, which opens the subagent's page on a click, then `ended <status>` and the reason when the message gives one. It says how the subagent ended at that moment and never changes, whatever the subagent does afterwards;
 - under it, the rest of the message (where the subagent's work is, its last words) renders as any message does: whole when short, clamped to its first line with the chevron when long. The line the tool sent is not shown as text.
 
-The same words in a prompt about an agent that is not one of these subagents, or with other words before them, stay the user's "YOU" row. The row is still a prompt for everything else: it is an anchor the scroller keeps in view, and a spinner under it reads "Starting…".
+The same words in a prompt about an agent that is not one of these subagents, or with other words before them, stay the user's "YOU" row. The row is still a prompt for everything else: while it is the newest prompt it is the anchor the scroller brings into view, and a spinner under it reads "Starting…".
 
 ### Badges once per group, colored as a scanning aid
 
@@ -232,4 +233,18 @@ See `## Context`.
 
 #### Business logic
 
-By default the transcript follows its newest row: as rows arrive the view stays at the bottom, until the reader scrolls up, at which point following yields to the reader. A "Jump to latest" button returns to the newest row; it is inert when there is nothing to scroll. A transcript told not to follow opens at its start, or at its end when the caller asks for the outcome first, which is how a replay opens. Each prompt row is the anchor the scroller keeps in view, so the current turn [7] stays put while its rows arrive. An optional trailing block supplied by the caller (the agent's page pins the row mirroring a hands-off [13] agent's cloud session [14] there) renders after the last row inside the scroller, so it scrolls and sticks with the transcript rather than floating over it.
+By default the transcript follows its newest row: as rows arrive the view stays at the bottom, until the reader scrolls up, at which point following yields to the reader. A "Jump to latest" button returns to the newest row; it is inert when there is nothing to scroll. A transcript told not to follow opens at its start, or at its end when the caller asks for the outcome first, which is how a replay opens. The newest prompt row is the anchor the scroller brings into view, so the current turn [7] stays put while its rows arrive (see "The view never jumps back when the agent goes on"). An optional trailing block supplied by the caller (the agent's page pins the row mirroring a hands-off [13] agent's cloud session [14] there) renders after the last row inside the scroller, so it scrolls and sticks with the transcript rather than floating over it.
+
+### The view never jumps back when the agent goes on
+
+#### Context
+
+**User story**: the user reads a main agent's transcript, several turns long, while one of its subagents [16] ends and the main agent is continued. The view stays where the user is reading, and the new turn's prompt is brought into view.
+
+**Problem**: the view jumped to the very top of the transcript at that moment. The scroller (`ui/message-scroller.tsx`) brings a row marked as an anchor to the top once, and looks for anchors it has not brought into view yet whenever one row takes another's place, starting with the oldest. Three things in the transcript set that off: every prompt was an anchor, so a transcript opened with several turns in it held anchors never brought into view, and went to its first prompt as soon as any row was replaced (the message being written giving way to the whole message, an end giving way to the next prompt); a row was known by its position among the rows shown, so a row that stopped being shown renamed every row after it; and an end that stopped being a row left its position to the prompt that followed it, which the scroller then did not see as new.
+
+#### Business logic
+
+- **One anchor.** Only the newest prompt among the rows shown is marked as the scroller's anchor: a message just sent while it is shown, else the last prompt of the transcript (a subagent's end counts, being a prompt). No earlier prompt is one.
+- **A row's identity is its event's place in the whole stream**, counted over every event [2], shown or not. A row that stops being shown, or one that is never shown, therefore changes no other row's identity. The message just sent, which is no event yet, has an identity of its own.
+- **An end that is no longer a row keeps its place.** Each end left out by "An end the agent went on after is not a row" stays in the list as an empty, hidden entry with its own identity, where it was: before the row that follows it, before a message just sent, or at the end of the list when nothing follows. The prompt after it is then past every entry the scroller already had, and is brought into view.

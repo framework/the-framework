@@ -56,7 +56,7 @@ When the daemon holds an in-memory stream for the agent (only ever a relayed age
 
 #### Business logic
 
-After everything already on disk has been delivered, and before any live event, the stream sends the end-of-replay marker [9], once per subscription. It is wire-only: not an agent event, never written to any file, and swallowed by the browser, which uses it to buffer the replay and swap its feed in one step. A relocation of the file (below) is not a new replay and never sends it again.
+After everything already on disk has been delivered, and before any live event, the stream sends the end-of-replay marker [9], once per subscription. For an agent whose diary cannot be read yet (it was started or continued a moment ago and its checkout, or the diary in it, is not there yet), the marker waits until the diary's lines have been delivered rather than announcing an empty replay (`events-tail.ts`). It is wire-only: not an agent event, never written to any file, and swallowed by the browser, which uses it to buffer the replay and swap its feed in one step. A relocation of the file (below) is not a new replay and never sends it again.
 
 ### The stream follows the diary when it moves
 

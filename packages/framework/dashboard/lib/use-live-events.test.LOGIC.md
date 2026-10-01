@@ -9,3 +9,4 @@ What the tests cover:
 - **A stream that reports no end of replay** - the held-back replay is swapped in at a deadline instead, so a relayed agent's feed never freezes.
 - **The message being written** - it is kept beside the events, never among them; the whole message replaces it, a late piece equal to the message just finished is not shown again, the next message's pieces show, and an agent that ends clears it.
 - **A reconnect that dies mid-replay** - the partial replay is discarded rather than swapped in, the feed on screen survives both drops, and the next attempt replays and swaps in full.
+- **A reconnect that brings nothing by the deadline** - the feed on screen is not emptied; when the replay comes late and the end-of-replay marker follows, it is swapped in whole; from a stream that sends no marker, the late replay is swapped in a deadline after its first event.

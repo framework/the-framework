@@ -19,7 +19,7 @@ Follows one agent's [1] event stream [2] live in the browser: the dashboard asks
 
 - **What is followed** - the selected agent's own stream; with no agent selected, the project's stream; with no project selected, nothing.
 - **Replay then live** - every subscription sends everything already recorded before it starts sending new lines, so a live agent and a past one render identically.
-- **A reconnect never shows less than what is on screen** - the re-sent history is held back and swapped in whole, on the stream's end-of-replay marker or after a short deadline for streams that send none.
+- **A reconnect never shows less than what is on screen** - the re-sent history is held back and swapped in whole, on the stream's end-of-replay marker or after a short deadline for streams that send none; a replay that has brought nothing by the deadline is not swapped in.
 - **The message being written** - kept beside the feed, never in it: each `partial` event replaces it, the whole message or the agent's end clears it, and a late piece equal to the message just finished is not shown again; a new subscription or a fresh start clears it.
 - **A lost stream is reported and retried** - the feed is flagged as behind reality and reconnected with a backoff that settles at one attempt every 8 seconds; an outage never clears the feed.
 - **A stream the daemon ends on purpose is final** - no retry, no alarm.
@@ -59,7 +59,7 @@ Every subscription first sends everything already recorded in the stream, then f
 
 #### Business logic
 
-The first subscription for a selection streams into a feed that is already empty, so its replay renders as it arrives. A reconnect is treated differently: its replayed events are held back while the feed on screen stays untouched, and the whole replay then replaces the feed in one step. The swap happens when the stream reports that its replay has been delivered, or at the latest 1.5 seconds after the reconnect for streams that report no such boundary, which is the case for the streams held in memory rather than read off a file (a relayed [4] agent, and an agent on a device [5]). If the reconnected stream dies before the swap, the partial history is thrown away rather than swapped in, and the next attempt replays from the top.
+The first subscription for a selection streams into a feed that is already empty, so its replay renders as it arrives. A reconnect is treated differently: its replayed events are held back while the feed on screen stays untouched, and the whole replay then replaces the feed in one step. The swap happens when the stream reports that its replay has been delivered, or 1.5 seconds after the reconnect for streams that report no such boundary, which is the case for the streams held in memory rather than read off a file (a relayed [4] agent, and an agent on a device [5]). The deadline swaps in only a replay that has brought at least one event. When it has brought nothing by then, the feed on screen stays, and the deadline runs again, 1.5 seconds from the first replayed event; the stream's own report still swaps at once, whatever the replay holds. This is for an agent being continued: for a moment its diary cannot be read, and a reconnect landing then would otherwise replace a full transcript with nothing. If the reconnected stream dies before the swap, the partial history is thrown away rather than swapped in, and the next attempt replays from the top.
 
 ### A lost stream is reported and retried
 

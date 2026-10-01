@@ -49,3 +49,10 @@
 {"kind":"result","text":"ok","sessionId":"3b9ab806-ada2-4de1-aff4-35e17f1761c6","at":"2026-10-01T21:23:30.492Z"}
 {"kind":"cost","usd":0.17000319999999997,"at":"2026-10-01T21:23:30.492Z"}
 {"kind":"ended","status":"done","at":"2026-10-01T21:23:31.386Z"}
+{"kind":"start","prompt":"Reply with the single word again and do nothing else.","at":"2026-10-01T21:23:44.352Z"}
+{"kind":"session","sessionId":"3b9ab806-ada2-4de1-aff4-35e17f1761c6","at":"2026-10-01T21:23:45.621Z"}
+{"kind":"said","text":"again","at":"2026-10-01T21:23:46.848Z"}
+{"kind":"rate-limit","limit":{"status":"allowed","window":"five_hour","resetsAt":1790902800000},"at":"2026-10-01T21:23:46.853Z"}
+{"kind":"result","text":"again","sessionId":"3b9ab806-ada2-4de1-aff4-35e17f1761c6","at":"2026-10-01T21:23:47.969Z"}
+{"kind":"cost","usd":0.17484899999999998,"at":"2026-10-01T21:23:47.969Z"}
+{"kind":"ended","status":"done","at":"2026-10-01T21:23:48.793Z"}

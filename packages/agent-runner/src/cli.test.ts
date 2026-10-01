@@ -51,6 +51,18 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
     const followed = await run(repo, 'run', '--detach', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--then', '/post-merge-cleanup')
     assert.equal(followed.code, 2)
     assert.match(followed.err, /--resume takes no --then/)
+    // A run that continues keeps the parent and the branch its record names.
+    const reparented = await run(repo, 'run', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--parent', 'p1')
+    assert.equal(reparented.code, 2)
+    assert.match(reparented.err, /--resume takes no --parent/)
+    const rebased = await run(repo, 'run', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--base', 'main')
+    assert.equal(rebased.code, 2)
+    assert.match(rebased.err, /--resume takes no --base/)
+    // A parent this project has no record of: refused before anything starts.
+    const orphan = await run(repo, 'run', '--detach', 'Do task one', '--parent', 'no-such-run')
+    assert.equal(orphan.code, 1)
+    assert.deepEqual(orphan.out, { ok: false, reason: 'no-parent', parent: 'no-such-run' })
+    assert.equal(orphan.err, 'no run no-such-run in this project')
     const outside = await run(elsewhere, 'check')
     assert.equal(outside.code, 1)
     assert.deepEqual(outside.out, { ok: false, reason: 'not-a-repo' })

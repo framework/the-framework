@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util'
 import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
+import { findRun } from '@gemstack/skill-logs'
 import { DRIVER_NAMES, detachResume, detachRun, isDriverName, readyToRun, resumeProject, runProject } from './runner.js'
 import { initHooks } from './init.js'
 
@@ -12,10 +13,12 @@ import { initHooks } from './init.js'
 
 export const USAGE = `usage: agent-runner <command>
 
-  run <prompt> [--model <id>] [--driver <claude-code|codex>] [--then <prompt>]
+  run <prompt> [--model <id>] [--driver <claude-code|codex>] [--then <prompt>] [--parent <id>] [--base <ref>]
                                 one run of <prompt> in its own checkout, now, recorded; on Claude Code unless --driver says Codex,
                                 on the coding agent's own default model unless --model names one;
-                                with --then, once it ends done with a pull request, a fresh agent on its branch gets that prompt and the run's id, and the merge waits for it
+                                with --then, once it ends done with a pull request, a fresh agent on its branch gets that prompt and the run's id, and the merge waits for it;
+                                with --parent, the run <id> is told when this one ends: which run, how it ended, its last words, as its next prompt;
+                                with --base, the run's branch starts from <ref> instead of origin's default branch
   run --detach <prompt>         the same run in its own process, answered at once with its id: what a dashboard's start hook runs
   run --resume <id> [<text>] [--answer <label>]
                                 continue an ended run: the same record, its session resumed; the text as the next prompt, or the answer to the question it ended on
@@ -89,7 +92,7 @@ type Command = (args: string[], io: CliIo, git: GitRunner) => Promise<unknown>
 
 const COMMANDS: Record<string, Command> = {
   async run(args, io, git) {
-    const { positionals, values } = parse(args, { id: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' }, mark: { type: 'boolean' }, driver: { type: 'string' }, then: { type: 'string' } }, 0, 1)
+    const { positionals, values } = parse(args, { id: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' }, mark: { type: 'boolean' }, driver: { type: 'string' }, then: { type: 'string' }, parent: { type: 'string' }, base: { type: 'string' } }, 0, 1)
     const repo = await project(io.cwd, git)
     const driver = values.driver
     if (driver !== undefined && !isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
@@ -97,16 +100,23 @@ const COMMANDS: Record<string, Command> = {
       if (driver !== undefined) throw new Usage('--resume takes no --driver: a run continues on the coding agent its record names')
       if (values.id !== undefined) throw new Usage('--resume takes no --id: a run continues under its own')
       if (values.then !== undefined) throw new Usage('--resume takes no --then: a run continues with the follow-up its record names')
+      if (values.parent !== undefined) throw new Usage('--resume takes no --parent: a run continues for the parent its record names')
+      if (values.base !== undefined) throw new Usage('--resume takes no --base: a run continues on its own branch')
       if (positionals[0] === undefined && values.answer === undefined) throw new Usage('a text or --answer is needed to resume a run')
     }
     if (values.then !== undefined && !values.then.trim()) throw new Usage('--then needs a prompt')
+    // A parent this project has no record of is refused while someone is still listening; a run
+    // spawned with its id was asked about already.
+    if (values.parent !== undefined && values.id === undefined && !(await findRun(repo, values.parent))) {
+      throw new Refused({ ok: false, reason: 'no-parent', parent: values.parent }, `no run ${values.parent} in this project`)
+    }
     // A person's run is refused before it spends a checkout when its coding agent cannot start;
     // a scheduler asks the same before it marks, and a resumed run's agent already ran once here.
     if (values.resume === undefined && values.id === undefined) {
       const ready = await readyToRun(repo, driver ?? 'claude-code')
       if (ready.problems.length > 0) throw new Refused({ ok: false, reason: 'not-ready', ...ready }, ready.problems.join(' '))
     }
-    const then = values.then !== undefined ? { then: values.then.trim() } : {}
+    const named = { ...(values.then !== undefined ? { then: values.then.trim() } : {}), ...(values.parent !== undefined ? { parent: values.parent } : {}), ...(values.base !== undefined ? { base: values.base } : {}) }
     if (values.detach && values.resume !== undefined) {
       const resumed = await detachResume(repo, {
         id: values.resume,
@@ -119,7 +129,7 @@ const COMMANDS: Record<string, Command> = {
     if (values.detach) {
       if (positionals[0] === undefined) throw new Usage('expected 1 argument(s), got 0')
       if (values.id !== undefined) throw new Usage('--detach takes no --id: the run\'s id is minted and answered')
-      const started = await detachRun(repo, { prompt: positionals[0], ...(values.model !== undefined ? { model: values.model } : {}), ...(driver !== undefined ? { driver } : {}), ...then })
+      const started = await detachRun(repo, { prompt: positionals[0], ...(values.model !== undefined ? { model: values.model } : {}), ...(driver !== undefined ? { driver } : {}), ...named })
       return { ok: true, detached: true, ...started }
     }
     if (values.resume !== undefined) {
@@ -139,7 +149,7 @@ const COMMANDS: Record<string, Command> = {
       ...(values.mark ? { mark: true } : {}),
       ...(values.model !== undefined ? { model: values.model } : {}),
       ...(driver !== undefined ? { driver } : {}),
-      ...then,
+      ...named,
       log: io.stderr,
     })
     return { ok: outcome.status === 'done' || outcome.status === 'waiting', ...outcome }

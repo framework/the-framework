@@ -1,4 +1,4 @@
-The sweep [1]: what a run's [2] own process could not do because it died. The scheduler runs it on every tick, before anything is decided; it acts only for this machine: a pid means nothing on another. A run whose lock [7] a live process holds is that process's: it is booting, working, recording, reclaiming or resuming, and the sweep does not touch it. Otherwise, a checkout [3] whose live card [4] says `running` is a run that died mid-work; a checkout whose card says the run ended is one whose process died between the end and the record, or whose reclaim [5] could not push; a running card on the branch from this machine with no checkout behind it is a run that never started. A running record from another machine is never touched: no age-out, a person's pick.
+The sweep [1]: what a run's [2] own process could not do because it died. The scheduler runs it on every tick, before anything is decided; it acts only for this machine: a pid means nothing on another. A run whose lock [7] a live process holds is that process's: it is booting, working, recording, reclaiming or resuming, and the sweep does not touch it. Otherwise, a checkout [3] whose live card [4] says `running` is a run that died mid-work; a checkout whose card says the run ended is one whose process died between the end and the record, or whose reclaim [5] could not push; a running card on the branch from this machine with no checkout behind it is a run that never started. A running record from another machine is never touched: no age-out, a person's pick. A run the sweep itself ends tells its parent [8], since its own process is not there to.
 
 ## Context
 
@@ -15,12 +15,14 @@ The sweep [1]: what a run's [2] own process could not do because it died. The sc
 [5] reclaim: removing a finished agent's checkout once its work is on the remote.
 [6] marker: a run record written before the agent exists: `status: running`, the tool's mark, an empty diary.
 [7] the run's lock: `.agent-runner/runs/<id>.lock` at the repository root, holding the pid of the one process of the run at work on it; a pid that is not a live process holds nothing (`run-lock.ts`).
+[8] parent: the run another run was started for (`run --parent <id>`), named in that run's mark and told when it ends (`parent.ts`).
 
 ## Business logic — TL;DR
 
 - **Checkouts of this machine** - every checkout under `.branches/` whose live card is this tool's and names this host: a run whose lock a live process holds is left alone, whatever its card says; otherwise `running` is ended `failed` with `its process died before the run ended`; either way an ended card is recorded with its diary; a `waiting` run is kept, for the answer; any other is reclaimed, its record written again without the branch when the branch went with the checkout, kept with the `branches` reason when it cannot go.
 - **Markers of this machine with nothing behind them** - a running card marked by this host whose checkout the first pass did not see: left alone while a live process holds its lock (booting, or resuming), or while a checkout exists with no live card yet (the run is opening it); otherwise recorded `failed` with the last five lines of the spawn's stderr when there are any, else `stopped` as `its process is gone and left no checkout`.
 - **Never another machine's** - a live card or a marker naming another host is that machine's.
+- **Telling the parent** - a run this sweep ended, one that died mid-work or never started, tells its parent [8] how it ended; a run that had ended by itself is not told again.
 - **What the sweep answers** - the runs it recorded with their status, the checkouts it reclaimed, and the ones it kept with why.
 
 ## Business logic
@@ -54,3 +56,13 @@ Every running card on the branch not seen in the first pass, marked by this host
 #### Business logic
 
 A live card or a marker whose host is not this machine's is not touched, whatever its pid says.
+
+### Telling the parent
+
+#### Context
+
+**Problem**: a run started for another run tells its parent when it ends (`run.ts`); a run whose process died tells nobody, and its parent would wait on it for ever.
+
+#### Business logic
+
+When the mark of a run this sweep ended names a parent [8], the parent is told through `parent.ts`. For a checkout whose card said `running`: after the record and the reclaim, with the run's id, `failed`, the detail `its process died before the run ended`, the pull request the card names, and the card's branch unless the reclaim deleted it. For a marker with nothing behind it: after the record, with the run's id, the status and the detail it was recorded with, and no branch. A checkout whose card already said the run ended tells nobody: that run's own process told its parent after the reclaim, or died just before it could, and the sweep cannot tell which. How a parent that has ended is continued is given by whoever runs the sweep (the scheduler gives the detached continuation, `runner.ts`); without it, only a parent that is working is told.

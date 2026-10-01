@@ -9,7 +9,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## The tool
 - A tool, a package with a command line, like `agent-driver`; not a skill. It runs one
   agent from start to end and nothing else: when an agent starts is the scheduler's call,
-  or a person's.
+  a person's, or another run's agent's.
 - Standalone, beside `agent-driver`, not inside it. `agent-driver` depends on nothing; the
   runner needs git for its checkouts and its records, and inside the driver every user of
   the driver would get git and the skills with it. Either way was open; this one for now.
@@ -78,6 +78,18 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A run with no model named starts on the coding agent's own default. Picked over the
   runner reading the scheduler's model: the runner reads no scheduler file, and the
   launcher already says "the CLI's own default".
+- A run can be started for another run: `run --parent <id>` writes the parent on the run's
+  record. The runner still starts nothing on its own: the parent's agent runs the command.
+  Picked over a separate file that maps parents to children: one record per run already
+  says everything about it.
+- When a run with a parent ends, the runner sends the parent one line: which run, how it
+  ended, its last words. The line reaches the parent the way a person's message does: into
+  its inbox while it runs, as a resume once it has ended. Picked over the parent waiting
+  inside a command for its child (a process that waits, and a coding agent's command cannot
+  wait an hour), and over the parent polling the records.
+- A run starts from the branch it is told, `run --base <ref>`, written on its record. With
+  none, origin's default branch, as before. Picked over a run that always starts from the
+  default branch: a run started for another run needs what that run has built so far.
 - The run records itself and reclaims its own checkout when the agent stops; the sweep on
   the tick catches what a dead process left, on this machine only.
 - A run stops on SIGINT or SIGTERM to its process: the agent's process tree is ended, the

@@ -34,7 +34,8 @@ export function SubagentLine({
       <button
         type="button"
         onClick={() => onOpen?.(agent.id)}
-        className="min-w-0 shrink truncate text-left text-foreground hover:underline"
+        // A long task keeps to half the line, so how the subagent stands is never pushed off it.
+        className="min-w-0 max-w-[55%] shrink truncate text-left text-foreground hover:underline"
         aria-label={`Open the subagent: ${taskLabel(agent)}`}
       >
         ↳ {taskLabel(agent)}

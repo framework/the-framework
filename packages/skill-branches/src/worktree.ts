@@ -132,25 +132,29 @@ export async function addWorktree(
  * Check an *existing* branch out into an agent's worktree (#762). Continuing an agent puts it back
  * on the branch its work is already on, rather than branching again and stranding what it did
  * last time. The branch as this clone has it; else origin's copy, as a new local branch with no
- * upstream set, as in {@link addWorktree}; else, gone everywhere, a new branch where a new agent
- * branch starts ({@link freshStart}): the only branch the package deletes is one that held nothing
- * past a commit the remote already had, so nothing of the agent's is lost. Anything git refuses —
- * the branch checked out elsewhere, say — rejects, like {@link addWorktree}: a continued agent
- * needs its checkout.
+ * upstream set, as in {@link addWorktree}; else, gone everywhere, a new branch where the agent's
+ * first one started: the base the caller names, as this clone has it or else as origin does, and
+ * with none, or one that is gone too, where a new agent branch starts ({@link freshStart}). The
+ * only branch the package deletes is one that held nothing past a commit the remote already had,
+ * so nothing of the agent's is lost. Anything git refuses — the branch checked out elsewhere, say —
+ * rejects, like {@link addWorktree}: a continued agent needs its checkout.
  */
 export async function attachWorktree(
   repo: string,
-  opts: { agentId: string; branch: string },
+  opts: { agentId: string; branch: string; base?: string },
   git: GitRunner = nodeGitRunner(),
 ): Promise<AddedWorktree> {
   if (!isSafeAgentId(opts.agentId)) throw new Error(`unsafe agent id: ${opts.agentId}`)
   const path = worktreePath(repo, opts.agentId)
-  const has = (ref: string) => git(['rev-parse', '--verify', '--quiet', ref], repo).then(out => out.trim() !== '', () => false)
+  const has = (ref: string) => git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], repo).then(out => out.trim() !== '', () => false)
   if (await has(`refs/heads/${opts.branch}`)) {
     await git(['worktree', 'add', path, opts.branch], repo)
   } else {
-    const base = (await has(`refs/remotes/origin/${opts.branch}`)) ? `origin/${opts.branch}` : await freshStart(repo, git)
-    await git(['worktree', 'add', '--no-track', '-b', opts.branch, path, ...(base ? [base] : [])], repo)
+    const starts = [`refs/remotes/origin/${opts.branch}`, ...(opts.base !== undefined ? [opts.base, `refs/remotes/origin/${opts.base}`] : [])]
+    let start: string | undefined
+    for (const ref of starts) if (start === undefined && (await has(ref))) start = ref
+    start ??= await freshStart(repo, git)
+    await git(['worktree', 'add', '--no-track', '-b', opts.branch, path, ...(start ? [start] : [])], repo)
   }
   return { path, branch: opts.branch }
 }

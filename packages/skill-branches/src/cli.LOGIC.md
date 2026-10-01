@@ -25,7 +25,7 @@ Gives an agent [1] in a shell, the user, and the dashboard's server the `branche
 - **Outside a repository** - a command that needs one is refused as `not-a-repo`; only git's own "not a git repository" reads as that.
 - **An agent id is checked before anything runs** - `create`, `attach` and `remove` refuse an id outside the charset, or `data`, as `invalid-id`, before the repository is even looked for.
 - **`create`: a checkout for a new agent** - `.branches/agent-<id>` on the fresh branch `agent-<id>`, from `--base` or origin's default branch, fully set up.
-- **`attach`: a checkout for a continued agent** - `.branches/agent-<id>` on the branch named, taken as given, fully set up.
+- **`attach`: a checkout for a continued agent** - `.branches/agent-<id>` on the branch named, taken as given, fully set up; a branch gone everywhere starts again from `--base`, or origin's default branch.
 - **`name`: the agent names its work** - the branch becomes `agent-<name>`, suffixed when taken, the name got is printed, and the branch links follow at once; four refusals.
 - **`status`: where the agent is and whether it may finish** - the checkout's path, its branch, whether it is clean and whether it is on the remote; refused for a directory git does not know as a worktree.
 - **`show`: what each branch holds and where it stands** - a bare JSON array, one state per branch named in the order named, gone branches included, each with the name the agent gave its work when it has one (`branch-state.ts`); at least one branch, else a usage error.
@@ -104,7 +104,7 @@ See `## Context`.
 
 #### Business logic
 
-`attach <id> <branch>` makes the checkout [2] for a continued agent [1] on the branch named, taken as given, a `/` in it included: `.branches/agent-<id>` with that branch checked out, recreated from origin's copy when it is gone locally and from origin's default branch when it is gone everywhere (`worktree.ts`), then set up exactly as `create` does. The result is `{"ok": true, "path": …, "branch": …}`.
+`attach <id> <branch> [--base <ref>]` makes the checkout [2] for a continued agent [1] on the branch named, taken as given, a `/` in it included: `.branches/agent-<id>` with that branch checked out, recreated from origin's copy when it is gone locally, and, when it is gone everywhere, from `--base` when given and from origin's default branch otherwise (`worktree.ts`), then set up exactly as `create` does. The result is `{"ok": true, "path": …, "branch": …}`.
 
 ### `name`: the agent names its work
 

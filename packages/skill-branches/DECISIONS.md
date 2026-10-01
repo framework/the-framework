@@ -47,8 +47,8 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   suffix included, is not counted.
 - Continuing an agent puts it back on the branch its work is on, even one the package did
   not make; a branch gone locally comes back from origin's copy, and one gone everywhere is
-  recreated from origin's default branch, as a new checkout starts: every branch the
-  package deletes held nothing the remote lacked.
+  recreated where the agent's first branch started: the base the caller names, else
+  origin's default branch: every branch the package deletes held nothing the remote lacked.
 - The user's installed dependencies are linked into the checkout, not copied or
   reinstalled: one link per entry of the folder, absolute, so an install in the checkout
   writes into the checkout. A scope like `@acme` is mirrored the same way one level down,

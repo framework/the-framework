@@ -28,13 +28,13 @@ export async function createCheckout(
   return worktree
 }
 
-/** A continued agent's checkout, back on the branch its work is on. */
+/** A continued agent's checkout, back on the branch its work is on; a branch gone everywhere starts again from `base`, or origin's default branch. */
 export async function attachCheckout(
   repo: string,
-  opts: { agentId: string; branch: string } & CheckoutSkills,
+  opts: { agentId: string; branch: string; base?: string } & CheckoutSkills,
   git: GitRunner = nodeGitRunner(),
 ): Promise<AddedWorktree> {
-  const worktree = await attachWorktree(repo, { agentId: opts.agentId, branch: opts.branch }, git)
+  const worktree = await attachWorktree(repo, { agentId: opts.agentId, branch: opts.branch, ...(opts.base ? { base: opts.base } : {}) }, git)
   await settle(repo, worktree.path, git, opts.skills)
   return worktree
 }

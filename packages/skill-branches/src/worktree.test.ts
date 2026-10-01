@@ -255,6 +255,33 @@ test('a follow-up whose branch is gone gets it back from origin’s default bran
   }
 })
 
+test('a continued agent whose branch is gone gets it back from the base named: this clone’s, else origin’s, else origin’s default branch', async () => {
+  const git = nodeGitRunner()
+  const { repo, base, main, feature } = await repoOnUnpushedFeature(git)
+  try {
+    const local = await attachWorktree(repo, { agentId: 'run1', branch: 'agent-run1', base: 'my-feature' }, git)
+    assert.equal((await git(['rev-parse', 'HEAD'], local.path)).trim(), feature, 'the base as this clone has it')
+    assert.equal(await git(['config', '--get', 'branch.agent-run1.remote'], repo).catch(() => ''), '', 'no upstream')
+
+    // The base is gone here and origin has it.
+    await git(['push', '-q', 'origin', 'my-feature:agent-main-run'], repo)
+    await git(['fetch', '-q', 'origin'], repo)
+    const remote = await attachWorktree(repo, { agentId: 'run2', branch: 'agent-run2', base: 'agent-main-run' }, git)
+    assert.equal((await git(['rev-parse', 'HEAD'], remote.path)).trim(), feature, 'the base as origin has it')
+
+    const gone = await attachWorktree(repo, { agentId: 'run3', branch: 'agent-run3', base: 'agent-no-such' }, git)
+    assert.equal((await git(['rev-parse', 'HEAD'], gone.path)).trim(), main, 'a base gone everywhere: origin’s default branch')
+
+    // The branch itself, where origin still has it, wins over the base.
+    await git(['push', '-q', 'origin', `${main}:refs/heads/agent-pushed`], repo)
+    await git(['fetch', '-q', 'origin'], repo)
+    const kept = await attachWorktree(repo, { agentId: 'run4', branch: 'agent-pushed', base: 'my-feature' }, git)
+    assert.equal((await git(['rev-parse', 'HEAD'], kept.path)).trim(), main, 'origin’s copy of the branch, not the base')
+  } finally {
+    await rm(base, { recursive: true, force: true })
+  }
+})
+
 test('a follow-up whose branch only origin has gets origin’s copy, with no upstream set', async () => {
   const git = nodeGitRunner()
   const { repo, base, feature } = await repoOnUnpushedFeature(git)

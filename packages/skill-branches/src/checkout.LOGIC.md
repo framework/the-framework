@@ -20,7 +20,7 @@ Makes a checkout [1] as an agent [2] gets it, in one sequence whichever surface 
 ## Business logic — TL;DR
 
 - **A new agent's checkout** - a worktree on the fresh birth branch [6] `agent-<agent id>`, from the base the caller names or origin's default branch (`worktree.ts`), then settled.
-- **A continued agent's checkout** - a worktree on the branch the caller names, the one the agent's work is on, then settled the same way.
+- **A continued agent's checkout** - a worktree on the branch the caller names, the one the agent's work is on, recreated from the base the caller names when the branch is gone, then settled the same way.
 - **What a checkout gets besides its files** - `.branches/` hidden from git, the user's dependency trees linked in, the `branches` skill and any further skills the caller names linked in, and the branch links reconciled, in that order.
 - **Only the worktree can fail the caller** - a checkout missing any of the rest is a worse agent, not a failed one.
 
@@ -44,7 +44,7 @@ Given the project's checkout, an agent id [7] and, optionally, a base revision a
 
 #### Business logic
 
-Given the project's checkout, an agent id [7], the branch to continue on and, optionally, further skills [3] to link, a worktree is created at `.branches/agent-<agent id>` with that branch checked out, whatever the branch's name (the rules for a branch gone locally or gone everywhere are in `worktree.ts`). The checkout [1] is then settled exactly as a new agent's, and the caller gets the checkout's path and branch back.
+Given the project's checkout, an agent id [7], the branch to continue on and, optionally, a base revision and further skills [3] to link, a worktree is created at `.branches/agent-<agent id>` with that branch checked out, whatever the branch's name (the rules for a branch gone locally or gone everywhere, where the base is used, are in `worktree.ts`). The checkout [1] is then settled exactly as a new agent's, and the caller gets the checkout's path and branch back.
 
 ### What a checkout gets besides its files
 

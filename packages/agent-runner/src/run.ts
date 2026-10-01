@@ -217,8 +217,9 @@ export interface ResumeOptions {
 
 /**
  * Continue an ended run: the same id, the same record, the same branch. The checkout is the one
- * the run kept, or a new one attached to its branch; the session resumes by the id the record
- * carries; the diary goes on from where it stopped. The prompt is the user's text, or the
+ * the run kept, or a new one attached to its branch; a branch that went with the checkout, for
+ * holding nothing, starts again from the base the record names. The session resumes by the id the
+ * record carries; the diary goes on from where it stopped. The prompt is the user's text, or the
  * continuation of the question the run ended on with the given answer. A follow-up the record
  * names is still owed: the agent is told again not to arm the merge, and the follow-up runs once
  * this ends done.
@@ -268,7 +269,7 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
     const branch = card.branch ?? agentBranchName(opts.id)
     const path = worktreePath(repo, opts.id)
     const kept = await stat(path).then(s => s.isDirectory(), () => false)
-    const checkout = kept ? { path, branch } : await attachCheckout(repo, { agentId: opts.id, branch }, git)
+    const checkout = kept ? { path, branch } : await attachCheckout(repo, { agentId: opts.id, branch, ...(previous.base !== undefined ? { base: previous.base } : {}) }, git)
 
     // The record is written running again over the ended one, so every reader sees the run in flight.
     const mark: RunnerMark = { host, pid, ...lasting(previous) }

@@ -11,7 +11,7 @@ vi.mock('../lib/preferences.js', () => ({
   updatePreferences: vi.fn(),
 }))
 
-const { EventList } = await import('./EventList.js')
+const { EventList, askedReplies, passedEnds } = await import('./EventList.js')
 
 beforeEach(() => {
   sendChoice.mockReset().mockResolvedValue(undefined)
@@ -481,5 +481,69 @@ describe('EventList subagent rows', () => {
     const { container } = render(<EventList events={events} subagents={[sub({ id: 'late', startedAt: '2026-10-01T10:09:00.000Z', intent: 'Late task' })]} stick={false} />)
     const text = container.textContent ?? ''
     expect(text.indexOf('I started one subagent.')).toBeLessThan(text.indexOf('Late task'))
+  })
+})
+
+// What the run's details already count is not said again in the chat, and "finished" is said once.
+describe('EventList turn ends', () => {
+  const prompt = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'start', prompt: text } })
+  const reply = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'text', text } })
+  const turnEnd = { kind: 'driver', event: { type: 'result', text: '' } } as FrameworkEvent
+  const cost: FrameworkEvent = { kind: 'usage', costUsd: 0.12 }
+  const end = (over: Record<string, unknown> = {}) => ({ kind: 'end', ok: true, ...over }) as FrameworkEvent
+
+  test("a turn's end and the spend so far are not rows", () => {
+    render(<EventList events={[prompt('go'), reply('did it'), turnEnd, cost, end()]} stick={false} />)
+    expect(screen.queryByText(/turn complete/)).toBeNull()
+    expect(screen.queryByText(/spend/)).toBeNull()
+    expect(screen.queryByText('cost')).toBeNull()
+    expect(screen.getByText(/finished/)).toBeTruthy()
+  })
+
+  test('a clean end the run went on after is not a row: only the last one says finished', () => {
+    render(<EventList events={[prompt('go'), reply('one'), end(), prompt('more'), reply('two'), end()]} stick={false} />)
+    expect(screen.getAllByText(/finished/)).toHaveLength(1)
+  })
+
+  test('the last clean end is not a row while the run is still going', () => {
+    render(<EventList events={[prompt('go'), reply('started them'), end()]} going stick={false} />)
+    expect(screen.queryByText(/finished/)).toBeNull()
+  })
+
+  test('an end that is not clean stays where it happened, and so does the clean end after it', () => {
+    const first = end({ ok: false, detail: 'boom' })
+    const stopped = end({ ok: false, stopped: true })
+    const last = end()
+    const events = [prompt('go'), first, prompt('again'), stopped, prompt('once more'), last]
+    expect(passedEnds(events, false).size).toBe(0)
+    expect([...passedEnds(events, true)]).toEqual([last])
+    // A failed last end is the run's end even while it is going.
+    expect(passedEnds([prompt('go'), first], true).size).toBe(0)
+  })
+})
+
+describe('EventList replies a question follows', () => {
+  const long = 'The plan is saved. '.repeat(10)
+  const prompt: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'plan it' } }
+  const reply = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'text', text } })
+  const choice = { kind: 'choice', id: 'await-choices', title: 'Start?', options: [{ id: 'a', label: 'Approve' }] } as FrameworkEvent
+
+  test('the reply a question follows is shown whole, and a click folds it', () => {
+    render(<EventList events={[prompt, reply(long), { kind: 'usage', costUsd: 0.1 }, choice]} stick={false} />)
+    const toggle = screen.getByRole('button', { name: 'Collapse message' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(toggle)
+    expect(screen.getByRole('button', { name: 'Expand message' }).getAttribute('aria-expanded')).toBe('false')
+  })
+
+  test('any other long reply is folded: one before it in the turn, and one no question follows', () => {
+    const early = reply(long + 'early')
+    const asked = reply(long + 'asked')
+    const later = reply(long + 'later')
+    const events = [prompt, early, asked, choice, { kind: 'driver', event: { type: 'start', prompt: 'Approve' } } as FrameworkEvent, later]
+    expect([...askedReplies(events)]).toEqual([asked])
+    render(<EventList events={events} stick={false} />)
+    expect(screen.getAllByRole('button', { name: 'Expand message' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Collapse message' })).toHaveLength(1)
   })
 })

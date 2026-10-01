@@ -23,7 +23,7 @@ import {
 
 // Presentational event log, shared by the live stream and past-run replay. Most events render as
 // their human-readable line (the same formatter the terminal uses, so a `driver` turn reads
-// "· Read  src/app.ts" / "‹ turn complete" rather than raw JSON). Some things get special rows:
+// "· Read  src/app.ts" rather than raw JSON). Some things get special rows:
 //   - The message text: the user's prompt (`driver` `start`) and the agent's reply (`driver` `text`)
 //     render their raw text inline, truncated to one line when long and expanding in place on click
 //     (#476/#520). The prompt carries its own YOU badge so the log reads like a conversation.
@@ -33,6 +33,9 @@ import {
 //     a resolved one collapses to the AnsweredChoice ✓ card and hides its "✓ chose" line.
 //   - Screens: the newest open `screen` line at an address, before the run's end, is the live
 //     screen itself (InlineScreen); an earlier one stays its one line, and an `ended` one is hidden.
+//   - A turn's end and the spend so far are not rows, and neither is a clean end the run went on
+//     after: the run's details count turns and spend, and "finished" between turns is not so.
+//   - The reply a question follows is shown whole: it is what the question asks about.
 //   - Subagents, when the log is given the run's: each has a SUBAGENT row where it was started,
 //     read off its card, so the row of a working one says what it is doing now; and the prompt
 //     that told the run a subagent ended is a SUBAGENT row too, not a YOU one.
@@ -225,12 +228,48 @@ export function foldScreenRows(events: readonly FrameworkEvent[]): { live: Set<F
   return { live, hidden }
 }
 
+/**
+ * The clean ends that are not the run's end: one a later prompt follows (the run went on), and
+ * the last one while the run's subagents still work (`going`). They are not rows: "finished"
+ * between two turns, or over working subagents, says what is not so.
+ */
+export function passedEnds(events: readonly FrameworkEvent[], going: boolean): Set<FrameworkEvent> {
+  const passed = new Set<FrameworkEvent>()
+  let pending: FrameworkEvent | undefined
+  for (const e of events) {
+    if (e.kind === 'end') pending = e.ok ? e : undefined
+    else if (pending && isTurnBoundary(e)) {
+      passed.add(pending)
+      pending = undefined
+    }
+  }
+  if (pending && going) passed.add(pending)
+  return passed
+}
+
+/**
+ * The replies a question follows: the agent's last message before each question it stopped on.
+ * It is what the question is about (a plan to approve), so it is shown whole, not folded.
+ */
+export function askedReplies(events: readonly FrameworkEvent[]): Set<FrameworkEvent> {
+  const asked = new Set<FrameworkEvent>()
+  let reply: FrameworkEvent | undefined
+  for (const e of events) {
+    if (isTurnBoundary(e)) reply = undefined
+    else if (e.kind === 'driver' && e.event.type === 'text') reply = e
+    else if (e.kind === 'choice' && reply) asked.add(reply)
+  }
+  return asked
+}
+
 // A conversation message (a prompt or a reply), rendered as compact Markdown. A short one renders
 // as-is. A long one clamps to its first line with a chevron beside it and expands in place on click —
 // the chevron stays on that first line (never a lone chevron on its own row), and the same rendered
 // Markdown just unclamps, so the opening is never shown twice.
-function Message({ text }: { text: string }) {
-  const [open, setOpen] = useState(false)
+function Message({ text, startOpen = false }: { text: string; startOpen?: boolean }) {
+  // The reader's own click wins; until then a message is folded, unless it starts open.
+  const [toggled, setOpen] = useState<boolean | null>(null)
+  const open = toggled ?? startOpen
   if (!isLong(text)) {
     return (
       <div className="min-w-0 flex-1">
@@ -242,7 +281,7 @@ function Message({ text }: { text: string }) {
     <div className="flex min-w-0 flex-1 items-start gap-1.5">
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label={open ? 'Collapse message' : 'Expand message'}
         className={`shrink-0 select-none text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}
@@ -284,11 +323,14 @@ const NOTHING_DOING: Record<string, string> = {}
 
 /**
  * Whether an event is a row at all. The agent's session id is plumbing, not conversation: the
- * run's ⋮ menu reads it from the events. A quota reading is worth a row only when the quota is
- * running low or used up; the agent reports it after every turn, "allowed" included.
+ * run's ⋮ menu reads it from the events. A turn's end and what the run has spent are not rows
+ * either: the run's details count the turns and total the spend. A quota reading is worth a row
+ * only when the quota is running low or used up; the agent reports it after every turn,
+ * "allowed" included.
  */
 function shownAsRow(e: FrameworkEvent): boolean {
-  if (e.kind === 'session-update') return false
+  if (e.kind === 'session-update' || e.kind === 'usage') return false
+  if (e.kind === 'driver' && e.event.type === 'result') return false
   if (e.kind === 'driver' && e.event.type === 'rate-limit') return e.event.limit.status !== 'allowed'
   return true
 }
@@ -305,6 +347,7 @@ export function EventList({
   agentId: agentId,
   subagents = NO_SUBAGENTS,
   doing = NOTHING_DOING,
+  going = false,
   onOpenAgent,
 }: {
   events: FrameworkEvent[]
@@ -334,12 +377,16 @@ export function EventList({
   subagents?: readonly AgentMeta[]
   /** What each working subagent is doing now, by id. */
   doing?: Record<string, string>
+  /** The run's job is not over (its subagents still work): its last clean end is not shown as the end. */
+  going?: boolean
   /** Open another run's page: what a subagent's row does on a click. */
   onOpenAgent?: ((agentId: string) => void) | undefined
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
   const screenRows = useMemo(() => foldScreenRows(events), [events])
-  const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
+  const passed = useMemo(() => passedEnds(events, going), [events, going])
+  const asked = useMemo(() => askedReplies(events), [events])
+  const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e) && !passed.has(e))
   const shown: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
   // The prompts that told this run one of its subagents ended: SUBAGENT rows, not the reader's own.
   const ends = new Map<FrameworkEvent, SubagentEnd>()
@@ -396,7 +443,7 @@ export function EventList({
                     </div>
                   ) : message !== null ? (
                     // A prompt (YOU) or a reply (AGENT): compact Markdown, collapsed to its first line when long.
-                    <Message text={message} />
+                    <Message text={message} startOpen={asked.has(e)} />
                   ) : e.kind === 'driver' && e.event.type === 'thought' ? (
                     <Thought text={e.event.text} />
                   ) : choiceRow && projectId ? (

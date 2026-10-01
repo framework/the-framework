@@ -22,6 +22,7 @@ export function AgentFeed({
   agentId: agentId,
   subagents,
   doing,
+  going,
   onOpenAgent,
 }: {
   events: FrameworkEvent[]
@@ -47,6 +48,8 @@ export function AgentFeed({
   /** The run's subagents, what each is doing now, and how a click on one's row opens it. */
   subagents?: readonly AgentMeta[] | undefined
   doing?: Record<string, string> | undefined
+  /** The run's job is not over: its subagents still work. */
+  going?: boolean | undefined
   onOpenAgent?: ((agentId: string) => void) | undefined
 }) {
   const lostBanner = lost && (
@@ -78,6 +81,7 @@ export function AgentFeed({
         agentId={agentId}
         {...(subagents ? { subagents } : {})}
         {...(doing ? { doing } : {})}
+        {...(going ? { going } : {})}
         onOpenAgent={onOpenAgent}
       />
     </>

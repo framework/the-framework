@@ -21,6 +21,19 @@ export function isOpenSubagent(agent: Pick<AgentMeta, 'status'>): boolean {
   return agent.status === 'running' || agent.status === 'waiting'
 }
 
+/** How long after a subagent ended its main agent may still be on its way back to work. */
+const CONTINUING_MS = 10_000
+
+/**
+ * A subagent its main agent's job is not over with: working, saving its record, or ended so
+ * recently that the main agent is still being continued with its end. A main agent is continued
+ * a few seconds after its subagent's card says it ended, and for that moment both read as ended.
+ */
+export function holdsMainAgent(agent: Pick<AgentMeta, 'status' | 'saving' | 'endedAt'>, now: number): boolean {
+  if (agent.status === 'running' || agent.saving === true) return true
+  return agent.endedAt !== undefined && now - Date.parse(agent.endedAt) < CONTINUING_MS
+}
+
 /** A row of a list of runs, as the tree needs it: a key that ends with the run's id, and the run. */
 type TreeRow = { key: string; agent: AgentMeta }
 

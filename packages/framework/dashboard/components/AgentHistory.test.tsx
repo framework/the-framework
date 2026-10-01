@@ -246,6 +246,27 @@ describe('subagents on the rail', () => {
     expect(screen.getByText('done')).toBeTruthy()
   })
 
+  test('a main agent reads as running for the moment after a subagent ended: it is about to go on', () => {
+    renderRail(<AgentHistory projectId="p1" agents={[sub('c1', { endedAt: new Date().toISOString() }), main]} selectedAgentId={null} onSelect={() => {}} />)
+    expect(screen.getByText('running')).toBeTruthy()
+    cleanup()
+    renderRail(<AgentHistory projectId="p1" agents={[sub('c1', { endedAt: '2026-07-19T16:10:00.000Z' }), main]} selectedAgentId={null} onSelect={() => {}} />)
+    expect(screen.queryByText('running')).toBeNull()
+  })
+
+  test("the count of subagents is on the main agent's own row, and a click on it folds the list without opening the agent", () => {
+    let picked: string | null = null
+    renderRail(<AgentHistory projectId="p1" agents={[sub('c2'), sub('c1'), main]} selectedAgentId={null} onSelect={id => (picked = id)} />)
+    const fold = screen.getByRole('button', { name: '2 agents' })
+    expect(fold.closest('button')?.textContent).toContain('split the login work')
+    fireEvent.click(fold)
+    expect(screen.getByText('task c1')).toBeTruthy()
+    expect(picked).toBeNull()
+    fireEvent.keyDown(fold, { key: 'Enter' })
+    expect(screen.queryByText('task c1')).toBeNull()
+    expect(picked).toBeNull()
+  })
+
   test('a main agent that failed or was stopped keeps its own word while a subagent works', () => {
     renderRail(<AgentHistory projectId="p1" agents={[sub('c1', { status: 'running' }), { ...main, status: 'failed' }]} selectedAgentId={null} onSelect={() => {}} />)
     expect(screen.getByText('failed')).toBeTruthy()

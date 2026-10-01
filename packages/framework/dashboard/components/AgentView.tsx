@@ -16,6 +16,7 @@ import { useMountedModules } from '../lib/use-modules.js'
 import { HandoffActions, HandoffSummary, AgentHandoffDetails } from './AgentHandoff.js'
 import { AgentDetails, type AgentDetailsCard } from './AgentDetails.js'
 import { SubagentsBar } from './SubagentLine.js'
+import { holdsMainAgent } from '../lib/subagents.js'
 
 // One session's view, whether it is running or finished (#1026).
 //
@@ -110,7 +111,9 @@ export function AgentView({
   )
   // What each working subagent is doing now, read only while one works: an ended one's row says how it ended.
   const workingSubagents = subagents.filter(agent => agent.status === 'running').map(agent => agent.id).join(',')
-  const subagentsRunning = workingSubagents ? workingSubagents.split(',').length : 0
+  // How many subagents the run's job still waits on: while any, the run is not over, whatever its own turn says.
+  const now = Date.now()
+  const subagentsRunning = subagents.filter(agent => holdsMainAgent(agent, now)).length
   const { value: doing } = usePolled<Record<string, string>>(
     workingSubagents ? () => onAgentsDoing(projectId, workingSubagents.split(',')) : null,
     NOTHING_DOING,
@@ -263,8 +266,9 @@ export function AgentView({
         onToggle={toggle}
         ready={ready}
         actions={
-          // A run that is working publishes its own work; the next step is offered once it has ended.
-          live === false ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} /> : undefined
+          // A run that is working publishes its own work; the next step is offered once it has ended,
+          // and a run whose subagents still work has not: it goes on as each of them ends.
+          live === false && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} /> : undefined
         }
       />
       {/* The always-available session-details strip: agent + spend (#322). Sits above the changes/
@@ -318,6 +322,7 @@ export function AgentView({
           tail={<CloudMirrorRow target={target} events={shown} />}
           subagents={subagents}
           doing={doing}
+          going={subagentsRunning > 0}
           onOpenAgent={onOpenAgent}
         />
       )}

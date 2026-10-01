@@ -1,6 +1,6 @@
 import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
 import { describe, expect, test } from 'vitest'
-import { isOpenSubagent, nestRows, startedBefore, subagentEnd, subagentStartedAt, subagentsOf, taskLabel } from './subagents.js'
+import { holdsMainAgent, isOpenSubagent, nestRows, startedBefore, subagentEnd, subagentStartedAt, subagentsOf, taskLabel } from './subagents.js'
 
 function agent(id: string, over: Partial<AgentMeta> = {}): AgentMeta {
   return { status: 'done', id, startedAt: '2026-10-01T10:00:00.000Z', updatedAt: '2026-10-01T10:00:00.000Z', ...over }
@@ -106,5 +106,20 @@ describe('subagentStartedAt', () => {
     const events = [{ kind: 'log', message: 'a', at: '2026-10-01T10:00:59.000Z' }, { kind: 'log', message: 'b', at: '2026-10-01T10:01:05.000Z' }] as FrameworkEvent[]
     const rows = startedBefore(events, [agent('2026-10-01T10-01-00-000Z', { startedAt: '2026-10-01T10:01:07.500Z' })])
     expect([...rows.keys()]).toEqual([1])
+  })
+})
+
+describe('holdsMainAgent', () => {
+  const now = Date.parse('2026-10-01T10:05:00.000Z')
+  test("a main agent's job is not over with a subagent that works, saves, or ended in the last seconds", () => {
+    expect(holdsMainAgent({ status: 'running' }, now)).toBe(true)
+    expect(holdsMainAgent({ status: 'done', saving: true, endedAt: '2026-10-01T10:00:00.000Z' }, now)).toBe(true)
+    expect(holdsMainAgent({ status: 'done', endedAt: '2026-10-01T10:04:55.000Z' }, now)).toBe(true)
+    expect(holdsMainAgent({ status: 'failed', endedAt: '2026-10-01T10:04:51.000Z' }, now)).toBe(true)
+  })
+
+  test('it is over with one that ended ten seconds ago or more, and with one that only waits', () => {
+    expect(holdsMainAgent({ status: 'done', endedAt: '2026-10-01T10:04:50.000Z' }, now)).toBe(false)
+    expect(holdsMainAgent({ status: 'waiting' }, now)).toBe(false)
   })
 })

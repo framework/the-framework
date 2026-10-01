@@ -8,10 +8,11 @@ import type { ModuleRunProps } from '../module/index.js'
 const onAgent = vi.fn(async () => [] as unknown)
 const onRetainedWorktrees = vi.fn(async () => [] as unknown)
 const onAgentHandoff = vi.fn(async () => null as unknown)
+const onAgentsDoing = vi.fn(async () => ({}) as unknown)
 const onBridgeQuestion = vi.fn(async () => null as unknown)
 const onBridgeEvents = vi.fn(async () => [] as unknown)
 const onBridgeAnswer = vi.fn(async () => null as unknown)
-vi.mock('../rpc/reads.js', () => ({ onAgent, onRetainedWorktrees, onAgentHandoff, onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
+vi.mock('../rpc/reads.js', () => ({ onAgent, onRetainedWorktrees, onAgentHandoff, onAgentsDoing, onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
 vi.mock('../rpc/control.js', () => ({
   sendOpenPullRequest: vi.fn(async () => null),
   sendSetHandoff: vi.fn(async () => null),
@@ -159,6 +160,29 @@ describe('AgentView branch read', () => {
     onAgentHandoff.mockResolvedValue(PUSHED)
     render(view({ card: { status: 'done', saving: true } }))
     await waitFor(() => expect(screen.getByRole('button', { name: /Open PR/ })).toBeTruthy())
+  })
+})
+
+describe('the next step of a run whose subagents still work', () => {
+  const sub = (over: Record<string, unknown>) => ({ id: 'c1', parent: 'run-1', startedAt: '2026-10-01T10:00:00.000Z', updatedAt: '2026-10-01T10:00:00.000Z', status: 'done', ...over }) as never
+
+  test('Open PR is not offered while a subagent works, and is once none does', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValue(PUSHED)
+    const { rerender } = render(view({ card: { status: 'done' }, subagents: [sub({ status: 'running' })] }))
+    await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledWith('p1', 'run-1'))
+    await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'))
+    expect(screen.queryByRole('button', { name: /Open PR/ })).toBeNull()
+    rerender(view({ card: { status: 'done' }, subagents: [sub({ status: 'done', endedAt: '2026-10-01T10:02:00.000Z' })] }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Open PR/ })).toBeTruthy())
+  })
+
+  test('nor right after a subagent ended: its main agent is about to go on', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValue(PUSHED)
+    render(view({ card: { status: 'done' }, subagents: [sub({ status: 'done', endedAt: new Date().toISOString() })] }))
+    await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'))
+    expect(screen.queryByRole('button', { name: /Open PR/ })).toBeNull()
   })
 })
 

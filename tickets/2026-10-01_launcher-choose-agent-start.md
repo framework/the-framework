@@ -6,7 +6,7 @@ Issue: [#1901](https://github.com/framework/the-framework/issues/1901)
 
 ## TLDR
 
-Nice to have: when starting an agent, choose where it starts: `main` (the default) or the branch the project's checkout is on, with its unpushed commits. The launcher shows the choice next to Start ("Starts from `main`"), as a small picker.
+Nice to have: when starting an agent, choose where it starts: `main` (the default) or the branch the project's checkout is on, with its unpushed commits. The launcher shows the choice next to Start ("Starts from `main`"), as a small picker. The Files tab shows the files of the picked branch, with that branch's changes marked.
 
 ## Why it matters
 
@@ -17,6 +17,7 @@ Since #1900 every agent starts from origin's default branch, fetched first. That
 - The launcher shows where the agent starts, next to Start: "Starts from `main`" (the real default branch's name).
 - That line is a picker with two choices: `main` (default) and "my current branch" (the branch the project's checkout is on, with its unpushed commits).
 - The pick reaches the run the way the coding agent and model do: an environment variable for the project's start hook, then a base for the checkout (`createCheckout`'s `base`, which `branches create --base` already uses).
+- The Files tab follows the pick: while the run's checkout is being made, it shows the picked branch's files, and for a local branch it marks that branch's changes against `main`. Today the "starting" view always shows `origin/main`, so the pick must be recorded where the Files tab can read it (the run's record).
 - Uncommitted edits are not carried over: the agent gets what is committed. A later step if it is missed.
 - A follow-up on an existing run is not affected: it continues on its own branch.
 
@@ -30,3 +31,4 @@ Since #1900 every agent starts from origin's default branch, fetched first. That
 
 - Remember the last pick per project, or always start on `main`?
 - Should the run page say the run started from a local branch, since its push may publish commits that were only local?
+

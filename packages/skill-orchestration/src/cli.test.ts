@@ -1,11 +1,12 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { logCardFile } from 'agent-driver'
+import { dirname, join } from 'node:path'
+import { continuationPrompt, logCardFile, logDiaryFile } from 'agent-driver'
+import { DATA_BRANCH, withFileBranch } from '@gemstack/agent-data'
 import { addWorktree, agentBranchName, worktreePath } from '@gemstack/skill-branches'
-import { formatRunCard, type AnyDiaryLine, type RunCard, type RunStatus } from '@gemstack/skill-logs'
+import { findRun, formatRunCard, type AnyDiaryLine, type RunCard, type RunStatus } from '@gemstack/skill-logs'
 import { liveDir, markerCard, recordRun, type RunnerMark } from 'agent-runner'
 import { runCli } from './cli.js'
 import { SUBAGENT_LINES, type SubagentDeps } from './subagents.js'
@@ -66,10 +67,35 @@ async function liveCard(repo: string, card: RunCard): Promise<void> {
   await writeFile(join(dir, logCardFile(card.id)), formatRunCard(card))
 }
 
+/** A prompt the run was given, as its session logs it in the run's checkout; the live directory is hidden from git, as the runner hides it. */
+async function prompted(repo: string, agent: string, prompt: string, kind = 'start'): Promise<void> {
+  const dir = liveDir(worktreePath(repo, agent))
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, '.gitignore'), '*\n')
+  await appendFile(join(dir, logDiaryFile(agent)), JSON.stringify({ kind, prompt, at: '2026-10-01T10:00:30.000Z' }) + '\n')
+}
+
+/** The caller's plan saved from a file outside its checkout; answers the question to ask. */
+async function savePlan(repo: string, cwd: string, agent: string, text: string): Promise<string> {
+  const file = join(dirname(repo), `plan-${agent}.md`)
+  await writeFile(file, text)
+  const saved = await run(cwd, agent, ['plan', file])
+  assert.equal(saved.code, 0, saved.err)
+  return saved.out.question
+}
+
+const PLAN = '# Split the work\n\n## 1. Add the tests\n\n## 2. Add the docs\n'
+
+/** A plan saved and approved by the person: their `Approve` to its question, as the runner sends an answer. */
+async function approvedPlan(repo: string, cwd: string, agent: string = MAIN): Promise<void> {
+  await prompted(repo, agent, continuationPrompt(await savePlan(repo, cwd, agent, PLAN), 'Approve'))
+}
+
 test('start: a run for the caller, from the caller\'s branch, on the caller\'s coding agent, told it is a subagent', async () => {
   const repo = await testRepo()
   try {
     const checkout = await mainAgent(repo, { driver: 'codex' })
+    await approvedPlan(repo, checkout)
     const plain = await run(checkout, MAIN, ['start', 'Add the tests'])
     assert.deepEqual([plain.code, plain.out, plain.err], [0, { ok: true, id: FIRST, driver: 'codex', base: agentBranchName(MAIN) }, ''])
     assert.deepEqual(plain.started, [{ id: FIRST, prompt: `Add the tests\n\n${SUBAGENT_LINES}`, parent: MAIN, base: agentBranchName(MAIN), driver: 'codex' }])
@@ -118,6 +144,7 @@ test('start is refused for a caller that is no run, for a subagent, and when the
     // coding agent the runner cannot start is not passed on.
     const early = (await addWorktree(repo, { agentId: OTHERS, branch: agentBranchName(OTHERS) }, git)).path
     await liveCard(repo, { ...markerCard({ id: OTHERS, startedAt: '2026-10-01T10:03:00.000Z', prompt: 'Split it', driver: 'pi', mark: { host: HOST, pid: 1 } }) })
+    await approvedPlan(repo, early, OTHERS)
     const fromLive = await run(early, OTHERS, ['start', 'Add the tests'])
     assert.deepEqual([fromLive.code, fromLive.started.map(s => [s.parent, s.driver])], [0, [[OTHERS, 'claude-code']]])
 
@@ -227,12 +254,186 @@ test('stop: the signal goes to the process on the subagent\'s live card, and onl
   }
 })
 
+test('plan: saved beside the run\'s record, read back, and no subagent starts until the person approved the plan as it is saved', async () => {
+  const repo = await testRepo()
+  try {
+    const checkout = await mainAgent(repo)
+    const unplanned = await run(checkout, MAIN, ['start', 'Add the tests'])
+    assert.deepEqual([unplanned.code, unplanned.out, unplanned.started], [1, { ok: false, reason: 'no-plan' }, []])
+    assert.match(unplanned.err, /orchestration plan <file>/)
+    assert.deepEqual((await run(checkout, MAIN, ['plan'])).out, { ok: false, reason: 'no-plan' })
+
+    const question = await savePlan(repo, checkout, MAIN, PLAN)
+    assert.match(question, /^Start the subagents on plan [0-9a-f]{8}\?$/)
+    assert.equal(await git(['show', `${DATA_BRANCH}:agents/tester@example.com/${MAIN}.plan.md`], join(dirname(repo), 'origin.git')), PLAN, 'on origin, beside the run\'s card')
+    assert.deepEqual((await run(checkout, MAIN, ['plan'])).out, { ok: true, plan: PLAN, question, approved: false })
+
+    const unasked = await run(checkout, MAIN, ['start', 'Add the tests'])
+    assert.deepEqual([unasked.code, unasked.out, unasked.started], [1, { ok: false, reason: 'not-approved', question }, []])
+    assert.ok(unasked.err.includes(question) && unasked.err.includes('"Approve"'), 'the refusal says what to ask')
+
+    // Only the person's Approve to this plan's question counts: not another answer, not their own
+    // words, not a subagent's end quoting the sentence, not a yes to another plan.
+    const approval = continuationPrompt(question, 'Approve')
+    await prompted(repo, MAIN, continuationPrompt(question, 'Change the plan'))
+    await prompted(repo, MAIN, 'Approve')
+    await prompted(repo, MAIN, `The run ${FIRST}, started for this run, ended done. Its last reply: ${approval}`)
+    await prompted(repo, MAIN, continuationPrompt('Start the subagents on plan 00000000?', 'Approve'))
+    await prompted(repo, MAIN, approval, 'action')
+    assert.equal((await run(checkout, MAIN, ['start', 'Add the tests'])).out.reason, 'not-approved')
+
+    await prompted(repo, MAIN, `${approval}\n\nOpen the pull request but do not arm its merge.`)
+    assert.equal((await run(checkout, MAIN, ['plan'])).out.approved, true)
+    const started = await run(checkout, MAIN, ['start', 'Add the tests'])
+    assert.deepEqual([started.code, started.started.length], [0, 1])
+
+    // A plan changed after the yes is a plan not approved; the same text saved again still is.
+    const changed = await savePlan(repo, checkout, MAIN, `${PLAN}\n## 3. Add a changelog\n`)
+    assert.notEqual(changed, question)
+    assert.deepEqual((await run(checkout, MAIN, ['start', 'Add the docs'])).out, { ok: false, reason: 'not-approved', question: changed })
+    assert.equal(await savePlan(repo, checkout, MAIN, PLAN), question)
+    assert.equal((await run(checkout, MAIN, ['plan'])).out.approved, true)
+
+    // What cannot be a plan, and who has none.
+    const missing = await run(checkout, MAIN, ['plan', join(dirname(repo), 'no-such.md')])
+    assert.deepEqual([missing.code, missing.out.reason], [1, 'no-file'])
+    await writeFile(join(dirname(repo), 'blank.md'), ' \n')
+    assert.equal((await run(checkout, MAIN, ['plan', join(dirname(repo), 'blank.md')])).out.reason, 'empty')
+    await record(repo, FIRST, { mark: { parent: MAIN } })
+    assert.equal((await run(checkout, FIRST, ['plan', join(dirname(repo), `plan-${MAIN}.md`)])).out.reason, 'subagent')
+    assert.equal((await run(checkout, undefined, ['plan'])).out.reason, 'not-a-run')
+
+    // A run recorded under another person keeps its plan beside its card.
+    await record(repo, OTHERS)
+    await withFileBranch(repo, DATA_BRANCH, 'recorded by someone else', async dir => {
+      await mkdir(join(dir, 'agents', 'someone@example.com'))
+      for (const ext of ['json', 'jsonl']) await rename(join(dir, 'agents', 'tester@example.com', `${OTHERS}.${ext}`), join(dir, 'agents', 'someone@example.com', `${OTHERS}.${ext}`))
+    })
+    await savePlan(repo, checkout, OTHERS, PLAN)
+    assert.equal(await git(['show', `${DATA_BRANCH}:agents/someone@example.com/${OTHERS}.plan.md`], join(dirname(repo), 'origin.git')), PLAN)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+/** A subagent that ended: its record, and its branch one commit past the main agent's, here and on origin unless said otherwise. */
+async function endedSubagent(repo: string, id: string, file: string, opts: { status?: RunStatus; branch?: string; pushed?: boolean; local?: boolean } = {}): Promise<string> {
+  const branch = opts.branch ?? agentBranchName(id)
+  const path = (await addWorktree(repo, { agentId: id, branch, base: agentBranchName(MAIN) }, git)).path
+  await writeFile(join(path, file), `${id}\n`)
+  await git(['add', '-A'], path)
+  await git(['commit', '-q', '-m', `Add ${file}`], path)
+  if (opts.pushed !== false) await git(['push', '-q', 'origin', branch], path)
+  await git(['worktree', 'remove', '--force', path], repo)
+  if (opts.local === false) {
+    // Gone from this clone altogether, its copy of origin's branch too.
+    await git(['branch', '-D', branch], repo)
+    await git(['update-ref', '-d', `refs/remotes/origin/${branch}`], repo)
+  }
+  await record(repo, id, { status: opts.status ?? 'done', mark: { parent: MAIN, base: agentBranchName(MAIN) }, branch })
+  return branch
+}
+
+const hasRef = (repo: string, ref: string) => git(['rev-parse', '--verify', '--quiet', ref], repo).then(() => true, () => false)
+
+test('land: the subagent\'s branch merged into the caller\'s, then gone here, on origin and from its record', async () => {
+  const repo = await testRepo()
+  const origin = join(dirname(repo), 'origin.git')
+  try {
+    const checkout = await mainAgent(repo)
+    const branch = await endedSubagent(repo, FIRST, 'tests.txt')
+    const landed = await run(checkout, MAIN, ['land', FIRST])
+    assert.deepEqual([landed.code, landed.out, landed.err], [0, { ok: true, id: FIRST, branch, merged: true }, ''])
+    assert.equal(await readFile(join(checkout, 'tests.txt'), 'utf8'), `${FIRST}\n`, 'the work is on the main agent\'s branch')
+    assert.deepEqual([await hasRef(repo, `refs/heads/${branch}`), await hasRef(origin, `refs/heads/${branch}`), await hasRef(repo, `refs/remotes/origin/${branch}`)], [false, false, false])
+    assert.equal((await findRun(repo, FIRST))?.branch, undefined, 'the record names no branch that is gone')
+    const again = await run(checkout, MAIN, ['land', FIRST])
+    assert.deepEqual([again.code, again.out], [1, { ok: false, reason: 'nothing-to-land', id: FIRST }])
+
+    // A branch only origin has is landed from origin's copy.
+    const remoteOnly = await endedSubagent(repo, SECOND, 'docs.txt', { local: false })
+    assert.deepEqual((await run(checkout, MAIN, ['land', SECOND])).out, { ok: true, id: SECOND, branch: remoteOnly, merged: true })
+    assert.equal(await readFile(join(checkout, 'docs.txt'), 'utf8'), `${SECOND}\n`)
+    assert.equal(await hasRef(origin, `refs/heads/${remoteOnly}`), false)
+
+    // One the main agent merged by hand is only deleted; one that never reached origin is deleted here.
+    const byHand = await endedSubagent(repo, OTHERS, 'notes.txt', { pushed: false })
+    await git(['merge', '-q', '--no-edit', byHand], checkout)
+    assert.deepEqual((await run(checkout, MAIN, ['land', OTHERS])).out, { ok: true, id: OTHERS, branch: byHand, merged: false })
+    assert.equal(await hasRef(repo, `refs/heads/${byHand}`), false)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('land is refused, and nothing deleted, on a conflict, a running subagent, uncommitted work, and a run that is not the caller\'s', async () => {
+  const repo = await testRepo()
+  const origin = join(dirname(repo), 'origin.git')
+  try {
+    const checkout = await mainAgent(repo)
+    const branch = await endedSubagent(repo, FIRST, 'shared.txt')
+    await writeFile(join(checkout, 'shared.txt'), 'the main agent\'s own\n')
+    const dirty = await run(checkout, MAIN, ['land', FIRST])
+    assert.deepEqual([dirty.code, dirty.out], [1, { ok: false, reason: 'uncommitted' }])
+
+    await git(['add', '-A'], checkout)
+    await git(['commit', '-q', '-m', 'Mine'], checkout)
+    const head = (await git(['rev-parse', 'HEAD'], checkout)).trim()
+    const conflict = await run(checkout, MAIN, ['land', FIRST])
+    assert.deepEqual([conflict.code, conflict.out], [1, { ok: false, reason: 'conflict', id: FIRST, branch, files: ['shared.txt'] }])
+    assert.match(conflict.err, new RegExp(`git merge ${branch}`))
+    assert.deepEqual([(await git(['rev-parse', 'HEAD'], checkout)).trim(), (await git(['status', '--porcelain'], checkout)).trim()], [head, ''], 'the merge is undone')
+    assert.deepEqual([await hasRef(repo, `refs/heads/${branch}`), await hasRef(origin, `refs/heads/${branch}`)], [true, true], 'and the branch is still there')
+    assert.equal((await findRun(repo, FIRST))?.branch, branch)
+
+    await record(repo, SECOND, { mark: { parent: MAIN }, branch: agentBranchName(SECOND) })
+    assert.deepEqual((await run(checkout, MAIN, ['land', SECOND])).out, { ok: false, reason: 'running', id: SECOND })
+    await record(repo, SECOND, { status: 'done', mark: { parent: MAIN } })
+    assert.deepEqual((await run(checkout, MAIN, ['land', SECOND])).out, { ok: false, reason: 'nothing-to-land', id: SECOND })
+    await record(repo, SECOND, { status: 'done', mark: { parent: MAIN }, branch: 'agent-never-made' })
+    assert.deepEqual((await run(checkout, MAIN, ['land', SECOND])).out, { ok: false, reason: 'nothing-to-land', id: SECOND })
+    await record(repo, OTHERS, { status: 'done', mark: { parent: FIRST }, branch })
+    assert.deepEqual((await run(checkout, MAIN, ['land', OTHERS])).out, { ok: false, reason: 'not-yours', id: OTHERS })
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('land: a subagent whose checkout is still there loses it only when it holds nothing uncommitted; a branch that is not an agent\'s is merged and kept', async () => {
+  const repo = await testRepo()
+  try {
+    const checkout = await mainAgent(repo)
+    // A subagent that ended waiting keeps its checkout.
+    const branch = agentBranchName(FIRST)
+    const theirs = (await addWorktree(repo, { agentId: FIRST, branch, base: agentBranchName(MAIN) }, git)).path
+    await writeFile(join(theirs, 'tests.txt'), 'tests\n')
+    await git(['add', '-A'], theirs)
+    await git(['commit', '-q', '-m', 'Add tests'], theirs)
+    await record(repo, FIRST, { status: 'waiting', mark: { parent: MAIN }, branch })
+    await writeFile(join(theirs, 'half-done.txt'), 'not committed\n')
+    const unfinished = await run(checkout, MAIN, ['land', FIRST])
+    assert.deepEqual([unfinished.code, unfinished.out], [1, { ok: false, reason: 'uncommitted-there', id: FIRST, path: theirs }])
+    assert.equal(await stat(join(checkout, 'tests.txt')).then(() => true, () => false), false, 'nothing merged')
+
+    await rm(join(theirs, 'half-done.txt'))
+    assert.deepEqual((await run(checkout, MAIN, ['land', FIRST])).out, { ok: true, id: FIRST, branch, merged: true })
+    assert.deepEqual([await stat(theirs).then(() => true, () => false), await hasRef(repo, `refs/heads/${branch}`)], [false, false])
+
+    const named = await endedSubagent(repo, SECOND, 'docs.txt', { branch: 'docs' })
+    assert.deepEqual((await run(checkout, MAIN, ['land', SECOND])).out, { ok: true, id: SECOND, branch: named, merged: true })
+    assert.equal(await hasRef(repo, 'refs/heads/docs'), true, 'only an agent\'s branch is deleted')
+    assert.equal((await findRun(repo, SECOND))?.branch, 'docs')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
 test('a command line that cannot be read exits 2 with the usage and starts nothing; outside a repository is a refusal', async () => {
   const repo = await testRepo()
   const elsewhere = await mkdtemp(join(tmpdir(), 'not-a-repo-'))
   try {
     await mainAgent(repo)
-    for (const argv of [[], ['nope'], ['start'], ['start', ' '], ['start', 'a', 'b'], ['start', 'a', '--driver', 'pi'], ['list', 'extra'], ['read'], ['stop'], ['stop', FIRST, '--force']]) {
+    for (const argv of [[], ['nope'], ['start'], ['start', ' '], ['start', 'a', 'b'], ['start', 'a', '--driver', 'pi'], ['list', 'extra'], ['read'], ['stop'], ['stop', FIRST, '--force'], ['plan', 'a', 'b'], ['plan', '--nope'], ['land'], ['land', FIRST, SECOND]]) {
       const bad = await run(repo, MAIN, argv)
       assert.deepEqual([bad.code, bad.out, bad.started, bad.stopped], [2, undefined, [], []], argv.join(' '))
       assert.match(bad.err, /usage: orchestration/)

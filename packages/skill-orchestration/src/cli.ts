@@ -1,9 +1,11 @@
+import { readFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
+import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { nodeGitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
 import { DRIVER_NAMES, isDriverName, isPidAlive, readyToRun, spawnRun, withdrawMarker, writeMarker } from 'agent-runner'
-import { Refused, listSubagents, readSubagent, startSubagent, stopSubagent, type SubagentDeps } from './subagents.js'
+import { Refused, landSubagent, listSubagents, readSubagent, savePlan, showPlan, startSubagent, stopSubagent, type SubagentDeps } from './subagents.js'
 
 /**
  * The `orchestration` command: JSON on stdout, one line for a person on stderr, and the exit code
@@ -13,11 +15,15 @@ import { Refused, listSubagents, readSubagent, startSubagent, stopSubagent, type
 
 export const USAGE = `usage: orchestration <command>
 
+  plan <file>       save the file as your plan; answers the \`question\` to ask the person
+  plan              your saved plan, its question, and whether the person approved it
   start <task> [--model <id>] [--driver <${DRIVER_NAMES.join('|')}>]
-                    start a subagent on the task, on a branch started from yours; answers its id at once
+                    start a subagent on the task, on a branch started from yours; answers its id at once;
+                    refused until the person approved your saved plan
   list              your subagents, newest first
   read <id>         one subagent: how it stands, its branch, and its last reply as \`result\`
   stop <id>         stop a subagent that is running
+  land <id>         merge an ended subagent's branch into yours, then delete that branch here and on origin
 
 JSON on stdout. Exit code 1 for a refusal or a failure (\`reason\` in the JSON, why on stderr), 2 for a usage error.`
 
@@ -61,6 +67,24 @@ export async function runCli(argv: string[], io: CliIo, given: Partial<SubagentD
 type Command = (args: string[], io: CliIo, deps: SubagentDeps) => Promise<unknown>
 
 const COMMANDS: Record<string, Command> = {
+  async plan(args, io, deps) {
+    let parsed
+    try {
+      parsed = parseArgs({ args, options: {}, allowPositionals: true, strict: true })
+    } catch (err) {
+      throw new Usage(err instanceof Error ? err.message : String(err))
+    }
+    const [file, ...more] = parsed.positionals
+    if (more.length > 0) throw new Usage(`expected at most 1 argument, got ${parsed.positionals.length}`)
+    const repo = await project(io.cwd, deps)
+    if (file === undefined) return { ok: true, ...(await showPlan(repo, io.env, deps)) }
+    const text = await readFile(resolve(io.cwd, file), 'utf8').catch(() => {
+      throw new Refused({ ok: false, reason: 'no-file', file }, `${file} cannot be read`)
+    })
+    if (!text.trim()) throw new Refused({ ok: false, reason: 'empty', file }, `${file} is empty`)
+    return { ok: true, ...(await savePlan(repo, io.env, text, deps)) }
+  },
+
   async start(args, io, deps) {
     const { positionals, values } = parse(args, { model: { type: 'string' }, driver: { type: 'string' } }, 1)
     const task = positionals[0]!
@@ -85,6 +109,11 @@ const COMMANDS: Record<string, Command> = {
   async stop(args, io, deps) {
     const { positionals } = parse(args, {}, 1)
     return { ok: true, ...(await stopSubagent(await project(io.cwd, deps), io.env, positionals[0]!, deps)) }
+  },
+
+  async land(args, io, deps) {
+    const { positionals } = parse(args, {}, 1)
+    return { ok: true, ...(await landSubagent(await project(io.cwd, deps), io.env, positionals[0]!, deps)) }
   },
 }
 

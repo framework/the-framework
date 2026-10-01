@@ -26,3 +26,19 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - Until a setting says which models subagents use, a subagent runs on the main agent's
   coding agent and that coding agent's default model, unless the main agent's own task
   names another.
+
+## The plan and the person's yes
+- The plan is one markdown file beside the main agent's run record on the data branch,
+  saved with `plan <file>`. Picked over a ticket file per task: tiny tasks would flood the
+  tickets, and one file is read in one go when approving.
+- No subagent starts before the person approved the plan: `start` is refused until the
+  main agent's log holds their Approve to a question that names the plan as it is saved,
+  so a changed plan needs a new yes. Picked over the skill file telling the agent to ask
+  first: nothing stops an agent that skips it, and a start spends money.
+
+## Landing
+- A subagent's work reaches the main agent's branch through `land`: a plain merge, then
+  the subagent's branch is deleted here and on origin. Picked over a squash per task, and
+  over the skill file telling the agent to merge and delete by hand: a branch left on
+  origin makes the main agent's branch look empty, and it is deleted with its checkout.
+- The main agent opens the one pull request, once every task is landed.

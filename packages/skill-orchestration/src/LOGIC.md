@@ -1,10 +1,10 @@
-The rules of the `orchestration` skill [1]: the `orchestration` command's four command lines and their JSON answers, and what starting, listing, reading and stopping a subagent [3] is. Every file here has a `LOGIC.md` of its own.
+The rules of the `orchestration` skill [1]: the `orchestration` command's command lines and their JSON answers, what a main agent's [2] plan and its approval are, and what starting, listing, reading, stopping and landing a subagent [3] is. Every file here has a `LOGIC.md` of its own.
 
 ## Context
 
-**User story**: an agent asked for a piece of work it can split starts a subagent per part, ends its turn, and is continued by the runner each time one ends, with which one, how it ended and its last words; it lists them, reads a result again, or stops one, with one short command each.
+**User story**: an agent asked for a piece of work it can split saves a plan, asks the person to approve it, then starts a subagent per part, ends its turn, and is continued by the runner each time one ends, with which one, how it ended and its last words; it lists them, reads a result again, stops one, or lands one's work on its own branch, with one short command each.
 
-**Business logic story**: each `orchestration` call is a short process (`cli.ts`) that reads the command line, finds the project and the calling run, and does one thing through the runner's library and the run records (`subagents.ts`). Nothing runs between calls and the package keeps no file of its own: a subagent is a run of the runner's, and everything about it is on its run record.
+**Business logic story**: each `orchestration` call is a short process (`cli.ts`) that reads the command line, finds the project and the calling run, and does one thing through the runner's library and the run records (`subagents.ts`). Nothing runs between calls. A subagent is a run of the runner's, and everything about it is on its run record; the one file the package keeps is the main agent's plan, beside that agent's run record (`plan.ts`).
 
 ## Glossary
 
@@ -14,7 +14,8 @@ The rules of the `orchestration` skill [1]: the `orchestration` command's four c
 
 ## Business logic — TL;DR
 
-- **The `orchestration` command** (`cli.ts`, `cli.test.ts`) - `start <task>`, `list`, `read <id>`, `stop <id>`; one JSON document on stdout, a line for a person on stderr, exit 0, 1 or 2.
-- **A main agent and its subagents** (`subagents.ts`) - who is calling (`AGENT_ID`); a subagent's record written and its process started as a run with the caller as parent, from the caller's branch, its task followed by fixed lines saying it is a subagent; the caller's subagents read back by the parent on their records; one stopped by SIGTERM to the process on its live card; the refusals.
-- **The entry point** (`index.ts`) - re-exports the command's runner and usage, and the four operations.
+- **The `orchestration` command** (`cli.ts`, `cli.test.ts`) - `plan [<file>]`, `start <task>`, `list`, `read <id>`, `stop <id>`, `land <id>`; one JSON document on stdout, a line for a person on stderr, exit 0, 1 or 2.
+- **A main agent and its subagents** (`subagents.ts`) - who is calling (`AGENT_ID`); a subagent's record written and its process started as a run with the caller as parent, from the caller's branch, its task followed by fixed lines saying it is a subagent; the caller's subagents read back by the parent on their records; one stopped by SIGTERM to the process on its live card; the plan saved and shown; no subagent before the plan is approved; one landed: merged into the caller's branch, its branch deleted; the refusals.
+- **The plan and its approval** (`plan.ts`) - the plan's file beside the run record, the question that names one plan's text, and the approval read off the main agent's diary: the person's `Approve` to that question, as the runner words an answer.
+- **The entry point** (`index.ts`) - re-exports the command's runner and usage, the operations, and the plan's parts.
 - **The tests' project** (`test-repo.ts`) - a throwaway repository with an origin and the `agent-data` branch.

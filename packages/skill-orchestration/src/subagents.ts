@@ -1,13 +1,18 @@
-import type { FileBranchWrite, GitRunner } from '@gemstack/agent-data'
-import { worktreeBranch, worktreeClean, worktreePath } from '@gemstack/skill-branches'
+import { stat } from 'node:fs/promises'
+import { gitReason, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
+import { isAgentBranch, removeWorktree, worktreeBranch, worktreeClean, worktreePath } from '@gemstack/skill-branches'
 import { agentLines, findRun, listRuns, publicCard, readDiary, type RunCard } from '@gemstack/skill-logs'
-import { AGENT_ID_ENV, isDriverName, markerCard, readLiveCard, runIdFrom, runnerMark, type DriverName, type readyToRun, type spawnRun } from 'agent-runner'
+import { AGENT_ID_ENV, isDriverName, markerCard, readLiveCard, recordRun, runIdFrom, runnerMark, type DriverName, type readyToRun, type spawnRun } from 'agent-runner'
+import { APPROVE, planApproved, planQuestion, readPlan, writePlan } from './plan.js'
 
 /**
  * A main agent and its subagents. The main agent is the run whose agent calls the command: its id
  * is in its environment (`AGENT_ID`). A subagent is a run started for it: a run of its own, in its
  * own checkout, on a branch started from the main agent's, with the main agent as its parent on
  * its record. The runner tells the main agent when a subagent ends; nothing here waits.
+ *
+ * No subagent starts before the person approved the main agent's plan (`plan.ts`), and a
+ * subagent's work reaches the main agent's branch by landing: merged there, its own branch gone.
  */
 
 /** What every subagent is told after its task: where its work goes, and that nobody answers it. */
@@ -97,6 +102,13 @@ export async function startSubagent(
   const driver = opts.driver ?? (main.driver !== undefined && isDriverName(main.driver) ? main.driver : 'claude-code')
   const ready = await deps.ready(repo, driver)
   if (ready.problems.length > 0) throw new Refused({ ok: false, reason: 'not-ready', ...ready }, ready.problems.join(' '))
+  // No subagent before the person said yes to the plan as it is saved now.
+  const plan = await readPlan(repo, main.id, deps.git)
+  if (plan === undefined) throw new Refused({ ok: false, reason: 'no-plan' }, 'no plan is saved: save your plan with `orchestration plan <file>` and ask the person the question it answers, before any subagent starts')
+  if (!(await planApproved(repo, main.id, plan))) {
+    const question = planQuestion(plan)
+    throw new Refused({ ok: false, reason: 'not-approved', question }, `the person has not approved the saved plan: ask them "${question}" with the option "${APPROVE}", end your reply there, and start once they chose it`)
+  }
   // The subagent's branch starts from the caller's last commit: what is not committed is not in it.
   const uncommitted = !(await worktreeClean(checkout, deps.git).catch(() => true))
   const startedAt = deps.now().toISOString()
@@ -142,4 +154,81 @@ export async function stopSubagent(repo: string, env: NodeJS.ProcessEnv, id: str
   if (pid === undefined || !deps.isAlive(pid)) throw new Refused({ ok: false, reason: 'no-process', id }, `${id} has no process to stop yet, or its process died: look again in a moment`)
   deps.stop(pid)
   return { id }
+}
+
+/** The caller's plan saved, and the question to ask the person about it. */
+export async function savePlan(repo: string, env: NodeJS.ProcessEnv, text: string, deps: SubagentDeps): Promise<{ question: string }> {
+  const main = await mainAgent(repo, env)
+  if (runnerMark(main)?.parent !== undefined) throw new Refused({ ok: false, reason: 'subagent' }, 'a subagent has no plan: do the task yourself')
+  await writePlan(repo, main.id, text, deps.git)
+  return { question: planQuestion(text) }
+}
+
+/** The caller's plan as it was last saved, its question, and whether the person approved it. */
+export async function showPlan(repo: string, env: NodeJS.ProcessEnv, deps: SubagentDeps): Promise<{ plan: string; question: string; approved: boolean }> {
+  const main = await mainAgent(repo, env)
+  const plan = await readPlan(repo, main.id, deps.git)
+  if (plan === undefined) throw new Refused({ ok: false, reason: 'no-plan' }, 'no plan is saved')
+  return { plan, question: planQuestion(plan), approved: await planApproved(repo, main.id, plan) }
+}
+
+/**
+ * Land one of the caller's subagents: its branch merged into the branch the caller's checkout is
+ * on, then deleted here and on origin, and taken off its record, so the work lives on the main
+ * agent's branch alone. A merge that conflicts is undone and refused: the main agent merges by
+ * hand and lands again, which then only deletes. Nothing is deleted before the merge is in.
+ */
+export async function landSubagent(repo: string, env: NodeJS.ProcessEnv, id: string, deps: SubagentDeps): Promise<{ id: string; branch: string; merged: boolean }> {
+  const { git } = deps
+  const main = await mainAgent(repo, env)
+  const card = await subagentOf(repo, main, id)
+  if (card.status === 'running') throw new Refused({ ok: false, reason: 'running', id }, `${id} is still running: land it once it has ended`)
+  const branch = card.branch
+  if (branch === undefined) throw new Refused({ ok: false, reason: 'nothing-to-land', id }, `${id} left no branch: it committed nothing, or it is landed already`)
+  const checkout = worktreePath(repo, main.id)
+  if (!(await worktreeClean(checkout, git).catch(() => false))) throw new Refused({ ok: false, reason: 'uncommitted' }, 'your checkout has uncommitted changes: commit them, then land')
+
+  // The subagent's own checkout, when it is still there, holds the branch: it goes first, and
+  // only when it holds nothing uncommitted.
+  const theirs = worktreePath(repo, id)
+  const kept = await stat(theirs).then(s => s.isDirectory(), () => false)
+  if (kept) {
+    if (!(await worktreeClean(theirs, git).catch(() => false))) throw new Refused({ ok: false, reason: 'uncommitted-there', id, path: theirs }, `${id} left uncommitted changes in ${theirs}: commit them there on its branch, then land`)
+  }
+
+  const has = (ref: string) => git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], repo).then(out => out.trim() !== '', () => false)
+  await git(['fetch', '--quiet', '--no-write-fetch-head', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`], repo).catch(() => {})
+  const local = await has(`refs/heads/${branch}`)
+  const remote = await has(`refs/remotes/origin/${branch}`)
+  if (!local && !remote) throw new Refused({ ok: false, reason: 'nothing-to-land', id }, `the branch ${branch} of ${id} is gone: there is nothing to land`)
+  const ref = local ? `refs/heads/${branch}` : `refs/remotes/origin/${branch}`
+
+  const merged = !(await git(['merge-base', '--is-ancestor', ref, 'HEAD'], checkout).then(() => true, () => false))
+  if (merged) {
+    try {
+      await git(['merge', '--no-edit', ref], checkout)
+    } catch (err) {
+      const files = (await git(['diff', '--name-only', '--diff-filter=U'], checkout).catch(() => '')).split('\n').filter(Boolean)
+      await git(['merge', '--abort'], checkout).catch(() => {})
+      if (files.length === 0) throw new Error(`merging ${branch} failed: ${gitReason(err)}`)
+      throw new Refused({ ok: false, reason: 'conflict', id, branch, files }, `merging ${branch} conflicts in ${files.join(', ')}: merge it yourself with \`git merge ${local ? branch : `origin/${branch}`}\`, resolve, commit, and land again`)
+    }
+  }
+
+  // Only an agent's branch is ever deleted, as in the branches package.
+  if (isAgentBranch(branch)) {
+    if (kept) await removeWorktree(repo, theirs, git)
+    if (local) await git(['branch', '-D', branch], repo)
+    if (remote) {
+      // A branch origin lost meanwhile is as gone as one deleted here: only the stale copy of it is left to drop.
+      await git(['push', '--quiet', 'origin', `:refs/heads/${branch}`], repo).catch(async err => {
+        if (!/remote ref does not exist/i.test(gitReason(err))) throw err
+        await git(['update-ref', '-d', `refs/remotes/origin/${branch}`], repo)
+      })
+    }
+    const { branch: _gone, ...branchless } = card
+    const recorded = await recordRun(repo, branchless, (await readDiary(repo, id)) ?? [])
+    if (!recorded.ok && !recorded.committed) throw new Error(`the record of ${id} could not be written: ${recorded.error}`)
+  }
+  return { id, branch, merged }
 }

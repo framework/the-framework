@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { DATA_BRANCH, fileBranchPath, nodeBranchFileFs, nodeGitRunner, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
 import { RUNS_DIR } from './names.js'
 import {
@@ -161,13 +161,16 @@ export async function patchRun(root: string, id: string, patch: RunPatch, deps: 
   return patched && (result.ok || result.committed)
 }
 
-/** Delete a run, card and diary, as one commit. A run that is not there is a landed no-op. */
+/**
+ * Delete a run as one commit: its card, its diary, and any other file named after its id that
+ * another package keeps beside them (`<id>.<anything>`). A run that is not there is a landed no-op.
+ */
 export async function deleteRun(root: string, id: string, deps: LogsDeps = {}): Promise<FileBranchWrite> {
   const r = resolveLogsDeps(deps)
   return r.funnel(root, `logs: delete run ${id}`, async checkout => {
     const files = await locate(checkout, id, r)
     if (!files) return
-    await r.remove(files.card)
-    await r.remove(files.diary).catch(() => {})
+    const dir = dirname(files.card)
+    for (const name of await r.list(dir)) if (name.startsWith(`${id}.`)) await r.remove(join(dir, name))
   })
 }

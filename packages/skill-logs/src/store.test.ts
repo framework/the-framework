@@ -62,7 +62,11 @@ test('a run is recorded under the person the repo commits as, one pushed commit;
     assert.equal((await findRun(root, R1))?.branch, 'claude/fix')
     assert.equal(await patchRun(root, 'nope', { branch: 'x' }), false, 'no such run: nothing patched')
 
+    // A file another package keeps beside the run, named after its id, goes with it.
+    await withFileBranch(root, DATA_BRANCH, 'a plan beside the run', async checkout => writeFile(join(checkout, RUNS_DIR, 'dev@example.com', `${R1}.plan.md`), '# Plan\n'))
     assert.deepEqual(await deleteRun(root, R1), { ok: true, changed: true, pushed: true })
+    assert.equal(await git(['show', `${DATA_BRANCH}:${RUNS_DIR}/dev@example.com/${R1}.plan.md`], bare).then(() => true, () => false), false, 'the file beside it went too')
+    assert.equal(await git(['show', `${DATA_BRANCH}:${RUNS_DIR}/dev@example.com/${R2}.json`], bare).then(() => true, () => false), true, 'another run stays')
     assert.equal((await git(['log', '-1', '--format=%s', DATA_BRANCH], bare)).trim(), `logs: delete run ${R1}`)
     assert.deepEqual((await listRuns(root)).map(c => c.id), [R2])
     assert.equal(await git(['show', `${DATA_BRANCH}:${RUNS_DIR}/dev@example.com/${R1}.jsonl`], bare).then(() => true, () => false), false, 'the diary went with it')

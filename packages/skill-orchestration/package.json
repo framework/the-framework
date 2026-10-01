@@ -1,7 +1,7 @@
 {
   "name": "@gemstack/skill-orchestration",
   "version": "0.0.1",
-  "description": "Orchestration as a skill: a main agent starts subagents on parts of its task, each a run of its own on a branch started from the main agent's, and lists them, reads their results and stops them with the orchestration command.",
+  "description": "Orchestration as a skill: a main agent plans its task, starts subagents on the parts once the person approved the plan, each a run of its own on a branch started from the main agent's, and lists them, reads their results, stops them and lands their work with the orchestration command.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -41,11 +41,11 @@
     "@gemstack/agent-data": "workspace:*",
     "@gemstack/skill-branches": "workspace:*",
     "@gemstack/skill-logs": "workspace:*",
+    "agent-driver": "workspace:*",
     "agent-runner": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "agent-driver": "workspace:*",
     "typescript": "^7.0.2"
   }
 }

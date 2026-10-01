@@ -393,7 +393,7 @@ test('tailAgentEvents on a diary rewritten in place: a run continued in the chec
     await appendFile(diary, line('three'))
     await sleep(1400)
     assert.deepEqual(seen, ['one', 'two', 'three'])
-    // Written again and grown in one step, and then shorter than what was read: still only what is new.
+    // Written again and grown in one step: still only what is new.
     await writeFile(diary, line('one') + line('two') + line('three') + line('four'))
     await sleep(1400)
     assert.deepEqual(seen, ['one', 'two', 'three', 'four'])

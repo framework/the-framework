@@ -14,7 +14,7 @@ Follows an append-only JSONL file, one JSON value per line, delivering each comp
 
 - **Only what is new** - each read starts where the previous one ended and delivers the complete lines appended since; a file that does not exist yet delivers nothing and is not an error.
 - **A torn line waits for its newline** - the trailing fragment without a newline is held back and delivered once the rest arrives; a line that still does not parse is skipped, because the file never rewrites history.
-- **Truncation and rewrite restart the read** - a file that shrank below what was consumed, or that was rewritten to the same length, is read again from the top, so replaced content is delivered instead of being waited on.
+- **Truncation and rewrite restart the read** - a file that shrank below what was consumed, or that was rewritten to the same length, is read again from the top, so replaced content is delivered instead of being waited on; the caller may ask to be told when that happens, before the lines are read again.
 - **Relocation carries the offset** - when the file is copied intact elsewhere, the tail is pointed at the copy and continues from the same offset, delivering only the lines the move would have swallowed and replaying nothing.
 - **The follower never dies** - change notifications trigger reads and a periodic poll guarantees them; reads never overlap; a failed read or a broken watcher is survived and the poll carries on alone; a follower marked as not holding the process open releases both its handles.
 
@@ -48,7 +48,7 @@ Whatever follows the last newline is kept back as a fragment and prepended to th
 
 #### Business logic
 
-Two signs mean the file was replaced: its size fell below what was consumed, or its size is unchanged but its modification time advanced, which is a rewrite to the same length. Either way the read restarts from the top with an empty fragment, and the new content is delivered from its first line.
+Two signs mean the file was replaced: its size fell below what was consumed, or its size is unchanged but its modification time advanced, which is a rewrite to the same length. Either way the read restarts from the top with an empty fragment, and the new content is delivered from its first line. The tail cannot know whether the new content is another log or the same log written again, so a caller may ask to be told each time the file is found replaced, before its lines are read again: a caller following one agent's [1] diary, which the tool that runs the agent writes again whole when it continues the agent, uses that to pass over the lines it already has (`dashboard-rpc/events-tail.ts`).
 
 ### Relocation carries the offset
 

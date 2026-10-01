@@ -8,7 +8,7 @@ The Files module's server part: the five reads its browser part makes, each give
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is the project's checkout.
-[3] the agent's facts: what the dashboard tells a module's server part about one agent when asked: its checkout while it has one, its record (status, machine, branch, pull request number), and whether it finished on this machine having changed nothing; and, on request, the commit a pull request of a branch merged as, or that the git host is still being asked.
+[3] the agent's facts: what the dashboard tells a module's server part about one agent when asked: its checkout while it has one, its record (status, machine, branch, pull request number, the commit its own work begins at, and the last commit of its work once its main agent landed it), and whether it finished on this machine having changed nothing; and, on request, the commit a pull request of a branch merged as, or that the git host is still being asked.
 
 ## Business logic — TL;DR
 

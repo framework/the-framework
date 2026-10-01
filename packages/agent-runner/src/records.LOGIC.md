@@ -10,14 +10,15 @@ A run in flight is a run record [1]: the `logs` skill's card on the project's `a
 
 [1] run record: the `logs` skill's record of a run on the `agent-data` branch: a card (`<id>.json`) and a diary (`<id>.jsonl`). Written over the same file: as a marker before the agent exists, with how it went when the run ends, and once more without its branch when the reclaim deleted that branch.
 [2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[3] the tool's mark: `caller.runner` on a card: `host`, the machine that started it; `pid`, the run's process on that machine while it runs, when known; `then`, the follow-up's prompt, when the run names one (`run --then`: once the run ends done with a pull request, a fresh run on its branch gets that prompt and the run's id, `run.ts`); `parent`, the id of the run this one was started for, when it has one (`run --parent`: that run is told when this one ends, `parent.ts`); `base`, the branch this run's own branch started from, when one was named (`run --base`; origin's default branch otherwise).
+[3] the tool's mark: `caller.runner` on a card: `host`, the machine that started it; `pid`, the run's process on that machine while it runs, when known; `then`, the follow-up's prompt, when the run names one (`run --then`: once the run ends done with a pull request, a fresh run on its branch gets that prompt and the run's id, `run.ts`); `parent`, the id of the run this one was started for, when it has one (`run --parent`: that run is told when this one ends, `parent.ts`); `base`, the branch this run's own branch started from, when one was named (`run --base`; origin's default branch otherwise); `baseCommit`, the commit that branch was at when the run's own branch was made from it, for a run that names a base: the run's own work is what came after that commit, and its changes are measured from it (`run.ts`).
 [4] cap: how many runs of one scheduled command may be in flight at once, across every machine that shares the repository.
 [5] marker: a run record written before the agent exists: `status: running`, the tool's mark, an empty diary.
 
 ## Business logic — TL;DR
 
 - **The marker** - a card with the run's id, its start time, `status: running`, the prompt as the intent, the driver, the model when the run has one and the tool's mark, written to the branch with an empty diary; the mark's machine is also on the card as `caller.host`, and the mark's parent, when it names one, as `caller.parent`; the write says whether it reached origin.
-- **Reading the mark** - a card carries the tool's mark when `caller.runner` is an object with a `host` string; `pid` is kept only when it is a number, and `then`, `parent` and `base` each only when it is a string; a card without it is somebody else's run.
+- **What a reader finds beside the host** - the mark's parent and the mark's `baseCommit`, each when the mark has one, are on the card a second time, as `caller.parent` and `caller.baseCommit`, outside the mark, for a reader that does not know the mark.
+- **Reading the mark** - a card carries the tool's mark when `caller.runner` is an object with a `host` string; `pid` is kept only when it is a number, and `then`, `parent`, `base` and `baseCommit` each only when it is a string; a card without it is somebody else's run.
 - **Withdrawing** - a marker whose scheduler lost the cap is deleted from the branch, so no record says running for a run that never was.
 - **The record at the end** - the card and the diary written over the marker, same id, same file; the mark stays on the card.
 - **A branch that is gone** - when the reclaim deleted the branch the card names, the record is written again without the branch.
@@ -34,6 +35,16 @@ See `## Context`.
 
 Before a run's process exists, or as the first thing a person's run does, its card is written to the `agent-data` branch [2] by the `logs` package: the run's id, its start time, `status: running`, the prompt as what was asked, the driver's id, the model when the run has one, and the tool's mark [3] under `caller.runner`, with the mark's machine also as `caller.host`, where a run's live card has it and where a dashboard tells this machine's runs from another's, with an empty diary. When the mark names a parent, the parent's id is on the card a second time, as `caller.parent`, beside `caller.host` and outside the mark, for the same reason: a reader of the card that does not know the tool's mark, such as a dashboard, finds there which run this one was started for. A run with no parent has no `caller.parent`. The write is one commit pushed straight to the branch, and its outcome says whether the commit reached origin: only a pushed marker is one another machine can see.
 
+### What a reader finds beside the host
+
+#### Context
+
+**User story**: the dashboard shows a subagent under its main agent, and shows as a run's changes only what the run itself changed. It reads both facts off the card without knowing the tool's mark [3].
+
+#### Business logic
+
+Two of the mark's facts are written on the card a second time, beside `caller.host` and outside the mark, each only when the mark has it: the parent's id as `caller.parent`, and `baseCommit` as `caller.baseCommit`, the commit the run's changes are measured from. The marker [5] carries the parent so. It carries no `baseCommit`: a marker is written before the run's checkout exists, so the commit is not known yet. The card a run starts with, and the card a resume writes, carry both (`run.ts`).
+
 ### Reading the mark
 
 #### Context
@@ -42,7 +53,7 @@ Before a run's process exists, or as the first thing a person's run does, its ca
 
 #### Business logic
 
-A card carries the tool's mark when `caller.runner` is an object whose `host` is a string. A card with no such object, or a mark with no `host` string, is somebody else's run. Reading a mark keeps `pid` only when it is a number, and `then`, `parent` and `base` each only when it is a string. Those three last for the run's whole life: a resume writes the mark again with its own host and pid and keeps them (`run.ts`).
+A card carries the tool's mark when `caller.runner` is an object whose `host` is a string. A card with no such object, or a mark with no `host` string, is somebody else's run. Reading a mark keeps `pid` only when it is a number, and `then`, `parent`, `base` and `baseCommit` each only when it is a string. Those four last for the run's whole life: a resume writes the mark again with its own host and pid and keeps them (`run.ts`). A resume replaces `baseCommit` in one case only: the run's branch was gone everywhere and was made again from the base, so the run's own work begins at the commit the base is at now (`run.ts`).
 
 ### Withdrawing
 

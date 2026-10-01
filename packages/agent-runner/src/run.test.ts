@@ -568,6 +568,31 @@ test('a run with a follow-up continued after its checkout went gets a new one, i
   }
 })
 
+test('a run started from a base, continued after its empty branch went with its checkout, starts again from that base', async () => {
+  const repo = await testRepo()
+  try {
+    // Another run's branch, on origin, one commit past main.
+    await git(['checkout', '-q', '-b', 'agent-plan'], repo)
+    await writeFile(join(repo, 'plan.txt'), 'the plan\n')
+    await git(['add', '-A'], repo)
+    await git(['commit', '-q', '-m', 'Plan'], repo)
+    await git(['push', '-q', 'origin', 'agent-plan'], repo)
+    await git(['checkout', '-q', 'main'], repo)
+
+    const first = await runCommand(repo, { prompt: 'Do task one', base: 'agent-plan', driver: new FakeDriver({ turns: [{ text: 'Nothing to change.' }], sessionId: 's-1' }), now: () => NOW, gitHost: noGitHost })
+    assert.deepEqual(first.checkout, { reclaimed: true })
+    assert.equal((await findRun(repo, first.id))?.branch, undefined, 'the branch held nothing and went with the checkout')
+
+    let head = ''
+    const looking: Driver = { id: 'fake', start: async opts => wrap(await new FakeDriver({ turns: [{ text: 'Done.' }] }).start(opts), async () => void (head = (await git(['rev-parse', 'HEAD'], opts.cwd)).trim())) }
+    const continued = await resumeRun(repo, { id: first.id, text: 'Look again.', driver: looking, now: () => new Date(NOW.getTime() + 60_000), gitHost: noGitHost })
+    assert.equal(continued.status, 'done')
+    assert.equal(head, (await git(['rev-parse', 'agent-plan'], repo)).trim(), 'the new branch starts from the base on the record, not origin’s default branch')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
 test("a run holds its lock while the agent works: a sweep of this machine leaves it alone, and the lock goes once the run has answered", async () => {
   const repo = await testRepo()
   try {

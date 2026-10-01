@@ -268,6 +268,11 @@ test('attach: a continued agent is put back on the branch its work is on', async
     assert.match(await git(['show', 'HEAD:index.html'], path), /Welcome/, 'with its previous commit')
     assert.equal(await isSymlink(join(path, 'node_modules', 'dep')), true)
     assert.equal(await readlink(join(repo, '.branches', 'agent-add-auth')), 'agent-a1')
+
+    // A branch that is gone starts again from the base named.
+    const based = await run(repo, 'attach', 'a2', 'agent-gone', '--base', 'agent-add-auth')
+    assert.deepEqual(based.out, { ok: true, path: worktreePath(repo, 'a2'), branch: 'agent-gone' })
+    assert.match(await git(['show', 'HEAD:index.html'], worktreePath(repo, 'a2')), /Welcome/, 'on the base, with its commit')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

@@ -45,7 +45,8 @@ import { readBranchStates } from './branch-state.js'
 export const USAGE = `usage: branches <command>
 
   create <id> [--base <ref>]   a checkout for agent <id>, on a fresh branch agent-<id>
-  attach <id> <branch>         a checkout for agent <id>, on an existing branch
+  attach <id> <branch> [--base <ref>]
+                               a checkout for agent <id>, on an existing branch; one that is gone starts again from <ref>
   name <name>                  rename this checkout's branch to agent-<name>; prints the name it got
   status [path]                the checkout's branch, whether it is clean, whether it is on the remote
   show <branch>...             what each branch holds and where it stands: its commits and files beyond the base, whether it is pushed, merged, and what its checkout left uncommitted
@@ -116,10 +117,10 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async attach(args, cwd, git) {
-    const { positionals } = parse(args, {}, 2)
+    const { positionals, values } = parse(args, { base: { type: 'string' } }, 2)
     const [agentId, branch] = [agentIdArg(positionals[0]!), positionals[1]!]
     const repo = await project(cwd, git)
-    return { ok: true, ...(await attachCheckout(repo, { agentId, branch }, git)) }
+    return { ok: true, ...(await attachCheckout(repo, { agentId, branch, ...(values.base ? { base: values.base } : {}) }, git)) }
   },
 
   async name(args, cwd, git) {

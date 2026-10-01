@@ -224,7 +224,7 @@ describe('run handoff (#799)', () => {
   test('a subagent is offered no pull request, no push and no merge: its line says whether its main agent landed it', async () => {
     onAgentHandoff.mockResolvedValue({ ...worked, pushed: true })
     render(<Harness subagent />)
-    await waitFor(() => expect(screen.getByText('· not landed')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('not landed')).toBeTruthy())
     expect(screen.getByText('1 commit')).toBeTruthy()
     expect(screen.queryByText('· pushed')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
@@ -233,19 +233,19 @@ describe('run handoff (#799)', () => {
     // Not even where another run would be offered the Merge of its open pull request, or a Push.
     onAgentHandoff.mockResolvedValue({ ...worked, pr: { number: 7, url: 'u', state: 'OPEN', title: '' } })
     render(<Harness subagent />)
-    await waitFor(() => expect(screen.getByText('· not landed')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('not landed')).toBeTruthy())
     expect(screen.queryByRole('button')).toBeNull()
     cleanup()
     onAgentHandoff.mockResolvedValue({ ...worked, gitHost: false })
     render(<Harness subagent />)
-    await waitFor(() => expect(screen.getByText('· not landed')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('not landed')).toBeTruthy())
     expect(screen.queryByRole('button')).toBeNull()
   })
 
   test('a landed subagent still says what it changed, and that it is landed', async () => {
     onAgentHandoff.mockResolvedValue({ ...worked, branch: 'a'.repeat(40), landed: true })
     render(<Harness subagent />)
-    await waitFor(() => expect(screen.getByText('· landed')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('landed')).toBeTruthy())
     expect(screen.getByText('1 commit')).toBeTruthy()
     expect(screen.getByText('src/theme.ts')).toBeTruthy()
     expect(screen.queryByRole('button')).toBeNull()
@@ -256,6 +256,7 @@ describe('run handoff (#799)', () => {
     render(<Harness subagent />)
     await waitFor(() => expect(screen.getByText('landed')).toBeTruthy())
     expect(screen.queryByText('branch gone')).toBeNull()
+    expect(screen.queryByText('no changes')).toBeNull()
     expect(screen.queryByText(/nothing to open a PR from/)).toBeNull()
   })
 
@@ -264,6 +265,7 @@ describe('run handoff (#799)', () => {
     render(<Harness subagent />)
     await waitFor(() => expect(screen.getByText('Nothing committed — handtest/one.md left uncommitted.')).toBeTruthy())
     expect(screen.getByText('no changes')).toBeTruthy()
+    expect(screen.queryByText('not landed')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
     cleanup()
 

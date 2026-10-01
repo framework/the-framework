@@ -211,6 +211,9 @@ test('a run’s handoff off its record: its branch from where its own work begin
   assert.deepEqual([landed?.exists, landed?.landed, landed?.commits.length], [true, true, 2])
   assert.deepEqual(calls, [['show', 'agent-sub', { from: start }], ['show', tip, { from: start }]])
 
+  // A commit has no pull request: the git host is not asked, so nothing is ever still being looked up.
+  assert.equal((await readRunHandoff('/repo', run({ baseCommit: start, landed: tip }), { branches, gitHost }))?.prPending, undefined)
+
   // Landed, its commit not on this machine: landed is the answer, never "changed nothing".
   const elsewhere = await readRunHandoff('/repo', run({ landed: 'gone' }), deps)
   assert.deepEqual([elsewhere?.exists, elsewhere?.landed, elsewhere?.unchanged], [false, true, undefined])

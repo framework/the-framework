@@ -30,14 +30,15 @@ export function handoffExpandable(handoff: AgentHandoff | null): boolean {
 /**
  * The one-line verdict, in the action bar: what the session left behind, or that it left nothing.
  *
- * A subagent's work goes to its main agent's branch, so whether it got there is what its line
- * ends on, landed or not landed, where another run's says pushed.
+ * A subagent's work goes to its main agent's branch, never to the remote by a person's hand: its
+ * line says what it changed, and whether it is landed is said where the next step would be
+ * ({@link HandoffActions}).
  */
 export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHandoff | null; subagent?: boolean }) {
   if (!handoff) return null
   // A landed run's branch is gone on purpose; what it held is read by its last commit, and when
-  // this machine does not have that commit, landed is still what there is to say.
-  if (!handoff.exists && handoff.landed) return <span className="text-muted-foreground">landed</span>
+  // this machine does not have that commit there is nothing to count: landed is said beside it.
+  if (!handoff.exists && handoff.landed) return null
   // A branch that is gone and a branch that was never pushed are different facts, and the summary
   // is only useful if it tells them apart. Gone because the run changed nothing is no changes.
   if (!handoff.exists) return <span className="text-muted-foreground">{handoff.unchanged ? 'no changes' : 'branch gone'}</span>
@@ -53,9 +54,8 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
       <span>{files}</span>
       <DiffStat added={handoff.insertions} removed={handoff.deletions} className="text-xs" />
       {/* Whether the work is on the remote yet is the first handoff question — say it. The PR
-          itself is not repeated here: the bar already links it. A subagent's first question is
-          whether its main agent took the work. */}
-      {handoff.landed ? <span>· landed</span> : subagent ? <span>· not landed</span> : handoff.pushed && !handoff.pr && <span>· pushed</span>}
+          itself is not repeated here: the bar already links it. */}
+      {!subagent && handoff.pushed && !handoff.pr && <span>· pushed</span>}
     </span>
   )
 }
@@ -71,7 +71,9 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
  * queue (#632) has picked it up by then.
  *
  * A subagent is offered none of them: it opens no pull request, and its branch is its main
- * agent's to land. What it left uncommitted is still named, since nothing lands that.
+ * agent's to land. In their place it says whether that happened, landed or not landed, at the end
+ * of the bar where it is always in view. What it left uncommitted is still named, since nothing
+ * lands that.
  */
 export function HandoffActions({
   projectId,
@@ -86,7 +88,11 @@ export function HandoffActions({
 }) {
   const { handoff, busy, pending, act } = state
   if (!handoff) return null
-  if (subagent) return handoff.exists && handoff.empty ? <Uncommitted paths={handoff.pendingFiles ?? []} /> : null
+  if (subagent) {
+    if (handoff.landed) return <Reason>landed</Reason>
+    if (!handoff.exists) return null
+    return handoff.empty ? <Uncommitted paths={handoff.pendingFiles ?? []} /> : <Reason>not landed</Reason>
+  }
   // While the PR lookup is still out (#1028), nothing is offered: acting on "not known yet" is
   // how a second PR gets opened.
   if (handoff.prPending) return null

@@ -286,7 +286,9 @@ export async function readRunHandoff(
 ): Promise<AgentHandoff | undefined> {
   const at = agentBranchFor(agent) ?? agent.landed
   if (at === undefined) return undefined
-  const handoff = await readAgentHandoff(cwd, at, { since: agent.startedAt, ...(agent.baseCommit !== undefined ? { from: agent.baseCommit } : {}), ...deps })
+  // A commit has no pull request to look up: only a branch is asked of the git host.
+  const noPr: AgentHandoffDeps = agentBranchFor(agent) === undefined ? { pr: async () => undefined } : {}
+  const handoff = await readAgentHandoff(cwd, at, { since: agent.startedAt, ...(agent.baseCommit !== undefined ? { from: agent.baseCommit } : {}), ...noPr, ...deps })
   if (!handoff) return undefined
   if (agent.landed !== undefined) return { ...handoff, landed: true }
   return !handoff.exists && leftNothing(agent) ? { ...handoff, unchanged: true } : handoff

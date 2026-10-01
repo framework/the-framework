@@ -8,7 +8,6 @@
 
 
 ## Priority 5
-- Create tickets/2026-10-01_orchestration-main-agent-subagents.plan.md
 
 
 ## Priority 4

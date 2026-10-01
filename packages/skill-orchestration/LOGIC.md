@@ -16,6 +16,6 @@ The `orchestration` skill [1]: a main agent [2] saves a plan of tasks, starts su
 
 ## Business logic — TL;DR
 
-- **What the agent is told** (`SKILL.md`) - what a subagent [3] is, the six command lines, to save a plan and ask the person before any subagent, to commit before starting and to write a task that stands alone, to end its reply after starting, what the message a subagent's end sends is, to land the work, and to open one pull request once every task is landed.
+- **What the agent is told** (`SKILL.md`) - what a subagent [3] is, the six command lines, to save a plan and ask the person before any subagent, to commit before starting and to write a task that stands alone, to end its reply after starting, what the message a subagent's end sends is and to land the work then, and to open one pull request once every task is landed.
 - **The executable** (`bin/`) - the `orchestration` command, handing the shell to the command's rules.
 - **The command and the subagents** (`src/`) - the command lines and their JSON answers; the plan saved beside the main agent's run record and approved by the person's answer to the question that names it; no subagent started before that; a subagent's branch landed on the main agent's and deleted; a subagent started as a run with the caller as parent, from the caller's branch, told it is a subagent; no subagent of a subagent; the caller's subagents listed and read by the parent on their records; one stopped by a signal to its process.

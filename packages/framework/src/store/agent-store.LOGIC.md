@@ -18,6 +18,7 @@ The read side of a project's agents [1]. The Framework runs no agent and writes 
 [5] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its card and diary.
 [6] status: how an agent stands: `running`, `done`, `stopped`, `failed`, or `waiting` (it ended on a question, its checkout kept, and the answer resumes it).
 [7] branches provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's checkouts, in its own package.json under `"framework": { "branches": "<command>" }` (the `branches` skill's package declares its `branches` command); it lists the checkouts, tells what a branch holds, pushes and opens a branch's pull request, lands one, and reclaims a checkout (`store/branches.ts`).
+[8] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card [2] names the main agent's id as its parent.
 
 ## Business logic — TL;DR
 
@@ -27,6 +28,7 @@ The read side of a project's agents [1]. The Framework runs no agent and writes 
 - **All agents, and one by id** - the ones with a checkout first, then the finished ones; an agent in both is listed once, from its checkout.
 - **One agent's events for replay** - the diary in the agent's checkout while it has one, else the finished agent's diary, each line turned into the event the dashboard draws.
 - **A finished agent's diary** - every line, from the runs provider; none for an agent whose record still says `running`.
+- **What working agents are doing now** - for each named agent that has a checkout and whose card says `running`, the last tool use or the last thing the agent said in its diary, on one line of at most 140 characters; any other agent has no entry.
 - **Whether a process is alive** - a process id on this machine is probed without signaling it.
 
 ## Business logic
@@ -39,7 +41,7 @@ See `## Context`. The answer is the runs provider's (`runs.ts`), turned into the
 
 #### Business logic
 
-The finished agents of a project are what its runs provider [4] lists, newest first by agent id [5], which sorts as time. Each card [2] becomes the dashboard's record of the agent: the card's own fields as they are, the fields the running tool filed under the card's `caller` key (the process id, the host, the checkout path and whatever else it recorded) unfolded beside them, and the time of the last update taken as the end time, else the start time. A caller may ask only for agents started at or after a moment. A project with no runs provider, or one whose provider fails, has no finished agents; nothing is thrown.
+The finished agents of a project are what its runs provider [4] lists, newest first by agent id [5], which sorts as time. Each card [2] becomes the dashboard's record of the agent: the card's own fields as they are, the fields the running tool filed under the card's `caller` key (the process id, the host, the checkout path, the parent of a subagent [8] and whatever else it recorded) unfolded beside them, and the time of the last update taken as the end time, else the start time. A caller may ask only for agents started at or after a moment. A project with no runs provider, or one whose provider fails, has no finished agents; nothing is thrown.
 
 ### The agent in a checkout
 
@@ -90,6 +92,16 @@ See `## Context`; the live feed uses this to follow an agent's diary once its ch
 #### Business logic
 
 For a safe agent id the runs provider [4] is asked for the agent with its whole diary; the answer is every line, in order. There is none for an unsafe id, a project with no provider, an agent the provider does not have, and an agent whose record still says `running`: the tool that runs an agent may record it as it starts, before its checkout exists, and that agent's diary is still to come in the checkout.
+
+### What working agents are doing now
+
+#### Context
+
+**User story**: a main agent split its task across subagents [8]; on the main agent's page, each working subagent's line says what that subagent is doing at this moment, without the user opening the subagent's own page.
+
+#### Business logic
+
+The caller names agents by id [5], and the answer says, per id, what that agent is doing now. Only an agent that was named, has a checkout [3], and whose card [2] in that checkout says `running` can have an entry: an ended agent is doing nothing. Its entry is read off the diary [2] in its checkout, from the last line backwards, and is the first line found that is either a tool use (an `action` line: its label, followed by a space and its detail when it has one) or something the agent said (a `said` line: its text). Lines of every other kind, and a last line torn by a write in flight, are passed over. The text is put on one line, every run of whitespace becoming one space, and a text longer than 140 characters is cut to its first 139 followed by `…`. An agent with no such line yet, or with no diary, has no entry. A project whose checkouts cannot be listed answers no entries. Nothing is written.
 
 ### Whether a process is alive
 

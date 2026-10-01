@@ -17,7 +17,7 @@ The browser's typed stubs for every read the dashboard makes: one stub per read 
 ## Business logic — TL;DR
 
 - **Typed against the daemon** - each stub's arguments and answer are the daemon's own for that read, so a read renamed or re-shaped on the daemon's side is a type error in the dashboard's build, never a call that fails in the browser; the daemon's implementation is imported for its types only and stays out of the bundle.
-- **The agent history and one agent** - a project's agents [1] newest first, the ids of ended agents whose checkout [3] is still on disk, where one agent is working (its checkout, branch, uncommitted changes, size and pull request), and one agent's replay: its recorded events [4].
+- **The agent history and one agent** - a project's agents [1] newest first, the ids of ended agents whose checkout [3] is still on disk, where one agent is working (its checkout, branch, uncommitted changes, size and pull request), one agent's replay: its recorded events [4], and, for agents named by id, what each one that is working is doing now.
 - **Documents** - the project's surfaced documents. (The tickets are the tickets package's module's reads, through its own command, `modules.ts`.)
 - **Cross-project rollups** - the aggregated agent queue [5], the Overview [6], the recent agents, the interventions [7], the open questions [8], the activity feed, the dashboard page's totals, agents going right now, projects and queues, and every project's scheduler state, each read across every registered project.
 - **A checkout's files and changes** - every file of the project's or of one agent's checkout, each changed file's git status, one file's diff or content, and every file the agent changed with its line counts.

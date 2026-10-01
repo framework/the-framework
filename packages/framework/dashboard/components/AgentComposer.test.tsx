@@ -143,7 +143,7 @@ describe('AgentComposer, ended (#720, #1774)', () => {
     expect(props().busyLabel).toBe('Resuming…')
   })
 
-  test('an ended run whose subagents still work says it waits for them; a failed or stopped one keeps its own note', () => {
+  test('an ended run whose subagents still work says it waits for them; a stopped one keeps its own note', () => {
     renderComposer({ live: false, outcome: { ok: true, stopped: false }, subagentsRunning: 2 })
     expect(screen.getByText(/Waiting for its subagents/)).toBeTruthy()
     expect(screen.queryByText(/Agent ended/)).toBeNull()

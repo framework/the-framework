@@ -9,4 +9,5 @@ Covered:
 - An agent with both a record and a checkout is listed once, as its checkout says, with the record's pull request when the checkout's card has none; one agent is found by id the same way; an unknown id finds nothing; with no runs provider only the agents with a checkout are listed.
 - An agent's events replay from the finished agent's diary, and from the newer diary in its checkout while it has one, a question and a waiting end included, a torn last line dropped; an unknown or unsafe id has no events, nor has a finished agent in a project with no runs provider.
 - A finished agent's diary is every line the provider has, and nothing for an unknown agent, an unsafe id or a project with no provider.
+- What working agents are doing now: the last tool use with its detail, on one line; the last thing said, cut to 140 characters, a torn last line passed over; no entry for an agent that is waiting, one not asked for, one with no diary, one whose diary holds neither a tool use nor anything said, or an id with no checkout; no ids asked, no entries.
 - An agent id and the start time it was derived from convert both ways, and a foreign id converts to nothing.

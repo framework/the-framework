@@ -391,8 +391,10 @@ export function EventList({
   const passed = useMemo(() => passedEnds(events, going, sending !== undefined), [events, going, sending])
   const rowIds = useMemo(() => new Map(events.map((e, at) => [e, String(at)])), [events])
   const asked = useMemo(() => askedReplies(events), [events])
-  const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e) && !passed.has(e))
-  const shown: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
+  const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
+  // Every row and every passed end, in order, a message just sent last; `shown` is the rows alone.
+  const kept: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
+  const shown = kept.filter(e => !passed.has(e))
   // The prompts that told this run one of its subagents ended: SUBAGENT rows, not the reader's own.
   const ends = new Map<FrameworkEvent, SubagentEnd>()
   for (const e of shown) {
@@ -409,6 +411,21 @@ export function EventList({
   // the moment the agent went on (the message being written giving way to the whole message, an
   // end giving way to the next prompt).
   const anchor = [...shown].reverse().find(isTurnBoundary)
+  // An end that is no longer a row keeps an empty place in the list, where it was. The scroller
+  // brings a new prompt to the top only when it finds it past the rows it already had: with the
+  // end gone from the list, the prompt that follows it would sit at the end's old place, unseen.
+  const passedAbove = new Map<FrameworkEvent, FrameworkEvent[]>()
+  const passedLast: FrameworkEvent[] = []
+  for (let at = 0, waiting: FrameworkEvent[] = []; at <= kept.length; at++) {
+    const e = kept[at]
+    if (e === undefined) passedLast.push(...waiting)
+    else if (passed.has(e)) waiting.push(e)
+    else if (waiting.length > 0) {
+      passedAbove.set(e, waiting)
+      waiting = []
+    }
+  }
+  const placeOf = (e: FrameworkEvent): ReactNode => <MessageScrollerItem key={`passed-${idOf(e)}`} messageId={idOf(e)} hidden />
   const groupOf = (e: FrameworkEvent): string => (ends.has(e) ? SUBAGENT : rowGroup(e))
   const started = startedBefore(shown, subagents)
   // One badge for a run of SUBAGENT rows: a started row right under the row of a subagent's end shows none.
@@ -440,6 +457,7 @@ export function EventList({
               const at = e.at
               return (
                 <Fragment key={idOf(e)}>
+                {passedAbove.get(e)?.map(placeOf)}
                 {startedRows(i)}
                 {/* Every row carries the same -mx/px pair so a washed row's band and a plain row's
                     text share the exact same columns; only the background differs. */}
@@ -501,6 +519,7 @@ export function EventList({
                 </Fragment>
               )
             })}
+            {passedLast.map(placeOf)}
             {startedRows(shown.length)}
             {writing && (
               <MessageScrollerItem messageId="writing" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">

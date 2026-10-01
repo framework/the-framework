@@ -594,6 +594,17 @@ describe('EventList scroll anchor', () => {
     expect(ids()).toEqual(['0', '1', '2'])
     // The run goes on: the end is no longer a row, and the new rows are known by their own place in the log.
     rerender(<EventList events={[...events, prompt('second'), reply('two')]} stick={false} />)
-    expect(ids()).toEqual(['0', '1', '3', '4'])
+    expect(ids()).toEqual(['0', '1', '2', '3', '4'])
+    // The end keeps an empty place where it was, so the prompt after it is past every row there was.
+    expect(container.querySelector('[data-message-id="2"]')?.hasAttribute('hidden')).toBe(true)
+    expect(container.querySelector('[data-message-id="2"]')?.textContent).toBe('')
+    // A message just sent comes after the place of the end it follows.
+    rerender(<EventList events={events} sending="second" stick={false} />)
+    expect(ids()).toEqual(['0', '1', '2', 'sending'])
+    expect(container.querySelector('[data-message-id="2"]')?.hasAttribute('hidden')).toBe(true)
+    // The last end hidden because the job is still going keeps its place too.
+    rerender(<EventList events={events} going stick={false} />)
+    expect(ids()).toEqual(['0', '1', '2'])
+    expect(container.querySelector('[data-message-id="2"]')?.hasAttribute('hidden')).toBe(true)
   })
 })

@@ -570,3 +570,30 @@ describe('EventList replies a question follows', () => {
     expect(screen.getAllByRole('button', { name: 'Collapse message' })).toHaveLength(1)
   })
 })
+
+// The scroller brings its anchor to the top; only the newest prompt may be one.
+describe('EventList scroll anchor', () => {
+  const prompt = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'start', prompt: text } })
+  const reply = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'text', text } })
+  const anchors = (container: HTMLElement) => [...container.querySelectorAll('[data-scroll-anchor="true"]')].map(el => el.textContent)
+
+  test('only the newest prompt is the anchor, and a message just sent takes it over', () => {
+    const events = [prompt('first'), reply('one'), { kind: 'end', ok: true } as FrameworkEvent, prompt('second'), reply('two')]
+    const { container, rerender } = render(<EventList events={events} stick={false} />)
+    expect(anchors(container)).toHaveLength(1)
+    expect(anchors(container)[0]).toContain('second')
+    rerender(<EventList events={events} sending="third" stick={false} />)
+    expect(anchors(container)).toHaveLength(1)
+    expect(anchors(container)[0]).toContain('third')
+  })
+
+  test('a row keeps its identity when a row above it stops being shown', () => {
+    const events = [prompt('first'), reply('one'), { kind: 'end', ok: true } as FrameworkEvent]
+    const { container, rerender } = render(<EventList events={events} stick={false} />)
+    const ids = () => [...container.querySelectorAll('[data-message-id]')].map(el => el.getAttribute('data-message-id'))
+    expect(ids()).toEqual(['0', '1', '2'])
+    // The run goes on: the end is no longer a row, and the new rows are known by their own place in the log.
+    rerender(<EventList events={[...events, prompt('second'), reply('two')]} stick={false} />)
+    expect(ids()).toEqual(['0', '1', '3', '4'])
+  })
+})

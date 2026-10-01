@@ -74,6 +74,7 @@ function rowLabel(e: FrameworkEvent): string {
 }
 
 // A driver `start` opens a fresh prompt turn — the natural anchor the scroller keeps in view.
+// Only the newest one is handed to the scroller as its anchor (see `anchor` in EventList).
 function isTurnBoundary(e: FrameworkEvent): boolean {
   return e.kind === 'driver' && e.event.type === 'start'
 }
@@ -402,6 +403,12 @@ export function EventList({
   // stops being shown (an end the run went on after) then changes no other row's identity, and
   // the scroller keeps its place. A message just sent has no place yet.
   const idOf = (e: FrameworkEvent): string => rowIds.get(e) ?? 'sending'
+  // The scroller's anchor is the newest prompt alone. It brings an anchor it has not yet brought
+  // into view to the top whenever one row takes another's place, and it starts with the oldest:
+  // with every prompt an anchor, a log opened with several turns in it jumped to its first prompt
+  // the moment the agent went on (the message being written giving way to the whole message, an
+  // end giving way to the next prompt).
+  const anchor = [...shown].reverse().find(isTurnBoundary)
   const groupOf = (e: FrameworkEvent): string => (ends.has(e) ? SUBAGENT : rowGroup(e))
   const started = startedBefore(shown, subagents)
   // One badge for a run of SUBAGENT rows: a started row right under the row of a subagent's end shows none.
@@ -436,7 +443,7 @@ export function EventList({
                 {startedRows(i)}
                 {/* Every row carries the same -mx/px pair so a washed row's band and a plain row's
                     text share the exact same columns; only the background differs. */}
-                <MessageScrollerItem messageId={idOf(e)} scrollAnchor={isTurnBoundary(e)} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${end ? '' : rowWash(e)}`}>
+                <MessageScrollerItem messageId={idOf(e)} scrollAnchor={e === anchor} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${end ? '' : rowWash(e)}`}>
                   {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("choice resolved") to sit on one line. */}
                   <span className="w-28 shrink-0">
                     {chunkHead && (

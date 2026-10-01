@@ -388,6 +388,7 @@ export function EventList({
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
   const screenRows = useMemo(() => foldScreenRows(events), [events])
   const passed = useMemo(() => passedEnds(events, going, sending !== undefined), [events, going, sending])
+  const rowIds = useMemo(() => new Map(events.map((e, at) => [e, String(at)])), [events])
   const asked = useMemo(() => askedReplies(events), [events])
   const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e) && !passed.has(e))
   const shown: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
@@ -397,6 +398,10 @@ export function EventList({
     const end = e.kind === 'driver' && e.event.type === 'start' ? subagentEnd(e.event.prompt, subagents) : undefined
     if (end) ends.set(e, end)
   }
+  // A row is known by its event's place in the whole log, not among the rows shown: a row that
+  // stops being shown (an end the run went on after) then changes no other row's identity, and
+  // the scroller keeps its place. A message just sent has no place yet.
+  const idOf = (e: FrameworkEvent): string => rowIds.get(e) ?? 'sending'
   const groupOf = (e: FrameworkEvent): string => (ends.has(e) ? SUBAGENT : rowGroup(e))
   const started = startedBefore(shown, subagents)
   // One badge for a run of SUBAGENT rows: a started row right under the row of a subagent's end shows none.
@@ -427,11 +432,11 @@ export function EventList({
               const chunkHead = !prev || (started.has(i) ? !end : groupOf(prev) !== groupOf(e))
               const at = e.at
               return (
-                <Fragment key={i}>
+                <Fragment key={idOf(e)}>
                 {startedRows(i)}
                 {/* Every row carries the same -mx/px pair so a washed row's band and a plain row's
                     text share the exact same columns; only the background differs. */}
-                <MessageScrollerItem messageId={String(i)} scrollAnchor={isTurnBoundary(e)} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${end ? '' : rowWash(e)}`}>
+                <MessageScrollerItem messageId={idOf(e)} scrollAnchor={isTurnBoundary(e)} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${end ? '' : rowWash(e)}`}>
                   {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("choice resolved") to sit on one line. */}
                   <span className="w-28 shrink-0">
                     {chunkHead && (

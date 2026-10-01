@@ -22,9 +22,9 @@ function hold(repo: string, id: string, pid: number): Promise<void> {
 const NOW = new Date('2026-09-16T14:30:00.000Z')
 
 /** A checkout with a live card and diary, as a run's session leaves them while it works. */
-async function liveRun(repo: string, id: string, host: string, pid: number, status: RunCard['status'] = 'running'): Promise<RunCard> {
+async function liveRun(repo: string, id: string, host: string, pid: number, status: RunCard['status'] = 'running', parent?: string): Promise<RunCard> {
   const checkout = await createCheckout(repo, { agentId: id })
-  const mark = { host, pid }
+  const mark = { host, pid, ...(parent !== undefined ? { parent } : {}) }
   const card: RunCard = { id, startedAt: '2026-09-16T14:01:00.000Z', status, intent: '/work-queue', driver: 'fake', model: 'opus', branch: checkout.branch, caller: { runner: mark, pid, host, kind: 'prompt' } }
   if (status !== 'running') card.endedAt = '2026-09-16T14:20:00.000Z'
   const dir = liveDir(checkout.path)
@@ -131,6 +131,26 @@ test('a run being resumed holds its lock: its kept checkout still saying waiting
     const result = await sweep(repo, { host: 'this-box', isAlive: pid => pid === 1, now: () => NOW })
     assert.deepEqual(result, { recorded: [], reclaimed: [], kept: [] })
     assert.equal((await findRun(repo, 'resuming'))?.status, 'running')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a run the sweep ends tells its parent: one that died mid-work, one that never started; one that had ended by itself is not told again', async () => {
+  const repo = await testRepo()
+  try {
+    await liveRun(repo, 'died', 'this-box', 999_999, 'running', 'p1')
+    await liveRun(repo, 'ended', 'this-box', 999_999, 'done', 'p1')
+    await liveRun(repo, 'orphan', 'this-box', 999_999)
+    await writeMarker(repo, markerCard({ id: 'vanished', startedAt: '2026-09-16T14:02:00.000Z', prompt: 'Do task two', driver: 'fake', mark: { host: 'this-box', pid: 999_999, parent: 'p1' } }))
+    const told: unknown[] = []
+    const result = await sweep(repo, { host: 'this-box', isAlive: () => false, now: () => NOW, resume: async (id, line) => void told.push({ id, line }) })
+    assert.deepEqual(result.recorded.map(r => r.id).sort(), ['died', 'ended', 'orphan', 'vanished'])
+    assert.deepEqual(told, [
+      { id: 'p1', line: { text: 'The run died, started for this run, ended failed: its process died before the run ended.' } },
+      { id: 'p1', line: { text: 'The run vanished, started for this run, ended stopped: its process is gone and left no checkout.' } },
+    ])
+    assert.equal(((await findRun(repo, 'died'))?.caller?.['runner'] as { parent?: string }).parent, 'p1', 'the record keeps the parent')
   } finally {
     await removeRepo(repo)
   }

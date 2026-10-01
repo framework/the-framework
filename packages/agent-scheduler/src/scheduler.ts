@@ -4,7 +4,7 @@ import { hostname } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readClaudeQuota } from '@agent-driver/claude'
-import { isPidAlive, markerCard, readyToRun, runIdFrom, spawnRun, sweep, withdrawMarker, writeMarker } from 'agent-runner'
+import { isPidAlive, markerCard, readyToRun, resumeDetached, runIdFrom, spawnRun, sweep, withdrawMarker, writeMarker } from 'agent-runner'
 import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@gemstack/agent-data'
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
 import { inFlight, lastStart } from './records.js'
@@ -36,7 +36,7 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     host,
     now,
     pull: () => pullFileBranch(repo, DATA_BRANCH, { git, log }),
-    sweep: () => sweep(repo, { host, isAlive: isPidAlive, now, git, log }),
+    sweep: () => sweep(repo, { host, isAlive: isPidAlive, now, git, log, resume: resumeDetached(repo) }),
     hasCommand: name => projectHasCommand(repo, name),
     check: shell => runCheck(repo, shell, CHECK_TIMEOUT_MS),
     lastStart: command => lastStart(repo, command, schedule),

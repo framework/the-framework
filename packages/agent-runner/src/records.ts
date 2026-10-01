@@ -21,15 +21,28 @@ export interface RunnerMark {
   pid?: number
   /** The prompt a fresh agent is given once the run ends done with a pull request, the run's id after it (`run --then`). */
   then?: string
+  /** The run this one was started for, told when this one ends (`run --parent`). */
+  parent?: string
+  /** The branch this run's own branch started from (`run --base`); origin's default branch when absent. */
+  base?: string
 }
 
 /** The mark a card carries, or `undefined` for a run this tool did not start. */
 export function runnerMark(card: RunCard): RunnerMark | undefined {
   const mark = card.caller?.['runner']
   if (!mark || typeof mark !== 'object') return undefined
-  const { host, pid, then } = mark as Record<string, unknown>
+  const { host, pid, then, parent, base } = mark as Record<string, unknown>
   if (typeof host !== 'string') return undefined
-  return { host, ...(typeof pid === 'number' ? { pid } : {}), ...(typeof then === 'string' ? { then } : {}) }
+  return { host, ...(typeof pid === 'number' ? { pid } : {}), ...lasting({ then, parent, base }) }
+}
+
+/** What a mark keeps for the run's whole life, a resume included: its follow-up, its parent, where it started. */
+export function lasting(mark: { then?: unknown; parent?: unknown; base?: unknown }): Pick<RunnerMark, 'then' | 'parent' | 'base'> {
+  return {
+    ...(typeof mark.then === 'string' ? { then: mark.then } : {}),
+    ...(typeof mark.parent === 'string' ? { parent: mark.parent } : {}),
+    ...(typeof mark.base === 'string' ? { base: mark.base } : {}),
+  }
 }
 
 /** The card a run starts with. */

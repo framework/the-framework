@@ -6,7 +6,7 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary, type AnyDiaryLine, type LogsDeps, type RunCard, type RunStatus } from '@gemstack/skill-logs'
 import { hideLiveDir, inboxPath, liveDir, readLiveCard, readLiveDiary } from './live-card.js'
-import { lasting, markerCard, parentOf, recordBranchGone, recordRun, runnerMark, writeMarker, type RunnerMark } from './records.js'
+import { forReaders, lasting, markerCard, recordBranchGone, recordRun, runnerMark, writeMarker, type RunnerMark } from './records.js'
 import { projectGitHost, type GitHost, type MergeOutcome } from './git-host.js'
 import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
 import { runEndedLine } from './ended.js'
@@ -45,8 +45,9 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
  * declares; a project with no git host package records none.
  *
  * A run may be started for another run, its parent (`run --parent <id>`), and from a branch other
- * than origin's default (`run --base <ref>`); both are on its record for its whole life. When it
- * ends, however it ends, its parent is told (`parent.ts`).
+ * than origin's default (`run --base <ref>`); both are on its record for its whole life, and so is
+ * the commit that branch was at when the run's own was made from it: the run's own work is what
+ * came after it. When it ends, however it ends, its parent is told (`parent.ts`).
  */
 
 /** The detail a stopped run's record carries. */
@@ -132,7 +133,7 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
   const pid = opts.pid ?? process.pid
   const startedAt = clock()
   const id = opts.id ?? runIdFrom(startedAt)
-  const mark: RunnerMark = { host, pid, ...lasting(opts) }
+  let mark: RunnerMark = { host, pid, ...lasting(opts) }
   const log = opts.log ?? (() => {})
   const logs = opts.logs ?? {}
   const isAlive = opts.isAlive ?? isPidAlive
@@ -166,12 +167,13 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
       if (opts.parent !== undefined) await tellParent(repo, opts.parent, childEndedLine({ id, status: 'failed', detail }), telling)
       return { id, status: 'failed', checkout: { reclaimed: false, reason: 'no checkout' }, detail }
     }
+    if (opts.base !== undefined) mark = { ...mark, ...(await startCommit(checkout.path, git)) }
     // Awaited here, not returned: the lock is let go in `finally`, and a bare `return` of the
     // promise would run that before the session ends, leaving the run to the sweep.
     return await session(repo, {
       id,
       checkout,
-      card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { runner: mark, pid, host, ...parentOf(mark), kind: 'prompt', workspace: checkout.path } },
+      card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { runner: mark, pid, host, ...forReaders(mark), kind: 'prompt', workspace: checkout.path } },
       prompt: agentPrompt(opts.prompt, opts.then),
       driver: opts.driver,
       ...modelOf(opts.model),
@@ -270,10 +272,13 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
     const path = worktreePath(repo, opts.id)
     const kept = await stat(path).then(s => s.isDirectory(), () => false)
     const checkout = kept ? { path, branch } : await attachCheckout(repo, { agentId: opts.id, branch, ...(previous.base !== undefined ? { base: previous.base } : {}) }, git)
+    // A record with no branch is a run whose branch went for holding nothing: it was just made
+    // again from the base, as the base is now, so that is where its own work begins.
+    const restarted = !kept && card.branch === undefined && previous.base !== undefined ? await startCommit(checkout.path, git) : {}
 
     // The record is written running again over the ended one, so every reader sees the run in flight.
-    const mark: RunnerMark = { host, pid, ...lasting(previous) }
-    const runningCard: RunCard = { ...card, status: 'running', caller: { ...card.caller, runner: mark, pid, host, workspace: checkout.path } }
+    const mark: RunnerMark = { host, pid, ...lasting(previous), ...restarted }
+    const runningCard: RunCard = { ...card, status: 'running', caller: { ...card.caller, runner: mark, pid, host, ...forReaders(mark), workspace: checkout.path } }
     delete runningCard.endedAt
     const reopened = await recordRun(repo, runningCard, diary, logs)
     if (!reopened.ok && !reopened.committed) log(`[agent-runner] the run's record could not be written: ${reopened.error}`)
@@ -498,6 +503,12 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
   }
   await tell(!(reclaimed.ok && reclaimed.branchesDeleted?.includes(branch)))
   return outcomeOf(run.id, status, branch, pr, card.cost, reclaimed.ok ? { reclaimed: true } : { reclaimed: false, reason: reclaimReason(reclaimed) }, detail)
+}
+
+/** The commit a checkout just made is at: where the run's own work begins. Nothing when git cannot say. */
+async function startCommit(checkout: string, git: GitRunner): Promise<{ baseCommit?: string }> {
+  const commit = (await git(['rev-parse', '--verify', '--quiet', 'HEAD^{commit}'], checkout).catch(() => '')).trim()
+  return commit ? { baseCommit: commit } : {}
 }
 
 function outcomeOf(id: string, status: Exclude<RunStatus, 'running'>, branch: string, pr: RunOutcome['pr'], cost: number | undefined, checkout: RunOutcome['checkout'], detail: string | undefined): RunOutcome {

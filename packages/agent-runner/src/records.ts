@@ -25,23 +25,26 @@ export interface RunnerMark {
   parent?: string
   /** The branch this run's own branch started from (`run --base`); origin's default branch when absent. */
   base?: string
+  /** The commit that branch was at when this run's own branch was made from it: where the run's own work begins. */
+  baseCommit?: string
 }
 
 /** The mark a card carries, or `undefined` for a run this tool did not start. */
 export function runnerMark(card: RunCard): RunnerMark | undefined {
   const mark = card.caller?.['runner']
   if (!mark || typeof mark !== 'object') return undefined
-  const { host, pid, then, parent, base } = mark as Record<string, unknown>
+  const { host, pid, then, parent, base, baseCommit } = mark as Record<string, unknown>
   if (typeof host !== 'string') return undefined
-  return { host, ...(typeof pid === 'number' ? { pid } : {}), ...lasting({ then, parent, base }) }
+  return { host, ...(typeof pid === 'number' ? { pid } : {}), ...lasting({ then, parent, base, baseCommit }) }
 }
 
 /** What a mark keeps for the run's whole life, a resume included: its follow-up, its parent, where it started. */
-export function lasting(mark: { then?: unknown; parent?: unknown; base?: unknown }): Pick<RunnerMark, 'then' | 'parent' | 'base'> {
+export function lasting(mark: { then?: unknown; parent?: unknown; base?: unknown; baseCommit?: unknown }): Pick<RunnerMark, 'then' | 'parent' | 'base' | 'baseCommit'> {
   return {
     ...(typeof mark.then === 'string' ? { then: mark.then } : {}),
     ...(typeof mark.parent === 'string' ? { parent: mark.parent } : {}),
     ...(typeof mark.base === 'string' ? { base: mark.base } : {}),
+    ...(typeof mark.baseCommit === 'string' ? { baseCommit: mark.baseCommit } : {}),
   }
 }
 
@@ -55,13 +58,16 @@ export function markerCard(run: { id: string; startedAt: string; prompt: string;
     driver: run.driver,
     ...(run.model !== undefined ? { model: run.model } : {}),
     // `host` as the run's live card has it too: a reader tells this machine's runs from another's by it.
-    caller: { runner: run.mark, host: run.mark.host, ...parentOf(run.mark) },
+    caller: { runner: run.mark, host: run.mark.host, ...forReaders(run.mark) },
   }
 }
 
-/** The run's parent as a reader of the card finds it: beside `host`, outside this tool's mark. */
-export function parentOf(mark: Pick<RunnerMark, 'parent'>): { parent?: string } {
-  return mark.parent !== undefined ? { parent: mark.parent } : {}
+/**
+ * What a reader of the card finds beside `host`, outside this tool's mark: the run's parent, and
+ * the commit its own work begins at, which its changes are measured from.
+ */
+export function forReaders(mark: Pick<RunnerMark, 'parent' | 'baseCommit'>): { parent?: string; baseCommit?: string } {
+  return { ...(mark.parent !== undefined ? { parent: mark.parent } : {}), ...(mark.baseCommit !== undefined ? { baseCommit: mark.baseCommit } : {}) }
 }
 
 /** Put the run's card on the branch before its agent exists. The outcome says whether it reached origin. */

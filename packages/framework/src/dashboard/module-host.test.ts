@@ -9,7 +9,7 @@ import { callModuleRead, serverHost, MAX_READ_INPUT, type ServerHostDeps } from 
 const listing = (checkouts: Checkout[]): BranchesFor => async () => ({ list: async () => checkouts }) as unknown as BranchesSource
 
 /** The deps for a project whose runs have the given checkouts and records. */
-function deps(checkouts: Checkout[], records: Record<string, { status?: string; host?: string; branch?: string; pr?: { number: number } }>): ServerHostDeps {
+function deps(checkouts: Checkout[], records: Record<string, { status?: string; host?: string; branch?: string; pr?: { number: number }; baseCommit?: string; landed?: string }>): ServerHostDeps {
   return {
     host: 'this-machine',
     branches: listing(checkouts),
@@ -30,6 +30,15 @@ test('a run’s facts: its checkout, its record, and whether it ended here havin
   assert.equal((await host.run('run-d'))?.changedNothing, false, 'a run with a pull request changed something')
   assert.deepEqual((await host.run('run-d'))?.record?.pr, { number: 4 })
   assert.equal(await host.run('run-z'), undefined, 'no checkout and no record: no run')
+})
+
+test('a run’s facts carry the commit its own work begins at and the commit it was landed at; a landed run did not change nothing', async () => {
+  const host = serverHost('/p', deps([], {
+    'run-s': { status: 'done', host: 'this-machine', branch: 'agent-s', baseCommit: 'b'.repeat(40) },
+    'run-l': { status: 'done', host: 'this-machine', baseCommit: 'b'.repeat(40), landed: 'c'.repeat(40) },
+  }))
+  assert.deepEqual((await host.run('run-s'))?.record, { status: 'done', host: 'this-machine', branch: 'agent-s', baseCommit: 'b'.repeat(40) })
+  assert.deepEqual(await host.run('run-l'), { record: { status: 'done', host: 'this-machine', baseCommit: 'b'.repeat(40), landed: 'c'.repeat(40) }, changedNothing: false })
   assert.equal(await host.run('../etc'), undefined, 'a string that is no run id is never looked up')
 })
 

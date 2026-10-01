@@ -49,7 +49,9 @@ export const USAGE = `usage: branches <command>
                                a checkout for agent <id>, on an existing branch; one that is gone starts again from <ref>
   name <name>                  rename this checkout's branch to agent-<name>; prints the name it got
   status [path]                the checkout's branch, whether it is clean, whether it is on the remote
-  show <branch>...             what each branch holds and where it stands: its commits and files beyond the base, whether it is pushed, merged, and what its checkout left uncommitted
+  show [--from <commit>] <branch>...
+                               what each branch holds and where it stands: its commits and files beyond the base, whether it is pushed, merged, and what its checkout left uncommitted;
+                               measured from <commit>, the one the branches started from, in place of the default branch; a full commit id in place of a branch is read as a branch that ends there
   push [--branch <b>]          push this checkout's branch, or branch <b>, to origin; a dirty checkout is refused
   list [--sizes]               every agent checkout under .branches/
   remove <id> [--no-push]      reclaim agent <id>'s checkout, once the remote has everything it holds
@@ -145,9 +147,10 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async show(args, cwd, git) {
-    const { positionals } = parse(args, {}, 1, Infinity)
+    const { values, positionals } = parse(args, { from: { type: 'string' } }, 1, Infinity)
+    if (values.from !== undefined && !values.from.trim()) throw new Usage('--from names a commit')
     const repo = await project(cwd, git)
-    return readBranchStates(repo, positionals, git)
+    return readBranchStates(repo, positionals, git, values.from)
   },
 
   async push(args, cwd, git) {

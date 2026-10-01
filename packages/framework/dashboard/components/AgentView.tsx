@@ -64,7 +64,7 @@ export function AgentView({
   /** Whether the agent is still running; `null` while the daemon's list of agents has not been read, so it is not known yet. */
   live: boolean | null
   /** What the run's card says, off the runs poll: the status pill's and the details strip's facts the feed cannot carry. Absent until the card is listed. */
-  card?: (AgentCardFacts & AgentDetailsCard) | undefined
+  card?: (AgentCardFacts & AgentDetailsCard & Pick<AgentMeta, 'parent'>) | undefined
   /** The session's own name — the same label the rail shows (#1030). It leads the action bar as
    * the stable identity, so the branch renaming itself near the end of an agent (#736) reads as a
    * detail changing rather than the whole view changing. */
@@ -150,6 +150,8 @@ export function AgentView({
   const read = useAgentHandoff(projectId, agentId, live === false, card?.saving === true)
   const kept = read.handoff !== null && read.handoff.exists && read.handoff.pushed && !read.handoff.empty
   const handoff = card?.saving && !kept ? { ...read, handoff: null, loaded: false } : read
+  // A run started for another run: it opens no pull request, its main agent lands its work.
+  const subagent = card?.parent !== undefined
   const [open, setOpen] = useState(false)
   // What the installed modules add to this run's page: a summary in the bar, details under it.
   const { runSlots: mountedSlots } = useMountedModules()
@@ -248,7 +250,7 @@ export function AgentView({
         summary={
           showHandoff ? (
             <>
-              <HandoffSummary handoff={handoff.handoff} />
+              <HandoffSummary handoff={handoff.handoff} subagent={subagent} />
               {handoff.error && <span className="text-danger">{handoff.error}</span>}
             </>
           ) : (
@@ -268,7 +270,7 @@ export function AgentView({
         actions={
           // A run that is working publishes its own work; the next step is offered once it has ended,
           // and a run whose subagents still work has not: it goes on as each of them ends.
-          live === false && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} /> : undefined
+          live === false && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} subagent={subagent} /> : undefined
         }
       />
       {/* The always-available session-details strip: agent + spend (#322). Sits above the changes/

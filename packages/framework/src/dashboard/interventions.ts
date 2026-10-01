@@ -181,7 +181,8 @@ async function unpushedFor(
   const branches = deps.branches ?? projectBranches
 
   const finished = (await agents(project.path))
-    .filter(agent => agent.status !== 'running')
+    // A subagent's branch is its main agent's to land, never a person's to push.
+    .filter(agent => agent.status !== 'running' && agent.parent === undefined)
     .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''))
     .slice(0, deps.handoffLimit ?? HANDOFF_LIMIT)
     .flatMap(agent => {

@@ -27,9 +27,17 @@ export function handoffExpandable(handoff: AgentHandoff | null): boolean {
   return Boolean(handoff && handoff.exists && (!handoff.empty || handoff.pendingFiles?.length))
 }
 
-/** The one-line verdict, in the action bar: what the session left behind, or that it left nothing. */
-export function HandoffSummary({ handoff }: { handoff: AgentHandoff | null }) {
+/**
+ * The one-line verdict, in the action bar: what the session left behind, or that it left nothing.
+ *
+ * A subagent's work goes to its main agent's branch, so whether it got there is what its line
+ * ends on, landed or not landed, where another run's says pushed.
+ */
+export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHandoff | null; subagent?: boolean }) {
   if (!handoff) return null
+  // A landed run's branch is gone on purpose; what it held is read by its last commit, and when
+  // this machine does not have that commit, landed is still what there is to say.
+  if (!handoff.exists && handoff.landed) return <span className="text-muted-foreground">landed</span>
   // A branch that is gone and a branch that was never pushed are different facts, and the summary
   // is only useful if it tells them apart. Gone because the run changed nothing is no changes.
   if (!handoff.exists) return <span className="text-muted-foreground">{handoff.unchanged ? 'no changes' : 'branch gone'}</span>
@@ -45,8 +53,9 @@ export function HandoffSummary({ handoff }: { handoff: AgentHandoff | null }) {
       <span>{files}</span>
       <DiffStat added={handoff.insertions} removed={handoff.deletions} className="text-xs" />
       {/* Whether the work is on the remote yet is the first handoff question — say it. The PR
-          itself is not repeated here: the bar already links it. */}
-      {handoff.pushed && !handoff.pr && <span>· pushed</span>}
+          itself is not repeated here: the bar already links it. A subagent's first question is
+          whether its main agent took the work. */}
+      {handoff.landed ? <span>· landed</span> : subagent ? <span>· not landed</span> : handoff.pushed && !handoff.pr && <span>· pushed</span>}
     </span>
   )
 }
@@ -60,18 +69,24 @@ export function HandoffSummary({ handoff }: { handoff: AgentHandoff | null }) {
  * bar rather than behind the disclosure, because the point of the handoff is to be offered without
  * being looked for. Once a PR exists neither shows — the bar links the PR, and the interventions
  * queue (#632) has picked it up by then.
+ *
+ * A subagent is offered none of them: it opens no pull request, and its branch is its main
+ * agent's to land. What it left uncommitted is still named, since nothing lands that.
  */
 export function HandoffActions({
   projectId,
   agentId: agentId,
   state,
+  subagent = false,
 }: {
   projectId: string
   agentId: string
   state: AgentHandoffState
+  subagent?: boolean
 }) {
   const { handoff, busy, pending, act } = state
   if (!handoff) return null
+  if (subagent) return handoff.exists && handoff.empty ? <Uncommitted paths={handoff.pendingFiles ?? []} /> : null
   // While the PR lookup is still out (#1028), nothing is offered: acting on "not known yet" is
   // how a second PR gets opened.
   if (handoff.prPending) return null
@@ -100,11 +115,7 @@ export function HandoffActions({
   // for, and offering one that fails with "No commits between main and <branch>" is the dead end
   // this bar exists to prevent. When the tree holds uncommitted work, that work is named — the
   // reader's next step is to have the session commit it (the composer is right below).
-  if (handoff.empty) {
-    const pending = handoff.pendingFiles ?? []
-    if (pending.length === 0) return null
-    return <Reason title={pending.join('\n')}>Nothing committed — {namePending(pending)} left uncommitted.</Reason>
-  }
+  if (handoff.empty) return <Uncommitted paths={handoff.pendingFiles ?? []} />
   if (!handoff.hasRemote) return <Reason>No remote to push to.</Reason>
   // No git host package (#1820): nothing opens a pull request for this project, so the last step is
   // the push, and a pushed branch is where the handoff ends.
@@ -131,6 +142,12 @@ export function HandoffActions({
       {pending === 'pr' ? 'Opening PR…' : 'Open PR'}
     </Button>
   )
+}
+
+/** The work an empty branch's checkout holds uncommitted, named; nothing when the tree is clean. */
+function Uncommitted({ paths }: { paths: string[] }) {
+  if (paths.length === 0) return null
+  return <Reason title={paths.join('\n')}>Nothing committed — {namePending(paths)} left uncommitted.</Reason>
 }
 
 /**

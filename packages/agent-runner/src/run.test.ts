@@ -8,6 +8,7 @@ import { findRun } from '@gemstack/skill-logs'
 import { inboxPath, readLiveCard } from './live-card.js'
 import { acquireRunLock, lockHolder, releaseRunLock } from './run-lock.js'
 import { HOLD_MERGE_LINE, resumeRun, runCommand, STOPPED_DETAIL } from './run.js'
+import { runnerMark } from './records.js'
 import type { GitHost } from './git-host.js'
 import { sweep } from './sweep.js'
 import { git, readUntimedDiary, removeRepo, testRepo } from './test-repo.js'
@@ -581,13 +582,35 @@ test('a run started from a base, continued after its empty branch went with its 
 
     const first = await runCommand(repo, { prompt: 'Do task one', base: 'agent-plan', driver: new FakeDriver({ turns: [{ text: 'Nothing to change.' }], sessionId: 's-1' }), now: () => NOW, gitHost: noGitHost })
     assert.deepEqual(first.checkout, { reclaimed: true })
-    assert.equal((await findRun(repo, first.id))?.branch, undefined, 'the branch held nothing and went with the checkout')
+    const ended = await findRun(repo, first.id)
+    assert.equal(ended?.branch, undefined, 'the branch held nothing and went with the checkout')
+    // Where its own work begins is on its record: in the tool's mark, and beside `host` for any reader.
+    const planAt = (await git(['rev-parse', 'agent-plan'], repo)).trim()
+    assert.equal(runnerMark(ended!)?.baseCommit, planAt)
+    assert.equal(ended!.caller?.['baseCommit'], planAt)
+
+    // The base moves on before the run is continued.
+    await git(['checkout', '-q', 'agent-plan'], repo)
+    await writeFile(join(repo, 'plan.txt'), 'the plan, revised\n')
+    await git(['commit', '-q', '-am', 'Plan revised'], repo)
+    await git(['checkout', '-q', 'main'], repo)
 
     let head = ''
     const looking: Driver = { id: 'fake', start: async opts => wrap(await new FakeDriver({ turns: [{ text: 'Done.' }] }).start(opts), async () => void (head = (await git(['rev-parse', 'HEAD'], opts.cwd)).trim())) }
     const continued = await resumeRun(repo, { id: first.id, text: 'Look again.', driver: looking, now: () => new Date(NOW.getTime() + 60_000), gitHost: noGitHost })
     assert.equal(continued.status, 'done')
-    assert.equal(head, (await git(['rev-parse', 'agent-plan'], repo)).trim(), 'the new branch starts from the base on the record, not origin’s default branch')
+    const planNow = (await git(['rev-parse', 'agent-plan'], repo)).trim()
+    assert.notEqual(planNow, planAt)
+    assert.equal(head, planNow, 'the new branch starts from the base on the record, not origin’s default branch')
+    const again = await findRun(repo, first.id)
+    assert.equal(runnerMark(again!)?.baseCommit, planNow, 'made again from the base as it is now: its own work begins there')
+    assert.equal(again!.caller?.['baseCommit'], planNow)
+
+    // A run from origin's default branch records none: it is measured against that branch as it is.
+    const plain = await runCommand(repo, { prompt: 'Do task two', driver: new FakeDriver({ turns: [{ text: 'Nothing to change.' }] }), now: () => new Date(NOW.getTime() + 120_000), gitHost: noGitHost })
+    const plainCard = await findRun(repo, plain.id)
+    assert.equal(runnerMark(plainCard!)?.baseCommit, undefined)
+    assert.equal(plainCard!.caller?.['baseCommit'], undefined)
   } finally {
     await removeRepo(repo)
   }

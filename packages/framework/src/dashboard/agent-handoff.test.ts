@@ -1,6 +1,7 @@
 import { test } from 'node:test'
+import { hostname } from 'node:os'
 import assert from 'node:assert/strict'
-import { readAgentHandoff, leftNothing, resolveAgentPr, mergeAgentPr, agentBranchFor, openAgentPullRequest, openRemoteBranchPullRequest, pushAgentBranch, type HandoffAgent } from './agent-handoff.js'
+import { readAgentHandoff, readRunHandoff, leftNothing, resolveAgentPr, mergeAgentPr, agentBranchFor, openAgentPullRequest, openRemoteBranchPullRequest, pushAgentBranch, type HandoffAgent } from './agent-handoff.js'
 import { pickAgentPr, type LinkedPr } from './pull-requests.js'
 import type { BranchState, BranchesFor, BranchesSource } from '../store/branches.js'
 import type { GitHostFor, GitHostSource } from '../store/git-host.js'
@@ -38,8 +39,8 @@ function fakeBranches(
   const calls: unknown[][] = []
   const branches: BranchesFor = async () => ({
     list: async () => [],
-    show: async asked => {
-      calls.push(['show', ...asked])
+    show: async (asked, from) => {
+      calls.push(['show', ...asked, ...(from !== undefined ? [{ from }] : [])])
       return asked.flatMap(branch => {
         const answer = states[branch]
         return answer ? [answer] : []
@@ -179,6 +180,43 @@ test('the Open PR button pushes the branch through the branches provider, then o
   // A caller not asking for review opens a draft.
   await openAgentPullRequest('/repo', agent(), { branches, gitHost, draft: true })
   assert.deepEqual((calls.at(-1) as unknown[])[2], { title: 'the-framework/work', body: 'fix it\n\nOpened from The Framework session `r1`.', draft: true })
+})
+
+test('a run started from another branch is read from the commit its own work begins at; a subagent is never opened a pull request', async () => {
+  const { branches, gitHost, calls } = fakeBranches({ 'the-framework/work': state() })
+  const read = await readAgentHandoff('/repo', 'the-framework/work', { branches, gitHost, pr: async () => undefined, from: 'b'.repeat(40) })
+  assert.equal(read?.exists, true)
+  assert.deepEqual(calls, [['show', 'the-framework/work', { from: 'b'.repeat(40) }]])
+
+  // The button's own read measures the same way, so "nothing to open" is judged on the run's own commits.
+  calls.length = 0
+  await openAgentPullRequest('/repo', agent({ baseCommit: 'b'.repeat(40) }), { branches, gitHost })
+  assert.deepEqual(calls[0], ['show', 'the-framework/work', { from: 'b'.repeat(40) }])
+
+  calls.length = 0
+  assert.deepEqual(await openAgentPullRequest('/repo', agent({ parent: 'r0' }), { branches, gitHost }), { ok: false, error: 'this run is a subagent: its main agent lands its work and opens the pull request' })
+  assert.deepEqual(calls, [], 'nothing pushed, nothing opened')
+})
+
+test('a run’s handoff off its record: its branch from where its own work begins; a landed run by the commit its record kept; a run with neither has none', async () => {
+  const start = 'b'.repeat(40)
+  const tip = 'c'.repeat(40)
+  const { branches, gitHost, calls } = fakeBranches({ 'agent-sub': state({ branch: 'agent-sub' }), [tip]: state({ branch: tip }), gone: state({ branch: 'gone', exists: false, commits: [], files: [] }) })
+  const deps = { branches, gitHost, pr: async () => undefined }
+  const run = (over: Partial<AgentMeta>) => ({ id: 'r1', startedAt: '2026-10-01T00:00:00Z', status: 'done' as const, host: hostname(), ...over })
+
+  const onBranch = await readRunHandoff('/repo', run({ branch: 'agent-sub', baseCommit: start }), deps)
+  assert.deepEqual([onBranch?.exists, onBranch?.landed], [true, undefined])
+  const landed = await readRunHandoff('/repo', run({ baseCommit: start, landed: tip }), deps)
+  assert.deepEqual([landed?.exists, landed?.landed, landed?.commits.length], [true, true, 2])
+  assert.deepEqual(calls, [['show', 'agent-sub', { from: start }], ['show', tip, { from: start }]])
+
+  // Landed, its commit not on this machine: landed is the answer, never "changed nothing".
+  const elsewhere = await readRunHandoff('/repo', run({ landed: 'gone' }), deps)
+  assert.deepEqual([elsewhere?.exists, elsewhere?.landed, elsewhere?.unchanged], [false, true, undefined])
+  // Not landed, the branch gone with its checkout: it changed nothing.
+  assert.equal((await readRunHandoff('/repo', run({ branch: 'gone' }), deps))?.unchanged, true)
+  assert.equal(await readRunHandoff('/repo', run({}), deps), undefined)
 })
 
 test('the Open PR button refuses a session with no branch, a gone branch, an empty branch, a project with no branches provider, and one with no git host', async () => {
@@ -339,4 +377,5 @@ test('a run changed nothing when its own tool ended it here, done or failed, wit
   assert.equal(leftNothing({ status: 'done', host: 'there' }, 'here'), false, 'another machine may hold its branch')
   assert.equal(leftNothing({ status: 'done' }, 'here'), false, 'a record that names no machine')
   assert.equal(leftNothing({ status: 'done', host: 'here', pr: { number: 7 } }, 'here'), false, 'its work is on a pull request')
+  assert.equal(leftNothing({ status: 'done', host: 'here', landed: 'c'.repeat(40) }, 'here'), false, 'its work was landed on its main agent’s branch')
 })

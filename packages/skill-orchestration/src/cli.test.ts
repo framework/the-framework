@@ -9,7 +9,7 @@ import { addWorktree, agentBranchName, worktreePath } from '@gemstack/skill-bran
 import { findRun, formatRunCard, type AnyDiaryLine, type RunCard, type RunStatus } from '@gemstack/skill-logs'
 import { liveDir, markerCard, recordRun, type RunnerMark } from 'agent-runner'
 import { runCli } from './cli.js'
-import { SUBAGENT_LINES, type SubagentDeps } from './subagents.js'
+import { landedRef, SUBAGENT_LINES, type SubagentDeps } from './subagents.js'
 import { git, removeRepo, testRepo } from './test-repo.js'
 
 const HOST = 'this-machine'
@@ -348,7 +348,14 @@ test('land: the subagent\'s branch merged into the caller\'s, then gone here, on
     assert.deepEqual([landed.code, landed.out, landed.err], [0, { ok: true, id: FIRST, branch, merged: true }, ''])
     assert.equal(await readFile(join(checkout, 'tests.txt'), 'utf8'), `${FIRST}\n`, 'the work is on the main agent\'s branch')
     assert.deepEqual([await hasRef(repo, `refs/heads/${branch}`), await hasRef(origin, `refs/heads/${branch}`), await hasRef(repo, `refs/remotes/origin/${branch}`)], [false, false, false])
-    assert.equal((await findRun(repo, FIRST))?.branch, undefined, 'the record names no branch that is gone')
+    const card = await findRun(repo, FIRST)
+    assert.equal(card?.branch, undefined, 'the record names no branch that is gone')
+    // Its last commit outlives the branch: kept under a ref here and on origin, and named on the record.
+    const tip = (await git(['rev-parse', 'HEAD'], checkout)).trim()
+    assert.equal((await git(['log', '-1', '--format=%s', tip], repo)).trim(), 'Add tests.txt')
+    assert.deepEqual([(await git(['rev-parse', landedRef(FIRST)], repo)).trim(), (await git(['rev-parse', landedRef(FIRST)], origin)).trim()], [tip, tip])
+    assert.equal(card?.caller?.['landed'], tip)
+    assert.deepEqual(card?.caller?.['runner'], { host: HOST, parent: MAIN, base: agentBranchName(MAIN) }, 'the rest of the record is as it was')
     const again = await run(checkout, MAIN, ['land', FIRST])
     assert.deepEqual([again.code, again.out], [1, { ok: false, reason: 'nothing-to-land', id: FIRST }])
 
@@ -363,6 +370,8 @@ test('land: the subagent\'s branch merged into the caller\'s, then gone here, on
     await git(['merge', '-q', '--no-edit', byHand], checkout)
     assert.deepEqual((await run(checkout, MAIN, ['land', OTHERS])).out, { ok: true, id: OTHERS, branch: byHand, merged: false })
     assert.equal(await hasRef(repo, `refs/heads/${byHand}`), false)
+    assert.equal((await findRun(repo, OTHERS))?.caller?.['landed'], (await git(['rev-parse', landedRef(OTHERS)], repo)).trim(), 'merged by hand, its last commit is kept all the same')
+    assert.equal((await git(['log', '-1', '--format=%s', landedRef(OTHERS)], repo)).trim(), 'Add notes.txt')
   } finally {
     await removeRepo(repo)
   }
@@ -387,6 +396,7 @@ test('land is refused, and nothing deleted, on a conflict, a running subagent, u
     assert.deepEqual([(await git(['rev-parse', 'HEAD'], checkout)).trim(), (await git(['status', '--porcelain'], checkout)).trim()], [head, ''], 'the merge is undone')
     assert.deepEqual([await hasRef(repo, `refs/heads/${branch}`), await hasRef(origin, `refs/heads/${branch}`)], [true, true], 'and the branch is still there')
     assert.equal((await findRun(repo, FIRST))?.branch, branch)
+    assert.deepEqual([await hasRef(repo, landedRef(FIRST)), (await findRun(repo, FIRST))?.caller?.['landed']], [false, undefined], 'not landed: nothing says it is')
 
     await record(repo, SECOND, { mark: { parent: MAIN }, branch: agentBranchName(SECOND) })
     assert.deepEqual((await run(checkout, MAIN, ['land', SECOND])).out, { ok: false, reason: 'running', id: SECOND })
@@ -424,7 +434,9 @@ test('land: a subagent whose checkout is still there loses it only when it holds
     const named = await endedSubagent(repo, SECOND, 'docs.txt', { branch: 'docs' })
     assert.deepEqual((await run(checkout, MAIN, ['land', SECOND])).out, { ok: true, id: SECOND, branch: named, merged: true })
     assert.equal(await hasRef(repo, 'refs/heads/docs'), true, 'only an agent\'s branch is deleted')
-    assert.equal((await findRun(repo, SECOND))?.branch, 'docs')
+    const kept = await findRun(repo, SECOND)
+    assert.equal(kept?.branch, 'docs')
+    assert.equal(kept?.caller?.['landed'], (await git(['rev-parse', 'refs/heads/docs'], repo)).trim(), 'landed all the same')
   } finally {
     await removeRepo(repo)
   }

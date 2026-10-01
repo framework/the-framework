@@ -11,10 +11,10 @@ let dir: string
 let root: string
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 
-/** The host for a run that has a checkout at `path`. */
-const inCheckout = (path: string): ModuleServerHost => ({
+/** The host for a run that has a checkout at `path`, and the record given, when one is. */
+const inCheckout = (path: string, record?: { baseCommit?: string }): ModuleServerHost => ({
   root,
-  run: async () => ({ checkout: path, changedNothing: false }),
+  run: async () => ({ checkout: path, ...(record ? { record } : {}), changedNothing: false }),
   mergeCommit: async () => ({ pending: false }),
 })
 
@@ -24,14 +24,14 @@ type Pr = { number: number; mergeCommit?: string } & Record<string, unknown>
 /**
  * The host for a run with no checkout, the given record, and the given pull requests on its
  * branch. "Changed nothing" is the core's rule, as the core's host answers it: it ended `done` or
- * `failed` on this machine, with no pull request.
+ * `failed` on this machine, with no pull request, and was not landed.
  */
-function deps(agent: { status?: string; host?: string; branch?: string; pr?: { number: number } }, prs: { value?: Pr[]; pending?: boolean } = {}): ModuleServerHost {
+function deps(agent: { status?: string; host?: string; branch?: string; pr?: { number: number }; baseCommit?: string; landed?: string }, prs: { value?: Pr[]; pending?: boolean } = {}): ModuleServerHost {
   return {
     root,
     run: async () => ({
       record: agent,
-      changedNothing: !agent.pr && (agent.status === 'done' || agent.status === 'failed' || agent.status === 'stopped') && agent.host === 'this-machine',
+      changedNothing: !agent.pr && agent.landed === undefined && (agent.status === 'done' || agent.status === 'failed' || agent.status === 'stopped') && agent.host === 'this-machine',
     }),
     mergeCommit: async (_branch, number) => {
       if (prs.pending && prs.value === undefined) return { pending: true }
@@ -239,4 +239,56 @@ test('a deleted file on disk is not read as content', async () => {
   await unlink(join(path, 'c.txt'))
   const at = await resolveAgentFiles(inCheckout(path), 'run-del')
   assert.equal(await readAgentFileContent(root, at, 'c.txt'), null)
+})
+
+test('a run started from another run’s branch is measured from the commit its own work begins at: in its checkout, on its branch, and once it is landed and its branch gone', async () => {
+  git(root, 'checkout', '-q', 'main')
+  // A main agent's branch with work of its own, and a subagent's started from it.
+  const mainPath = join(dir, 'wt-main-agent')
+  git(root, 'worktree', 'add', '-q', '-b', 'agent-main-agent', mainPath, 'main')
+  const start = commit(mainPath, 'the main agent’s work', { 'plan.txt': 'plan\n' })
+  const subPath = join(dir, 'wt-subagent')
+  git(root, 'worktree', 'add', '-q', '-b', 'agent-subagent', subPath, 'agent-main-agent')
+  const tip = commit(subPath, 'the subagent’s part', { 'part.txt': 'part\n' })
+  const own = { 'part.txt': { status: 'added', committed: true } }
+
+  // In its checkout: without the commit on its record, the main agent's work reads as its own.
+  const unknown = await readAgentTree(root, await resolveAgentFiles(inCheckout(subPath), 'run-sub'))
+  assert.deepEqual(unknown.source === 'checkout' && Object.keys(unknown.changes).sort(), ['part.txt', 'plan.txt'])
+  const live = await resolveAgentFiles(inCheckout(subPath, { baseCommit: start }), 'run-sub')
+  const liveTree = await readAgentTree(root, live)
+  assert.deepEqual(liveTree.source === 'checkout' && liveTree.changes, own)
+  assert.equal(await readAgentFileDiff(root, live, 'plan.txt'), null, 'the main agent’s file is no change of this run')
+
+  // On its branch, its checkout gone.
+  git(root, 'worktree', 'remove', subPath)
+  const onBranch = await resolve(deps({ status: 'done', host: 'this-machine', branch: 'agent-subagent', baseCommit: start }))
+  assert.deepEqual(onBranch, { source: 'branch', branch: 'agent-subagent', ref: tip, base: start })
+  const branchTree = await readAgentTree(root, onBranch)
+  assert.deepEqual(branchTree.source === 'branch' && branchTree.changes, own)
+  // A commit this machine does not have is no base: the default branch is.
+  const elsewhere = await readAgentTree(root, await resolve(deps({ branch: 'agent-subagent', baseCommit: '0'.repeat(40) })))
+  assert.deepEqual(elsewhere.source === 'branch' && Object.keys(elsewhere.changes).sort(), ['part.txt', 'plan.txt'])
+
+  // Landed: merged into the main agent's branch, its own branch gone, its last commit kept and on its record.
+  git(mainPath, 'merge', '-q', '--no-ff', '-m', 'Merge branch agent-subagent', 'agent-subagent')
+  git(root, 'update-ref', 'refs/landed/run-sub', tip)
+  git(root, 'branch', '-q', '-D', 'agent-subagent')
+  const landed = await resolve(deps({ status: 'done', host: 'this-machine', baseCommit: start, landed: tip }))
+  assert.deepEqual(landed, { source: 'landed', ref: tip, base: start })
+  const landedTree = await readAgentTree(root, landed)
+  assert.equal(landedTree.source, 'landed')
+  if (landedTree.source !== 'landed') return
+  assert.deepEqual(landedTree.changes, own)
+  assert.ok(landedTree.files.includes('part.txt') && landedTree.files.includes('plan.txt'), 'the whole tree at its last commit')
+  assert.match((await readAgentFileDiff(root, landed, 'part.txt'))?.patch ?? '', /\+part/)
+  assert.deepEqual(await readAgentFileContent(root, landed, 'plan.txt'), { path: 'plan.txt', text: 'plan', truncated: false, binary: false })
+
+  // The main agent's branch squashed and deleted later changes nothing: the kept ref holds the commit.
+  git(root, 'worktree', 'remove', mainPath)
+  git(root, 'branch', '-q', '-D', 'agent-main-agent')
+  assert.deepEqual(await readAgentTree(root, await resolve(deps({ status: 'done', host: 'this-machine', baseCommit: start, landed: tip }))), landedTree)
+
+  // A landed run whose commit this machine does not have is gone, never "changed nothing".
+  assert.deepEqual(await resolve(deps({ status: 'done', host: 'this-machine', landed: '0'.repeat(40) })), { source: 'gone' })
 })

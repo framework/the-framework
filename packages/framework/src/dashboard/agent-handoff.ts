@@ -54,7 +54,12 @@ export interface AgentHandoff {
   exists: boolean
   /** The branch is gone because the run changed nothing ({@link leftNothing}), not because work went. */
   unchanged?: boolean
-  /** What the branch is measured against (the repo's default branch), when one was found. */
+  /**
+   * The run's main agent landed its work: merged into the main agent's branch. The run's own branch
+   * went with that, and what is read here is what it held, by the last commit its record kept.
+   */
+  landed?: boolean
+  /** What the branch is measured against: the commit the run's own work begins at, else the repo's default branch, when one was found. */
   base?: string
   commits: HandoffCommit[]
   files: HandoffFile[]
@@ -111,6 +116,8 @@ export interface AgentHandoffDeps {
    * that saw the branch, or work a later PR already landed reads as unlanded. See {@link pickAgentPr}.
    */
   order?: 'first' | 'latest'
+  /** The commit the run's own work begins at ({@link AgentMeta.baseCommit}): what the branch is measured from. */
+  from?: string
 }
 
 /**
@@ -124,14 +131,15 @@ export function agentBranchFor(agent: { id: string; branch?: string }): string |
 
 /**
  * Whether a run whose branch is gone changed nothing (#1850): it ended `done`, `failed` or
- * `stopped` on this machine, and has no pull request. Such a run's own tool recorded the branch's
+ * `stopped` on this machine, has no pull request, and was not landed by a main agent (a landed
+ * run's branch went because its work moved on, not for holding nothing). Such a run's own tool recorded the branch's
  * last name as it ended, a Stop included, and then reclaimed the checkout, and the branches rule
  * deletes a branch with the checkout only when it holds nothing. A run whose process died is marked
  * `stopped` by the sweep only when it left no checkout, so it had nowhere to keep a change. A run
  * another machine ran leaves no such proof here, and one `waiting` keeps its checkout.
  */
-export function leftNothing(agent: { status?: string; host?: string; pr?: unknown }, host: string = hostname()): boolean {
-  return !agent.pr && (agent.status === 'done' || agent.status === 'failed' || agent.status === 'stopped') && agent.host === host
+export function leftNothing(agent: { status?: string; host?: string; pr?: unknown; landed?: string }, host: string = hostname()): boolean {
+  return !agent.pr && agent.landed === undefined && (agent.status === 'done' || agent.status === 'failed' || agent.status === 'stopped') && agent.host === host
 }
 
 /**
@@ -231,7 +239,7 @@ export async function readAgentHandoff(
 ): Promise<AgentHandoff | undefined> {
   const branches = await (deps.branches ?? projectBranches)(cwd).catch(() => undefined)
   if (!branches) return undefined
-  const [state] = await branches.show([branch])
+  const [state] = await branches.show([branch], deps.from)
   if (!state) return undefined
   const gitHost = await (deps.gitHost ?? projectGitHost)(cwd).catch(() => undefined)
   // Read through the cache and allowed to arrive late (#1028): the branch's facts are local
@@ -260,6 +268,28 @@ export async function readAgentHandoff(
     ...(pr.pending ? { prPending: true } : {}),
     ...(state.pendingFiles ? { pendingFiles: state.pendingFiles } : {}),
   }
+}
+
+/**
+ * What a finished run left behind, off its record: {@link readAgentHandoff} for the branch the
+ * record names, measured from the commit the run's own work begins at when the record names one
+ * (a run started from another branch holds, beyond the default branch, that branch's work too).
+ *
+ * A run its main agent landed has no branch left: what it held is read by the last commit its
+ * record kept, and the answer says landed. A branch gone because the run changed nothing is said
+ * as that, not as lost work. Undefined for a run with neither a branch nor a landed commit.
+ */
+export async function readRunHandoff(
+  cwd: string,
+  agent: Pick<AgentMeta, 'id' | 'startedAt' | 'branch' | 'baseCommit' | 'landed' | 'status' | 'host' | 'pr'>,
+  deps: AgentHandoffDeps = {},
+): Promise<AgentHandoff | undefined> {
+  const at = agentBranchFor(agent) ?? agent.landed
+  if (at === undefined) return undefined
+  const handoff = await readAgentHandoff(cwd, at, { since: agent.startedAt, ...(agent.baseCommit !== undefined ? { from: agent.baseCommit } : {}), ...deps })
+  if (!handoff) return undefined
+  if (agent.landed !== undefined) return { ...handoff, landed: true }
+  return !handoff.exists && leftNothing(agent) ? { ...handoff, unchanged: true } : handoff
 }
 
 /**
@@ -345,6 +375,8 @@ export async function openAgentPullRequest(
   agent: AgentMeta,
   options: { draft?: boolean; branches?: BranchesFor; gitHost?: GitHostFor; pr?: BranchPrLookup } = {},
 ): Promise<HandoffResult> {
+  // A subagent's work goes to its main agent's branch, and that one opens the pull request.
+  if (agent.parent !== undefined) return { ok: false, error: 'this run is a subagent: its main agent lands its work and opens the pull request' }
   const branch = agentBranchFor(agent)
   if (branch === undefined) return { ok: false, error: 'this session recorded no branch to open a PR from' }
   const branches = options.branches ?? projectBranches
@@ -352,7 +384,7 @@ export async function openAgentPullRequest(
   // `latest` order (#1512), because the `movedPastPr` decision below compares the branch tip
   // against a PR's head: against the *first* PR, work a second one already landed reads as
   // unlanded and this opens a third for it.
-  const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt, order: 'latest', branches, gitHost, ...(options.pr ? { pr: options.pr } : {}) }).catch(() => undefined)
+  const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt, order: 'latest', branches, gitHost, ...(options.pr ? { pr: options.pr } : {}), ...(agent.baseCommit !== undefined ? { from: agent.baseCommit } : {}) }).catch(() => undefined)
   // The agent's PR first, even when its branch is gone locally: a hands-off web agent's branch only
   // ever existed on the remote, and its PR is the answer the button exists to give (#1255).
   // Unless the session demonstrably kept committing after that PR merged or closed (#1512) —

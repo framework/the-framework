@@ -12,6 +12,12 @@ import { repoHasRemote, worktreeBranch, worktreeDirEntries } from './worktree.js
  * the uncommitted paths of the checkout that is on the branch, when one is. The pull request is
  * the caller's own question, asked of the git host, never here.
  *
+ * A caller that knows the commit a branch started from names it (`from`): the commits and the
+ * files are then measured from that commit, since a branch started from another branch holds, beyond
+ * the default branch, that branch's work as well as its own. A full commit id asked in place of a
+ * branch is read as a branch whose tip it is: what a branch held, for a caller that kept its last
+ * commit after the branch went.
+ *
  * Forgiving throughout: a branch that is gone answers `exists: false` with empty lists, a
  * project without a remote answers `hasRemote: false`, and a git read that fails reads as empty.
  */
@@ -37,7 +43,7 @@ export interface BranchState {
   name?: string
   /** The branch exists in the repository. Gone: every list below is empty. */
   exists: boolean
-  /** What it is measured against: the remote's default branch, else a local `main` or `master`. Absent when none was found. */
+  /** What it is measured against: the commit the caller named, else the remote's default branch, else a local `main` or `master`. Absent when none was found. */
   base?: string
   /** The branch's own commits beyond the base, newest first. */
   commits: BranchCommit[]
@@ -56,12 +62,16 @@ export interface BranchState {
 /** A subject can hold anything, so the fields are unit-separated rather than space-split. */
 const SEP = String.fromCharCode(31)
 
-/** The state of each branch named, in that order. One read of the checkouts serves them all. */
-export async function readBranchStates(repo: string, branches: readonly string[], git: GitRunner = nodeGitRunner()): Promise<BranchState[]> {
+/**
+ * The state of each branch named, in that order. One read of the checkouts serves them all.
+ * `from` is the commit they started from, when the caller knows it; one this machine does not
+ * have is no base, and the default branch is.
+ */
+export async function readBranchStates(repo: string, branches: readonly string[], git: GitRunner = nodeGitRunner(), from?: string): Promise<BranchState[]> {
   const ask = soft(git, repo)
-  const [hasRemote, base, checkouts] = await Promise.all([repoHasRemote(repo, git), detectBase(ask), checkoutsByBranch(repo, git)])
+  const [hasRemote, base, checkouts, start] = await Promise.all([repoHasRemote(repo, git), detectBase(ask), checkoutsByBranch(repo, git), from !== undefined ? commitOf(ask, from) : undefined])
   const states: BranchState[] = []
-  for (const branch of branches) states.push(await readOne(repo, branch, { git, ask, hasRemote, base, checkouts }))
+  for (const branch of branches) states.push(await readOne(repo, branch, { git, ask, hasRemote, base, from: start, checkouts }))
   return states
 }
 
@@ -69,13 +79,27 @@ interface Reads {
   git: GitRunner
   ask: (args: string[]) => Promise<string>
   hasRemote: boolean
+  /** The project's default branch. */
   base: string | undefined
+  /** The commit the caller says the branches started from, when this machine has it. */
+  from: string | undefined
   checkouts: Map<string, string>
+}
+
+/** A full commit id: what a caller asks in place of a branch that is gone. */
+const COMMIT_ID = /^[0-9a-f]{40}$/
+
+/** The commit `rev` names, when this machine has it. */
+async function commitOf(ask: (args: string[]) => Promise<string>, rev: string): Promise<string | undefined> {
+  return (await ask(['rev-parse', '--verify', '--quiet', `${rev}^{commit}`])).trim() || undefined
 }
 
 async function readOne(repo: string, branch: string, reads: Reads): Promise<BranchState> {
   const { ask, hasRemote, base } = reads
-  const tip = (await ask(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).trim()
+  const tip = (await commitOf(ask, `refs/heads/${branch}`)) ?? (COMMIT_ID.test(branch) ? await commitOf(ask, branch) : undefined)
+  // The commits and the files are measured from where the caller says the branch started; whether
+  // it is merged is always the default branch's answer.
+  const from = reads.from ?? base
   const checkout = reads.checkouts.get(branch)
   const pending = checkout ? await pendingFiles(reads.git, checkout) : {}
   const name = sessionNameOf(branch, checkout ? agentIdFromWorktreeDir(basename(checkout)) : undefined)
@@ -84,8 +108,8 @@ async function readOne(repo: string, branch: string, reads: Reads): Promise<Bran
   // `base..branch` is the branch's own commits; `base...branch` is the change since it left the
   // base, whatever the base did since. Each spelling answers its own question.
   const [commitsOut, numstatOut, remoteTip, mergedOut] = await Promise.all([
-    base ? ask(['log', '--format=%H%x1f%s', `${base}..${branch}`]) : Promise.resolve(''),
-    base ? ask(['diff', '--numstat', `${base}...${branch}`]) : Promise.resolve(''),
+    from ? ask(['log', '--format=%H%x1f%s', `${from}..${tip}`]) : Promise.resolve(''),
+    from ? ask(['diff', '--numstat', `${from}...${tip}`]) : Promise.resolve(''),
     hasRemote ? ask(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]) : Promise.resolve(''),
     base ? ask(['branch', '--list', '--merged', base, branch]) : Promise.resolve(''),
   ])
@@ -93,7 +117,7 @@ async function readOne(repo: string, branch: string, reads: Reads): Promise<Bran
     branch,
     ...named,
     exists: true,
-    ...(base ? { base } : {}),
+    ...(from ? { base: from } : {}),
     commits: parseCommits(commitsOut),
     files: parseNumstat(numstatOut),
     hasRemote,

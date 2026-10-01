@@ -77,7 +77,7 @@ describe('subagentEnd', () => {
 
   test("the same words about a run that is not one of this run's subagents, and any other prompt, read as a person's", () => {
     expect(subagentEnd('The run 2026-09-01T10-00-00-000Z, started for this run, ended done.', subagents)).toBeUndefined()
-    expect(subagentEnd('Please look at the run 2026-10-01T10-00-00-000Z, started for this run, ended done.', subagents)).toBeUndefined()
+    expect(subagentEnd('Note: The run 2026-10-01T10-00-00-000Z, started for this run, ended done.', subagents)).toBeUndefined()
     expect(subagentEnd('The run 2026-10-01T10-00-00-000Z, started for this run, ended done.', [])).toBeUndefined()
   })
 })

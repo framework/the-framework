@@ -439,6 +439,14 @@ describe('EventList subagent rows', () => {
     expect(screen.queryByText(/started for this run/)).toBeNull()
   })
 
+  test("right after the reader's own prompt, the row of a subagent's end still shows its own badge", () => {
+    const typed: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'and then?' }, at: '2026-10-01T10:03:30.000Z' }
+    const told: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' }, at: '2026-10-01T10:04:00.000Z' }
+    render(<EventList events={[...events, typed, told]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' })]} stick={false} />)
+    expect(screen.getAllByText('you')).toHaveLength(2)
+    expect(screen.getAllByText('subagent')).toHaveLength(2)
+  })
+
   test('the same words about a run that is not a subagent of this one stay a YOU row', () => {
     const typed: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' } }
     render(<EventList events={[...events, typed]} stick={false} />)

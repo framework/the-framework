@@ -273,7 +273,7 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
 
     // The record is written running again over the ended one, so every reader sees the run in flight.
     const mark: RunnerMark = { host, pid, ...lasting(previous) }
-    const runningCard: RunCard = { ...card, status: 'running', caller: { ...card.caller, runner: mark, pid, host, ...parentOf(mark), workspace: checkout.path } }
+    const runningCard: RunCard = { ...card, status: 'running', caller: { ...card.caller, runner: mark, pid, host, workspace: checkout.path } }
     delete runningCard.endedAt
     const reopened = await recordRun(repo, runningCard, diary, logs)
     if (!reopened.ok && !reopened.committed) log(`[agent-runner] the run's record could not be written: ${reopened.error}`)

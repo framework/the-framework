@@ -278,6 +278,8 @@ describe('subagents on the rail', () => {
     ]
     renderRail(<AgentHistory projectId={null} agents={[]} recentAgents={recentAgents} selectedAgentId={null} onSelect={() => {}} />)
     expect(screen.getAllByRole('button', { name: /1 agent/ })).toHaveLength(1)
+    // The subagent's row does not name the project again: it is its main agent's.
+    expect(screen.getAllByText(/alpha/)).toHaveLength(1)
     const titles = screen.getAllByText(/^(split the login work|task c1|other project)$/).map(el => el.textContent)
     expect(titles).toEqual(['other project', 'split the login work', 'task c1'])
   })

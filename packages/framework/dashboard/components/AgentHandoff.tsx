@@ -90,7 +90,6 @@ export function HandoffActions({
   if (!handoff) return null
   if (subagent) {
     if (handoff.landed) return <Reason>landed</Reason>
-    if (!handoff.exists) return null
     return handoff.empty ? <Uncommitted paths={handoff.pendingFiles ?? []} /> : <Reason>not landed</Reason>
   }
   // While the PR lookup is still out (#1028), nothing is offered: acting on "not known yet" is

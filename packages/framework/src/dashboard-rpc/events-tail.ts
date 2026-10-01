@@ -75,9 +75,12 @@ export type TailTarget<T> = { file: string } | { finished: T[] } | { pending: tr
  * file had, in the same order, so the ones past the count already delivered are sent and the tail
  * ends: a finished diary does not grow. The same file, or no answer, means the diary has not
  * moved, and the tail keeps waiting where it is. A diary that is nowhere yet (`pending`: the run
- * was started a moment ago and its tool has not made the checkout) is asked for again on the
- * same cadence until it has a home, and only then followed; the replay boundary is reported at
- * once, since there is nothing to replay. Asking even when the file was never seen matters for a
+ * was started a moment ago and its tool has not made the checkout, or it is being continued and
+ * its checkout is on its way back) is asked for again on the same cadence until it has a home,
+ * and only then followed; the replay boundary is reported once what that home holds has been
+ * delivered, not before: a feed that reconnects swaps what it shows for the replay at the
+ * boundary, and a boundary reported with nothing delivered emptied a chat that was full, for as
+ * long as the diary took to have a home. Asking even when the file was never seen matters for a
  * short run (#1774): started, ended and reclaimed between two polls, its diary was only ever
  * visible as a finished run.
  *
@@ -100,6 +103,8 @@ export function tailAgentEvents<T = unknown>(
   let relocating = false
   let waiting: NodeJS.Timeout | undefined
   let delivered = 0
+  /** The replay boundary still to report: the followed file was not there when it was first read. */
+  let owed: (() => void) | undefined
   const deliver = (event: T): void => {
     delivered++
     onEvent(event)
@@ -109,6 +114,10 @@ export function tailAgentEvents<T = unknown>(
     stopFollow?.()
     stopFollow = undefined
     for (const line of lines.slice(delivered)) deliver(line)
+    // A boundary owed for a file that never came: the finished run's lines are the replay.
+    const boundary = owed
+    owed = undefined
+    boundary?.()
     awaitDiary(true)
   }
 
@@ -134,6 +143,9 @@ export function tailAgentEvents<T = unknown>(
     if (stopped || !tailer || path === undefined) return
     if (existsSync(path)) {
       await tailer.pull()
+      const boundary = owed
+      owed = undefined
+      boundary?.()
       await afterPull?.(path)
       return
     }
@@ -166,9 +178,12 @@ export function tailAgentEvents<T = unknown>(
         skip = delivered
       },
     )
+    // The boundary is reported once the file has been read. A checkout is there a moment before
+    // the diary is written into it: reported then, the boundary would say an empty replay.
     const replayed = (): void => {
       if (stopped) return
-      onReplayedOnce()
+      if (existsSync(file)) onReplayedOnce()
+      else owed = onReplayedOnce
       follow()
     }
     void tailer.pull().then(replayed, replayed)
@@ -178,9 +193,10 @@ export function tailAgentEvents<T = unknown>(
    * The diary is nowhere yet, or is a finished run's: ask again after a poll, until it has a home.
    * A finished run is asked about for as long as the feed is open, since it may be resumed: its diary
    * is then a file in a checkout again, or, for a resumed run that already ended again, more
-   * finished lines. The boundary was already reported.
+   * finished lines. `replayed` is the boundary still owed, when the diary had no home at first:
+   * it is reported once the home's lines are delivered.
    */
-  const awaitDiary = (finished: boolean): void => {
+  const awaitDiary = (finished: boolean, replayed: () => void = () => {}): void => {
     if (stopped) return
     waiting = setTimeout(() => {
       waiting = undefined
@@ -188,11 +204,15 @@ export function tailAgentEvents<T = unknown>(
       void resolve({ cached: finished }).then(
         next => {
           if (stopped) return
-          if (next === undefined || 'pending' in next) return awaitDiary(finished)
-          if ('finished' in next) return finish(next.finished)
-          begin(next.file, () => {})
+          if (next === undefined || 'pending' in next) return awaitDiary(finished, replayed)
+          if ('finished' in next) {
+            finish(next.finished)
+            replayed()
+            return
+          }
+          begin(next.file, replayed)
         },
-        () => awaitDiary(finished),
+        () => awaitDiary(finished, replayed),
       )
     }, POLL_MS)
     waiting.unref?.()
@@ -212,8 +232,7 @@ export function tailAgentEvents<T = unknown>(
         return
       }
       if ('pending' in initial) {
-        onReplayed?.()
-        awaitDiary(false)
+        awaitDiary(false, () => onReplayed?.())
         return
       }
       begin(initial.file, () => onReplayed?.())

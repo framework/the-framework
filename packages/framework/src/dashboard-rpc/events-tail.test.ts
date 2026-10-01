@@ -267,7 +267,7 @@ test('tailAgentEvents finds a diary it never saw in its checkout: a short run, s
   }
 })
 
-test('tailAgentEvents on a diary that is nowhere yet: the replay marker at once, then the file once it has a home (#1774)', async () => {
+test('tailAgentEvents on a diary that is nowhere yet: the file once it has a home, and the replay marker only after its lines (#1774)', async () => {
   const cwd = await tmpWorkspace()
   const live = join(cwd, 'diary.jsonl')
   const seen: string[] = []
@@ -280,13 +280,15 @@ test('tailAgentEvents on a diary that is nowhere yet: the replay marker at once,
   )
   try {
     await sleep(200)
-    assert.equal(sync, 1, 'nothing to replay is an empty replay, reported at once')
+    assert.equal(sync, 0, 'no boundary yet: a feed that reconnects would swap a full chat for nothing')
     assert.deepEqual(seen, [])
     await sleep(1300) // one poll: asked again, still nowhere
+    assert.equal(sync, 0)
     await writeFile(live, line('one'))
     home = true
     await sleep(1600) // the next poll: asked again, and found
     assert.deepEqual(seen, ['one'])
+    assert.equal(sync, 1, 'the boundary, once the lines the home holds are delivered')
     await appendFile(live, line('two'))
     await sleep(1600)
     assert.deepEqual(seen, ['one', 'two'], 'and followed from there')
@@ -397,6 +399,47 @@ test('tailAgentEvents on a diary rewritten in place: a run continued in the chec
     await writeFile(diary, line('one') + line('two') + line('three') + line('four'))
     await sleep(1400)
     assert.deepEqual(seen, ['one', 'two', 'three', 'four'])
+  } finally {
+    stop()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('tailAgentEvents on a diary that is nowhere yet and turns up finished: its lines, then the replay marker', async () => {
+  const order: string[] = []
+  let finished = false
+  const stop = tailAgentEvents<FrameworkEvent>(
+    async () => (finished ? { finished: [{ kind: 'log', message: 'one' }] as FrameworkEvent[] } : { pending: true }),
+    e => void (e.kind === 'log' && order.push(e.message)),
+    () => order.push('boundary'),
+  )
+  try {
+    await sleep(200)
+    assert.deepEqual(order, [])
+    finished = true
+    await sleep(1400)
+    assert.deepEqual(order, ['one', 'boundary'])
+    await sleep(1200)
+    assert.deepEqual(order, ['one', 'boundary'], 'reported once, however often the finished run is asked about')
+  } finally {
+    stop()
+  }
+})
+
+test('tailAgentEvents on a checkout whose diary is not written yet: the replay marker waits for the file', async () => {
+  const cwd = await tmpWorkspace()
+  const diary = join(cwd, 'r1.jsonl')
+  const order: string[] = []
+  const stop = tailAgentEvents<FrameworkEvent>(async () => ({ file: diary }), e => void (e.kind === 'log' && order.push(e.message)), () => order.push('boundary'))
+  try {
+    await sleep(300)
+    assert.deepEqual(order, [], 'no boundary over a file that is not there: it would say an empty replay')
+    await writeFile(diary, line('one') + line('two'))
+    await sleep(1400)
+    assert.deepEqual(order, ['one', 'two', 'boundary'])
+    await appendFile(diary, line('three'))
+    await sleep(1400)
+    assert.deepEqual(order, ['one', 'two', 'boundary', 'three'], 'reported once')
   } finally {
     stop()
     await rm(cwd, { recursive: true, force: true })

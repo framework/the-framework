@@ -108,10 +108,18 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
           buffer = undefined
           setEvents(replay)
         }
-        if (reconnect) graceTimer = setTimeout(swap, SYNC_GRACE_MS)
+        // The deadline swaps what the replay has brought. With nothing brought yet there is nothing
+        // to swap in: the feed on screen stays, and the deadline runs again from the first event.
+        let graceSpent = false
+        const atGrace = () => {
+          if (buffer !== undefined && buffer.length === 0) graceSpent = true
+          else swap()
+        }
+        if (reconnect) graceTimer = setTimeout(atGrace, SYNC_GRACE_MS)
         else setEvents([]) // fresh subscribe: start clean so the replay is not appended twice
         ch.listen(event => {
           if (event.kind === 'stream-sync') {
+            if (graceTimer) clearTimeout(graceTimer)
             swap()
             return
           }
@@ -124,8 +132,13 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
             finished = event.kind === 'driver' && event.event.type === 'text' ? event.event.text : ''
             setWriting('')
           }
-          if (buffer) buffer.push(event)
-          else setEvents(prev => [...prev, event])
+          if (buffer) {
+            buffer.push(event)
+            if (graceSpent) {
+              graceSpent = false
+              graceTimer = setTimeout(swap, SYNC_GRACE_MS)
+            }
+          } else setEvents(prev => [...prev, event])
         })
         ch.onClose(err => {
           // A close mid-replay drops the partial buffer: swapping it in would be exactly the

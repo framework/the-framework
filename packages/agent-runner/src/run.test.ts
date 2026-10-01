@@ -4,11 +4,11 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { AgentExitError, appendInbox, FakeDriver, type Driver, type DriverSession, type DriverStartOptions, type FakeDriverSession } from 'agent-driver'
 import { worktreePath } from '@gemstack/skill-branches'
-import { findRun } from '@gemstack/skill-logs'
+import { findRun, readDiary } from '@gemstack/skill-logs'
 import { inboxPath, readLiveCard } from './live-card.js'
 import { acquireRunLock, lockHolder, releaseRunLock } from './run-lock.js'
 import { HOLD_MERGE_LINE, resumeRun, runCommand, STOPPED_DETAIL } from './run.js'
-import { runnerMark } from './records.js'
+import { recordRun, runnerMark } from './records.js'
 import type { GitHost } from './git-host.js'
 import { sweep } from './sweep.js'
 import { git, readUntimedDiary, removeRepo, testRepo } from './test-repo.js'
@@ -611,6 +611,53 @@ test('a run started from a base, continued after its empty branch went with its 
     const plainCard = await findRun(repo, plain.id)
     assert.equal(runnerMark(plainCard!)?.baseCommit, undefined)
     assert.equal(plainCard!.caller?.['baseCommit'], undefined)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a run started from a base, continued on the branch its work is on, keeps the commit its own work begins at, however the base moved', async () => {
+  const repo = await testRepo()
+  try {
+    await git(['checkout', '-q', '-b', 'agent-plan'], repo)
+    await writeFile(join(repo, 'plan.txt'), 'the plan\n')
+    await git(['add', '-A'], repo)
+    await git(['commit', '-q', '-m', 'Plan'], repo)
+    await git(['push', '-q', 'origin', 'agent-plan'], repo)
+    await git(['checkout', '-q', 'main'], repo)
+    const planAt = (await git(['rev-parse', 'agent-plan'], repo)).trim()
+
+    const working: Driver = {
+      id: 'fake',
+      start: async opts =>
+        wrap(await new FakeDriver({ turns: [{ text: 'Task one is done.' }], sessionId: 's-1' }).start(opts), async () => {
+          await writeFile(join(opts.cwd, 'task-one.txt'), 'done\n')
+          await git(['add', 'task-one.txt'], opts.cwd)
+          await git(['-c', 'user.email=agent@example.com', '-c', 'user.name=agent', 'commit', '-q', '-m', 'Task one'], opts.cwd)
+        }),
+    }
+    const first = await runCommand(repo, { prompt: 'Do task one', base: 'agent-plan', driver: working, now: () => NOW, gitHost: noGitHost })
+    assert.deepEqual(first.checkout, { reclaimed: true })
+    // The record lost its branch's name, and this clone the branch: only origin still has it.
+    const ended = (await findRun(repo, first.id))!
+    const { branch, ...branchless } = ended
+    assert.equal(branch, `agent-${first.id}`)
+    await recordRun(repo, branchless, (await readDiary(repo, first.id)) ?? [])
+    await git(['branch', '-D', branch!], repo).catch(() => {})
+
+    await git(['checkout', '-q', 'agent-plan'], repo)
+    await writeFile(join(repo, 'plan.txt'), 'the plan, revised\n')
+    await git(['commit', '-q', '-am', 'Plan revised'], repo)
+    await git(['checkout', '-q', 'main'], repo)
+
+    let sawWork = false
+    const looking: Driver = { id: 'fake', start: async opts => wrap(await new FakeDriver({ turns: [{ text: 'Done.' }] }).start(opts), async () => void (sawWork = await stat(join(opts.cwd, 'task-one.txt')).then(() => true, () => false))) }
+    const continued = await resumeRun(repo, { id: first.id, text: 'Look again.', driver: looking, now: () => new Date(NOW.getTime() + 60_000), gitHost: noGitHost })
+    assert.equal(continued.status, 'done')
+    assert.equal(sawWork, true, 'back on its own branch, with its commit')
+    const again = (await findRun(repo, first.id))!
+    assert.equal(runnerMark(again)?.baseCommit, planAt, 'its own work still begins where it did')
+    assert.equal(again.caller?.['baseCommit'], planAt)
   } finally {
     await removeRepo(repo)
   }

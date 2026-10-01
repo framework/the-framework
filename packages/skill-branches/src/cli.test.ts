@@ -271,7 +271,7 @@ test('attach: a continued agent is put back on the branch its work is on', async
 
     // A branch that is gone starts again from the base named.
     const based = await run(repo, 'attach', 'a2', 'agent-gone', '--base', 'agent-add-auth')
-    assert.deepEqual(based.out, { ok: true, path: worktreePath(repo, 'a2'), branch: 'agent-gone' })
+    assert.deepEqual(based.out, { ok: true, path: worktreePath(repo, 'a2'), branch: 'agent-gone', again: true }, 'and says the branch was made again')
     assert.match(await git(['show', 'HEAD:index.html'], worktreePath(repo, 'a2')), /Welcome/, 'on the base, with its commit')
   } finally {
     await rm(repo, { recursive: true, force: true })

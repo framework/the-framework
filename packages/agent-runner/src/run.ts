@@ -271,10 +271,10 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
     const branch = card.branch ?? agentBranchName(opts.id)
     const path = worktreePath(repo, opts.id)
     const kept = await stat(path).then(s => s.isDirectory(), () => false)
-    const checkout = kept ? { path, branch } : await attachCheckout(repo, { agentId: opts.id, branch, ...(previous.base !== undefined ? { base: previous.base } : {}) }, git)
-    // A record with no branch is a run whose branch went for holding nothing: it was just made
-    // again from the base, as the base is now, so that is where its own work begins.
-    const restarted = !kept && card.branch === undefined && previous.base !== undefined ? await startCommit(checkout.path, git) : {}
+    const checkout: { path: string; branch: string; again?: true } = kept ? { path, branch } : await attachCheckout(repo, { agentId: opts.id, branch, ...(previous.base !== undefined ? { base: previous.base } : {}) }, git)
+    // A branch that was gone everywhere was just made again from the base, as the base is now:
+    // that is where the run's own work begins. One still on origin came back with its work.
+    const restarted = checkout.again && previous.base !== undefined ? await startCommit(checkout.path, git) : {}
 
     // The record is written running again over the ended one, so every reader sees the run in flight.
     const mark: RunnerMark = { host, pid, ...lasting(previous), ...restarted }

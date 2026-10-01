@@ -33,7 +33,7 @@ How the launcher's "Starts from" pick is shown, carried to the run as a base for
 - A follow-up (`resume`) and a `--then` follow-up are untouched: both attach to the run's own branch (`attachCheckout`). `--resume` refuses `--base`, as it refuses `--driver` and `--then`.
 - A base skips the fetch (`freshStart` runs only without one): nothing to fetch for a local branch.
 - No remote: `originDefaultBranch` answers nothing and git starts from the head. The line reads "Starts from `<current branch>`", no picker: there is one choice.
-- A detached checkout: no current branch, so only the default is offered. The same when the project's checkout is on an `agent-*` branch? No: offered like any branch.
+- A detached checkout: no current branch, so only the default is offered. A checkout on an `agent-*` branch is offered like any other branch.
 - On `main` itself the second choice still means something (local `main` with unpushed commits against `origin/main`); it is offered whenever the checkout is on a branch.
 - Uncommitted edits are not carried (the ticket says so); the choice's text says "what is committed".
 - The other surfaces that start a run (`StartAgentButton`, `UpdateTicketsButton`, the scheduler, the bridge and web starts) send no base: they start from the default.

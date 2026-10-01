@@ -229,21 +229,23 @@ export function foldScreenRows(events: readonly FrameworkEvent[]): { live: Set<F
 }
 
 /**
- * The clean ends that are not the run's end: one a later prompt follows (the run went on), and
- * the last one while the run's subagents still work (`going`). They are not rows: "finished"
- * between two turns, or over working subagents, says what is not so.
+ * The ends that are not the run's end: a clean one, or one waiting on an answer, that a later
+ * prompt follows (the run went on), and the last clean one while the run's subagents still work
+ * (`going`). They are not rows: "finished" between two turns or over working subagents, and
+ * "waiting for an answer" above the answer, say what is not so. A failed or stopped end stays
+ * where it happened: it says why the next prompt was needed.
  */
 export function passedEnds(events: readonly FrameworkEvent[], going: boolean): Set<FrameworkEvent> {
   const passed = new Set<FrameworkEvent>()
   let pending: FrameworkEvent | undefined
   for (const e of events) {
-    if (e.kind === 'end') pending = e.ok ? e : undefined
+    if (e.kind === 'end') pending = e.ok || e.waiting ? e : undefined
     else if (pending && isTurnBoundary(e)) {
       passed.add(pending)
       pending = undefined
     }
   }
-  if (pending && going) passed.add(pending)
+  if (pending?.kind === 'end' && pending.ok && going) passed.add(pending)
   return passed
 }
 

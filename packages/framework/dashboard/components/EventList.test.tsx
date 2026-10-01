@@ -517,8 +517,18 @@ describe('EventList turn ends', () => {
     const events = [prompt('go'), first, prompt('again'), stopped, prompt('once more'), last]
     expect(passedEnds(events, false).size).toBe(0)
     expect([...passedEnds(events, true)]).toEqual([last])
+    // What is written after the last end without a new prompt (a pull request line) leaves it the run's end.
+    expect(passedEnds([prompt('go'), last, { kind: 'log', message: 'recorded' } as FrameworkEvent], false).size).toBe(0)
     // A failed last end is the run's end even while it is going.
     expect(passedEnds([prompt('go'), first], true).size).toBe(0)
+  })
+
+  test('an end waiting on an answer is not a row once the answer came, and is one until then, going or not', () => {
+    const asked = end({ ok: false, waiting: true })
+    expect([...passedEnds([prompt('go'), asked, prompt('Approve'), reply('on it')], false)]).toEqual([asked])
+    expect(passedEnds([prompt('go'), asked], true).size).toBe(0)
+    render(<EventList events={[prompt('go'), asked]} going stick={false} />)
+    expect(screen.getByText(/waiting for an answer/)).toBeTruthy()
   })
 })
 
@@ -540,8 +550,10 @@ describe('EventList replies a question follows', () => {
     const early = reply(long + 'early')
     const asked = reply(long + 'asked')
     const later = reply(long + 'later')
-    const events = [prompt, early, asked, choice, { kind: 'driver', event: { type: 'start', prompt: 'Approve' } } as FrameworkEvent, later]
+    const events = [prompt, early, asked, choice, { kind: 'driver', event: { type: 'start', prompt: 'Approve' } } as FrameworkEvent, later, { kind: 'usage', costUsd: 0.2 } as FrameworkEvent]
     expect([...askedReplies(events)]).toEqual([asked])
+    // A question in a later turn is not about a reply of the turn before.
+    expect(askedReplies([prompt, early, { kind: 'driver', event: { type: 'start', prompt: 'go on' } } as FrameworkEvent, choice]).size).toBe(0)
     render(<EventList events={events} stick={false} />)
     expect(screen.getAllByRole('button', { name: 'Expand message' })).toHaveLength(2)
     expect(screen.getAllByRole('button', { name: 'Collapse message' })).toHaveLength(1)

@@ -21,6 +21,18 @@ describe('agentStatusPill', () => {
     expect(agentStatusPill([], card({ status: 'running' }))).toMatchObject({ label: 'building…' })
   })
 
+  test('ended clean with subagents still working, it says how many: the job is not finished', () => {
+    expect(agentStatusPill([said, ended({ ok: true })], card(), 2)).toMatchObject({ label: '2 subagents running' })
+    expect(agentStatusPill([said, ended({ ok: true })], card({ pr }), 1)).toMatchObject({ label: '1 subagent running' })
+    // Its own state wins while it works, while it saves, and when it did not end clean.
+    expect(agentStatusPill([said], card({ status: 'running' }), 2)).toMatchObject({ label: 'building…' })
+    expect(agentStatusPill([said, ended({ ok: true })], card({ saving: true }), 2)).toMatchObject({ label: 'saving…' })
+    expect(agentStatusPill([said, ended({ ok: false })], card({ status: 'failed' }), 2)).toMatchObject({ label: 'failed' })
+    expect(agentStatusPill([said, ended({ ok: false, stopped: true })], card({ status: 'stopped' }), 2)).toMatchObject({ label: 'stopped' })
+    expect(agentStatusPill([said, ended({ ok: false, waiting: true })], card({ status: 'waiting' }), 2)).toMatchObject({ label: 'waiting for an answer' })
+    expect(agentStatusPill([said, ended({ ok: true })], card(), 0)).toMatchObject({ label: 'finished' })
+  })
+
   test('ready for merge, once the run ended clean with a pull request on its card', () => {
     expect(agentStatusPill([said, ended({ ok: true })], card({ pr }))).toMatchObject({ label: 'ready for merge' })
     // Still working, the pull request of an earlier leg is not the word yet.

@@ -3,7 +3,7 @@ import type { AgentMeta } from '../../src/index.js'
 import { cn } from '../lib/utils.js'
 import { formatDuration } from '../lib/format-date.js'
 import { STATUS_TONE } from '../lib/status-tone.js'
-import { taskLabel } from '../lib/subagents.js'
+import { subagentStartedAt, taskLabel } from '../lib/subagents.js'
 import { DisclosureToggle } from './DisclosureToggle.js'
 
 // One subagent on its main agent's page, on one line: its task, which opens the subagent, then
@@ -27,7 +27,7 @@ export function SubagentLine({
 }) {
   const status = end?.status ?? agent.status
   const working = !end && agent.status === 'running'
-  const took = !end && agent.endedAt !== undefined ? formatDuration(Date.parse(agent.endedAt) - Date.parse(agent.startedAt)) : undefined
+  const took = !end && agent.endedAt !== undefined ? formatDuration(Date.parse(agent.endedAt) - Date.parse(subagentStartedAt(agent))) : undefined
   const tail = end ? end.detail : working ? doing : took
   return (
     <span className="flex min-w-0 flex-1 items-baseline gap-2">

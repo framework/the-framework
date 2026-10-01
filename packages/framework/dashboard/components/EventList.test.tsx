@@ -447,6 +447,29 @@ describe('EventList subagent rows', () => {
     expect(screen.getAllByText('subagent')).toHaveLength(2)
   })
 
+  test('a subagent started right after another one ended goes on under the same SUBAGENT badge', () => {
+    const told: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' }, at: '2026-10-01T10:04:00.000Z' }
+    const next = sub({ id: '2026-10-01T10-04-01-000Z', startedAt: '2026-10-01T10:04:01.000Z', intent: 'Second task' })
+    const after: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'Started the second.' }, at: '2026-10-01T10:04:05.000Z' }
+    render(<EventList events={[...events, told, after]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' }), next]} stick={false} />)
+    // The first subagent's row, then its end and the second's row as one run of rows.
+    expect(screen.getAllByText('subagent')).toHaveLength(2)
+    expect(screen.getByText(/Second task/)).toBeTruthy()
+  })
+
+  test("a subagent's end right under the row of a subagent just started goes on under that row's badge", () => {
+    const told: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' }, at: '2026-10-01T10:04:00.000Z' }
+    const second = sub({ id: '2026-10-01T10-03-59-000Z', startedAt: '2026-10-01T10:03:59.000Z', intent: 'Second task' })
+    render(<EventList events={[...events, told]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' }), second]} stick={false} />)
+    expect(screen.getAllByText('subagent')).toHaveLength(2)
+    expect(screen.getByText('ended done')).toBeTruthy()
+  })
+
+  test('the message being written under a subagent row at the end of the log shows the AGENT badge', () => {
+    render(<EventList events={events} subagents={[sub({ id: '2026-10-01T10-09-00-000Z', startedAt: '2026-10-01T10:09:00.000Z', intent: 'Late task' })]} writing="Now I wait" stick={false} />)
+    expect(screen.getAllByText('agent')).toHaveLength(2)
+  })
+
   test('the same words about a run that is not a subagent of this one stay a YOU row', () => {
     const typed: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' } }
     render(<EventList events={[...events, typed]} stick={false} />)

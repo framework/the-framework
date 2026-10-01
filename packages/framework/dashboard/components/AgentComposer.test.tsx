@@ -143,6 +143,15 @@ describe('AgentComposer, ended (#720, #1774)', () => {
     expect(props().busyLabel).toBe('Resuming…')
   })
 
+  test('an ended run whose subagents still work says it waits for them; a failed or stopped one keeps its own note', () => {
+    renderComposer({ live: false, outcome: { ok: true, stopped: false }, subagentsRunning: 2 })
+    expect(screen.getByText(/Waiting for its subagents/)).toBeTruthy()
+    expect(screen.queryByText(/Agent ended/)).toBeNull()
+    cleanup()
+    renderComposer({ live: false, outcome: { ok: false, stopped: true }, subagentsRunning: 2 })
+    expect(screen.getByText(/Session stopped/)).toBeTruthy()
+  })
+
   test('a send is the same message call: the daemon resumes the run, and the shell follows the same run', async () => {
     sendMessage.mockResolvedValue({ ok: true })
     const { onAgentStarted } = renderComposer({ live: false, outcome: { ok: true, stopped: false } })

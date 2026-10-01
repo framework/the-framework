@@ -188,10 +188,11 @@ export function AgentHistory({
 
   const hasRecents = rows.length > 0 || showOptimistic
 
-  const renderRow = (row: Row, subagent: boolean) => (
+  const renderRow = (row: Row, subagent: boolean, status: AgentStatus = row.agent.status) => (
     <AgentHistoryRow
-      status={row.agent.status}
-      saving={row.agent.saving === true}
+      status={status}
+      // A main agent shown as still going is not shown as saving too: one dot, one word.
+      saving={row.agent.saving === true && status === row.agent.status}
       // A subagent's prompt is its task and then the lines every subagent is told: its row names the task.
       intent={subagent ? taskLabel(row.agent) : agentLabel(row.agent)}
       driver={row.agent.driver}
@@ -284,7 +285,8 @@ export function AgentHistory({
                   const working = subagents.filter(sub => sub.agent.status === 'running').length
                   return (
                     <SidebarMenuItem key={row.key}>
-                      {renderRow(row, false)}
+                      {/* A main agent whose own turn is over while its subagents work is still going. */}
+                      {renderRow(row, false, row.agent.status === 'done' && working > 0 ? 'running' : row.agent.status)}
                       {subagents.length > 0 && (
                         <>
                           <button

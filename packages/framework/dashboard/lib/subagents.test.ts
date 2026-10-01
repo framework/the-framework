@@ -1,6 +1,6 @@
 import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
 import { describe, expect, test } from 'vitest'
-import { isOpenSubagent, nestRows, startedBefore, subagentEnd, subagentsOf, taskLabel } from './subagents.js'
+import { isOpenSubagent, nestRows, startedBefore, subagentEnd, subagentStartedAt, subagentsOf, taskLabel } from './subagents.js'
 
 function agent(id: string, over: Partial<AgentMeta> = {}): AgentMeta {
   return { status: 'done', id, startedAt: '2026-10-01T10:00:00.000Z', updatedAt: '2026-10-01T10:00:00.000Z', ...over }
@@ -93,5 +93,18 @@ describe('startedBefore', () => {
       [3, ['c']],
       [4, ['d']],
     ])
+  })
+})
+
+describe('subagentStartedAt', () => {
+  test("a subagent started when its id was made, whatever start time its card carries now; an id that is no time falls back to the card's", () => {
+    expect(subagentStartedAt(agent('2026-10-01T10-01-00-000Z', { startedAt: '2026-10-01T10:01:07.500Z' }))).toBe('2026-10-01T10:01:00.000Z')
+    expect(subagentStartedAt(agent('c1', { startedAt: '2026-10-01T10:01:07.500Z' }))).toBe('2026-10-01T10:01:07.500Z')
+  })
+
+  test("a subagent's row keeps its place when its card's start time moves past the next line of the log", () => {
+    const events = [{ kind: 'log', message: 'a', at: '2026-10-01T10:00:59.000Z' }, { kind: 'log', message: 'b', at: '2026-10-01T10:01:05.000Z' }] as FrameworkEvent[]
+    const rows = startedBefore(events, [agent('2026-10-01T10-01-00-000Z', { startedAt: '2026-10-01T10:01:07.500Z' })])
+    expect([...rows.keys()]).toEqual([1])
   })
 })

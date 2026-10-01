@@ -1,4 +1,5 @@
 import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
+import { startedAtFromAgentId } from '../../src/agent-id.js'
 import { agentLabel } from './agent-label.js'
 
 // A run started for another run is that run's subagent: its card names the other run as its
@@ -66,13 +67,22 @@ export function subagentEnd(prompt: string, subagents: readonly AgentMeta[]): Su
 }
 
 /**
+ * When a subagent was started: the moment its id was made from, which never changes. Its card's
+ * own start time moves a moment later once its process writes the card in its checkout, and a
+ * row placed by that would move with it.
+ */
+export function subagentStartedAt(agent: Pick<AgentMeta, 'id' | 'startedAt'>): string {
+  return startedAtFromAgentId(agent.id) ?? agent.startedAt
+}
+
+/**
  * Where each subagent's row goes in a log: before the first event written after the subagent
  * started, by index, or at the log's length when none was. An event with no time is passed over.
  */
 export function startedBefore(events: readonly FrameworkEvent[], subagents: readonly AgentMeta[]): Map<number, AgentMeta[]> {
   const rows = new Map<number, AgentMeta[]>()
   for (const agent of subagents) {
-    const started = Date.parse(agent.startedAt)
+    const started = Date.parse(subagentStartedAt(agent))
     const at = events.findIndex(e => e.at !== undefined && Date.parse(e.at) > started)
     const index = at === -1 ? events.length : at
     rows.set(index, [...(rows.get(index) ?? []), agent])

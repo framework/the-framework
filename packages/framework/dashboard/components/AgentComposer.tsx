@@ -34,6 +34,7 @@ export function AgentComposer({
   onAgentStarted,
   onSending,
   outcome,
+  subagentsRunning = 0,
 }: {
   projectId: string
   /** Which run this addresses (#749). */
@@ -47,6 +48,8 @@ export function AgentComposer({
   onSending?: ((text: string | null) => void) | undefined
   /** How the agent ended (#948), so the note does not call a crash "ended". */
   outcome?: AgentOutcome | undefined
+  /** How many of the run's subagents are still working: an ended run is then waiting for them. */
+  subagentsRunning?: number
 }) {
   const composerRef = useRef<ComposerHandle>(null)
   const { busy, error, run } = useAction()
@@ -161,7 +164,7 @@ export function AgentComposer({
 
   return (
     <div className="p-2">
-      <Note live={live} outcome={outcome} queued={queued} muted={Boolean(surfacedError)} />
+      <Note live={live} outcome={outcome} waitingOnSubagents={subagentsRunning > 0} queued={queued} muted={Boolean(surfacedError)} />
       {surfacedError && <p role="alert" className="mb-1 px-2 text-xs text-danger">{surfacedError}</p>}
       <Composer
         ref={composerRef}
@@ -187,11 +190,14 @@ export function AgentComposer({
 function Note({
   live,
   outcome,
+  waitingOnSubagents,
   queued,
   muted,
 }: {
   live: boolean
   outcome: AgentOutcome | undefined
+  /** The run ended its turn while its subagents still work: it is told as each ends. */
+  waitingOnSubagents: boolean
   queued: string | null
   muted: boolean
 }) {
@@ -209,6 +215,8 @@ function Note({
       ? 'Session failed — your next message resumes it where it stopped.'
       : outcome?.stopped
         ? 'Session stopped — your next message resumes it.'
-        : 'Agent ended — your next message continues it.'
+        : waitingOnSubagents
+          ? 'Waiting for its subagents — it continues as each one ends, or now with your next message.'
+          : 'Agent ended — your next message continues it.'
   return <p className="mb-2 px-2 text-xs text-muted-foreground">{text}</p>
 }

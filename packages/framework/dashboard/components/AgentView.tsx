@@ -110,6 +110,7 @@ export function AgentView({
   )
   // What each working subagent is doing now, read only while one works: an ended one's row says how it ended.
   const workingSubagents = subagents.filter(agent => agent.status === 'running').map(agent => agent.id).join(',')
+  const subagentsRunning = workingSubagents ? workingSubagents.split(',').length : 0
   const { value: doing } = usePolled<Record<string, string>>(
     workingSubagents ? () => onAgentsDoing(projectId, workingSubagents.split(',')) : null,
     NOTHING_DOING,
@@ -235,6 +236,7 @@ export function AgentView({
         agentId={agentId}
         events={shown}
         card={card}
+        subagentsRunning={subagentsRunning}
         label={label}
         projectName={projectName}
         retainedWorktree={hasWorktree}
@@ -319,7 +321,8 @@ export function AgentView({
           onOpenAgent={onOpenAgent}
         />
       )}
-      <SubagentsBar subagents={subagents} doing={doing} onOpen={onOpenAgent} />
+      {/* Keyed by the run: a list opened for one main agent is not open for the next. */}
+      <SubagentsBar key={agentId} subagents={subagents} doing={doing} onOpen={onOpenAgent} />
       <AgentComposer
         projectId={projectId}
         agentId={agentId}
@@ -328,6 +331,7 @@ export function AgentView({
         onAgentStarted={onAgentStarted}
         onSending={onSending}
         outcome={outcome}
+        subagentsRunning={subagentsRunning}
       />
     </>
   )

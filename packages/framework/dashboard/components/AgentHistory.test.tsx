@@ -234,6 +234,24 @@ describe('subagents on the rail', () => {
     expect(titles).toEqual(['split the login work', 'task c1', 'task c2'])
   })
 
+  test('a main agent whose own turn is over reads as running while a subagent works, and as done once none does', () => {
+    const { container, rerender } = renderRail(<AgentHistory projectId="p1" agents={[sub('c1', { status: 'running' }), { ...main, saving: true }]} selectedAgentId={null} onSelect={() => {}} />)
+    expect(screen.getAllByText('running')).toHaveLength(2)
+    expect(screen.queryByText('done')).toBeNull()
+    // One dot and one word: not "saving…" as well.
+    expect(screen.queryByText('saving…')).toBeNull()
+    expect(container.querySelectorAll('.animate-pulse')).toHaveLength(2)
+    rerender(<SidebarProvider><AgentHistory projectId="p1" agents={[sub('c1', { status: 'waiting' }), main]} selectedAgentId={null} onSelect={() => {}} /></SidebarProvider>)
+    expect(screen.queryByText('running')).toBeNull()
+    expect(screen.getByText('done')).toBeTruthy()
+  })
+
+  test('a main agent that failed or was stopped keeps its own word while a subagent works', () => {
+    renderRail(<AgentHistory projectId="p1" agents={[sub('c1', { status: 'running' }), { ...main, status: 'failed' }]} selectedAgentId={null} onSelect={() => {}} />)
+    expect(screen.getByText('failed')).toBeTruthy()
+    expect(screen.getAllByText('running')).toHaveLength(1)
+  })
+
   test('a subagent stopped on a question keeps the list open too', () => {
     renderRail(<AgentHistory projectId="p1" agents={[sub('c1', { status: 'waiting' }), main]} selectedAgentId={null} onSelect={() => {}} />)
     expect(screen.getByRole('button', { name: '1 agent' }).getAttribute('aria-expanded')).toBe('true')

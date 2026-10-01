@@ -4,7 +4,7 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { eventKindLabel } from '../lib/event-labels.js'
 import { pendingChoices } from '../lib/live-state.js'
-import { startedBefore, subagentEnd, type SubagentEnd } from '../lib/subagents.js'
+import { startedBefore, subagentEnd, subagentStartedAt, type SubagentEnd } from '../lib/subagents.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
 import { ChoicePanel } from './ChoicePanel.js'
 import { InlineScreen, isLoopbackScreen } from './InlineScreen.js'
@@ -349,14 +349,16 @@ export function EventList({
   }
   const groupOf = (e: FrameworkEvent): string => (ends.has(e) ? SUBAGENT : rowGroup(e))
   const started = startedBefore(shown, subagents)
+  // One badge for a run of SUBAGENT rows: a started row right under the row of a subagent's end shows none.
+  const afterEnd = (at: number): boolean => at > 0 && ends.has(shown[at - 1]!)
   const startedRows = (at: number): ReactNode =>
     started.get(at)?.map((agent, n) => (
       <MessageScrollerItem key={`subagent-${agent.id}`} messageId={`subagent-${agent.id}`} className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
-        <span className="w-28 shrink-0">{n === 0 && <Badge className="mt-0.5 text-[10px] uppercase text-muted-foreground">{SUBAGENT}</Badge>}</span>
+        <span className="w-28 shrink-0">{n === 0 && !afterEnd(at) && <Badge className="mt-0.5 text-[10px] uppercase text-muted-foreground">{SUBAGENT}</Badge>}</span>
         <SubagentLine agent={agent} doing={doing[agent.id]} onOpen={onOpenAgent} />
         <Tooltip>
-          <TooltipTrigger render={<span className="ml-auto shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground" />}>{formatTime(agent.startedAt)}</TooltipTrigger>
-          <TooltipContent>{new Date(agent.startedAt).toLocaleString()}</TooltipContent>
+          <TooltipTrigger render={<span className="ml-auto shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground" />}>{formatTime(subagentStartedAt(agent))}</TooltipTrigger>
+          <TooltipContent>{new Date(subagentStartedAt(agent)).toLocaleString()}</TooltipContent>
         </Tooltip>
       </MessageScrollerItem>
     ))
@@ -370,8 +372,9 @@ export function EventList({
               const choiceRow = choiceRows?.rows.get(e)
               const prev = i > 0 ? rows[i - 1] : undefined
               const end = ends.get(e)
-              // A subagent's row above this one breaks the run of same-kind rows, so the badge shows again.
-              const chunkHead = !prev || groupOf(prev) !== groupOf(e) || started.has(i)
+              // A subagent's row above this one breaks the run of same-kind rows, so the badge shows
+              // again; the row of a subagent's end goes on that run of SUBAGENT rows instead.
+              const chunkHead = !prev || (started.has(i) ? !end : groupOf(prev) !== groupOf(e))
               const at = e.at
               return (
                 <Fragment key={i}>
@@ -440,7 +443,7 @@ export function EventList({
             {writing && (
               <MessageScrollerItem messageId="writing" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
                 <span className="w-28 shrink-0">
-                  {shown.length === 0 || rowGroup(shown[shown.length - 1]!) !== 'agent' ? (
+                  {shown.length === 0 || started.has(shown.length) || groupOf(shown[shown.length - 1]!) !== 'agent' ? (
                     <Badge className="mt-0.5 text-[10px] uppercase text-muted-foreground">{eventKindLabel('driver')}</Badge>
                   ) : null}
                 </span>

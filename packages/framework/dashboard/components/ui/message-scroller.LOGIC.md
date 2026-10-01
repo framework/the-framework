@@ -49,7 +49,7 @@ The button floats over the bottom of the view and reads "Jump to latest" with a 
 
 #### Business logic
 
-The host marks some messages as anchors; the event stream [2] marks each turn boundary. When a marked message appears among newly appended messages, the view scrolls so that message sits at the top, with 64 pixels of the previous message peeking above it, and a spacer is added below the content so this works even when little follows the anchor. The same happens when an existing message becomes an anchor. If the view is following and more than one anchor arrives in one batch, the view goes to the end instead. While anchored, a change of size keeps the anchor in place. Any scroll gesture by the user releases the anchor, and each anchor pulls the view only once.
+The host marks some messages as anchors; the event stream [2] marks only its newest prompt, the start of the current turn [3]. When a marked message appears among newly appended messages, the view scrolls so that message sits at the top, with 64 pixels of the previous message peeking above it, and a spacer is added below the content so this works even when little follows the anchor. The same happens when an existing message becomes an anchor. If the view is following and more than one anchor arrives in one batch, the view goes to the end instead. While anchored, a change of size keeps the anchor in place. Any scroll gesture by the user releases the anchor, and each anchor pulls the view only once.
 
 ### Older rows added above do not move the reader
 

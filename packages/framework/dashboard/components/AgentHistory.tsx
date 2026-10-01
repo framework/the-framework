@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Plus, ChevronDown, Cloud, Laptop, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Blocks } from 'lucide-react'
+import { Plus, ChevronDown, Bot, Cloud, Laptop, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Blocks } from 'lucide-react'
 import type { ComponentType } from 'react'
 import type { AgentMeta, AgentStatus, RecentAgent, ProjectSummary } from '../../src/index.js'
 import { DRIVER_LABELS, driverFromImpl, cloudRunState, type CloudRunState } from '../../src/client.js'
@@ -9,6 +9,7 @@ import { cn } from '../lib/utils.js'
 import { formatRelative } from '../lib/format-date.js'
 import { STATUS_TONE } from '../lib/status-tone.js'
 import { agentLabel } from '../lib/agent-label.js'
+import { holdsMainAgent, isOpenSubagent, nestRows, taskLabel } from '../lib/subagents.js'
 import { DriverLogo } from './driver-logos.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu.js'
@@ -180,7 +181,35 @@ export function AgentHistory({
   // belongs to the Overview item instead, so the two are never active at once.
   const atProjectLauncher = projectId !== null && selectedAgentId === null
 
+  // The rows as a tree: a run started for another run in the list sits under it, as its subagent.
+  const tree = nestRows(rows)
+  // Which lists of subagents the reader opened or folded by hand, by the main agent's row.
+  const [folds, setFolds] = useState<Record<string, boolean>>({})
+
   const hasRecents = rows.length > 0 || showOptimistic
+
+  const renderRow = (row: Row, subagent: boolean, status: AgentStatus = row.agent.status, fold?: SubagentsFold) => (
+    <AgentHistoryRow
+      status={status}
+      fold={fold}
+      // A main agent shown as still going is not shown as saving too: one dot, one word.
+      saving={row.agent.saving === true && status === row.agent.status}
+      // A subagent's prompt is its task and then the lines every subagent is told: its row names the task.
+      intent={subagent ? taskLabel(row.agent) : agentLabel(row.agent)}
+      driver={row.agent.driver}
+      // On the Overview the project is what tells the rows apart, so it leads the meta
+      // line; a project's own rail already knows its project, so it shows just the time. A
+      // subagent is in its main agent's project.
+      subtitle={row.project && !subagent ? `${row.project} · ${formatRelative(row.agent.startedAt)}` : formatRelative(row.agent.startedAt)}
+      active={row.active}
+      remote={row.agent.target === 'remote'}
+      cloud={row.agent.target === 'web'}
+      {...(row.agent.otherHost && row.agent.host ? { startedOn: row.agent.host } : {})}
+      cloudState={cloudRunState(row.agent, Date.now())}
+      {...(row.agent.remoteLabel ? { remoteLabel: row.agent.remoteLabel } : {})}
+      onClick={row.onClick}
+    />
+  )
 
   return (
     // A fixed-width, in-flow column (`collapsible="none"`): with the top navbar gone (#772
@@ -250,26 +279,33 @@ export function AgentHistory({
                     <AgentHistoryRow status="running" intent={optimistic?.intent ?? undefined} subtitle="starting…" active={starting} dim onClick={() => onSelect(null)} />
                   </SidebarMenuItem>
                 )}
-                {rows.map(row => (
-                  <SidebarMenuItem key={row.key}>
-                    <AgentHistoryRow
-                      status={row.agent.status}
-                      saving={row.agent.saving === true}
-                      intent={agentLabel(row.agent)}
-                      driver={row.agent.driver}
-                      // On the Overview the project is what tells the rows apart, so it leads the meta
-                      // line; a project's own rail already knows its project, so it shows just the time.
-                      subtitle={row.project ? `${row.project} · ${formatRelative(row.agent.startedAt)}` : formatRelative(row.agent.startedAt)}
-                      active={row.active}
-                      remote={row.agent.target === 'remote'}
-                      cloud={row.agent.target === 'web'}
-                      {...(row.agent.otherHost && row.agent.host ? { startedOn: row.agent.host } : {})}
-                      cloudState={cloudRunState(row.agent, Date.now())}
-                      {...(row.agent.remoteLabel ? { remoteLabel: row.agent.remoteLabel } : {})}
-                      onClick={row.onClick}
-                    />
-                  </SidebarMenuItem>
-                ))}
+                {tree.map(({ row, subagents }) => {
+                  // Open while a subagent is not over, or is the page being read; folded to a count once
+                  // all have ended. A click on the count is the reader's own choice and wins.
+                  const open = folds[row.key] ?? subagents.some(sub => isOpenSubagent(sub.agent) || sub.active)
+                  const working = subagents.filter(sub => sub.agent.status === 'running').length
+                  // A main agent whose own turn is over while its job waits on a subagent is still going.
+                  const now = Date.now()
+                  const going = row.agent.status === 'done' && subagents.some(sub => holdsMainAgent(sub.agent, now))
+                  return (
+                    <SidebarMenuItem key={row.key}>
+                      {renderRow(
+                        row,
+                        false,
+                        going ? 'running' : row.agent.status,
+                        subagents.length > 0 ? { count: subagents.length, working, open, onToggle: () => setFolds(f => ({ ...f, [row.key]: !open })) } : undefined,
+                      )}
+                      {subagents.length > 0 && open && (
+                        // The indented sub-list, with the rule the Projects list draws down its group.
+                        <div className="mt-0.5 ml-4 flex flex-col gap-0.5 border-l border-sidebar-border pl-2">
+                          {subagents.map(sub => (
+                            <div key={sub.key}>{renderRow(sub, true)}</div>
+                          ))}
+                        </div>
+                      )}
+                    </SidebarMenuItem>
+                  )
+                })}
               </SidebarMenu>
               {!hasRecents && (
                 <p className="whitespace-nowrap px-2 py-1 text-sm text-muted-foreground">No agents yet.</p>
@@ -525,6 +561,9 @@ function NewButton({
   )
 }
 
+/** A main agent's list of subagents, as its row folds it: how many, how many work, and the fold. */
+type SubagentsFold = { count: number; working: number; open: boolean; onToggle: () => void }
+
 // One agent row: a pulsing dot + RUNNING badge for a working agent, a still dot + WAITING for one
 // parked on the user (#785), else the terminal-status badge.
 function AgentHistoryRow({
@@ -541,8 +580,11 @@ function AgentHistoryRow({
   cloudState,
   remoteLabel,
   startedOn,
+  fold,
 }: {
   status: AgentStatus
+  /** The row's subagents, folded or open under it: a count on the row's first line, so a row with subagents is no taller than one without. */
+  fold?: SubagentsFold | undefined
   intent: string | undefined
   subtitle: string
   /** The agent that ran it, so the row can show whose session it was. */
@@ -620,8 +662,34 @@ function AgentHistoryRow({
             a cloud glyph for a Claude Code cloud session (#1263), then the driver logo. The logo
             is the only thing naming the driver on this row, so it carries a title rather than
             being decorative. */}
-        {(remote || cloud || picked || startedOn) && (
+        {(remote || cloud || picked || startedOn || fold) && (
           <span className="ml-auto flex shrink-0 items-center gap-1.5">
+            {/* The row's subagents: how many, and the fold of their list. Inside the row's own
+                button, so it is a span that takes the click for itself. */}
+            {fold && (
+              <span
+                role="button"
+                tabIndex={0}
+                aria-expanded={fold.open}
+                aria-label={`${fold.count} agent${fold.count === 1 ? '' : 's'}${fold.working > 0 ? ` · ${fold.working} running` : ''}`}
+                title={`${fold.count} subagent${fold.count === 1 ? '' : 's'}${fold.working > 0 ? `, ${fold.working} running` : ''}`}
+                onClick={e => {
+                  e.stopPropagation()
+                  fold.onToggle()
+                }}
+                onKeyDown={e => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  fold.onToggle()
+                }}
+                className="flex items-center gap-0.5 rounded-sm px-1 text-[11px] font-normal tabular-nums text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+              >
+                <ChevronDown className={cn('h-3 w-3 shrink-0 transition-transform', fold.open || '-rotate-90')} aria-hidden />
+                <Bot className="h-3 w-3 shrink-0" aria-hidden />
+                {fold.count}
+              </span>
+            )}
             {/* Another machine's daemon started this run (#1648): the shared agent-data branch lists every
                 machine's runs here, and one that looked exactly like this daemon's own was a mystery
                 solved only by reading the archive. A glyph, not a word in the meta line: the rail's

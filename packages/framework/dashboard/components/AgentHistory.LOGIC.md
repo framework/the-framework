@@ -1,4 +1,4 @@
-The dashboard's left column, present on every page: the brand mark, the "New agent" button, the "Overview" destination, one row per page the installed modules [15] add, the "Projects" destination, the "Recent agents" list, and a footer with the connection indicator, the theme toggle, the notifications menu and "Settings". The list shows a project's own agents [1] when a project is selected, and every project's agents pooled newest-first on the Overview [2]; each row says in one word what its agent is doing, when it started, where it runs and which coding agent [3] runs it, and a stand-in row says "starting…" for a just-started agent until its own row lands.
+The dashboard's left column, present on every page: the brand mark, the "New agent" button, the "Overview" destination, one row per page the installed modules [15] add, the "Projects" destination, the "Recent agents" list, and a footer with the connection indicator, the theme toggle, the notifications menu and "Settings". The list shows a project's own agents [1] when a project is selected, and every project's agents pooled newest-first on the Overview [2], in both cases with a main agent's subagents [16] folded under it; each row says in one word what its agent is doing, when it started, where it runs and which coding agent [3] runs it, and a stand-in row says "starting…" for a just-started agent until its own row lands.
 
 ## Context
 
@@ -19,6 +19,7 @@ The dashboard's left column, present on every page: the brand mark, the "New age
 [13] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [14] driver: a coding agent wrapped as a black box. The user's driver choice is `claude-code` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [15] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
+[16] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent.
 
 ## Business logic — TL;DR
 
@@ -27,6 +28,7 @@ The dashboard's left column, present on every page: the brand mark, the "New age
 - **"Overview" and the modules' pages** - the cross-project destinations, "Overview" carrying the count of items in the "Human Queue", then one row per page a module [15] adds, labelled by the module (the tickets' page among them, when a package brings one); only the current view carries the active fill, never two.
 - **"Projects"** - an expandable list of every registered project with a dot saying whether it is activated or in error, the error named on hover, and an "Add project" entry at its end.
 - **Which agents are listed** - a selected project's own agents, or on the Overview every project's recent agents pooled, each row naming its project; "No agents yet." when there is nothing.
+- **Subagents under their main agent** - the list is a tree one level deep: a subagent [16] whose main agent is in the list sits under it, in a list that is open by itself while a subagent is working, waiting or the one selected, and folded otherwise; the main agent's row carries the count of its subagents on its first line, and a click on the count opens or folds the list without opening the agent, the user's choice winning from then on. A main agent that is `done` reads "running" while one of its subagents in the list still holds its job.
 - **The starting row** - a dimmed "starting…" stand-in appears once a start reports its agent's id, unless the list already holds that agent, and retires when that agent lands, whatever its status, or after 20 seconds without it.
 - **Which row is highlighted** - the selected agent's row, or the newest running agent's row while following a just-started agent, or the stand-in while the selected agent's row has not landed; nothing on the Overview.
 - **What a row shows** - one status word with a dot, the project and the relative start time, the agent's title, and a cluster of glyphs for another machine's daemon, a device, a cloud session and the coding agent.
@@ -95,7 +97,29 @@ See `## Context`.
 
 #### Business logic
 
-With a project selected, the list holds that project's own agents [1], in the order the caller gives them, newest first. On the Overview [2], the list holds every project's recent agents pooled, newest first, and each row's second line leads with its project's name; selecting a pooled row jumps into that project and that agent, so both the project and the agent change at once. When neither the list nor the starting row has anything to show, "No agents yet." is shown under the heading.
+With a project selected, the list holds that project's own agents [1], in the order the caller gives them, newest first. On the Overview [2], the list holds every project's recent agents pooled, newest first, and each row's second line leads with its project's name, except a subagent's [16] under its main agent; selecting a pooled row jumps into that project and that agent, so both the project and the agent change at once. When neither the list nor the starting row has anything to show, "No agents yet." is shown under the heading.
+
+### Subagents under their main agent
+
+#### Context
+
+**User story**: the user asked one agent for work it split across subagents [16]. The list shows that agent as one row with its subagents under it, open while they work so the user sees them, and folded to a count once they are all done, so five finished subagents do not push the user's other agents down the list.
+
+**Problem**: without this every subagent was a row like any other, named by a prompt that ends in the same lines for every subagent, and nothing said which agent it worked for.
+
+#### Business logic
+
+The list, a project's own or the Overview's [2] pooled one, is shown as a tree one level deep (the rule in `lib/subagents.ts`): a subagent whose main agent is in the list sits under that main agent, oldest first, and no longer has a row of its own in the list's order; on the Overview the main agent is looked for among the same project's rows. A subagent whose main agent is not in the list, and an agent started for a subagent, are ordinary rows.
+
+Under a main agent's row that has subagents:
+
+- The main agent's row is as tall as any other row: the count of its subagents sits on the row's first line, in the cluster at its right end, before the other glyphs. It shows a chevron that points right while the list is folded and down while it is open, a small agent icon, and the number of its subagents in the list. Its accessible name is "1 agent" or "<N> agents", followed by " · <K> running" while K of them, at least one, have the status `running`; its hover reads "<N> subagents", with ", <K> running" likewise.
+- The subagents' rows are shown under the main agent's row, indented under a connecting rule, while the list is open. By itself the list is open while any of the subagents is not over (`running` or `waiting`) or is the selected agent, and folded otherwise; on the Overview, where no row is selected, only the first applies.
+- A click on the count, or Enter or Space while it has the focus, opens a folded list and folds an open one, and does not open the main agent. From then on the user's choice for that main agent wins over the rule above, in either direction. The choice is kept in the page's memory only: a reload forgets it.
+
+A subagent's row is an ordinary row (see "What a row shows" and "The status word"), selected and highlighted like any other, with two differences: its title is its task, the first line of what it was asked, without the lines every subagent is told (`lib/subagents.ts`); and its subtitle is only when it started, on the Overview too, since it is in its main agent's project.
+
+A main agent never waits in a process: it ends its turn after starting its subagents and is continued each time one of them ends, so its record says `done` while the work it was asked for is still going. Its row therefore does not say "done" then: while the main agent's stored status is `done` and at least one of its subagents in the list holds its job (it is `running`, it is saving, or it ended less than 10 seconds ago: the main agent is continued a few seconds after a subagent's card says it ended, and without those seconds the row flickered to "done" and back; the rule in `lib/subagents.ts`), the row is drawn as a running agent's, the word "running" with the pulsing dot, and is not shown as saving [7] as well, so it has one dot and one word. A main agent whose stored status is `failed`, `stopped` or `waiting` keeps its own word, and once no subagent holds its job the row reads "done" again. Only the row changes; the record stays `done`.
 
 ### The starting row
 
@@ -133,10 +157,10 @@ The first line, left to right:
 
 - a dot, only while the agent is running or waiting: pulsing in the primary color while it is working, still and muted while it waits for the user's answer; and, while the agent is saving [7], a pulsing green dot instead, the same window the agent's own status pill calls "saving…";
 - the status word (next section), in uppercase, colored by the stored status when it is the word (primary for running, green for done, amber for stopped, red for failed), muted when waiting or saving, primary for "in cloud", green for "merged";
-- the subtitle: on the Overview [2], "<project name> · <when it started>"; within a project, just when it started, as "just now", "<N>m ago", "<N>h ago", "<N>d ago" up to a week, and the local date beyond it (the rule in `lib/format-date.ts`);
-- at the right end, a cluster of small glyphs, each with a hover: a laptop glyph named "Started on <host>" with the hover "Started on <host>, by that machine's daemon." when another machine's daemon started the agent, since the shared record lists every machine's agents here; a device glyph named "Runs on <device>" (or "Runs on a connected device" when the device has no label) when the agent is relayed [13]; a cloud glyph named "Runs as a Claude Code cloud session" with the hover "Runs as a Claude Code cloud session; it works and opens its PR over there." for a web agent; and the coding agent's logo, named "Claude Code" or "Codex". The logo names the driver [14] the agent recorded, and every surface Claude runs on — the local CLI, the cloud session, the Actions runner — is still "Claude Code": where it runs is the glyph beside it, not the logo.
+- the subtitle: on the Overview [2], "<project name> · <when it started>"; within a project, and for a subagent [16] under its main agent, just when it started, as "just now", "<N>m ago", "<N>h ago", "<N>d ago" up to a week, and the local date beyond it (the rule in `lib/format-date.ts`);
+- at the right end, a cluster of small glyphs, each with a hover: on a main agent's row, first the count of its subagents [16] (see "Subagents under their main agent"); a laptop glyph named "Started on <host>" with the hover "Started on <host>, by that machine's daemon." when another machine's daemon started the agent, since the shared record lists every machine's agents here; a device glyph named "Runs on <device>" (or "Runs on a connected device" when the device has no label) when the agent is relayed [13]; a cloud glyph named "Runs as a Claude Code cloud session" with the hover "Runs as a Claude Code cloud session; it works and opens its PR over there." for a web agent; and the coding agent's logo, named "Claude Code" or "Codex". The logo names the driver [14] the agent recorded, and every surface Claude runs on — the local CLI, the cloud session, the Actions runner — is still "Claude Code": where it runs is the glyph beside it, not the logo.
 
-The second line is the title: what the user typed as the prompt; failing that, the branch itself; failing that, the moment it started as a short local date and time (the rule in `lib/agent-label.ts`).
+The second line is the title: what the user typed as the prompt; failing that, the branch itself; failing that, the moment it started as a short local date and time (the rule in `lib/agent-label.ts`). A subagent's [16] row under its main agent shows only the first line of that.
 
 ### The status word
 
@@ -152,7 +176,7 @@ The word, by the first rule that applies:
 - "in cloud": a web agent whose local half is done, with no pull request known, no question pending, and started within the last 12 hours (the window in `src/cloud-run-state.ts`). This outranks "saving…": the cloud side owns its own push and pull request.
 - "merged": a web agent whose adopted work (cloud work adoption [10]) had its pull request merged by The Framework.
 - "saving…": a non-web agent the daemon marks saving [7]: it ended cleanly and its process is still alive on this machine.
-- Otherwise the stored status: "running", "done", "stopped" or "failed". A web agent past the 12-hour window with nothing adopted, or with a pull request, reads "done"; a web agent that was stopped or failed reads that.
+- Otherwise the stored status: "running", "done", "stopped" or "failed". A main agent that is `done` while one of its subagents [16] holds its job counts as `running` here and is not marked saving (see "Subagents under their main agent"). A web agent past the 12-hour window with nothing adopted, or with a pull request, reads "done"; a web agent that was stopped or failed reads that.
 
 ### Long titles
 

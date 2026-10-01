@@ -25,11 +25,12 @@ export type AgentCardFacts = Pick<AgentMeta, 'status' | 'pr' | 'saving'>
  * ending: a feed yet to arrive, or a diary whose process died before writing its last line. The
  * card also says what the feed cannot: the pull request the run's work is on, and whether the
  * run's process is still saving its record after a clean end. A card alone (a run whose first
- * line has not landed yet) is enough to say it builds.
+ * line has not landed yet) is enough to say it builds. How many of the run's subagents are still
+ * working comes from the runs list: neither the feed nor the card of this run knows it.
  *
  * Shared so the session toolbar and the overview cannot drift apart on what an agent is.
  */
-export function agentStatusPill(events: FrameworkEvent[], card?: AgentCardFacts): AgentStatusPill | null {
+export function agentStatusPill(events: FrameworkEvent[], card?: AgentCardFacts, subagentsRunning = 0): AgentStatusPill | null {
   const outcome = agentOutcome(events) ?? cardOutcome(card)
   if (events.length === 0 && !card) return null
   const failed = outcome !== undefined && !outcome.ok && !outcome.stopped && !outcome.waiting
@@ -38,10 +39,16 @@ export function agentStatusPill(events: FrameworkEvent[], card?: AgentCardFacts)
   }
   if (outcome?.stopped) return { dot: 'bg-warning', label: 'stopped', tone: 'text-warning' }
   if (outcome?.waiting) return { dot: 'bg-warning', label: 'waiting for an answer', tone: 'text-warning' }
+  const endedClean = outcome?.ok === true
+  // Ended clean with subagents still working: the agent's own turn is over, the job is not. It is
+  // told as each one ends, so the pill says what the page waits on rather than "finished",
+  // and rather than "saving…" after each of its turns.
+  if (endedClean && subagentsRunning > 0) {
+    return { dot: 'animate-pulse bg-primary', label: `${subagentsRunning} subagent${subagentsRunning === 1 ? '' : 's'} running`, tone: 'text-muted-foreground' }
+  }
   // Ended clean, and the run's process is still saving its record and cleaning up its checkout (#1431):
   // an ending-side state like failed/stopped, so it sits above "ready for merge" (#948) — during
   // this window the saving is what is actually happening.
-  const endedClean = outcome?.ok === true
   if (endedClean && card?.saving) {
     return { dot: 'animate-pulse bg-success', label: 'saving…', tone: 'text-muted-foreground' }
   }

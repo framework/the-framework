@@ -7,6 +7,7 @@ export {
   readLiveMeta,
   loadAgentEvents,
   readLiveMetas,
+  readDoing,
   readFinishedDiary,
   type StoreFs,
   type AgentMeta,

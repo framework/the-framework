@@ -198,6 +198,48 @@ describe('useLiveEvents reconnect keeps the feed (#1383)', () => {
     await waitFor(() => expect(feed()).toBe('a,b'), { timeout: 3000 })
   })
 
+  test('a reconnect that brings nothing by the deadline keeps the feed: an agent being continued has no diary to replay for a moment', async () => {
+    const first = fakeChannel()
+    const second = fakeChannel()
+    onEvents.mockResolvedValueOnce(first.channel).mockResolvedValue(second.channel)
+    render(<FeedProbe projectId="p1" agentId="run-a" />)
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
+    first.push(log('a'))
+    first.push(log('b'))
+    await waitFor(() => expect(feed()).toBe('a,b'))
+
+    first.dropWith(new Error('connection reset'))
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(2), { timeout: 3000 })
+    // Past the deadline with nothing replayed: the feed is not emptied.
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    expect(feed()).toBe('a,b')
+    // The replay comes late, then the marker: swapped in whole.
+    second.push(log('a'))
+    second.push(log('b'))
+    second.push(log('c'))
+    expect(feed()).toBe('a,b')
+    second.push({ kind: 'stream-sync' })
+    await waitFor(() => expect(feed()).toBe('a,b,c'))
+  }, 10_000)
+
+  test('a late replay from a source that sends no marker swaps a deadline after its first event', async () => {
+    const first = fakeChannel()
+    const second = fakeChannel()
+    onEvents.mockResolvedValueOnce(first.channel).mockResolvedValue(second.channel)
+    render(<FeedProbe projectId="p1" agentId="run-a" />)
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
+    first.push(log('a'))
+    await waitFor(() => expect(feed()).toBe('a'))
+
+    first.dropWith(new Error('connection reset'))
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(2), { timeout: 3000 })
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    second.push(log('a'))
+    second.push(log('b'))
+    expect(feed()).toBe('a')
+    await waitFor(() => expect(feed()).toBe('a,b'), { timeout: 3000 })
+  }, 10_000)
+
   test('a reconnect that dies mid-replay drops the partial buffer rather than swapping it in', async () => {
     const first = fakeChannel()
     const second = fakeChannel()

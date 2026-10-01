@@ -19,7 +19,7 @@ The box at the bottom of an agent view [1]: where the user says something to tha
 - **One send, working or ended** - the text goes to the daemon addressed at this agent; while the agent works the box says the message is queued, and when the agent had ended the shell is told to follow the same agent as it goes on. A message to an ended agent is handed to the feed the moment it is sent, since its continuation takes seconds to write its first line, and taken back if the send fails.
 - **A refusal** - the daemon's reason is shown as an alert, the text stays in the box, and nothing is reported as queued or resumed.
 - **The slot: Stop, Resume, or send** - the empty box's corner holds "Stop agent" while the agent works and "Resume" once it was stopped; typing swaps in the send arrow.
-- **The line above the box** - what a send will do from here: queued, continues, resumes, or answer the question above.
+- **The line above the box** - what a send will do from here: queued, continues, resumes, or answer the question above; an agent that ended clean while its subagents (the agents started for it, when it split its task across them) still run is said to be waiting for them.
 - **What the box leaves out** - no coding agent and model select and no "Run on": an agent cannot change either.
 
 ## Business logic
@@ -79,6 +79,7 @@ While the agent works the line is absent, except for the "Queued" status after a
 - waiting [5]: "The agent asked a question — answer it above, or your next message continues the session."
 - failed: "Session failed — your next message resumes it where it stopped."
 - stopped: "Session stopped — your next message resumes it."
+- ended clean while at least one of its subagents still holds its job, as the caller counts them (the agent view counts a subagent that is running, is saving, or ended less than 10 seconds ago): "Waiting for its subagents — it continues as each one ends, or now with your next message." The agent ended its turn after starting them and is continued each time one ends, so "Agent ended" would say the job is over when it is not;
 - otherwise: "Agent ended — your next message continues it."
 
 The "Queued" status is hidden while an error is shown, so the box never says "queued" next to a refusal. The editor's placeholder reads "Message the agent…" while the agent works and "Message the agent to continue it…" once it has ended.

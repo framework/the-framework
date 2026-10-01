@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { FrameworkEvent } from '../../src/index.js'
-import { onAgent, onRetainedWorktrees } from '../rpc/reads.js'
-import { useLoaded } from '../lib/use-async.js'
+import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
+import { onAgent, onAgentsDoing, onRetainedWorktrees } from '../rpc/reads.js'
+import { useLoaded, usePolled } from '../lib/use-async.js'
 import { useAgentHandoff } from '../lib/use-agent-handoff.js'
 import { isAgentActive, agentOutcome } from '../lib/live-state.js'
 import type { AgentCardFacts } from '../lib/agent-status.js'
@@ -15,6 +15,8 @@ import { ModuleSlot } from './ModulePageView.js'
 import { useMountedModules } from '../lib/use-modules.js'
 import { HandoffActions, HandoffSummary, AgentHandoffDetails } from './AgentHandoff.js'
 import { AgentDetails, type AgentDetailsCard } from './AgentDetails.js'
+import { SubagentsBar } from './SubagentLine.js'
+import { holdsMainAgent } from '../lib/subagents.js'
 
 // One session's view, whether it is running or finished (#1026).
 //
@@ -30,6 +32,10 @@ import { AgentDetails, type AgentDetailsCard } from './AgentDetails.js'
 // events already on screen.
 /** How long the bar waits for the run's own reads before it shows the facts that are in. */
 const READY_WAIT_MS = 1_000
+/** How often what the working subagents are doing is read: the runs poll's own pace. */
+const DOING_EVERY_MS = 2_000
+const NO_SUBAGENTS: readonly AgentMeta[] = []
+const NOTHING_DOING: Record<string, string> = {}
 
 export function AgentView({
   projectId,
@@ -47,6 +53,8 @@ export function AgentView({
   startedWith,
   onAgentStarted,
   onDeleted,
+  subagents = NO_SUBAGENTS,
+  onOpenAgent,
 }: {
   projectId: string
   /** Which run this is (#749); absent right after Start, before the poll adopts its id. */
@@ -80,6 +88,10 @@ export function AgentView({
   onAgentStarted?: ((intent: string, agentId: string) => void) | undefined
   /** Leave this session after it is deleted (#1032) — back to the project home. */
   onDeleted?: (() => void) | undefined
+  /** The runs started for this run, oldest first: rows in its chat, and a line above the message box while any works. */
+  subagents?: readonly AgentMeta[]
+  /** Open another run of this project: what a subagent's row does on a click. */
+  onOpenAgent?: ((agentId: string) => void) | undefined
   /** The loop's verdict, handed up so the right rail can pin it under its tabs. It is reported from
    *  here rather than read in the shell because a finished agent's log is archived, and this view is
    *  the one that reads it back. */
@@ -96,6 +108,18 @@ export function AgentView({
     [projectId, agentId, live, archiveBehind],
     // Going back to an ended run shows its log at once, as last read, while it is read again.
     { remember: `agent-log:${projectId}:${agentId}` },
+  )
+  // What each working subagent is doing now, read only while one works: an ended one's row says how it ended.
+  const workingSubagents = subagents.filter(agent => agent.status === 'running').map(agent => agent.id).join(',')
+  // How many subagents the run's job still waits on: while any, the run is not over, whatever its own turn says.
+  const now = Date.now()
+  const subagentsRunning = subagents.filter(agent => holdsMainAgent(agent, now)).length
+  const { value: doing } = usePolled<Record<string, string>>(
+    workingSubagents ? () => onAgentsDoing(projectId, workingSubagents.split(',')) : null,
+    NOTHING_DOING,
+    DOING_EVERY_MS,
+    [projectId, workingSubagents],
+    'previous',
   )
   // Whether this agent kept its worktree (#737): a failed/stopped run does, a clean one had it
   // removed when it finished. Drives the Remove button, and is cleared locally once removed so
@@ -215,6 +239,7 @@ export function AgentView({
         agentId={agentId}
         events={shown}
         card={card}
+        subagentsRunning={subagentsRunning}
         label={label}
         projectName={projectName}
         retainedWorktree={hasWorktree}
@@ -241,8 +266,9 @@ export function AgentView({
         onToggle={toggle}
         ready={ready}
         actions={
-          // A run that is working publishes its own work; the next step is offered once it has ended.
-          live === false ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} /> : undefined
+          // A run that is working publishes its own work; the next step is offered once it has ended,
+          // and a run whose subagents still work has not: it goes on as each of them ends.
+          live === false && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} /> : undefined
         }
       />
       {/* The always-available session-details strip: agent + spend (#322). Sits above the changes/
@@ -294,8 +320,14 @@ export function AgentView({
           // A web agent's log dead-ends at the hand-off (#1265): the mirror box rides the tail of
           // the scroller, where "and then…" belongs. Self-nulling for every other target.
           tail={<CloudMirrorRow target={target} events={shown} />}
+          subagents={subagents}
+          doing={doing}
+          going={subagentsRunning > 0}
+          onOpenAgent={onOpenAgent}
         />
       )}
+      {/* Keyed by the run: a list opened for one main agent is not open for the next. */}
+      <SubagentsBar key={agentId} subagents={subagents} doing={doing} onOpen={onOpenAgent} />
       <AgentComposer
         projectId={projectId}
         agentId={agentId}
@@ -304,6 +336,7 @@ export function AgentView({
         onAgentStarted={onAgentStarted}
         onSending={onSending}
         outcome={outcome}
+        subagentsRunning={subagentsRunning}
       />
     </>
   )

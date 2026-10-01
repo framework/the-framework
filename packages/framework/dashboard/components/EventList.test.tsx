@@ -1,4 +1,4 @@
-import type { FrameworkEvent } from '../../src/index.js'
+import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
@@ -11,7 +11,7 @@ vi.mock('../lib/preferences.js', () => ({
   updatePreferences: vi.fn(),
 }))
 
-const { EventList } = await import('./EventList.js')
+const { EventList, askedReplies, passedEnds } = await import('./EventList.js')
 
 beforeEach(() => {
   sendChoice.mockReset().mockResolvedValue(undefined)
@@ -379,5 +379,232 @@ describe('EventList screen rows', () => {
     render(<EventList events={[{ kind: 'screen', url: 'https://example.com/', label: 'somewhere' }]} stick={false} />)
     expect(frames()).toEqual([])
     expect(screen.getByText('◆ somewhere')).toBeTruthy()
+  })
+})
+
+// A run's subagents in its chat: a row where each was started, read off the subagent's card, and
+// the prompt that told the run a subagent ended as a row of the subagent's, not the reader's.
+describe('EventList subagent rows', () => {
+  const sub = (over: Partial<AgentMeta> = {}): AgentMeta => ({
+    status: 'running',
+    id: '2026-10-01T10-01-00-000Z',
+    startedAt: '2026-10-01T10:01:00.000Z',
+    updatedAt: '2026-10-01T10:01:00.000Z',
+    parent: 'main',
+    intent: 'Validate the form\n\nYou are a subagent: another agent started you.',
+    ...over,
+  })
+  const events: FrameworkEvent[] = [
+    { kind: 'driver', event: { type: 'start', prompt: 'split the work' }, at: '2026-10-01T10:00:00.000Z' },
+    { kind: 'driver', event: { type: 'action', label: 'Bash', detail: 'npx orchestration start' }, at: '2026-10-01T10:00:59.000Z' },
+    { kind: 'driver', event: { type: 'text', text: 'I started one subagent.' }, at: '2026-10-01T10:01:05.000Z' },
+  ]
+
+  test('a working subagent has a row where it was started, saying its task and what it is doing now', () => {
+    const { container } = render(<EventList events={events} subagents={[sub()]} doing={{ '2026-10-01T10-01-00-000Z': 'Edit login.ts' }} stick={false} />)
+    expect(screen.getByText('subagent')).toBeTruthy()
+    expect(screen.getByText(/Validate the form/)).toBeTruthy()
+    expect(screen.getByText('running')).toBeTruthy()
+    expect(screen.getByText('Edit login.ts')).toBeTruthy()
+    expect(screen.queryByText(/You are a subagent/)).toBeNull()
+    // Between the command that started it and what the agent said next.
+    const text = container.textContent ?? ''
+    expect(text.indexOf('npx orchestration start')).toBeLessThan(text.indexOf('Validate the form'))
+    expect(text.indexOf('Validate the form')).toBeLessThan(text.indexOf('I started one subagent.'))
+    // The agent's reply after the row shows its badge again: the row broke the agent's run of rows.
+    expect(screen.getAllByText('agent')).toHaveLength(2)
+  })
+
+  test('the row of an ended subagent says how it ended and how long it took, and a click opens the subagent', () => {
+    const opened: string[] = []
+    render(<EventList events={events} subagents={[sub({ status: 'failed', endedAt: '2026-10-01T10:03:10.000Z' })]} doing={{ '2026-10-01T10-01-00-000Z': 'stale' }} onOpenAgent={id => opened.push(id)} stick={false} />)
+    expect(screen.getByText('failed')).toBeTruthy()
+    expect(screen.getByText('2m')).toBeTruthy()
+    expect(screen.queryByText('stale')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Open the subagent: Validate the form' }))
+    expect(opened).toEqual(['2026-10-01T10-01-00-000Z'])
+  })
+
+  test('the prompt that told the run its subagent ended is a SUBAGENT row saying how it ended, not a YOU row', () => {
+    const told: FrameworkEvent = {
+      kind: 'driver',
+      event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.\nIts work is on the branch agent-form.' },
+      at: '2026-10-01T10:04:00.000Z',
+    }
+    render(<EventList events={[...events, told]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' })]} stick={false} />)
+    expect(screen.getAllByText('you')).toHaveLength(1)
+    expect(screen.getAllByText('subagent')).toHaveLength(2)
+    expect(screen.getByText('ended done')).toBeTruthy()
+    expect(screen.getByText(/Its work is on the branch agent-form/)).toBeTruthy()
+    expect(screen.queryByText(/started for this run/)).toBeNull()
+  })
+
+  test("right after the reader's own prompt, the row of a subagent's end still shows its own badge", () => {
+    const typed: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'and then?' }, at: '2026-10-01T10:03:30.000Z' }
+    const told: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' }, at: '2026-10-01T10:04:00.000Z' }
+    render(<EventList events={[...events, typed, told]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' })]} stick={false} />)
+    expect(screen.getAllByText('you')).toHaveLength(2)
+    expect(screen.getAllByText('subagent')).toHaveLength(2)
+  })
+
+  test('a subagent started right after another one ended goes on under the same SUBAGENT badge', () => {
+    const told: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' }, at: '2026-10-01T10:04:00.000Z' }
+    const next = sub({ id: '2026-10-01T10-04-01-000Z', startedAt: '2026-10-01T10:04:01.000Z', intent: 'Second task' })
+    const after: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'Started the second.' }, at: '2026-10-01T10:04:05.000Z' }
+    render(<EventList events={[...events, told, after]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' }), next]} stick={false} />)
+    // The first subagent's row, then its end and the second's row as one run of rows.
+    expect(screen.getAllByText('subagent')).toHaveLength(2)
+    expect(screen.getByText(/Second task/)).toBeTruthy()
+  })
+
+  test("a subagent's end right under the row of a subagent just started goes on under that row's badge", () => {
+    const told: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' }, at: '2026-10-01T10:04:00.000Z' }
+    const second = sub({ id: '2026-10-01T10-03-59-000Z', startedAt: '2026-10-01T10:03:59.000Z', intent: 'Second task' })
+    render(<EventList events={[...events, told]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' }), second]} stick={false} />)
+    expect(screen.getAllByText('subagent')).toHaveLength(2)
+    expect(screen.getByText('ended done')).toBeTruthy()
+  })
+
+  test('the message being written under a subagent row at the end of the log shows the AGENT badge', () => {
+    render(<EventList events={events} subagents={[sub({ id: '2026-10-01T10-09-00-000Z', startedAt: '2026-10-01T10:09:00.000Z', intent: 'Late task' })]} writing="Now I wait" stick={false} />)
+    expect(screen.getAllByText('agent')).toHaveLength(2)
+  })
+
+  test('the same words about a run that is not a subagent of this one stay a YOU row', () => {
+    const typed: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' } }
+    render(<EventList events={[...events, typed]} stick={false} />)
+    expect(screen.getAllByText('you')).toHaveLength(2)
+    expect(screen.queryByText('subagent')).toBeNull()
+  })
+
+  test('a subagent started after the last line is the last row', () => {
+    const { container } = render(<EventList events={events} subagents={[sub({ id: 'late', startedAt: '2026-10-01T10:09:00.000Z', intent: 'Late task' })]} stick={false} />)
+    const text = container.textContent ?? ''
+    expect(text.indexOf('I started one subagent.')).toBeLessThan(text.indexOf('Late task'))
+  })
+})
+
+// What the run's details already count is not said again in the chat, and "finished" is said once.
+describe('EventList turn ends', () => {
+  const prompt = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'start', prompt: text } })
+  const reply = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'text', text } })
+  const turnEnd = { kind: 'driver', event: { type: 'result', text: '' } } as FrameworkEvent
+  const cost: FrameworkEvent = { kind: 'usage', costUsd: 0.12 }
+  const end = (over: Record<string, unknown> = {}) => ({ kind: 'end', ok: true, ...over }) as FrameworkEvent
+
+  test("a turn's end and the spend so far are not rows", () => {
+    render(<EventList events={[prompt('go'), reply('did it'), turnEnd, cost, end()]} stick={false} />)
+    expect(screen.queryByText(/turn complete/)).toBeNull()
+    expect(screen.queryByText(/spend/)).toBeNull()
+    expect(screen.queryByText('cost')).toBeNull()
+    expect(screen.getByText(/finished/)).toBeTruthy()
+  })
+
+  test('a clean end the run went on after is not a row: only the last one says finished', () => {
+    render(<EventList events={[prompt('go'), reply('one'), end(), prompt('more'), reply('two'), end()]} stick={false} />)
+    expect(screen.getAllByText(/finished/)).toHaveLength(1)
+  })
+
+  test('the last clean end is not a row while the run is still going', () => {
+    render(<EventList events={[prompt('go'), reply('started them'), end()]} going stick={false} />)
+    expect(screen.queryByText(/finished/)).toBeNull()
+  })
+
+  test('a message just sent takes the place of the end above it at once, clean or waiting; a failed end stays', () => {
+    const { unmount } = render(<EventList events={[prompt('go'), reply('did it'), end()]} sending="and now this" stick={false} />)
+    expect(screen.queryByText(/finished/)).toBeNull()
+    unmount()
+    render(<EventList events={[prompt('go'), end({ ok: false, waiting: true })]} sending="my answer" stick={false} />)
+    expect(screen.queryByText(/waiting for an answer/)).toBeNull()
+    cleanup()
+    render(<EventList events={[prompt('go'), end({ ok: false, detail: 'boom' })]} sending="try again" stick={false} />)
+    expect(screen.getByText(/failed: boom/)).toBeTruthy()
+  })
+
+  test('an end that is not clean stays where it happened, and so does the clean end after it', () => {
+    const first = end({ ok: false, detail: 'boom' })
+    const stopped = end({ ok: false, stopped: true })
+    const last = end()
+    const events = [prompt('go'), first, prompt('again'), stopped, prompt('once more'), last]
+    expect(passedEnds(events, false).size).toBe(0)
+    expect([...passedEnds(events, true)]).toEqual([last])
+    // What is written after the last end without a new prompt (a pull request line) leaves it the run's end.
+    expect(passedEnds([prompt('go'), last, { kind: 'log', message: 'recorded' } as FrameworkEvent], false).size).toBe(0)
+    // A failed last end is the run's end even while it is going.
+    expect(passedEnds([prompt('go'), first], true).size).toBe(0)
+  })
+
+  test('an end waiting on an answer is not a row once the answer came, and is one until then, going or not', () => {
+    const asked = end({ ok: false, waiting: true })
+    expect([...passedEnds([prompt('go'), asked, prompt('Approve'), reply('on it')], false)]).toEqual([asked])
+    expect(passedEnds([prompt('go'), asked], true).size).toBe(0)
+    render(<EventList events={[prompt('go'), asked]} going stick={false} />)
+    expect(screen.getByText(/waiting for an answer/)).toBeTruthy()
+  })
+})
+
+describe('EventList replies a question follows', () => {
+  const long = 'The plan is saved. '.repeat(10)
+  const prompt: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'plan it' } }
+  const reply = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'text', text } })
+  const choice = { kind: 'choice', id: 'await-choices', title: 'Start?', options: [{ id: 'a', label: 'Approve' }] } as FrameworkEvent
+
+  test('the reply a question follows is shown whole, and a click folds it', () => {
+    render(<EventList events={[prompt, reply(long), { kind: 'usage', costUsd: 0.1 }, choice]} stick={false} />)
+    const toggle = screen.getByRole('button', { name: 'Collapse message' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(toggle)
+    expect(screen.getByRole('button', { name: 'Expand message' }).getAttribute('aria-expanded')).toBe('false')
+  })
+
+  test('any other long reply is folded: one before it in the turn, and one no question follows', () => {
+    const early = reply(long + 'early')
+    const asked = reply(long + 'asked')
+    const later = reply(long + 'later')
+    const events = [prompt, early, asked, choice, { kind: 'driver', event: { type: 'start', prompt: 'Approve' } } as FrameworkEvent, later, { kind: 'usage', costUsd: 0.2 } as FrameworkEvent]
+    expect([...askedReplies(events)]).toEqual([asked])
+    // A question in a later turn is not about a reply of the turn before.
+    expect(askedReplies([prompt, early, { kind: 'driver', event: { type: 'start', prompt: 'go on' } } as FrameworkEvent, choice]).size).toBe(0)
+    render(<EventList events={events} stick={false} />)
+    expect(screen.getAllByRole('button', { name: 'Expand message' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Collapse message' })).toHaveLength(1)
+  })
+})
+
+// The scroller brings its anchor to the top; only the newest prompt may be one.
+describe('EventList scroll anchor', () => {
+  const prompt = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'start', prompt: text } })
+  const reply = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'text', text } })
+  const anchors = (container: HTMLElement) => [...container.querySelectorAll('[data-scroll-anchor="true"]')].map(el => el.textContent)
+
+  test('only the newest prompt is the anchor, and a message just sent takes it over', () => {
+    const events = [prompt('first'), reply('one'), { kind: 'end', ok: true } as FrameworkEvent, prompt('second'), reply('two')]
+    const { container, rerender } = render(<EventList events={events} stick={false} />)
+    expect(anchors(container)).toHaveLength(1)
+    expect(anchors(container)[0]).toContain('second')
+    rerender(<EventList events={events} sending="third" stick={false} />)
+    expect(anchors(container)).toHaveLength(1)
+    expect(anchors(container)[0]).toContain('third')
+  })
+
+  test('a row keeps its identity when a row above it stops being shown', () => {
+    const events = [prompt('first'), reply('one'), { kind: 'end', ok: true } as FrameworkEvent]
+    const { container, rerender } = render(<EventList events={events} stick={false} />)
+    const ids = () => [...container.querySelectorAll('[data-message-id]')].map(el => el.getAttribute('data-message-id'))
+    expect(ids()).toEqual(['0', '1', '2'])
+    // The run goes on: the end is no longer a row, and the new rows are known by their own place in the log.
+    rerender(<EventList events={[...events, prompt('second'), reply('two')]} stick={false} />)
+    expect(ids()).toEqual(['0', '1', '2', '3', '4'])
+    // The end keeps an empty place where it was, so the prompt after it is past every row there was.
+    expect(container.querySelector('[data-message-id="2"]')?.hasAttribute('hidden')).toBe(true)
+    expect(container.querySelector('[data-message-id="2"]')?.textContent).toBe('')
+    // A message just sent comes after the place of the end it follows.
+    rerender(<EventList events={events} sending="second" stick={false} />)
+    expect(ids()).toEqual(['0', '1', '2', 'sending'])
+    expect(container.querySelector('[data-message-id="2"]')?.hasAttribute('hidden')).toBe(true)
+    // The last end hidden because the job is still going keeps its place too.
+    rerender(<EventList events={events} going stick={false} />)
+    expect(ids()).toEqual(['0', '1', '2'])
+    expect(container.querySelector('[data-message-id="2"]')?.hasAttribute('hidden')).toBe(true)
   })
 })

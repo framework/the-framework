@@ -136,6 +136,7 @@ test('a run started for a working parent, from the parent\'s branch: it sees the
 
     const recorded = await findRun(repo, child!.id)
     assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: process.pid, parent: parentId, base: `agent-${parentId}` })
+    assert.equal(recorded?.caller?.['parent'], parentId, 'the parent beside the host too, where a reader of the record looks for it')
 
     const diary = await readUntimedDiary(repo, parentId)
     assert.deepEqual(

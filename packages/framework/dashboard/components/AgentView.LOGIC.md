@@ -25,6 +25,7 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 [16] project home: a project's own page with the launcher (the Start form) and its composer.
 [17] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [18] run slot: a place on an agent's page a module fills: the summary, a few words in the action bar, shown until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the bar. Each is told the agent, whether it is still working, and whether the bar is open.
+[19] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent.
 
 ## Business logic — TL;DR
 
@@ -41,6 +42,7 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 - **The disclosure** - opening the bar's disclosure adds the agent's details strip and, once stopped, the commits and files its branch holds; the installed modules' details sit under the bar in every state, told whether it is open (the Files module shows a working agent's changed files there).
 - **Removing a kept checkout** - a finished agent that kept its checkout (it failed or was stopped) is offered a Remove, which disappears at once when used.
 - **Notices for work that runs elsewhere** - an agent whose turns run on GitHub Actions, in a cloud session, or on a device gets a notice explaining what the feed can and cannot show.
+- **The agent's subagents** - the agent's subagents [19] are handed to the feed, which gives each its rows; while any of them is `running`, what each is doing now is read every 2 seconds, and a line above the composer says how many are running; while any of them holds the agent's job (it is `running`, it is saving, or it ended less than 10 seconds ago), the agent reads as waiting for its subagents in the action bar and the composer, its next step is not offered, and its last clean end is not shown as the end.
 - **The feed and the composer** - a finished feed is static and opens at its end; the composer knows how the agent ended, so it can say what the next message will do and offer a resume.
 
 ## Business logic
@@ -53,9 +55,9 @@ See `## Context`.
 
 #### Business logic
 
-The page for one agent [1] always holds, top to bottom: the action bar (`AgentActionBar.tsx`), the optional details strip and the changes or the branch detail behind the bar's disclosure, the notices for work that runs elsewhere, the feed of events [4] (`AgentFeed.tsx`), and the composer [5] (`AgentComposer.tsx`). None of these parts is replaced when the agent's state changes; each is told whether the agent is still running and what it has to show, and adapts its contents.
+The page for one agent [1] always holds, top to bottom: the action bar (`AgentActionBar.tsx`), the optional details strip and the changes or the branch detail behind the bar's disclosure, the notices for work that runs elsewhere, the feed of events [4] (`AgentFeed.tsx`), the subagents line while one of the agent's subagents [19] is working (see "The agent's subagents"), and the composer [5] (`AgentComposer.tsx`). None of these parts is replaced when the agent's state changes; each is told whether the agent is still running and what it has to show, and adapts its contents.
 
-The agent's name leads the bar: the label the caller passes, the same label the history rail shows (what the user typed, else the branch, else the start time). The project's name is shown beside it as a `project / session` breadcrumb.
+The agent's name leads the bar: the label the caller passes, the same label the history rail shows (what the user typed, else the branch, else the start time; for a subagent [19], its task: the first line of that). The project's name is shown beside it as a `project / session` breadcrumb.
 
 ### Which events are shown
 
@@ -97,7 +99,7 @@ The agent's name leads the bar: the label the caller passes, the same label the 
 An agent [1] counts as working exactly while the daemon's list of agents says it is running. Everything that asks "is there anything more coming?" asks whether the agent is working:
 
 - what the branch holds (the read in `lib/use-agent-handoff.ts`) is read once the agent is not working: a branch still being written to has nothing to offer yet. While its card [3] is marked saving, its checkout is being cleaned up, which deletes a branch that holds nothing, so a next step offered then would be gone moments later: the answer is shown then only for a branch already on the remote with commits of its own, which the clean-up keeps, and the branch is read again the moment the mark is gone;
-- the bar's action slot is empty while working — an agent that is working publishes its own work — and holds the next step [9] once not working;
+- the bar's action slot is empty while working — an agent that is working publishes its own work — and holds the next step [9] once not working and no subagent [19] holds the agent's job (see "The agent's subagents");
 - the modules' run slots [18] are told whether the agent works: the Files module reads the checkout [7] only while it does; the branch's commits and files take over once not working.
 
 Until the daemon's list of agents has been read (an agent opened from the Overview, or from a link, before its project's list has answered), whether the agent runs is not known: it counts as neither working nor ended. Its archive, its branch and the project's kept checkouts are not read, the bar offers nothing and waits (see "Switching between agents"), and the feed stays blank until the list is read or a second has passed, then shows the live event stream's events.
@@ -144,12 +146,13 @@ The bar's summary line:
 - Once the agent is not working and the read of what its branch holds has answered: the one-line verdict on the branch (`AgentHandoff.tsx`), followed, in the danger color, by the error of the last next-step [9] action the user pressed in the bar, when one failed.
 - Until that read has answered, a just-stopped agent keeps showing the modules' summaries (the Files module keeps the counts the agent ended with): the summary swaps once, to the branch verdict, instead of going blank for the beat the read takes.
 
-The bar's status word, ranked in `lib/agent-status.ts`, is read off the events shown and the agent's card [3]: the caller hands over the agent's card as the daemon's list of agents last reported it, which is what the word needs for "saving…" and "ready for merge"; before the list holds the agent there is no card, and the word is read off the events alone. The same card is handed to the details strip, which names the coding agent and model off it.
+The bar's status word, ranked in `lib/agent-status.ts`, is read off the events shown and the agent's card [3]: the caller hands over the agent's card as the daemon's list of agents last reported it, which is what the word needs for "saving…" and "ready for merge", and the number of the agent's subagents [19] that hold its job, for "<N> subagents running"; before the list holds the agent there is no card, and the word is read off the events alone. The same card is handed to the details strip, which names the coding agent and model off it.
 
 The bar's action slot:
 
 - Nothing while working.
 - Once not working: the next step [9] (open a pull request, or merge the one it has) with the state of the branch read (`AgentHandoff.tsx`).
+- Nothing, still, while a subagent [19] holds the agent's job: the agent has ended its own turn but goes on as each subagent ends, and a next step offered then appeared and disappeared between its turns.
 
 ### The disclosure
 
@@ -190,6 +193,26 @@ Where the agent runs is one of: this machine, a GitHub Actions runner, a device 
 - a cloud agent's work happens in a cloud session this machine cannot stream; the notice points at where it is instead of showing an empty feed (`CloudAgentNotice.tsx`), and a mirror row rides the tail of the feed where the story continues;
 - a relayed agent's notice only flags that the browser preview stays local, since its changes and its next step [9] relay to the device (`RemoteAgentNotice.tsx`).
 
+### The agent's subagents
+
+#### Context
+
+**User story**: the user asked one agent for work it split across subagents [19] (the `orchestration` skill). On that agent's page the user follows every subagent without leaving: a row per subagent in the transcript, saying what it is doing at this moment, and a line above the composer [5] counting the ones still working.
+
+**Problem**: the main agent ends its turn after starting its subagents, so its own page went quiet while they worked.
+
+#### Business logic
+
+The caller hands the page the agent's subagents, oldest first, as the project's list of agents last reported them, and how to open another agent of the project; an agent with no subagents gets none, and nothing below shows.
+
+- The subagents, and the way to open one, are passed to the feed, whose transcript gives each subagent a row where it was started and reads the message that told the agent a subagent ended as the subagent's row (`EventList.tsx`).
+- While at least one subagent's status is `running`, the daemon is asked every 2 seconds, the pace of the project's list of agents, what each running subagent is doing now, and the answer is passed to the feed and to the subagents line. When the set of running subagents changes, the last answer stays on screen until the next one lands. While none is running, nothing is asked.
+- Between the feed and the composer sits the subagents line (`SubagentLine.tsx`): "Subagents · N of M running", opening to one line per subagent, shown only while a subagent is `running`. It is folded until the user opens it, per agent: opened for one main agent, it is folded again on the next agent's page.
+- The subagents that hold the agent's job are counted (the rule in `lib/subagents.ts`: a subagent holds it while it is `running`, it is saving, or it ended less than 10 seconds ago). A main agent never waits in a process: it ends its turn after starting its subagents and is continued each time one of them ends, a few seconds after that subagent's card says it ended. So its record says `done` while the work it was asked for is still going, and the page said "finished" and "Agent ended" and offered Open PR between its turns. While the count is above zero: the action bar's status word reads "<N> subagents running" for an agent that ended clean (`lib/agent-status.ts`); the composer's line above the box reads "Waiting for its subagents — it continues as each one ends, or now with your next message." (`AgentComposer.tsx`); the bar's action slot offers no next step [9]; and the feed is told the job is still going, so the transcript does not show the agent's last clean end as its end (`EventList.tsx`).
+- The line above the composer and the reading of what subagents are doing count only the subagents whose status is `running`, not the ones that merely hold the job.
+
+A click on a subagent, in the transcript or in the subagents line, opens that subagent's own page.
+
 ### The feed and the composer
 
 #### Context
@@ -198,7 +221,7 @@ See `## Context`.
 
 #### Business logic
 
-- The feed follows new output while the agent [1] is live as the feed knows it. A finished agent's feed is static: it does not follow, and it opens at its end, where the outcome, the final spend and the last changes are.
+- The feed follows new output while the agent [1] is live as the feed knows it. A finished agent's feed is static: it does not follow, and it opens at its end, where the outcome and the last changes are.
 - The health of the live event stream is passed to the feed, which shows a banner over the events when the stream is lost.
 - The composer [5] is told: whether the agent is live as the feed knows it; and, once the agent is finished, how it ended: cleanly, with an error, by a stop [15], or waiting on a question, with the detail the end event carries. The composer uses the ending for its note and its resume offer.
 - When the composer's message continues this agent after it ended, the shell is told, and the page stays on the same agent as it goes on. When the bar's menu deletes this agent, the page leaves for the project home [16].

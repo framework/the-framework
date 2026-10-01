@@ -18,6 +18,7 @@ export function AgentActionBar({
   agentId: agentId,
   events,
   card,
+  subagentsRunning = 0,
   retainedWorktree = false,
   onWorktreeRemoved,
   onDeleted,
@@ -35,6 +36,8 @@ export function AgentActionBar({
   events: FrameworkEvent[]
   /** What the run's card says, for the status pill: its status, its pull request, whether it is saving. */
   card?: AgentCardFacts | undefined
+  /** How many of the run's subagents are still working, for the status pill. */
+  subagentsRunning?: number
   /** The session's name — leads the bar, so the branch is git context, not the identity (#1030). */
   label?: string | undefined
   /** The session's project, shown as a `project / session` breadcrumb before the name. */
@@ -64,7 +67,7 @@ export function AgentActionBar({
   // spent a full row on one word and pushed the output down. Ranked in agentStatusPill, so exactly
   // one of failed / stopped / waiting for an answer / saving… / ready for merge / building… /
   // finished is ever shown.
-  const status = agentStatusPill(events, card)
+  const status = agentStatusPill(events, card, subagentsRunning)
   return (
     // One row, always (#1026). The branch and its summary give up width as the row fills; the
     // controls never drop under them, because a bar that reflows moves everything below it.

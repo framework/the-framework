@@ -16,7 +16,7 @@ A run in flight is a run record [1]: the `logs` skill's card on the project's `a
 
 ## Business logic — TL;DR
 
-- **The marker** - a card with the run's id, its start time, `status: running`, the prompt as the intent, the driver, the model when the run has one and the tool's mark, written to the branch with an empty diary; the write says whether it reached origin.
+- **The marker** - a card with the run's id, its start time, `status: running`, the prompt as the intent, the driver, the model when the run has one and the tool's mark, written to the branch with an empty diary; the mark's machine is also on the card as `caller.host`, and the mark's parent, when it names one, as `caller.parent`; the write says whether it reached origin.
 - **Reading the mark** - a card carries the tool's mark when `caller.runner` is an object with a `host` string; `pid` is kept only when it is a number, and `then`, `parent` and `base` each only when it is a string; a card without it is somebody else's run.
 - **Withdrawing** - a marker whose scheduler lost the cap is deleted from the branch, so no record says running for a run that never was.
 - **The record at the end** - the card and the diary written over the marker, same id, same file; the mark stays on the card.
@@ -32,7 +32,7 @@ See `## Context`.
 
 #### Business logic
 
-Before a run's process exists, or as the first thing a person's run does, its card is written to the `agent-data` branch [2] by the `logs` package: the run's id, its start time, `status: running`, the prompt as what was asked, the driver's id, the model when the run has one, and the tool's mark [3] under `caller.runner`, with the mark's machine also as `caller.host`, where a run's live card has it and where a dashboard tells this machine's runs from another's, with an empty diary. The write is one commit pushed straight to the branch, and its outcome says whether the commit reached origin: only a pushed marker is one another machine can see.
+Before a run's process exists, or as the first thing a person's run does, its card is written to the `agent-data` branch [2] by the `logs` package: the run's id, its start time, `status: running`, the prompt as what was asked, the driver's id, the model when the run has one, and the tool's mark [3] under `caller.runner`, with the mark's machine also as `caller.host`, where a run's live card has it and where a dashboard tells this machine's runs from another's, with an empty diary. When the mark names a parent, the parent's id is on the card a second time, as `caller.parent`, beside `caller.host` and outside the mark, for the same reason: a reader of the card that does not know the tool's mark, such as a dashboard, finds there which run this one was started for. A run with no parent has no `caller.parent`. The write is one commit pushed straight to the branch, and its outcome says whether the commit reached origin: only a pushed marker is one another machine can see.
 
 ### Reading the mark
 

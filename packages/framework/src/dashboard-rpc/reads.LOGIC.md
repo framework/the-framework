@@ -1,4 +1,4 @@
-Answers everything the dashboard reads about a project or an agent [1]: the agent history, one agent's replay, the project's surfaced documents, the cross-project rollups the Overview [2] and the launcher show, the files of a checkout [3] for the composer's picker, where an agent is working and what its handoff [4] left behind, and the state of the Claude web bridge [5]. Every read is forgiving: an unknown project or a failing read answers the empty shape (an empty list, an empty map, nothing) rather than an error, and a read about an agent relayed [6] to a device [7] is answered by that device.
+Answers everything the dashboard reads about a project or an agent [1]: the agent history, one agent's replay, what named working agents are doing now, the project's surfaced documents, the cross-project rollups the Overview [2] and the launcher show, the files of a checkout [3] for the composer's picker, where an agent is working and what its handoff [4] left behind, and the state of the Claude web bridge [5]. Every read is forgiving: an unknown project or a failing read answers the empty shape (an empty list, an empty map, nothing) rather than an error, and a read about an agent relayed [6] to a device [7] is answered by that device.
 
 ## Context
 
@@ -28,6 +28,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 [19] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [21] pick: the answer to a gate: the option or options the user chose.
 [22] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[23] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent.
 
 ## Business logic — TL;DR
 
@@ -35,6 +36,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 - **The agent history** - a project's agents newest first, the live ones prepended to the recorded ones, one row per id with the live copy winning, and the agents relayed to devices merged in from the daemon's memory.
 - **What only the daemon knows about an agent** - a `web` agent whose cloud session is waiting on a human is marked waiting, an agent another machine's daemon started is marked as from another host, and an agent that ended clean while its process is still alive on this machine is marked saving.
 - **An agent's replay** - the agent's events, from the diary in its checkout while it has one, else from its run on the `agent-data` branch; nothing when it is in neither.
+- **What working agents are doing now** - for the agents of a project named by id, what each one that is working is doing at this moment, by id; an agent that is not working has no entry.
 - **Retained checkouts** - the ids of ended agents whose checkout is still on disk, live agents excluded.
 - **Where an agent is working** - while it has a checkout: the checkout's path, its branch, whether it holds uncommitted changes, its size once nothing writes to it, and the pull request that belongs to this agent and not a predecessor's; once the checkout is gone, only the branch and the pull request the agent recorded.
 - **Documents** - the surfaced documents at the project root.
@@ -86,6 +88,16 @@ An agent whose location [13] is `web`, which has a session id, and whose cloud s
 #### Business logic
 
 The replay is the agent's events [15]: the diary in its checkout while it has one, else its run's [9] diary on the `agent-data` branch, each line turned into the event it records; an unknown or unsafe id, or a project that is gone, answers an empty list. For a relayed agent the replay comes from the device.
+
+### What working agents are doing now
+
+#### Context
+
+**User story**: on a main agent's page, each working subagent's [23] line says what the subagent is doing now; the page asks every 2 seconds while a subagent is working (`dashboard/components/AgentView.tsx`).
+
+#### Business logic
+
+The read takes a project and a list of agent ids [8] and answers a map from id to one line: what that agent is doing now, as the store reads it off the diary [15] in the agent's checkout [3] (the last tool use or the last thing the agent said; the rule is `store/agent-store.ts`'s). An agent that has no checkout on this machine, is not `running`, or has done nothing yet has no entry. An unknown project, or a read that fails, answers an empty map. The read is never forwarded to a device [7].
 
 ### Retained checkouts
 

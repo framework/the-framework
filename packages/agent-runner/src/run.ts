@@ -6,7 +6,7 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary, type AnyDiaryLine, type LogsDeps, type RunCard, type RunStatus } from '@gemstack/skill-logs'
 import { hideLiveDir, inboxPath, liveDir, readLiveCard, readLiveDiary } from './live-card.js'
-import { lasting, markerCard, recordBranchGone, recordRun, runnerMark, writeMarker, type RunnerMark } from './records.js'
+import { lasting, markerCard, parentOf, recordBranchGone, recordRun, runnerMark, writeMarker, type RunnerMark } from './records.js'
 import { projectGitHost, type GitHost, type MergeOutcome } from './git-host.js'
 import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
 import { runEndedLine } from './ended.js'
@@ -171,7 +171,7 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
     return await session(repo, {
       id,
       checkout,
-      card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { runner: mark, pid, host, kind: 'prompt', workspace: checkout.path } },
+      card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { runner: mark, pid, host, ...parentOf(mark), kind: 'prompt', workspace: checkout.path } },
       prompt: agentPrompt(opts.prompt, opts.then),
       driver: opts.driver,
       ...modelOf(opts.model),

@@ -1,13 +1,15 @@
-import type { ChoiceRequest, FrameworkEvent } from '../../src/index.js'
+import type { AgentMeta, ChoiceRequest, FrameworkEvent } from '../../src/index.js'
 import { formatFrameworkEvent } from '../../src/client.js'
-import { useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { eventKindLabel } from '../lib/event-labels.js'
 import { pendingChoices } from '../lib/live-state.js'
+import { startedBefore, subagentEnd, subagentStartedAt, type SubagentEnd } from '../lib/subagents.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
 import { ChoicePanel } from './ChoicePanel.js'
 import { InlineScreen, isLoopbackScreen } from './InlineScreen.js'
 import { Markdown } from './Markdown.js'
+import { SubagentLine } from './SubagentLine.js'
 import { Badge } from './ui/badge.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
@@ -21,7 +23,7 @@ import {
 
 // Presentational event log, shared by the live stream and past-run replay. Most events render as
 // their human-readable line (the same formatter the terminal uses, so a `driver` turn reads
-// "· Read  src/app.ts" / "‹ turn complete" rather than raw JSON). Some things get special rows:
+// "· Read  src/app.ts" rather than raw JSON). Some things get special rows:
 //   - The message text: the user's prompt (`driver` `start`) and the agent's reply (`driver` `text`)
 //     render their raw text inline, truncated to one line when long and expanding in place on click
 //     (#476/#520). The prompt carries its own YOU badge so the log reads like a conversation.
@@ -31,6 +33,12 @@ import {
 //     a resolved one collapses to the AnsweredChoice ✓ card and hides its "✓ chose" line.
 //   - Screens: the newest open `screen` line at an address, before the run's end, is the live
 //     screen itself (InlineScreen); an earlier one stays its one line, and an `ended` one is hidden.
+//   - A turn's end and the spend so far are not rows, and neither is a clean end the run went on
+//     after: the run's details count turns and spend, and "finished" between turns is not so.
+//   - The reply a question follows is shown whole: it is what the question asks about.
+//   - Subagents, when the log is given the run's: each has a SUBAGENT row where it was started,
+//     read off its card, so the row of a working one says what it is doing now; and the prompt
+//     that told the run a subagent ended is a SUBAGENT row too, not a YOU one.
 // The kind badge shows once per agent of same-group rows — a 200-line driver turn used to be 200
 // identical badges (#948). A driver `start` breaks out of the AGENT group so the user's turn gets
 // its own YOU badge. A row at a group boundary shows the time its diary line was written, the same
@@ -66,6 +74,7 @@ function rowLabel(e: FrameworkEvent): string {
 }
 
 // A driver `start` opens a fresh prompt turn — the natural anchor the scroller keeps in view.
+// Only the newest one is handed to the scroller as its anchor (see `anchor` in EventList).
 function isTurnBoundary(e: FrameworkEvent): boolean {
   return e.kind === 'driver' && e.event.type === 'start'
 }
@@ -220,12 +229,51 @@ export function foldScreenRows(events: readonly FrameworkEvent[]): { live: Set<F
   return { live, hidden }
 }
 
+/**
+ * The ends that are not the run's end: a clean one, or one waiting on an answer, that a later
+ * prompt follows (the run went on), and the last clean one while the run's subagents still work
+ * (`going`). They are not rows: "finished" between two turns or over working subagents, and
+ * "waiting for an answer" above the answer, say what is not so. A failed or stopped end stays
+ * where it happened: it says why the next prompt was needed.
+ */
+export function passedEnds(events: readonly FrameworkEvent[], going: boolean, sent = false): Set<FrameworkEvent> {
+  const passed = new Set<FrameworkEvent>()
+  let pending: FrameworkEvent | undefined
+  for (const e of events) {
+    if (e.kind === 'end') pending = e.ok || e.waiting ? e : undefined
+    else if (pending && isTurnBoundary(e)) {
+      passed.add(pending)
+      pending = undefined
+    }
+  }
+  // A message just sent (`sent`) is a prompt on its way: the end above it is passed already.
+  if (pending?.kind === 'end' && (sent || (going && pending.ok))) passed.add(pending)
+  return passed
+}
+
+/**
+ * The replies a question follows: the agent's last message before each question it stopped on.
+ * It is what the question is about (a plan to approve), so it is shown whole, not folded.
+ */
+export function askedReplies(events: readonly FrameworkEvent[]): Set<FrameworkEvent> {
+  const asked = new Set<FrameworkEvent>()
+  let reply: FrameworkEvent | undefined
+  for (const e of events) {
+    if (isTurnBoundary(e)) reply = undefined
+    else if (e.kind === 'driver' && e.event.type === 'text') reply = e
+    else if (e.kind === 'choice' && reply) asked.add(reply)
+  }
+  return asked
+}
+
 // A conversation message (a prompt or a reply), rendered as compact Markdown. A short one renders
 // as-is. A long one clamps to its first line with a chevron beside it and expands in place on click —
 // the chevron stays on that first line (never a lone chevron on its own row), and the same rendered
 // Markdown just unclamps, so the opening is never shown twice.
-function Message({ text }: { text: string }) {
-  const [open, setOpen] = useState(false)
+function Message({ text, startOpen = false }: { text: string; startOpen?: boolean }) {
+  // The reader's own click wins; until then a message is folded, unless it starts open.
+  const [toggled, setOpen] = useState<boolean | null>(null)
+  const open = toggled ?? startOpen
   if (!isLong(text)) {
     return (
       <div className="min-w-0 flex-1">
@@ -237,7 +285,7 @@ function Message({ text }: { text: string }) {
     <div className="flex min-w-0 flex-1 items-start gap-1.5">
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label={open ? 'Collapse message' : 'Expand message'}
         className={`shrink-0 select-none text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}
@@ -272,13 +320,21 @@ function Thought({ text }: { text: string }) {
   )
 }
 
+/** The badge word, and the grouping key, of a row about one of the run's subagents. */
+const SUBAGENT = 'subagent'
+const NO_SUBAGENTS: readonly AgentMeta[] = []
+const NOTHING_DOING: Record<string, string> = {}
+
 /**
  * Whether an event is a row at all. The agent's session id is plumbing, not conversation: the
- * run's ⋮ menu reads it from the events. A quota reading is worth a row only when the quota is
- * running low or used up; the agent reports it after every turn, "allowed" included.
+ * run's ⋮ menu reads it from the events. A turn's end and what the run has spent are not rows
+ * either: the run's details count the turns and total the spend. A quota reading is worth a row
+ * only when the quota is running low or used up; the agent reports it after every turn,
+ * "allowed" included.
  */
 function shownAsRow(e: FrameworkEvent): boolean {
-  if (e.kind === 'session-update') return false
+  if (e.kind === 'session-update' || e.kind === 'usage') return false
+  if (e.kind === 'driver' && e.event.type === 'result') return false
   if (e.kind === 'driver' && e.event.type === 'rate-limit') return e.event.limit.status !== 'allowed'
   return true
 }
@@ -293,6 +349,10 @@ export function EventList({
   tail,
   projectId,
   agentId: agentId,
+  subagents = NO_SUBAGENTS,
+  doing = NOTHING_DOING,
+  going = false,
+  onOpenAgent,
 }: {
   events: FrameworkEvent[]
   /** The message the agent is writing, as far as it has got: an AGENT row after the last, shown
@@ -317,11 +377,70 @@ export function EventList({
   projectId?: string | undefined
   /** Which run an inline pick resolves (#749), forwarded to the panel with projectId. */
   agentId?: string | null | undefined
+  /** The runs started for this run, oldest first: each gets a row where it was started. */
+  subagents?: readonly AgentMeta[]
+  /** What each working subagent is doing now, by id. */
+  doing?: Record<string, string>
+  /** The run's job is not over (its subagents still work): its last clean end is not shown as the end. */
+  going?: boolean
+  /** Open another run's page: what a subagent's row does on a click. */
+  onOpenAgent?: ((agentId: string) => void) | undefined
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
   const screenRows = useMemo(() => foldScreenRows(events), [events])
+  const passed = useMemo(() => passedEnds(events, going, sending !== undefined), [events, going, sending])
+  const rowIds = useMemo(() => new Map(events.map((e, at) => [e, String(at)])), [events])
+  const asked = useMemo(() => askedReplies(events), [events])
   const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
-  const shown: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
+  // Every row and every passed end, in order, a message just sent last; `shown` is the rows alone.
+  const kept: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
+  const shown = kept.filter(e => !passed.has(e))
+  // The prompts that told this run one of its subagents ended: SUBAGENT rows, not the reader's own.
+  const ends = new Map<FrameworkEvent, SubagentEnd>()
+  for (const e of shown) {
+    const end = e.kind === 'driver' && e.event.type === 'start' ? subagentEnd(e.event.prompt, subagents) : undefined
+    if (end) ends.set(e, end)
+  }
+  // A row is known by its event's place in the whole log, not among the rows shown: a row that
+  // stops being shown (an end the run went on after) then changes no other row's identity, and
+  // the scroller keeps its place. A message just sent has no place yet.
+  const idOf = (e: FrameworkEvent): string => rowIds.get(e) ?? 'sending'
+  // The scroller's anchor is the newest prompt alone. It brings an anchor it has not yet brought
+  // into view to the top whenever one row takes another's place, and it starts with the oldest:
+  // with every prompt an anchor, a log opened with several turns in it jumped to its first prompt
+  // the moment the agent went on (the message being written giving way to the whole message, an
+  // end giving way to the next prompt).
+  const anchor = [...shown].reverse().find(isTurnBoundary)
+  // An end that is no longer a row keeps an empty place in the list, where it was. The scroller
+  // brings a new prompt to the top only when it finds it past the rows it already had: with the
+  // end gone from the list, the prompt that follows it would sit at the end's old place, unseen.
+  const passedAbove = new Map<FrameworkEvent, FrameworkEvent[]>()
+  const passedLast: FrameworkEvent[] = []
+  for (let at = 0, waiting: FrameworkEvent[] = []; at <= kept.length; at++) {
+    const e = kept[at]
+    if (e === undefined) passedLast.push(...waiting)
+    else if (passed.has(e)) waiting.push(e)
+    else if (waiting.length > 0) {
+      passedAbove.set(e, waiting)
+      waiting = []
+    }
+  }
+  const placeOf = (e: FrameworkEvent): ReactNode => <MessageScrollerItem key={`passed-${idOf(e)}`} messageId={idOf(e)} hidden />
+  const groupOf = (e: FrameworkEvent): string => (ends.has(e) ? SUBAGENT : rowGroup(e))
+  const started = startedBefore(shown, subagents)
+  // One badge for a run of SUBAGENT rows: a started row right under the row of a subagent's end shows none.
+  const afterEnd = (at: number): boolean => at > 0 && ends.has(shown[at - 1]!)
+  const startedRows = (at: number): ReactNode =>
+    started.get(at)?.map((agent, n) => (
+      <MessageScrollerItem key={`subagent-${agent.id}`} messageId={`subagent-${agent.id}`} className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
+        <span className="w-28 shrink-0">{n === 0 && !afterEnd(at) && <Badge className="mt-0.5 text-[10px] uppercase text-muted-foreground">{SUBAGENT}</Badge>}</span>
+        <SubagentLine agent={agent} doing={doing[agent.id]} onOpen={onOpenAgent} />
+        <Tooltip>
+          <TooltipTrigger render={<span className="ml-auto shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground" />}>{formatTime(subagentStartedAt(agent))}</TooltipTrigger>
+          <TooltipContent>{new Date(subagentStartedAt(agent)).toLocaleString()}</TooltipContent>
+        </Tooltip>
+      </MessageScrollerItem>
+    ))
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>
       <MessageScroller className="flex-1">
@@ -331,21 +450,33 @@ export function EventList({
               const message = messageText(e)
               const choiceRow = choiceRows?.rows.get(e)
               const prev = i > 0 ? rows[i - 1] : undefined
-              const chunkHead = !prev || rowGroup(prev) !== rowGroup(e)
+              const end = ends.get(e)
+              // A subagent's row above this one breaks the run of same-kind rows, so the badge shows
+              // again; the row of a subagent's end goes on that run of SUBAGENT rows instead.
+              const chunkHead = !prev || (started.has(i) ? !end : groupOf(prev) !== groupOf(e))
               const at = e.at
               return (
-                // Every row carries the same -mx/px pair so a washed row's band and a plain row's
-                // text share the exact same columns; only the background differs.
-                <MessageScrollerItem key={i} messageId={String(i)} scrollAnchor={isTurnBoundary(e)} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${rowWash(e)}`}>
+                <Fragment key={idOf(e)}>
+                {passedAbove.get(e)?.map(placeOf)}
+                {startedRows(i)}
+                {/* Every row carries the same -mx/px pair so a washed row's band and a plain row's
+                    text share the exact same columns; only the background differs. */}
+                <MessageScrollerItem messageId={idOf(e)} scrollAnchor={e === anchor} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${end ? '' : rowWash(e)}`}>
                   {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("choice resolved") to sit on one line. */}
                   <span className="w-28 shrink-0">
                     {chunkHead && (
-                      <Badge className={`mt-0.5 text-[10px] uppercase ${badgeTone(e) || 'text-muted-foreground'}`}>{rowLabel(e)}</Badge>
+                      <Badge className={`mt-0.5 text-[10px] uppercase ${(end ? '' : badgeTone(e)) || 'text-muted-foreground'}`}>{end ? SUBAGENT : rowLabel(e)}</Badge>
                     )}
                   </span>
-                  {message !== null ? (
+                  {end ? (
+                    // A subagent ended: which one and how, then what the run was told about it.
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <SubagentLine agent={end.agent} end={end} onOpen={onOpenAgent} />
+                      {end.rest && <Message text={end.rest} />}
+                    </div>
+                  ) : message !== null ? (
                     // A prompt (YOU) or a reply (AGENT): compact Markdown, collapsed to its first line when long.
-                    <Message text={message} />
+                    <Message text={message} startOpen={asked.has(e)} />
                   ) : e.kind === 'driver' && e.event.type === 'thought' ? (
                     <Thought text={e.event.text} />
                   ) : choiceRow && projectId ? (
@@ -385,12 +516,15 @@ export function EventList({
                     </Tooltip>
                   )}
                 </MessageScrollerItem>
+                </Fragment>
               )
             })}
+            {passedLast.map(placeOf)}
+            {startedRows(shown.length)}
             {writing && (
               <MessageScrollerItem messageId="writing" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
                 <span className="w-28 shrink-0">
-                  {shown.length === 0 || rowGroup(shown[shown.length - 1]!) !== 'agent' ? (
+                  {shown.length === 0 || started.has(shown.length) || groupOf(shown[shown.length - 1]!) !== 'agent' ? (
                     <Badge className="mt-0.5 text-[10px] uppercase text-muted-foreground">{eventKindLabel('driver')}</Badge>
                   ) : null}
                 </span>

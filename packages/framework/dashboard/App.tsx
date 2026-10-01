@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Intervention, Activity, ProjectionRead, ProjectSummary, RecentAgent } from '../src/index.js'
 import { onProjectFiles, onInterventions, onActivity, onRecentAgents, onAgents } from './rpc/reads.js'
 import { sendStart } from './rpc/control.js'
@@ -10,6 +10,7 @@ import { DashboardPage } from './components/DashboardPage.js'
 import { SettingsPage } from './components/SettingsPage.js'
 import { AgentView } from './components/AgentView.js'
 import { agentLabel } from './lib/agent-label.js'
+import { subagentsOf, taskLabel } from './lib/subagents.js'
 import { RightRail } from './components/RightRail.js'
 import { NotFound } from './components/NotFound.js'
 import { ModulePageView } from './components/ModulePageView.js'
@@ -273,6 +274,8 @@ export function App() {
   // project home/launcher, a running agent's live output, or a finished agent's replay. Each live
   // run streams its own feed and is steered by its own id (#749).
   const selectedAgent = agentId ? agents.find(agent => agent.id === agentId) : undefined
+  // The runs started for the selected one: rows in its chat.
+  const subagents = useMemo(() => (agentId ? subagentsOf(agents, agentId) : []), [agents, agentId])
   const renderMain = () => {
     if (view === 'settings')
       return <SettingsPage onAgentStarted={agentStarted} onSelectProject={selectProject} onDone={showDashboard} />
@@ -349,7 +352,8 @@ export function App() {
         events={events}
         live={selectedAgent.status === 'running'}
         card={selectedAgent}
-        label={agentLabel(selectedAgent)}
+        // A subagent's page is named as its rows are: by its task, not by its whole prompt.
+        label={selectedAgent.parent !== undefined ? taskLabel(selectedAgent) : agentLabel(selectedAgent)}
         projectName={projectName}
         files={files}
         lost={lost}
@@ -357,6 +361,8 @@ export function App() {
         startedWith={agentId === agentStart.id ? agentStart.intent : undefined}
         target={selectedAgent.target}
         remoteLabel={selectedAgent.remoteLabel}
+        subagents={subagents}
+        onOpenAgent={selectAgent}
         onAgentStarted={onAgentStarted}
         onDeleted={() => {
           // Its view is about to point at a session that no longer exists; go home and refresh

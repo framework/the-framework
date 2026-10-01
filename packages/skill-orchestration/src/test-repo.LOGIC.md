@@ -1,0 +1,1 @@
+A test helper, not business logic: a throwaway project for the tests: one commit on `main`, a bare `origin`, and the `agent-data` branch born on origin; real git, because the run records and the checkouts are git. Removed with its origin after each test.

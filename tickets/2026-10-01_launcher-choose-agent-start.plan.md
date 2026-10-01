@@ -1,5 +1,6 @@
 Effort: 3
 Uncertainty: 4
+Outdated: yes
 
 # [Plan] Launcher: choose where an agent starts
 
@@ -54,3 +55,4 @@ How the launcher's "Starts from" pick is shown, carried to the run as a base for
 
 - The reclaim bullet (Solutions 3): take it, or accept the push.
 - Whether a command that merges its own pull request should refuse, or warn, on a run that started from a local branch. Not planned here: the launcher's text and the run page say it, and the user picked it.
+

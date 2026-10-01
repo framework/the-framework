@@ -342,6 +342,8 @@ test('land: the subagent\'s branch merged into the caller\'s, then gone here, on
   try {
     const checkout = await mainAgent(repo)
     const branch = await endedSubagent(repo, FIRST, 'tests.txt')
+    // A second one from the same start, which only origin has: this clone holds no copy of it.
+    const remoteOnly = await endedSubagent(repo, SECOND, 'docs.txt', { local: false })
     const landed = await run(checkout, MAIN, ['land', FIRST])
     assert.deepEqual([landed.code, landed.out, landed.err], [0, { ok: true, id: FIRST, branch, merged: true }, ''])
     assert.equal(await readFile(join(checkout, 'tests.txt'), 'utf8'), `${FIRST}\n`, 'the work is on the main agent\'s branch')
@@ -350,8 +352,7 @@ test('land: the subagent\'s branch merged into the caller\'s, then gone here, on
     const again = await run(checkout, MAIN, ['land', FIRST])
     assert.deepEqual([again.code, again.out], [1, { ok: false, reason: 'nothing-to-land', id: FIRST }])
 
-    // A branch only origin has is landed from origin's copy.
-    const remoteOnly = await endedSubagent(repo, SECOND, 'docs.txt', { local: false })
+    // It is landed from origin's copy, as a merge: the main agent's branch has moved on.
     assert.deepEqual((await run(checkout, MAIN, ['land', SECOND])).out, { ok: true, id: SECOND, branch: remoteOnly, merged: true })
     assert.equal(await readFile(join(checkout, 'docs.txt'), 'utf8'), `${SECOND}\n`)
     assert.equal((await git(['log', '-1', '--format=%s'], checkout)).trim(), `Merge branch '${remoteOnly}'`)

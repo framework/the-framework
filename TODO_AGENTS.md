@@ -18,4 +18,5 @@
 
 
 ## Priority 2
+- Create tickets/2026-10-01_launcher-choose-agent-start.plan.md
 

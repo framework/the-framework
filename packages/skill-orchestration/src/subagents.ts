@@ -206,7 +206,7 @@ export async function landSubagent(repo: string, env: NodeJS.ProcessEnv, id: str
   const merged = !(await git(['merge-base', '--is-ancestor', ref, 'HEAD'], checkout).then(() => true, () => false))
   if (merged) {
     try {
-      await git(['merge', '--no-edit', ref], checkout)
+      await git(['merge', '--no-edit', '-m', `Merge branch '${branch}'`, ref], checkout)
     } catch (err) {
       const files = (await git(['diff', '--name-only', '--diff-filter=U'], checkout).catch(() => '')).split('\n').filter(Boolean)
       await git(['merge', '--abort'], checkout).catch(() => {})

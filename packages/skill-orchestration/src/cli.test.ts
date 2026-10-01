@@ -354,6 +354,7 @@ test('land: the subagent\'s branch merged into the caller\'s, then gone here, on
     const remoteOnly = await endedSubagent(repo, SECOND, 'docs.txt', { local: false })
     assert.deepEqual((await run(checkout, MAIN, ['land', SECOND])).out, { ok: true, id: SECOND, branch: remoteOnly, merged: true })
     assert.equal(await readFile(join(checkout, 'docs.txt'), 'utf8'), `${SECOND}\n`)
+    assert.equal((await git(['log', '-1', '--format=%s'], checkout)).trim(), `Merge branch '${remoteOnly}'`)
     assert.equal(await hasRef(origin, `refs/heads/${remoteOnly}`), false)
 
     // One the main agent merged by hand is only deleted; one that never reached origin is deleted here.

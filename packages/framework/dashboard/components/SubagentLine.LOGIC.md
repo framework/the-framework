@@ -69,7 +69,7 @@ The task is a button whose accessible name is "Open the subagent: <task>". A cli
 
 Given an agent's subagents [2] and what each working one is doing now:
 
-- While no subagent's status is `running`, nothing is shown: none at all, all ended, or only subagents that are `waiting`. A waiting subagent does not keep the line.
+- While no subagent's status is `running`, nothing is shown: none at all, all ended, or only subagents that are `waiting`. A waiting subagent does not keep the line, nor does one that is saving or just ended, although those still hold the main agent's job elsewhere on the page (`lib/subagents.ts`).
 - Otherwise the line reads "Subagents · N of M running", N being the subagents whose status is `running` and M all of the agent's subagents. It is a toggle (`DisclosureToggle.tsx`), folded until the user opens it; the agent view keeps that choice per main agent, so the line of the next main agent the user opens is folded again (`AgentView.tsx`).
 - Opened, it lists every subagent, working or not, in the order given (oldest first), each as a subagent's line as described above, with the same click to open it.
 

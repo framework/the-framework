@@ -235,7 +235,7 @@ export function foldScreenRows(events: readonly FrameworkEvent[]): { live: Set<F
  * "waiting for an answer" above the answer, say what is not so. A failed or stopped end stays
  * where it happened: it says why the next prompt was needed.
  */
-export function passedEnds(events: readonly FrameworkEvent[], going: boolean): Set<FrameworkEvent> {
+export function passedEnds(events: readonly FrameworkEvent[], going: boolean, sent = false): Set<FrameworkEvent> {
   const passed = new Set<FrameworkEvent>()
   let pending: FrameworkEvent | undefined
   for (const e of events) {
@@ -245,7 +245,8 @@ export function passedEnds(events: readonly FrameworkEvent[], going: boolean): S
       pending = undefined
     }
   }
-  if (pending?.kind === 'end' && pending.ok && going) passed.add(pending)
+  // A message just sent (`sent`) is a prompt on its way: the end above it is passed already.
+  if (pending?.kind === 'end' && (sent || (going && pending.ok))) passed.add(pending)
   return passed
 }
 
@@ -386,7 +387,7 @@ export function EventList({
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
   const screenRows = useMemo(() => foldScreenRows(events), [events])
-  const passed = useMemo(() => passedEnds(events, going), [events, going])
+  const passed = useMemo(() => passedEnds(events, going, sending !== undefined), [events, going, sending])
   const asked = useMemo(() => askedReplies(events), [events])
   const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e) && !passed.has(e))
   const shown: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]

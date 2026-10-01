@@ -79,7 +79,7 @@ While the agent works the line is absent, except for the "Queued" status after a
 - waiting [5]: "The agent asked a question — answer it above, or your next message continues the session."
 - failed: "Session failed — your next message resumes it where it stopped."
 - stopped: "Session stopped — your next message resumes it."
-- ended clean while at least one of its subagents is still running, as the caller counts them: "Waiting for its subagents — it continues as each one ends, or now with your next message." The agent ended its turn after starting them and is continued each time one ends, so "Agent ended" would say the job is over when it is not;
+- ended clean while at least one of its subagents still holds its job, as the caller counts them (the agent view counts a subagent that is running, is saving, or ended less than 10 seconds ago): "Waiting for its subagents — it continues as each one ends, or now with your next message." The agent ended its turn after starting them and is continued each time one ends, so "Agent ended" would say the job is over when it is not;
 - otherwise: "Agent ended — your next message continues it."
 
 The "Queued" status is hidden while an error is shown, so the box never says "queued" next to a refusal. The editor's placeholder reads "Message the agent…" while the agent works and "Message the agent to continue it…" once it has ended.

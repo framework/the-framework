@@ -1,8 +1,8 @@
-Renders an agent's [1] transcript: every event [2] the agent emitted, one row each, in the order it happened — for a running agent, whose rows arrive live, and for a finished agent replayed from the archive [3] alike. Most rows read as the one-line text the terminal prints; the user's prompts and the agent's replies, gates [4], live screens [15] and the agent's subagents [16] get their own row treatment, so the transcript reads like a conversation whose interactions can be acted on where they happened.
+Renders an agent's [1] transcript: the events [2] the agent emitted, one row each, in the order they happened, except those the page already says elsewhere or that no longer hold (a turn's end, the spend so far, an end the agent went on after) — for a running agent, whose rows arrive live, and for a finished agent replayed from the archive [3] alike. Most rows read as the one-line text the terminal prints; the user's prompts and the agent's replies, gates [4], live screens [15] and the agent's subagents [16] get their own row treatment, so the transcript reads like a conversation whose interactions can be acted on where they happened.
 
 ## Context
 
-**User story**: the user opens an agent's [1] page and reads what happened: what they asked, what the coding agent [5] read and edited, what it answered, the questions it stopped at, what it cost and how it ended. While the agent runs, the transcript follows the newest row; afterwards the same transcript is replayed from the archive [3].
+**User story**: the user opens an agent's [1] page and reads what happened: what they asked, what the coding agent [5] read and edited, what it answered, the questions it stopped at and how it ended. While the agent runs, the transcript follows the newest row; afterwards the same transcript is replayed from the archive [3].
 
 ## Glossary
 
@@ -29,6 +29,9 @@ Renders an agent's [1] transcript: every event [2] the agent emitted, one row ea
 - **The message just sent** - a message sent to an ended agent is one more "YOU" row after the last, a prompt like any other, so the scroller brings it into view; the prompt line of the continuation takes the same row when it arrives.
 - **A spinner while the agent works** - while the agent works and writes nothing, the last row is a spinner reading "Starting…" when the row above it is a prompt, "Working…" otherwise; it gives way to the message being written, and goes when the agent ends.
 - **The message being written grows in place** - while the agent writes a message, it is one more agent row after the last, whole rather than clamped so the words can be seen arriving, badged "AGENT" unless the row above is already the agent's; when the whole message arrives, its own row replaces it and clamps as usual.
+- **A turn's end and the spend are not rows** - the end of each turn [7] and the spend so far are left out: the agent's details strip counts the turns and totals the spend.
+- **An end the agent went on after is not a row** - a clean end, or an end waiting on an answer, that a later prompt follows is left out, and so is the last clean end while the caller says the agent's job is still going; a failed or stopped end stays where it happened.
+- **The reply a question follows is shown whole** - the agent's last reply before a gate [4] in the same turn is not clamped: it is what the question is about.
 - **The session id is not a row** - the coding agent's session id update is plumbing, not conversation: it is left out of the list, and the run's menu reads it from the events.
 - **The quota only when it matters** - the coding agent reports the account's quota after every turn; a reading that is `allowed` is left out of the list, and one running low or used up is a row.
 - **Thinking stays folded** - a thought of the coding agent renders as one muted "💭 Thinking" line; clicking it opens the thought in place, in italics, and clicking again folds it.
@@ -52,7 +55,7 @@ See `## Context`.
 
 #### Business logic
 
-Each event [2] is one row with three columns: a fixed-width badge column, the row's body, and, on rows that open a group (see "Badges once per group, colored as a scanning aid"), the time the event's diary line was written. Unless a rule below gives the event a special body, the body is the one-line text the terminal prints for the same event (the wording rules live in `src/terminal.ts`), with its leading indentation trimmed. For example: the coding agent's [5] actions read as "· <action>" lines, a finished turn [7] as "‹ turn complete", the agent's end as "✓ finished", "■ stopped" or "✗ failed: <detail>", the spend as "spend: $<cost> over N turns", and the agent settling [8] as "◆ done for now — waiting for your next message". An error the agent reported itself keeps its headline and its detail lines. The transcript is monospaced, except for the interactive rows described below, which use the dashboard's regular typeface because they are controls rather than text.
+Each event [2] is one row with three columns: a fixed-width badge column, the row's body, and, on rows that open a group (see "Badges once per group, colored as a scanning aid"), the time the event's diary line was written. Unless a rule below gives the event a special body, the body is the one-line text the terminal prints for the same event (the wording rules live in `src/terminal.ts`), with its leading indentation trimmed. For example: the coding agent's [5] actions read as "· <action>" lines, the agent's end as "✓ finished", "■ stopped", "? waiting for an answer" or "✗ failed: <detail>", and the agent settling [8] as "◆ done for now — waiting for your next message". An error the agent reported itself keeps its headline and its detail lines. The transcript is monospaced, except for the interactive rows described below, which use the dashboard's regular typeface because they are controls rather than text.
 
 ### The conversation reads as messages
 
@@ -62,7 +65,45 @@ Each event [2] is one row with three columns: a fixed-width badge column, the ro
 
 #### Business logic
 
-Two events carry conversation text: the prompt that opens a turn [7] (the user's prompt, or a live chat [9] message) and the agent's reply. Both render as compact Markdown (the rendering rules in `Markdown.tsx`) instead of the terminal's truncated line. A message whose text, with runs of whitespace collapsed to one space, is at most 100 characters renders whole. A longer message is clamped to its first line with a chevron ("›") in front of it; clicking either the chevron or the clamped text expands the same rendered Markdown in place, so the opening is never shown twice, and the chevron turns to point down and folds it back on click. The chevron's accessible name is "Expand message" while folded and "Collapse message" while expanded.
+Two events carry conversation text: the prompt that opens a turn [7] (the user's prompt, or a live chat [9] message) and the agent's reply. Both render as compact Markdown (the rendering rules in `Markdown.tsx`) instead of the terminal's truncated line. A message whose text, with runs of whitespace collapsed to one space, is at most 100 characters renders whole. A longer message is clamped to its first line (unless it is the reply a question follows, see that section) with a chevron ("›") in front of it; clicking either the chevron or the clamped text expands the same rendered Markdown in place, so the opening is never shown twice, and the chevron turns to point down and folds it back on click. The chevron's accessible name is "Expand message" while folded and "Collapse message" while expanded.
+
+### A turn's end and the spend are not rows
+
+#### Context
+
+**Problem**: every turn [7] closed with a "‹ turn complete" row and a "COST" row reading "spend: $…". The agent's details strip (`AgentDetails.tsx`) already counts the turns and totals the spend, so the transcript said it again after every turn.
+
+#### Business logic
+
+The event that ends a turn (the turn's final answer) and the event that reports the spend are never rows, for any agent. The other left-out events are described in "The session id is not a row", "The quota only when it matters" and the next section.
+
+### An end the agent went on after is not a row
+
+#### Context
+
+**Problem**: an agent that is continued (by the user's next message, by an answer, or, for a main agent, by the message saying one of its subagents [16] ended) has one end event per leg. The transcript read "✓ finished" between two turns, and "? waiting for an answer" above the answer. And a main agent ends its turn clean while its subagents still work: "✓ finished" stood over work still going.
+
+#### Business logic
+
+Reading the events in order, an end is not a row when:
+
+- it is clean, or it is waiting on an answer, and a prompt comes after it before any other end: the agent went on. An end waiting on an answer that no prompt follows is a row, whatever the caller says about the agent's job;
+- it is the last end, it is clean or waiting on an answer, and the user has just sent a message that the transcript shows ahead of its own prompt line: that message is the prompt on its way, so the end above it goes at once rather than a few seconds later;
+- it is the last end, it is clean, no prompt follows it, and the caller says the agent's job is still going (the agent view says so while a subagent holds the job, `AgentView.tsx`).
+
+A failed or stopped end is always a row, where it happened: it says why the next prompt was needed. What is written after the last end without a new prompt (a line recorded after the agent ended) leaves that end the agent's end, and a row. So an agent's transcript says "✓ finished" at most once per stretch of clean legs, at the end, and only once nothing more is coming.
+
+### The reply a question follows is shown whole
+
+#### Context
+
+**User story**: the agent writes a plan and then asks the user to approve it. The plan is the reply just above the question, and the user must read it to answer.
+
+**Problem**: a long reply is clamped to its first line, so the user was asked to approve a plan folded to one line.
+
+#### Business logic
+
+In each turn [7], the agent's last reply before a gate [4] is the reply that question follows; a gate in a later turn is not about a reply of the turn before, and a reply earlier in the same turn than the last one is not it either. That reply starts expanded instead of clamped, whether or not the transcript knows its project. The chevron still folds it and opens it again, and the user's click wins from then on. Every other long message is clamped as described in "The conversation reads as messages".
 
 ### Thinking stays folded
 
@@ -159,7 +200,7 @@ The same words in a prompt about an agent that is not one of these subagents, or
 
 #### Business logic
 
-Consecutive rows of the same group share one badge, shown on the group's first row. The group is the event's kind, except that the user's prompt forms its own group apart from the rest of the coding agent's events, so each of the user's turns opens a new group, and that a prompt that is a subagent's [16] end forms a third (see "A subagent's end is not the user's prompt"). The badge word is "you" for the user's prompt, "subagent" for a subagent's end, and otherwise the kind's plain-language label (the label rules in `lib/event-labels.ts`: "agent" for the coding agent's own events, "waiting" for the agent settling [8], "cost" for a usage report, "resume" for a session id update, and every other kind's name with hyphens turned to spaces, such as "choice resolved"); the badge is shown uppercased. The badge column is wide enough for "choice resolved" on one line, and the body column aligns whether or not the row shows a badge.
+Consecutive rows of the same group share one badge, shown on the group's first row. The group is the event's kind, except that the user's prompt forms its own group apart from the rest of the coding agent's events, so each of the user's turns opens a new group, and that a prompt that is a subagent's [16] end forms a third (see "A subagent's end is not the user's prompt"). The badge word is "you" for the user's prompt, "subagent" for a subagent's end, and otherwise the kind's plain-language label (the label rules in `lib/event-labels.ts`: "agent" for the coding agent's own events, "waiting" for the agent settling [8], and every other kind's name with hyphens turned to spaces, such as "choice resolved"); the badge is shown uppercased. The badge column is wide enough for "choice resolved" on one line, and the body column aligns whether or not the row shows a badge.
 
 The badge's color is a navigation aid: a failing row's badge is red and the user's prompt's badge is blue (those two win over everything below); a gate [4] and its resolution are amber, the rows the reader most wants to find; a clean end is green, as a milestone; a pushed surface (a view [11] or a screen [15]) takes the dashboard's primary accent, as the agent showing the user something; every other badge is muted. A stopped or failed end is not a milestone and stays out of green, and the handoff [12] report stays muted because its body may report mixed outcomes.
 

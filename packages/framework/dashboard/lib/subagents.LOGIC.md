@@ -1,4 +1,4 @@
-Everything the dashboard works out about subagents [2] from the list of agents [1] it already reads: which agents are a given agent's subagents, what a subagent is called, whether it is over, how a list of agents becomes a tree with subagents under their main agent, which prompt of a main agent's transcript is really the line saying one of its subagents ended, when a subagent started, and where in that transcript each subagent's row goes. All of it is read off one fact, the parent on a subagent's card.
+Everything the dashboard works out about subagents [2] from the list of agents [1] it already reads: which agents are a given agent's subagents, what a subagent is called, whether it is over, whether it still holds its main agent's job, how a list of agents becomes a tree with subagents under their main agent, which prompt of a main agent's transcript is really the line saying one of its subagents ended, when a subagent started, and where in that transcript each subagent's row goes. All of it is read off one fact, the parent on a subagent's card.
 
 ## Context
 
@@ -21,6 +21,7 @@ Everything the dashboard works out about subagents [2] from the list of agents [
 - **An agent's subagents** - the agents whose card names it as their parent, oldest first.
 - **What a subagent is called** - the first line of what it was asked; else what any agent is called.
 - **Whether a subagent is over** - a subagent that is `running` or `waiting` is not over; any other is.
+- **Whether a subagent holds its main agent's job** - while it is `running`, it is saving, or it ended less than 10 seconds ago, its main agent's job is not over.
 - **A list as a tree** - an agent whose parent is in the list sits under it, oldest first; the tree is one level deep, every other agent keeps its place, and in a list pooling several projects the main agent is looked for in the same project.
 - **A subagent's end among the prompts** - a prompt that opens with the ended line [4] and names one of this agent's subagents is that subagent's end: the subagent, the status, the reason and the rest of the message; any other prompt is the user's.
 - **When a subagent started** - the moment its id [3] was made from, which never changes; the start time on its card only for an id that is no time.
@@ -57,6 +58,16 @@ See `## Context`. The "Recent agents" list keeps a main agent's subagents open w
 #### Business logic
 
 A subagent [2] whose status is `running` (it is working) or `waiting` (it ended on a question, and the answer resumes it) is not over. With any other status it is over.
+
+### Whether a subagent holds its main agent's job
+
+#### Context
+
+**Problem**: a main agent never waits in a process: it ends its turn after starting its subagents [2] and is continued each time one of them ends. So its own record says `done` while the job it was given is still going. And the continuation comes a few seconds after the subagent's card says it ended: for that moment the main agent and all its subagents read as ended, and everything that says "the job is over" (the main agent's row, its status word, its Open PR button) appeared and went away again between the main agent's turns.
+
+#### Business logic
+
+A subagent holds its main agent's job at a given moment when any of these is true: its status is `running`; its card is marked saving (it ended clean and the tool that runs it is still saving its record); or its card has an end time less than 10 seconds before that moment, whatever status it ended with. A subagent that only waits on a question, with no recent end, does not hold it. While at least one subagent holds the job, the "Recent agents" list shows a main agent that is `done` as running (`components/AgentHistory.tsx`), and the main agent's page counts the holding subagents for its status word and its composer's note, offers no next step, and does not show the main agent's last clean end as the end (`components/AgentView.tsx`).
 
 ### A list as a tree
 

@@ -510,6 +510,17 @@ describe('EventList turn ends', () => {
     expect(screen.queryByText(/finished/)).toBeNull()
   })
 
+  test('a message just sent takes the place of the end above it at once, clean or waiting; a failed end stays', () => {
+    const { unmount } = render(<EventList events={[prompt('go'), reply('did it'), end()]} sending="and now this" stick={false} />)
+    expect(screen.queryByText(/finished/)).toBeNull()
+    unmount()
+    render(<EventList events={[prompt('go'), end({ ok: false, waiting: true })]} sending="my answer" stick={false} />)
+    expect(screen.queryByText(/waiting for an answer/)).toBeNull()
+    cleanup()
+    render(<EventList events={[prompt('go'), end({ ok: false, detail: 'boom' })]} sending="try again" stick={false} />)
+    expect(screen.getByText(/failed: boom/)).toBeTruthy()
+  })
+
   test('an end that is not clean stays where it happened, and so does the clean end after it', () => {
     const first = end({ ok: false, detail: 'boom' })
     const stopped = end({ ok: false, stopped: true })

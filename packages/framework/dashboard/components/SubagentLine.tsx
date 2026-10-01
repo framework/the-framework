@@ -34,8 +34,7 @@ export function SubagentLine({
       <button
         type="button"
         onClick={() => onOpen?.(agent.id)}
-        // A long task keeps to half the line, so how the subagent stands is never pushed off it.
-        className="min-w-0 max-w-[55%] shrink truncate text-left text-foreground hover:underline"
+        className="min-w-0 shrink truncate text-left text-foreground hover:underline"
         aria-label={`Open the subagent: ${taskLabel(agent)}`}
       >
         ↳ {taskLabel(agent)}
@@ -44,7 +43,8 @@ export function SubagentLine({
         {working && <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary" aria-hidden />}
         {end ? `ended ${status}` : status}
       </span>
-      {tail && <span className="min-w-0 flex-1 truncate text-muted-foreground">{tail}</span>}
+      {/* The task gives way first: what the subagent is doing keeps up to near half the line. */}
+      {tail && <span className="max-w-[45%] shrink-0 truncate text-muted-foreground">{tail}</span>}
     </span>
   )
 }

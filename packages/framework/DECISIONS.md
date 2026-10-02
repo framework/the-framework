@@ -32,6 +32,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   has no pull requests, and a finished run's last step is Push. Picked over the branches
   package opening the request, which put the git host inside the git skill, and over a git host
   adapter inside it, which made another git host a change to that package.
+- A subagent's page offers no pull request, no merge and no push. It says landed or not
+  landed. Picked over saying nothing in their place.
 - Which package provides a kind of data when several installed packages declare it: the
   project's own package.json says, under the same `framework` key with the package's name
   as the value; several and no line means nothing provides it, and the project's banner

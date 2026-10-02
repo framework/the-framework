@@ -90,6 +90,10 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A run starts from the branch it is told, `run --base <ref>`, written on its record. With
   none, origin's default branch, as before. Picked over a run that always starts from the
   default branch: a run started for another run needs what that run has built so far.
+- A run started with `--base` records the commit its branch was made from, and its changes
+  are measured from it. Picked over the base's name: a branch is renamed, moves on, and is
+  deleted once merged. Picked over recording it for every run: a run from the default
+  branch is measured against that branch as it is now, which stays right after a rebase.
 - The run records itself and reclaims its own checkout when the agent stops; the sweep on
   the tick catches what a dead process left, on this machine only.
 - A run stops on SIGINT or SIGTERM to its process: the agent's process tree is ended, the

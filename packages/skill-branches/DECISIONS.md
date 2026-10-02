@@ -117,6 +117,11 @@ Pushing it too was the earlier rule and was dropped: a cleanup could publish `ma
   it is pushed and merged, what its checkout left uncommitted; its pull request is the
   caller's question. Picked over the package asking the git host, which would have put a
   network call inside every poll.
+- `show` measures a branch from the commit the caller names (`--from`), in place of the
+  default branch. Picked over measuring every branch from the default branch: a branch
+  started from another branch would show that branch's work as its own.
+- `show` reads a full commit id in place of a branch. Picked over a second command for a
+  branch that is gone: the caller wants the same answer.
 - `list` and `show` answer a branch's `name`, the name the agent gave its work: the branch
   minus the package's prefix, and nothing while a checkout is still on the branch it was
   created on. The naming rule stays the package's. Picked over the dashboard cutting the prefix

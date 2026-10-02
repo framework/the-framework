@@ -41,4 +41,8 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   the subagent's branch is deleted here and on origin. Picked over a squash per task, and
   over the skill file telling the agent to merge and delete by hand: a branch left on
   origin makes the main agent's branch look empty, and it is deleted with its checkout.
+- `land` keeps the subagent's last commit, under `refs/landed/<run id>` here and on origin,
+  and on its record. Picked over the commit id alone: git drops the commit once the main
+  agent's branch is squashed and deleted. Picked over saving the list of changed files:
+  the counts would stay and the diffs would go.
 - The main agent opens the one pull request, once every task is landed.

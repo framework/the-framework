@@ -1,6 +1,7 @@
 import { contextAddProject, contextProjectErrors, contextProjects, resolveProjectPath } from './context.js'
 import { readProjectCommands, type ProjectCommand } from '../project-commands.js'
-import { readProjectHooks, runCheckHook, runSwitchHook, type StartReadiness } from '../project-hooks.js'
+import { readProjectHooks, runCheckHook, runPublishHook, runSwitchHook, type StartReadiness } from '../project-hooks.js'
+import { isPublishPick, publishPickIn, type PublishPick } from '../publish-levels.js'
 import { pickDirectory, type PickDirectoryResult } from '../pick-directory.js'
 import { projectGitHost } from '../store/git-host.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
@@ -102,4 +103,21 @@ export async function sendScheduleSwitch(projectId: string, command: string, on:
   const switched = await runSwitchHook(cwd, command, on)
   if (switched.ok) return { ok: true }
   return { ok: false, error: switched.noHook ? 'this project has no switch hook in .the-framework/hooks.yml' : switched.error }
+}
+
+/**
+ * How far one scheduled command's runs publish on this machine: the project's `publish` hook line,
+ * given the pick, or no pick (`null`) for what the project's schedule says. A project with no git
+ * host package can open no pull request: a pull request pick is saved as Publish branch, the
+ * furthest that project goes. The daemon names no tool; the Settings page reads the pick back from
+ * the scheduler's state.
+ */
+export async function sendSchedulePublish(projectId: string, command: string, pick: PublishPick | null): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (pick !== null && !isPublishPick(pick)) return { ok: false, error: 'not a publish pick' }
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return { ok: false, error: 'unknown project' }
+  const capped = pick === null ? undefined : publishPickIn(pick, (await projectGitHost(cwd).catch(() => undefined)) !== undefined)
+  const saved = await runPublishHook(cwd, command, capped)
+  if (saved.ok) return { ok: true }
+  return { ok: false, error: saved.noHook ? 'this project has no publish hook in .the-framework/hooks.yml' : saved.error }
 }

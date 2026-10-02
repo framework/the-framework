@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isPidAlive } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
-import { isPublishLevel, type PublishLevel } from '../publish-levels.js'
+import { isPublishLevel, isPublishPick, type PublishLevel, type PublishPick } from '../publish-levels.js'
+import { projectGitHost, type GitHostFor } from '../store/git-host.js'
 
 // The scheduler card's read (#1774): a projection of `.agent-scheduler/state.json`, the file the
 // scheduler writes per project and per user, exactly as it stands. The dashboard reads the file by
@@ -11,7 +12,8 @@ import { isPublishLevel, type PublishLevel } from '../publish-levels.js'
 // Forgiving like every other read here: a missing, unreadable or malformed file reads as not set
 // up, and a field that is not what the file promises reads as absent. The one thing added on the
 // way out is whether the scheduler's process is alive, which only the operating system knows; and
-// each scheduled command's switch on this machine folded into the list the last tick recorded.
+// each scheduled command's switch and publish pick on this machine folded into the list the last
+// tick recorded.
 
 /** The file the scheduler keeps its state in, at the project's root; per user, hidden from git by the tool. */
 export const SCHEDULER_STATE_FILE = '.agent-scheduler/state.json'
@@ -33,7 +35,7 @@ export interface SchedulerTick {
   note?: string
 }
 
-/** One command of the project's schedule, as the scheduler's last tick read it, with this machine's switch. */
+/** One command of the project's schedule, as the scheduler's last tick read it, with this machine's switch and publish pick. */
 export interface SchedulerCommand {
   command: string
   /** How often at most, as written (`1d`). */
@@ -44,6 +46,8 @@ export interface SchedulerCommand {
   on: boolean
   /** How far a run of the command publishes its work, when the line says: `branch`, `pr` or `merge`. A line that says nothing publishes nothing. */
   publish?: PublishLevel
+  /** This machine's publish pick for the command, which stands in for the line's level; absent when nobody picked here. */
+  publishPick?: PublishPick
 }
 
 /** A project's scheduler as the card shows it. */
@@ -68,6 +72,8 @@ export interface SchedulerState {
 export interface ProjectScheduler extends SchedulerState {
   projectId: string
   projectName: string
+  /** Whether one of the project's packages provides a git host; without one no pull request can be opened, so a publish pick stops at the branch. */
+  gitHost: boolean
 }
 
 const NOT_SET_UP: SchedulerState = { present: false, on: false, keepAlive: false, running: false, commands: [] }
@@ -94,9 +100,11 @@ export async function readSchedulerState(cwd: string, isAlive: (pid: number) => 
   const pid = typeof state['pid'] === 'number' ? state['pid'] : undefined
   const tick = lastTick(state['lastTick'])
   const switches = state['switches'] && typeof state['switches'] === 'object' ? (state['switches'] as Record<string, unknown>) : {}
+  const publishes = state['publishes'] && typeof state['publishes'] === 'object' ? (state['publishes'] as Record<string, unknown>) : {}
   const commands = scheduleLines(state['lastTick']).map(line => {
     const switched = switches[line.command]
-    return { ...line, on: typeof switched === 'boolean' ? switched : line.on }
+    const picked = publishes[line.command]
+    return { ...line, on: typeof switched === 'boolean' ? switched : line.on, ...(isPublishPick(picked) ? { publishPick: picked } : {}) }
   })
   return {
     present: true,
@@ -149,11 +157,13 @@ function lastTick(value: unknown): SchedulerTick | undefined {
 export async function collectSchedulers(
   projects: ProjectSummary[],
   read: (cwd: string) => Promise<SchedulerState> = readSchedulerState,
+  gitHost: GitHostFor = projectGitHost,
 ): Promise<ProjectScheduler[]> {
   const rows: ProjectScheduler[] = []
   for (const project of projects) {
     const state = await read(project.path).catch((): SchedulerState => ({ ...NOT_SET_UP }))
-    rows.push({ projectId: project.id, projectName: project.name, ...state })
+    const host = await gitHost(project.path).catch(() => undefined)
+    rows.push({ projectId: project.id, projectName: project.name, gitHost: host !== undefined, ...state })
   }
   return rows
 }

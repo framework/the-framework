@@ -26,7 +26,8 @@ import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
  * unless a person switched it off there. The switches are per machine, in the tool's state.
  * `publish` says how far a run of the command publishes its work: push its `branch`, open its
  * `pr`, or set the request to `merge` once its checks pass; a line that says nothing publishes
- * nothing, as a person's run does.
+ * nothing, as a person's run does. The level is the team's default: a person may pick another for
+ * one command on their machine, kept in the tool's state like the switches.
  *
  * Every other line — headings, blank lines, prose — is the person's, and is not read. A list line
  * the parser cannot read is skipped and named, so a typo stands down one command and says so

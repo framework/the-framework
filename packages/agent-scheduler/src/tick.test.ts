@@ -122,6 +122,23 @@ test('a line with a publish level: the marker and the spawned run carry it, and 
   ])
 })
 
+test("this machine's publish pick stands in for the line's level on the marker and the spawned run; the recorded schedule still says what the lines say", async () => {
+  const md = '- work-queue: when `npx queue`, publish merge\n- triage quick: every 6h\n- plan-tickets: every 6h, publish pr\n'
+  const { deps: d, seen } = deps({ md, stateOver: { publishes: { 'work-queue': 'nothing', 'triage quick': 'branch' } } })
+  const record = await tick(d)
+  assert.deepEqual(seen.markers.map(m => m.caller), [
+    { runner: { host: 'this-box' }, host: 'this-box' },
+    { runner: { host: 'this-box', publish: 'branch' }, host: 'this-box' },
+    { runner: { host: 'this-box', publish: 'pr' }, host: 'this-box' },
+  ])
+  assert.deepEqual(seen.spawned.map(s => [s.prompt, s.publish]), [['/work-queue', undefined], ['/triage quick', 'branch'], ['/plan-tickets', 'pr']])
+  assert.deepEqual(record.schedule, [
+    { command: 'work-queue', when: 'npx queue', on: true, publish: 'merge' },
+    { command: 'triage quick', every: '6h', on: true },
+    { command: 'plan-tickets', every: '6h', on: true, publish: 'pr' },
+  ])
+})
+
 test('a command with a word after its folder name: the folder is looked up, the whole name is what the switch, the interval, the marker and the decision carry, and the prompt is the name with a slash', async () => {
   const md = '- triage quick: every 6h\n- triage consensual: every 7d\n'
   const looked: string[] = []

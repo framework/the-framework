@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from 'react'
-import { DRIVERS, MAX_SPEND_OFFSET } from '../../src/client.js'
+import { DRIVERS, MAX_SPEND_OFFSET, PUBLISH_LABELS, isPublishPick, offeredPublishPicks, type PublishPick } from '../../src/client.js'
 import { driverOptions, useModels } from '../lib/models.js'
 import { NO_MODEL_PINNED } from '../lib/agent-settings.js'
 import type { DriverOption } from './DriverModelMenu.js'
 import { useQuota } from '../lib/quota.js'
 import { useSpendOffset } from './Quota.js'
 import { onSchedulers } from '../rpc/reads.js'
-import { sendScheduleSwitch } from '../rpc/projects.js'
+import { sendSchedulePublish, sendScheduleSwitch } from '../rpc/projects.js'
 import { usePolled } from '../lib/use-async.js'
 import type { ProjectScheduler, SchedulerCommand } from '../../src/index.js'
 import { useDetectedEditors } from '../lib/editors.js'
@@ -30,7 +30,8 @@ import { cn } from '../lib/utils.js'
 //
 // Everything here writes your own settings, the same on every project: what is a project's own
 // (how a run is started) lives in that project's hooks file, not here. The Automation section's
-// schedule switches are this machine's too, written through each project's `switch` hook.
+// schedule switches and publish picks are this machine's too, written through each project's
+// `switch` and `publish` hooks.
 
 export function SettingsPage({
   onAgentStarted,
@@ -383,47 +384,83 @@ function SpendOffsetSection() {
 const NO_SCHEDULERS: ProjectScheduler[] = []
 
 /**
- * Run on a schedule: one switch per command of each project's schedule (`agent-schedule.md`), as
- * the project's scheduler last read it. On means the scheduler starts the command on this machine
- * when it is due; the switch is this machine's, written through the project's `switch` hook, and
- * what the schedule line says is the default. A project whose scheduler has not ticked yet lists
- * nothing.
+ * Run on a schedule: one row per command of each project's schedule (`agent-schedule.md`), as the
+ * project's scheduler last read it, with a switch and a publish menu. On means the scheduler
+ * starts the command on this machine when it is due; the menu says how far its runs publish on
+ * this machine: what the schedule line says, or the person's pick in its place. Both are this
+ * machine's, written through the project's `switch` and `publish` hooks, and what the schedule
+ * line says is the default. A project whose scheduler has not ticked yet lists nothing.
  */
 function ScheduleSwitchRows() {
   const { value: rows, reload } = usePolled(onSchedulers, NO_SCHEDULERS, 5000, [])
   const [saving, setSaving] = useState<string | undefined>()
   const [error, setError] = useState<string | undefined>()
-  const flip = (projectId: string, command: string, on: boolean): void => {
+  const save = (projectId: string, command: string, what: string, send: Promise<{ ok: true } | { ok: false; error: string }>): void => {
     const key = `${projectId}/${command}`
     setSaving(key)
     setError(undefined)
-    void sendScheduleSwitch(projectId, command, on).then(result => {
+    void send.then(result => {
       setSaving(current => (current === key ? undefined : current))
-      if (!result.ok) setError(`/${command}: ${result.error}`)
+      if (!result.ok) setError(`The ${what} was not saved: /${command}: ${result.error}`)
       reload()
     })
   }
   return (
     <>
       {rows.flatMap(row =>
-        row.commands.map(command => (
-          <ToggleRow
-            key={`${row.projectId}/${command.command}`}
-            label={`Run /${command.command} on a schedule`}
-            description={`${row.projectName} · ${pace(command)} · ${publishes(command)}. On this machine only; agent-schedule.md sets the default, and how far a run publishes.`}
-            checked={command.on}
-            disabled={saving === `${row.projectId}/${command.command}`}
-            onChange={next => flip(row.projectId, command.command, next)}
-          />
-        )),
+        row.commands.map(command => {
+          const label = `Run /${command.command} on a schedule`
+          const busy = saving === `${row.projectId}/${command.command}`
+          return (
+            <Row
+              key={`${row.projectId}/${command.command}`}
+              label={label}
+              description={`${row.projectName} · ${pace(command)} · ${publishes(command)}. On this machine only; agent-schedule.md sets the defaults.`}
+              dimmed={busy}
+              control={
+                <div className="flex items-center gap-3">
+                  <select
+                    value={command.publishPick ?? ''}
+                    disabled={busy}
+                    onChange={e => {
+                      const pick = e.target.value
+                      if (pick === '' || isPublishPick(pick)) save(row.projectId, command.command, 'publish pick', sendSchedulePublish(row.projectId, command.command, pick === '' ? null : pick))
+                    }}
+                    aria-label={`What /${command.command} publishes`}
+                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                  >
+                    <option value="">As the file says ({PUBLISH_LABELS[command.publish ?? 'nothing']})</option>
+                    {publishChoices(row.gitHost, command.publishPick).map(pick => (
+                      <option key={pick} value={pick}>
+                        {PUBLISH_LABELS[pick]}
+                      </option>
+                    ))}
+                  </select>
+                  <Checkbox
+                    checked={command.on}
+                    disabled={busy}
+                    onCheckedChange={next => save(row.projectId, command.command, 'switch', sendScheduleSwitch(row.projectId, command.command, next === true))}
+                    aria-label={label}
+                  />
+                </div>
+              }
+            />
+          )
+        }),
       )}
       {error && (
         <p role="alert" className="text-xs text-danger">
-          The switch was not saved: {error}
+          {error}
         </p>
       )}
     </>
   )
+}
+
+/** The picks a scheduled command's publish menu lists after "As the file says": the ones its project is offered, and the pick already saved when the project is no longer offered it. */
+export function publishChoices(gitHost: boolean, saved: PublishPick | undefined): readonly PublishPick[] {
+  const offered = offeredPublishPicks(gitHost)
+  return saved !== undefined && !offered.includes(saved) ? [...offered, saved] : offered
 }
 
 /** How often a scheduled command runs, in words: its interval, its check, or both. */
@@ -433,11 +470,12 @@ export function pace(command: SchedulerCommand): string {
   return 'when its check finds work'
 }
 
-/** How far a scheduled command's runs publish, in words: what its schedule line says, nothing when it says none. */
+/** How far a scheduled command's runs publish on this machine, in words: the person's pick here, else what its schedule line says, nothing when it says none. */
 export function publishes(command: SchedulerCommand): string {
-  if (command.publish === 'branch') return 'publishes its branch'
-  if (command.publish === 'pr') return 'opens a pull request'
-  if (command.publish === 'merge') return 'opens a pull request that merges on green'
+  const level = command.publishPick ?? command.publish
+  if (level === 'branch') return 'publishes its branch'
+  if (level === 'pr') return 'opens a pull request'
+  if (level === 'merge') return 'opens a pull request that merges on green'
   return 'publishes nothing'
 }
 

@@ -4,7 +4,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@gemstack/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, withSwitch } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, withSwitch, publishInForce, withPublish } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
@@ -75,4 +75,29 @@ test('a scheduler ending clears its own pid only: a pid another scheduler wrote 
   const theirs: State = { ...mine, pid: 200 }
   assert.deepEqual(withoutPid(theirs, 100), theirs, 'the next scheduler keeps its pid')
   assert.deepEqual(withoutPid({ ...DEFAULT_STATE, on: true }, 100), { ...DEFAULT_STATE, on: true })
+})
+
+test("a publish pick stands in for the line's level until it is taken back, even when it says what the line says", () => {
+  // Nobody picked: the line decides, and a line that says nothing publishes nothing.
+  assert.equal(publishInForce(DEFAULT_STATE, { name: 'work-queue', publish: 'merge' }), 'merge')
+  assert.equal(publishInForce(DEFAULT_STATE, { name: 'triage quick' }), undefined)
+
+  const picked = withPublish(withPublish(DEFAULT_STATE, 'work-queue', 'nothing'), 'triage quick', 'pr')
+  assert.deepEqual(picked.publishes, { 'work-queue': 'nothing', 'triage quick': 'pr' })
+  assert.equal(publishInForce(picked, { name: 'work-queue', publish: 'merge' }), undefined)
+  assert.equal(publishInForce(picked, { name: 'triage quick' }), 'pr')
+  // Another command is still its line's.
+  assert.equal(publishInForce(picked, { name: 'post-merge-cleanup', publish: 'branch' }), 'branch')
+
+  // A pick that says what the line says is kept: the line may change, the pick stays.
+  const same = withPublish(DEFAULT_STATE, 'work-queue', 'merge')
+  assert.deepEqual(same.publishes, { 'work-queue': 'merge' })
+  assert.equal(publishInForce(same, { name: 'work-queue', publish: 'branch' }), 'merge')
+
+  // A hand-edited state with a word that is no pick: the line decides.
+  assert.equal(publishInForce({ ...DEFAULT_STATE, publishes: { 'work-queue': 'push' as never } }, { name: 'work-queue', publish: 'merge' }), 'merge')
+
+  const back = withPublish(withPublish(picked, 'work-queue', undefined), 'triage quick', undefined)
+  assert.equal('publishes' in back, false)
+  assert.equal(publishInForce(back, { name: 'work-queue', publish: 'merge' }), 'merge')
 })

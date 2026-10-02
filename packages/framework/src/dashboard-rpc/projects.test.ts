@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { addProject } from '../registry.js'
 import { projectErrorStore } from '../project-errors.js'
 import { provideTestContext } from './test-context.js'
-import { onProjects, sendScheduleSwitch } from './projects.js'
+import { onProjects, sendSchedulePublish, sendScheduleSwitch } from './projects.js'
 
 // Against the real registry, pointed at a temp $XDG_CONFIG_HOME so the user's own is never touched.
 async function registered(): Promise<{ dir: string; restore: () => Promise<void> }> {
@@ -58,6 +58,32 @@ test("sendScheduleSwitch runs the project's switch line with the command and on 
     assert.deepEqual(await sendScheduleSwitch(project!.id, 'post-merge-cleanup', true), { ok: true })
     assert.equal(await readFile(join(dir, 'switched.txt'), 'utf8'), 'post-merge-cleanup on')
     assert.deepEqual(await sendScheduleSwitch('no-such-project', 'post-merge-cleanup', false), { ok: false, error: 'unknown project' })
+  } finally {
+    await restore()
+  }
+})
+
+test("sendSchedulePublish runs the project's publish line with the command and the pick, `file` for none; a pull request pick in a project with no git host is saved as the branch; no line, a word that is no pick and an unknown project are said", async () => {
+  const { dir, restore } = await registered()
+  try {
+    provideTestContext({})
+    const [project] = await onProjects()
+    assert.deepEqual(await sendSchedulePublish(project!.id, 'work-queue', 'nothing'), { ok: false, error: 'this project has no publish hook in .the-framework/hooks.yml' })
+    await mkdir(join(dir, '.the-framework'))
+    await writeFile(join(dir, '.the-framework', 'hooks.yml'), `publish: 'printf "%s %s" "$COMMAND" "$PUBLISH" > published.txt'\n`)
+    const saved = (): Promise<string> => readFile(join(dir, 'published.txt'), 'utf8')
+    assert.deepEqual(await sendSchedulePublish(project!.id, 'work-queue', 'nothing'), { ok: true })
+    assert.equal(await saved(), 'work-queue nothing')
+    assert.deepEqual(await sendSchedulePublish(project!.id, 'work-queue', 'branch'), { ok: true })
+    assert.equal(await saved(), 'work-queue branch')
+    // This project has no git host package: it can open no pull request.
+    assert.deepEqual(await sendSchedulePublish(project!.id, 'work-queue', 'merge'), { ok: true })
+    assert.equal(await saved(), 'work-queue branch')
+    assert.deepEqual(await sendSchedulePublish(project!.id, 'work-queue', null), { ok: true })
+    assert.equal(await saved(), 'work-queue file')
+    assert.deepEqual(await sendSchedulePublish(project!.id, 'work-queue', 'push' as never), { ok: false, error: 'not a publish pick' })
+    assert.equal(await saved(), 'work-queue file', 'a word that is no pick runs no line')
+    assert.deepEqual(await sendSchedulePublish('no-such-project', 'work-queue', 'pr'), { ok: false, error: 'unknown project' })
   } finally {
     await restore()
   }

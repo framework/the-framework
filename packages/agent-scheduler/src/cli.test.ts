@@ -55,7 +55,7 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
   const repo = await testRepo()
   const elsewhere = await mkdtemp(join(tmpdir(), 'not-a-repo-'))
   try {
-    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['init', 'extra'], ['run', 'Read the docs'], ['check'], ['switch', 'work-queue'], ['switch', 'work-queue', 'maybe']]) {
+    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['init', 'extra'], ['run', 'Read the docs'], ['check'], ['switch', 'work-queue'], ['switch', 'work-queue', 'maybe'], ['publish', 'work-queue'], ['publish', 'work-queue', 'push']]) {
       const bad = await run(repo, ...argv)
       assert.equal(bad.code, 2, argv.join(' '))
       assert.equal(bad.out, undefined)
@@ -123,6 +123,36 @@ test('switch writes this machine\'s switch for a scheduled command; a command wi
     assert.equal((await readState(repo)).switches, undefined)
 
     const unknown = await run(repo, 'switch', 'triage-quick', 'on')
+    assert.equal(unknown.code, 1)
+    assert.deepEqual(unknown.out, { ok: false, reason: 'not-scheduled', command: 'triage-quick' })
+    assert.equal(unknown.err, 'agent-schedule.md has no line for triage-quick')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('publish writes this machine\'s publish pick for a scheduled command, and `file` takes it back; a command with no line, or no schedule, is refused', async () => {
+  const repo = await testRepo()
+  try {
+    const none = await run(repo, 'publish', 'work-queue', 'pr')
+    assert.equal(none.code, 1)
+    assert.deepEqual(none.out, { ok: false, reason: 'no-schedule' })
+
+    await writeFile(join(repo, 'agent-schedule.md'), '- work-queue: when `npx queue`, publish merge\n- triage quick: every 6h\n')
+    const nothing = await run(repo, 'publish', 'work-queue', 'nothing')
+    assert.equal(nothing.code, 0)
+    assert.deepEqual((nothing.out as { publishes: unknown }).publishes, { 'work-queue': 'nothing' })
+    await run(repo, 'publish', 'triage quick', 'pr')
+    assert.deepEqual((await readState(repo)).publishes, { 'work-queue': 'nothing', 'triage quick': 'pr' })
+    // A pick that says what the line says is kept all the same.
+    await run(repo, 'publish', 'work-queue', 'merge')
+    assert.deepEqual((await readState(repo)).publishes, { 'work-queue': 'merge', 'triage quick': 'pr' })
+    // Back to the file: nothing kept.
+    await run(repo, 'publish', 'work-queue', 'file')
+    await run(repo, 'publish', 'triage quick', 'file')
+    assert.equal((await readState(repo)).publishes, undefined)
+
+    const unknown = await run(repo, 'publish', 'triage-quick', 'pr')
     assert.equal(unknown.code, 1)
     assert.deepEqual(unknown.out, { ok: false, reason: 'not-scheduled', command: 'triage-quick' })
     assert.equal(unknown.err, 'agent-schedule.md has no line for triage-quick')

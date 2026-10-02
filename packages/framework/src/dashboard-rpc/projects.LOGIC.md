@@ -1,4 +1,4 @@
-Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder), the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], whether an agent can be started there at all, whether a pull request can be opened there, and what would stop an agent before it is started; and switching one of the project's scheduled commands on or off on this machine, through the project's switch hook [9].
+Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder), the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], whether an agent can be started there at all, whether a pull request can be opened there, and what would stop an agent before it is started; switching one of the project's scheduled commands on or off on this machine, through the project's switch hook [9]; and setting how far that command's runs publish on this machine, through the project's publish hook [12].
 
 ## Context
 
@@ -18,6 +18,8 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 [8] check hook: the one shell line under `check` in a project's `.the-framework/hooks.yml`, which the daemon runs when the launcher asks what would stop an agent; it answers a list of problems and a list of warnings.
 [9] switch hook: the one shell line under `switch` in a project's `.the-framework/hooks.yml`, which the daemon runs with a scheduled command's name and `on` or `off` when the user sets that command's schedule switch [10].
 [10] schedule switch: a person's choice, on one machine, whether a scheduled command (a line of the project's `agent-schedule.md`) runs there; the project's scheduler keeps it in its state file, and the schedule line is the default where nobody switched the command.
+[11] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: nothing, the branch, a pull request, or a pull request set to merge on its own once its checks pass; the project's scheduler keeps it in its state file, where it stands in for the level the command's line in `agent-schedule.md` says until the person takes it back.
+[12] publish hook: the one shell line under `publish` in a project's `.the-framework/hooks.yml`, which the daemon runs with a scheduled command's name and a publish pick [11], or `file` for none, when the user sets or takes back that command's publish pick.
 
 ## Business logic — TL;DR
 
@@ -28,6 +30,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 - **What the launcher offers** - the project's commands [3], read off its skills folders, whether its hooks file has a start hook [7], and whether one of its packages provides a git host; an unknown project answers nothing.
 - **What would stop an agent** - the project's check hook [8], run with the coding agent the user picked: its problems and its warnings; a check hook that fails is one warning; no check hook, or an unknown project, answers nothing.
 - **A schedule switch** - the project's switch hook [9], run with the command and `on` or `off`: done, or the error in words; a project with no switch hook, and an unknown project, are each an error.
+- **A publish pick** - the project's publish hook [12], run with the command and the publish pick [11], or `file` for none: done, or the error in words; a pull request pick in a project with no git host package is saved as the branch; a value that is no pick, a project with no publish hook, and an unknown project are each an error.
 
 ## Business logic
 
@@ -112,3 +115,15 @@ For a given project [1] and, when the user picked one, a coding agent, the daemo
 #### Business logic
 
 For a given project [1], a scheduled command's name and on or off, the daemon runs the project's switch hook [9] (`project-hooks.ts`), with the name in `COMMAND` and `on` or `off` in `SWITCH`, and answers done when it exits 0. Otherwise it answers an error in words: "unknown project" for a project id that names no registered project; "this project has no switch hook in .the-framework/hooks.yml" when the hooks file has no `switch` line; otherwise the hook's own error ("the switch hook: <what it said>", or the reason a broken hooks file was ignored).
+
+### A publish pick
+
+#### Context
+
+**User story**: in Settings → Automation the user picks "Open PR" in the menu on the row "Run /work-queue on a schedule" for a project whose tracked schedule says `publish merge`, and from then on that project's scheduler starts the command's runs on this machine at "open the pull request"; picking "As the file says" there follows the schedule again. The rows come from the scheduler's state (`../dashboard/scheduler-state.ts`).
+
+**Problem**: the daemon names no tool; the publish pick [11] lives in the scheduler's own state, which only the project's line knows how to write. And a project with no git host package can open no pull request, so a pick that asks for one there would be a level the run cannot reach.
+
+#### Business logic
+
+For a given project [1], a scheduled command's name and either a publish pick [11] (`nothing`, `branch`, `pr` or `merge`) or no pick, the daemon runs the project's publish hook [12] (`project-hooks.ts`), with the name in `COMMAND` and the pick in `PUBLISH`, `file` for no pick, and answers done when it exits 0. Before the hook runs, a pick of `pr` or `merge` in a project where no package provides a git host is replaced by `branch`, the furthest that project goes, the same rule the launcher's Start follows (`../publish-levels.ts`); no pick is passed on as it is. Otherwise it answers an error in words: "not a publish pick" for a value that is neither a pick nor no pick, with no hook run; "unknown project" for a project id that names no registered project; "this project has no publish hook in .the-framework/hooks.yml" when the hooks file has no `publish` line; otherwise the hook's own error ("the publish hook: <what it said>", or the reason a broken hooks file was ignored).

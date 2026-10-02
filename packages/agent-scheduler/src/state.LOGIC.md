@@ -2,19 +2,21 @@ The state [1]: one JSON file under `.agent-scheduler/` at the repository root, w
 
 ## Context
 
-**User story**: the user turns the scheduler on and off, picks the model and the spend cushion for their own machine, turns a scheduled command on or off for their own machine with its schedule switch [3], and reads what the last tick [2] decided per command, in one file a dashboard can show as it is; a machine restart, or a crashed scheduler, leaves all of it in place.
+**User story**: the user turns the scheduler on and off, picks the model and the spend cushion for their own machine, turns a scheduled command on or off for their own machine with its schedule switch [3], changes how far a scheduled command's runs publish on their own machine with its publish pick [4], and reads what the last tick [2] decided per command, in one file a dashboard can show as it is; a machine restart, or a crashed scheduler, leaves all of it in place.
 
 ## Glossary
 
 [1] the state: `.agent-scheduler/state.json` at the repository root, per user, hidden from git through the repository's exclude file.
 [2] tick: one pass of the scheduler: pull the `agent-data` branch, sweep, then one decision per scheduled command, each decision one line in the state.
 [3] schedule switch: a person's choice, on one machine, whether a scheduled command runs there, by the command's name as its schedule line writes it (`triage quick`); kept in the state, not in the schedule (`agent-schedule.md`). The schedule line is the default where nobody switched the command: on, unless the line says `off`.
+[4] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: `nothing`, or one of the levels a schedule line may say (`branch`, `pr`, `merge`); kept in the state, not in the schedule. It stands in for the `publish` clause of the command's schedule line until the person takes it back.
 
 ## Business logic — TL;DR
 
 - **A schedule switch per machine** - a command's schedule switch [3] is kept only where it differs from its schedule line, and switching it back to what the line says removes it; a command nobody switched runs as its line says.
+- **A publish pick per machine** - a command's publish pick [4] is kept until the person takes it back, even when it says what its schedule line says; while it is there it decides how far the command's runs publish on this machine, `nothing` meaning no level; a command nobody picked for publishes as its line says.
 - **A scheduler ending clears only its own pid** - the pid and the start time are removed only when the pid is the ending process's; a pid the next scheduler wrote meanwhile stays.
-- **What the state holds** - `on`, `keepAlive`, `model`, `spendOffset`, `switches`, the scheduler's `pid` and `startedAt` while its process runs, and `lastTick`: when, one decision per command (`command`, `outcome`, `run` when one started), the schedule's commands as the tick read them, and a `note` when the tick decided nothing.
+- **What the state holds** - `on`, `keepAlive`, `model`, `spendOffset`, `switches`, `publishes`, the scheduler's `pid` and `startedAt` while its process runs, and `lastTick`: when, one decision per command (`command`, `outcome`, `run` when one started), the schedule's commands as the tick read them, and a `note` when the tick decided nothing.
 - **The defaults** - off, no keep-alive, `opus`, a spend cushion of 100/14 points; a missing file, and a file that does not parse, read as the defaults with nothing else, so a corrupt state never stops a tick.
 - **Writing** - every write creates the directory, hides `/.agent-scheduler` through the exclude file (best-effort: a repository whose exclude file cannot be written still has a scheduler), and writes the whole file; an edit is one read, one change, one write.
 
@@ -28,7 +30,7 @@ See `## Context`.
 
 #### Business logic
 
-`on`: whether ticks start agents; off by default, so nothing runs until a person says so. `keepAlive`: whether the scheduler's process outlives whatever started it; written by `start --keep-alive` and read by `stop --unless-keep-alive` only, the line a dashboard runs when it closes. `model`: the model every scheduled run starts on, passed to each run the tick starts; a run started any other way is not given it. `spendOffset`: how far past the spend boundary a run may still start, in percentage points. `switches`: this machine's schedule switch [3] per command, `true` or `false` by the command's name, present only when at least one command is switched away from its line. `pid` and `startedAt`: the scheduler's own process and when it started, present only while `start` has one running. `lastTick`: the last tick's ISO time, its decisions, one per command with the command's name, one outcome line for a person (`started <id>`, `not due`, `not due (last start 2h ago, every 6h)`, `cap reached (…)`, `quota: …`, …) and the run's id when one was started, `schedule`: the schedule's commands as the tick read them, each with its name (`command`), its interval as written (`every`, `1d`) when it has one, its check (`when`) when it has one, how far its runs publish (`publish`: `branch`, `pr` or `merge`) when its line says so, and `on`, what its line says rather than this machine's schedule switch, absent when there is no schedule; and a `note` when the tick decided nothing (`off`, `no agent-schedule.md`, `agent-data could not be pulled: …`).
+`on`: whether ticks start agents; off by default, so nothing runs until a person says so. `keepAlive`: whether the scheduler's process outlives whatever started it; written by `start --keep-alive` and read by `stop --unless-keep-alive` only, the line a dashboard runs when it closes. `model`: the model every scheduled run starts on, passed to each run the tick starts; a run started any other way is not given it. `spendOffset`: how far past the spend boundary a run may still start, in percentage points. `switches`: this machine's schedule switch [3] per command, `true` or `false` by the command's name, present only when at least one command is switched away from its line. `publishes`: this machine's publish pick [4] per command, `nothing`, `branch`, `pr` or `merge` by the command's name, present only when at least one command has a pick. `pid` and `startedAt`: the scheduler's own process and when it started, present only while `start` has one running. `lastTick`: the last tick's ISO time, its decisions, one per command with the command's name, one outcome line for a person (`started <id>`, `not due`, `not due (last start 2h ago, every 6h)`, `cap reached (…)`, `quota: …`, …) and the run's id when one was started, `schedule`: the schedule's commands as the tick read them, each with its name (`command`), its interval as written (`every`, `1d`) when it has one, its check (`when`) when it has one, how far its runs publish (`publish`: `branch`, `pr` or `merge`) when its line says so, and `on`, what its line says rather than this machine's schedule switch, absent when there is no schedule; and a `note` when the tick decided nothing (`off`, `no agent-schedule.md`, `agent-data could not be pulled: …`).
 
 ### A schedule switch per machine
 
@@ -39,6 +41,20 @@ See `## Context`.
 #### Business logic
 
 Switching a command takes the command's name, the value wanted (on or off) and what its schedule line says. When the value wanted is what the line says, the command's entry is removed from `switches`; otherwise the entry is set to the value wanted. A `switches` left empty is removed from the state. So a command switched back to its line leaves no trace, and a line changed later in the tracked file is the default again on every machine that never switched that command. Whether a command runs on this machine is its entry in `switches` when it has one, else what its line says.
+
+### A publish pick per machine
+
+#### Context
+
+**User story**: the tracked schedule says `- work-queue: when \`npx queue\`, cap 1, publish merge`, the team's default; one person wants the queue's runs on their own machine to open a pull request and leave the merge to them, and another wants a routine whose line says nothing to push its branch from their machine. Each sets the command's publish pick [4] on their own machine, from `agent-scheduler publish` or a dashboard's Settings page, and the tracked file never changes.
+
+**Problem**: a schedule switch is forgotten when it says what the line says. A publish pick is not: a person who picked `nothing` for a line that says nothing must still publish nothing after a teammate writes `publish merge` on that line.
+
+#### Business logic
+
+Setting a command's publish pick takes the command's name and the pick, `nothing`, `branch`, `pr` or `merge`: the command's entry in `publishes` is set to it, whatever its schedule line says. Taking the pick back removes the entry. A `publishes` left empty is removed from the state.
+
+How far a run of a command publishes on this machine: when the command has an entry in `publishes`, that entry, `nothing` meaning the run is given no level and publishes nothing; otherwise the `publish` clause of its schedule line, and no level when the line has none. An entry that is none of the four picks, in a state file edited by hand, counts as no entry. So a line changed later in the tracked file changes nothing on a machine holding a pick for that command, and is followed again there once the pick is taken back.
 
 ### A scheduler ending clears only its own pid
 

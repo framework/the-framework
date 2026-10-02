@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import type { GitHostSource } from '../store/git-host.js'
 import { SCHEDULER_STATE_FILE, collectSchedulers, loosestSpendOffset, readSchedulerState } from './scheduler-state.js'
 import type { ProjectSummary } from './projects.js'
 
@@ -64,10 +65,11 @@ test('a tick that decided nothing carries its note; keep-alive and no pid read a
   }
 })
 
-test("each scheduled command reads with this machine's switch, else what its line says; a line of the wrong shape is left out", async () => {
+test("each scheduled command reads with this machine's switch, else what its line says, and with this machine's publish pick when it has one; a line of the wrong shape is left out", async () => {
   const cwd = await projectWith(JSON.stringify({
     on: true,
     switches: { 'post-merge-cleanup': true, 'triage-quick': false, 'work-queue': 'yes' },
+    publishes: { 'work-queue': 'nothing', 'post-merge-cleanup': 'pr', 'plan-tickets': 'push', 'no-such-line': 'merge' },
     lastTick: {
       at: 't',
       decisions: [],
@@ -84,9 +86,10 @@ test("each scheduled command reads with this machine's switch, else what its lin
   try {
     assert.deepEqual((await readSchedulerState(cwd, () => true)).commands, [
       // A switch that is not a boolean is no switch. The publish level is the line's; a word that is no level is left out.
-      { command: 'work-queue', when: 'npx queue', on: true, publish: 'merge' },
+      // This machine's pick rides beside the line's level, never in its place; a word that is no pick is no pick.
+      { command: 'work-queue', when: 'npx queue', on: true, publish: 'merge', publishPick: 'nothing' },
       { command: 'triage-quick', every: '6h', on: false },
-      { command: 'post-merge-cleanup', every: '1d', on: true },
+      { command: 'post-merge-cleanup', every: '1d', on: true, publishPick: 'pr' },
       { command: 'plan-tickets', every: '6h', on: false },
     ])
   } finally {
@@ -111,16 +114,20 @@ test('no file, a file that does not parse, a file of the wrong shape, and a tick
   }
 })
 
-test('collectSchedulers gives one row per registered project, in registry order, a failing read as not set up', async () => {
+test('collectSchedulers gives one row per registered project, in registry order, a failing read as not set up, each with whether the project has a git host', async () => {
   const project = (id: string): ProjectSummary => ({ id, path: `/${id}`, name: id, activated: true })
   const rows = await collectSchedulers([project('a'), project('b'), project('c')], async cwd => {
     if (cwd === '/b') throw new Error('unreadable')
     return { present: true, on: cwd === '/a', keepAlive: false, running: cwd === '/a', model: 'opus', commands: [] }
+  }, async cwd => {
+    // Only `a` has a git host package; a lookup that fails reads as none.
+    if (cwd === '/c') throw new Error('unreadable')
+    return cwd === '/a' ? ({} as GitHostSource) : undefined
   })
   assert.deepEqual(rows, [
-    { projectId: 'a', projectName: 'a', present: true, on: true, keepAlive: false, running: true, model: 'opus', commands: [] },
-    { projectId: 'b', projectName: 'b', ...NOT_SET_UP },
-    { projectId: 'c', projectName: 'c', present: true, on: false, keepAlive: false, running: false, model: 'opus', commands: [] },
+    { projectId: 'a', projectName: 'a', gitHost: true, present: true, on: true, keepAlive: false, running: true, model: 'opus', commands: [] },
+    { projectId: 'b', projectName: 'b', gitHost: false, ...NOT_SET_UP },
+    { projectId: 'c', projectName: 'c', gitHost: false, present: true, on: false, keepAlive: false, running: false, model: 'opus', commands: [] },
   ])
 })
 

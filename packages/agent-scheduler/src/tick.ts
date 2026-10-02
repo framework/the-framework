@@ -7,7 +7,7 @@ import type { RunCard } from '@gemstack/skill-logs'
 import { COMMANDS_DIR } from './names.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
 import { commandPrompt, commandSkill, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
-import { isSwitchedOn, type ScheduleLine, type State, type TickDecision, type TickRecord } from './state.js'
+import { isSwitchedOn, publishInForce, type ScheduleLine, type State, type TickDecision, type TickRecord } from './state.js'
 
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
@@ -125,8 +125,9 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     }
     const id = deps.mint()
     const prompt = commandPrompt(command.name)
-    // The line's publish level, when it has one, goes on the marker and to the run: the agent is told it after its prompt.
-    const publish = command.publish !== undefined ? { publish: command.publish } : {}
+    // The publish level in force, this machine's pick else the line's, goes on the marker and to the run: the agent is told it after its prompt.
+    const level = publishInForce(deps.state, command)
+    const publish = level !== undefined ? { publish: level } : {}
     const mark: RunnerMark = { host: deps.host, ...publish }
     const marked = await deps.writeMarker(markerCard({ id, startedAt: deps.now().toISOString(), prompt, driver: deps.driver, model: deps.state.model, mark }))
     if (!marked.ok) {
@@ -155,7 +156,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
   return record
 }
 
-/** A command as a dashboard lists it: what the line says, not this machine's switch, which the state carries. */
+/** A command as a dashboard lists it: what the line says, not this machine's switch or publish pick, which the state carries. */
 function scheduleLine(command: ScheduledCommand): ScheduleLine {
   return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), on: command.on, ...(command.publish !== undefined ? { publish: command.publish } : {}) }
 }

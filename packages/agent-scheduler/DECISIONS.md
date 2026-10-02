@@ -44,8 +44,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   clock (empty runs). A list line the parser cannot read is skipped and named, never
   guessed.
 - A schedule line may say `publish <branch|pr|merge>`; a line that says nothing publishes
-  nothing, as a person's run does. In the tracked schedule, like the cap, because the level
-  is the team's. Picked over a per-machine setting in the state file.
+  nothing, as a person's run does. The line is the team's default, in the tracked schedule
+  like the cap. A person may override it for one command on their machine, in the state file
+  like the on/off switch; Settings → Automation shows the level in force and changes it.
+  Picked over the level being the file's alone, where changing it on one machine meant
+  editing a tracked file.
 - A schedule line paces a command two ways, alone or together: `when` says there is work
   (the check's output), `every` says how often at most (the least time since the command's
   last recorded start, read off the run records on the branch, so every machine agrees and

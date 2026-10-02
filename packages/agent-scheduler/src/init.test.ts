@@ -14,7 +14,7 @@ test('a project the dashboard knows, with no hooks file, gets the scheduler\'s l
   await mkdir(join(repo, '.the-framework'))
   try {
     const outcome = await initHooks(repo)
-    assert.deepEqual(outcome, { ok: true, file: join(repo, '.the-framework', 'hooks.yml'), added: ['open', 'close', 'offset', 'switch'], kept: [] })
+    assert.deepEqual(outcome, { ok: true, file: join(repo, '.the-framework', 'hooks.yml'), added: ['open', 'close', 'offset', 'switch', 'publish'], kept: [] })
     assert.deepEqual(parse(await readFile(join(repo, '.the-framework', 'hooks.yml'), 'utf8')), HOOK_LINES)
   } finally {
     await rm(repo, { recursive: true, force: true })

@@ -4,7 +4,7 @@ One tick [1]: pull the `agent-data` branch [2], sweep [3], read the schedule [4]
 
 **User story**: every minute the user's scheduler looks at the schedule; when the queue holds work and nothing is running it, one agent starts; the user reads in the state, per command, `started <id>`, `not due`, `cap reached (1 in flight: <id> on <host>)`, `not ready: …` (Claude Code missing or logged out, with the command that fixes it), `quota: …`, `no such command in this project` or `switched off on this machine`; a schedule line with a typo shows as `line 3: unreadable: …` while the other lines still run.
 
-**Business logic story**: this file decides with every reading handed to it (the pull, the sweep, the command's existence, the state's schedule switches [12], the check, the in-flight markers, the coding agent's readiness, the quota, the marker writes, the spawn); `scheduler.ts` wires it to the real project. The marker is `agent-runner`'s, the rule for which command a run counts for `records.ts`'s, the due rule `schedule.ts`'s, the headroom rule `quota-boundary.ts`'s.
+**Business logic story**: this file decides with every reading handed to it (the pull, the sweep, the command's existence, the state's schedule switches [12] and publish picks [14], the check, the in-flight markers, the coding agent's readiness, the quota, the marker writes, the spawn); `scheduler.ts` wires it to the real project. The marker is `agent-runner`'s, the rule for which command a run counts for `records.ts`'s, the due rule `schedule.ts`'s, the headroom rule `quota-boundary.ts`'s.
 
 ## Glossary
 
@@ -16,16 +16,17 @@ One tick [1]: pull the `agent-data` branch [2], sweep [3], read the schedule [4]
 [6] cap: how many runs of one command may be in flight at once, across every machine that shares the repository.
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [8] run: one agent this tool starts: a detached process of `agent-runner` (`agent-runner run`), a checkout, one prompt to the coding agent, and a run record when it ends.
-[9] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, the model, the spend cushion, this machine's schedule switches [12], the last tick's decisions.
+[9] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, the model, the spend cushion, this machine's schedule switches [12] and publish picks [14], the last tick's decisions.
 [10] marker: a run record written before the agent exists: `status: running`, `agent-runner`'s mark, an empty diary.
 [11] check: the shell command a schedule line puts after `when`, run at the repository root; its output says whether the command is due.
 [12] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the schedule. The schedule line is the default where nobody switched the command: on, unless the line says `off`.
 [13] publish level: how far a run of a command publishes its work, said by the `publish` clause of its schedule line: `branch` (push the branch and open no pull request), `pr` (push the branch and open its pull request) or `merge` (push the branch and open its pull request, set to merge on its own once its checks pass). A line that says nothing publishes nothing.
+[14] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: `nothing`, or one of the levels a schedule line may say (`branch`, `pr`, `merge`); kept in the state, not in the schedule. It stands in for the `publish` clause of the command's schedule line until the person takes it back.
 
 ## Business logic — TL;DR
 
 - **Before any decision** - the branch is pulled; a pull that fails ends the tick with the note `agent-data could not be pulled: <error>`, since a stale branch must start nothing; the sweep runs; a state that is off ends the tick with the note `off`; no schedule file ends it with `no agent-schedule.md`.
-- **The schedule as read** - every tick record carries the schedule's commands, each with its name, its interval as written, its check, whether its line runs it where nobody switched it, and its publish level [13] when the line says one; this machine's schedule switches [12] are not in it; absent when there is no schedule file.
+- **The schedule as read** - every tick record carries the schedule's commands, each with its name, its interval as written, its check, whether its line runs it where nobody switched it, and its publish level [13] when the line says one; this machine's schedule switches [12] and publish picks [14] are not in it; absent when there is no schedule file.
 - **Unreadable lines** - each is one decision under `line <N>` with `unreadable: <text>`.
 - **Per command, in order** - `no such command in this project`; `switched off on this machine` when this machine's schedule switch [12], else the line, says off, and no check runs; for a line with an interval, `not due (last start <age> ago, every <interval>)` while the command's last recorded start on any machine is younger than the interval, and no check runs; for a line with a check, `check failed: <last line of stderr>` or `not due`; `cap reached (<N> in flight: <id> on <host>, …)`; `not ready: <problems>`; `quota: <reason>`; `not started: the scheduler was stopped` when a stop came in during the readings; then the marker, the re-count, and `started <id>` or `could not start: <error>`; the marker and the spawned run carry the line's publish level [13] when it has one.
 - **Two machines** - a marker whose push was rejected twice is withdrawn: `another machine got there first: <error>`; a marker that landed but ranks past the cap among the in-flight ids in time order is withdrawn: `cap reached (…)` naming the others.
@@ -49,11 +50,11 @@ The tick's time is the clock's now. The `agent-data` branch is pulled first; whe
 
 #### Context
 
-**User story**: the dashboard's Settings page lists one schedule switch [12] per scheduled command of every project; the dashboard names no tool and does not read `agent-schedule.md`, so it lists what the scheduler's last tick recorded.
+**User story**: the dashboard's Settings page lists one schedule switch [12] and one publish menu per scheduled command of every project, the menu naming what the command's line says beside this machine's publish pick [14]; the dashboard names no tool and does not read `agent-schedule.md`, so it lists what the scheduler's last tick recorded.
 
 #### Business logic
 
-Every tick record, whatever its note (a failed pull, `off`), carries `schedule`: one entry per readable command of the schedule, in the file's order, with the command's name (`command`), its interval as written (`every`, `1d`) when the line has one, its check (`when`) when the line has one, `on`: what the line says, `false` for a line with `off`, and `publish`: the line's publish level [13], when the line says one. This machine's schedule switches [12] are not folded in: the state carries them beside the tick. With no schedule file, the record has no `schedule`.
+Every tick record, whatever its note (a failed pull, `off`), carries `schedule`: one entry per readable command of the schedule, in the file's order, with the command's name (`command`), its interval as written (`every`, `1d`) when the line has one, its check (`when`) when the line has one, `on`: what the line says, `false` for a line with `off`, and `publish`: the line's publish level [13], when the line says one. This machine's schedule switches [12] and publish picks [14] are not folded in: the state carries them beside the tick, so a reader has both what the line says and what this machine chose. With no schedule file, the record has no `schedule`.
 
 ### Unreadable lines
 
@@ -82,9 +83,9 @@ Once the command passed its schedule switch (step 2 below), when the line carrie
 6. Whether the coding agent can start on this machine is read, once per tick and only now (`agent-runner`'s `readyToRun`); an answer with problems gives `not ready: <the problems, joined by a space>`, nothing is marked and the quota is not read, and every later command of this tick sees the same answer without a second read. Warnings change nothing here.
 7. The quota is read, once per tick and only now, and measured against the spend boundary with the state's model and spend cushion; a reading that fails or is not available counts as unknown. No headroom gives `quota: <the headroom rule's reason>`, and every later command of this tick sees the same answer without a second read.
 8. The scheduler has not been told to stop while the readings above ran, or the outcome is `not started: the scheduler was stopped`: a stopped scheduler starts nothing, and the readings are where a tick spends its seconds.
-9. A run id is minted from the clock, the prompt is `/<command>` (the whole name, `/triage quick`), and a marker [10] is written: a running card with the prompt, the driver's id, the state's model, and `agent-runner`'s mark naming this host and, when the line has one, the line's publish level [13] (no pid: the run's process does not exist yet; no command: the prompt is what the run counts by).
+9. A run id is minted from the clock, the prompt is `/<command>` (the whole name, `/triage quick`), and a marker [10] is written: a running card with the prompt, the driver's id, the state's model, and `agent-runner`'s mark naming this host and the publish level [13] in force, when there is one: this machine's publish pick [14] for the command when it has one (`nothing` being no level), else the line's level (no pid: the run's process does not exist yet; no command: the prompt is what the run counts by).
 10. The re-count, below.
-11. The run is spawned detached with the id, the prompt, the model and, when the line has one, the line's publish level [13], which `agent-runner` tells the agent in one sentence after the prompt; a run of a line that says nothing is given no level and publishes nothing; the outcome is `started <id>` and the decision carries the id as its `run`; a spawn that throws gives `could not start: <the error>`, and the marker stays for the sweep to end on the next tick.
+11. The run is spawned detached with the id, the prompt, the model and the publish level [13] in force, the one on the marker, which `agent-runner` tells the agent in one sentence after the prompt; a run with no level in force (its line says nothing and this machine has no publish pick [14] for it, or the pick is `nothing`) is given no level and publishes nothing; the outcome is `started <id>` and the decision carries the id as its `run`; a spawn that throws gives `could not start: <the error>`, and the marker stays for the sweep to end on the next tick.
 
 ### Two machines
 

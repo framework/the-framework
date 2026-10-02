@@ -3,8 +3,8 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
 import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
-import { updateState, withSwitch } from './state.js'
-import { readSchedule } from './schedule.js'
+import { PUBLISH_PICKS, updateState, withPublish, withSwitch, type PublishPick } from './state.js'
+import { readSchedule, type ScheduledCommand } from './schedule.js'
 
 /**
  * The command line: JSON on stdout, one line for a person on stderr, and the exit code says how
@@ -22,6 +22,8 @@ export const USAGE = `usage: agent-scheduler <command>
   model <id>                    the model every scheduled run starts on (this user)
   offset <points>               how far past the spend boundary a run may still start (this user)
   switch <command> <on|off>     whether a command of agent-schedule.md runs on this machine, the command as its line names it (quoted when it has a word after it); what a dashboard's switch hook runs
+  publish <command> <file|nothing|branch|pr|merge>
+                                how far this machine's runs of a command of agent-schedule.md publish, in place of what its line says; file takes the pick back; what a dashboard's publish hook runs
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
 
@@ -132,12 +134,27 @@ const COMMANDS: Record<string, Command> = {
     const [name, to] = positionals as [string, string]
     if (to !== 'on' && to !== 'off') throw new Usage(`${to} is neither on nor off`)
     const repo = await project(io.cwd, git)
-    const schedule = await readSchedule(repo)
-    if (!schedule) throw new Refused({ ok: false, reason: 'no-schedule' }, 'no agent-schedule.md in this repository')
-    const command = schedule.commands.find(c => c.name === name)
-    if (!command) throw new Refused({ ok: false, reason: 'not-scheduled', command: name }, `agent-schedule.md has no line for ${name}`)
+    const command = await scheduled(repo, name)
     return { ok: true, ...(await updateState(repo, s => withSwitch(s, name, to === 'on', command.on), git)) }
   },
+
+  async publish(args, io, git) {
+    const { positionals } = parse(args, {}, 2)
+    const [name, to] = positionals as [string, string]
+    if (to !== 'file' && !(PUBLISH_PICKS as readonly string[]).includes(to)) throw new Usage(`${to} is none of file, ${PUBLISH_PICKS.join(', ')}`)
+    const repo = await project(io.cwd, git)
+    await scheduled(repo, name)
+    return { ok: true, ...(await updateState(repo, s => withPublish(s, name, to === 'file' ? undefined : (to as PublishPick)), git)) }
+  },
+}
+
+/** The schedule's line for a command; refused where the repository has no schedule or the schedule no such line. */
+async function scheduled(repo: string, name: string): Promise<ScheduledCommand> {
+  const schedule = await readSchedule(repo)
+  if (!schedule) throw new Refused({ ok: false, reason: 'no-schedule' }, 'no agent-schedule.md in this repository')
+  const command = schedule.commands.find(c => c.name === name)
+  if (!command) throw new Refused({ ok: false, reason: 'not-scheduled', command: name }, `agent-schedule.md has no line for ${name}`)
+  return command
 }
 
 /** The project the working directory belongs to, even from inside a checkout under `.branches/`. */

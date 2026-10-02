@@ -19,8 +19,8 @@ What an agent [2] left behind, as the user meets it in the agent's action bar: a
 ## Business logic — TL;DR
 
 - **The one-line verdict** - what the branch holds, in a phrase: "branch gone" (or "no changes" when the agent changed nothing), "merged", "no changes", or the commit and file counts with the lines added and removed, plus "pushed" for a branch on the remote with no pull request; a subagent's [5] verdict says neither, and a landed one whose last commit is not on this machine has no verdict.
-- **A subagent: landed or not landed** - a subagent is offered no "Publish & Open PR", no "Merge PR" and no "Push"; where the button would be, the bar says "landed" once its main agent landed its work and "not landed" while its branch holds commits that are not landed; work it left uncommitted is still named.
-- **The next step, or why there is none** - once the agent has stopped: "Publish & Open PR", or "Merge PR" for an open pull request, or "Push" where the project has no git host package, or one sentence saying why nothing can be pressed; never a button the git host would refuse, and nothing at all while the pull request lookup is still out.
+- **A subagent: landed or not landed** - a subagent is offered no "Open PR", no "Merge PR" and no "Publish branch"; where the button would be, the bar says "landed" once its main agent landed its work and "not landed" while its branch holds commits that are not landed; work it left uncommitted is still named.
+- **The next step, or why there is none** - once the agent has stopped: "Open PR" with "Publish branch" in the menu beside it, or "Merge PR" for an open pull request, or "Publish branch" alone where the project has no git host package, or one sentence saying why nothing can be pressed; never a button the git host would refuse, and nothing at all while the pull request lookup is still out.
 - **The lists behind the disclosure** - the commits (up to 6), the changed files (up to 10) and the uncommitted files (up to 10), the rest counted as "and N more"; shown only when there is something to list.
 
 ## Business logic
@@ -47,11 +47,11 @@ For a subagent [5] the verdict is the same, with two differences. No "· pushed"
 
 See the second user story in `## Context`.
 
-**Problem**: "Publish & Open PR" on a subagent would open a pull request for a part of the work, beside the one opened from its main agent's branch for the whole. "Branch gone — nothing to open a PR from." on a landed subagent would read as lost work.
+**Problem**: "Open PR" on a subagent would open a pull request for a part of the work, beside the one opened from its main agent's branch for the whole. "Branch gone — nothing to open a PR from." on a landed subagent would read as lost work.
 
 #### Business logic
 
-Shown once the agent has ended, in the place of the next step [1] (the caller's decision, in `AgentView.tsx`). A subagent is offered no button, whatever its branch holds: not "Publish & Open PR", not "Merge PR" even when its branch has an open pull request, not "Push" even where the project has no git host package. Nothing is rendered until the read of the branch has answered. Then, the first rule that applies:
+Shown once the agent has ended, in the place of the next step [1] (the caller's decision, in `AgentView.tsx`). A subagent is offered no button, whatever its branch holds: not "Open PR", not "Merge PR" even when its branch has an open pull request, not "Publish branch" even where the project has no git host package. Nothing is rendered until the read of the branch has answered. Then, the first rule that applies:
 
 - The daemon's read says the subagent is landed: "landed".
 - The branch is gone, or carries no commit beyond the commit the subagent's own work begins at: nothing when the checkout [3] holds no uncommitted files; otherwise the same "Nothing committed — <files> left uncommitted." sentence as for any other agent (below), since nothing lands uncommitted work.
@@ -63,7 +63,7 @@ The line does not wait for the pull request lookup: no rule of a subagent's read
 
 #### Context
 
-**User story**: an agent [2] has ended and its work is on this machine only, as the work of every agent nobody asked to publish is; publishing the work to a shared remote under the user's name should be one deliberate click, offered without being looked for, on a button that says it publishes. And an agent that shows no control says why only when it left something the user may act on; an agent that changed nothing shows nothing, since an agent with work always shows its button.
+**User story**: an agent [2] has ended and its work is on this machine only, as the work of every agent nobody asked to publish is; publishing the work to a shared remote under the user's name should be one deliberate click, offered without being looked for, beside words that say nothing is published yet. Most often the user wants the pull request; sometimes only the branch on the remote, with no pull request yet. And an agent that shows no control says why only when it left something the user may act on; an agent that changed nothing shows nothing, since an agent with work always shows its button.
 
 **Problem**: opening a second pull request for a branch that already has one is the one mistake this must not make. Once a pull request exists, the bar links it and the interventions [4] feed has picked it up.
 
@@ -75,10 +75,10 @@ Shown once the agent has ended (the caller's decision, in `AgentView.tsx`); an a
 - The branch is gone: "Branch gone — nothing to open a PR from.", or nothing when the daemon marks it as belonging to an agent that changed nothing.
 - The branch carries no commit beyond the base: nothing when the checkout [3] holds no uncommitted files; otherwise "Nothing committed — <files> left uncommitted.", where <files> names the first two paths, joined by a comma, followed by "and <N> more" for the rest; hovering the sentence shows every path, one per line. No button: GitHub would refuse a pull request with no commits, and the named work is what the user's next message to the agent should have it commit.
 - The repository has no remote: "No remote to push to."
-- The project has no git host package: nothing can open a pull request for it, so the last step is the push. A branch not yet on the remote reads "not published" and gets one button, "Push", reading "Pushing…" while it is in flight; a branch already pushed gets "Pushed — no git host package to open a pull request with." and no button.
-- Otherwise one button, "Publish & Open PR", reading "Publishing…" while it is in flight. Opening a pull request pushes the branch on the way, so no separate push button competes with it, and the button names the push too: nothing left this machine before the click. While the branch is not on the remote, "not published" is said before the button: an agent publishes nothing by itself, so work still only on this machine is the usual answer and must not read as silence.
+- The project has no git host package: nothing can open a pull request for it, so the last step is the push. A branch not yet on the remote reads "not published" and gets one plain button, "Publish branch", reading "Publishing…" while it is in flight; a branch already pushed gets "Pushed — no git host package to open a pull request with." and no button.
+- Otherwise a split button. Its main part, "Open PR", pushes the branch and opens its pull request, reading "Opening PR…" while that is in flight. Its second part, a down arrow labelled "More ways to publish", opens a menu with one item, "Publish branch", which pushes the branch and opens no pull request; the main part reads "Publishing…" while that is in flight. The push alone is in the menu, never a second button beside the first: the pull request is what the user most often wants. Once the branch is on the remote the menu has nothing left to offer, so "Open PR" stands alone, with no arrow. While the branch is not on the remote, "not published" is said before the button: an agent publishes nothing by itself, so work still only on this machine is the usual answer and must not read as silence, and "Open PR" does not itself say that it pushes.
 
-A reason is capped in width and truncated with an ellipsis, so a long file name never widens the row. Both buttons are disabled while an action is in flight. A failed action reports "Could not merge the pull request.", "Could not open the pull request." or "Could not push the branch." unless the daemon answered with a more specific error, and the reason reaches the bar's summary line beside the verdict rather than nothing happening. After an action succeeds, the branch is read again so the bar shows the new state.
+A reason is capped in width and truncated with an ellipsis, so a long file name never widens the row. Every button, and the arrow, is disabled while an action is in flight. A failed action reports "Could not merge the pull request.", "Could not open the pull request." or "Could not push the branch." unless the daemon answered with a more specific error, and the reason reaches the bar's summary line beside the verdict rather than nothing happening. After an action succeeds, the branch is read again so the bar shows the new state.
 
 ### The lists behind the disclosure
 

@@ -2,7 +2,7 @@ Everything of The Framework that executes in Node: the `the-framework` command, 
 
 ## Context
 
-**User story**: the user runs one command in a repository, and from then on works entirely in the dashboard: they pick one of the project's commands [4] or type what they want, an agent [2] does it in a checkout [5] of its own, stops when it has a question, and leaves its work committed on its branch, on this machine; nothing is published until the user says so, with the agent page's "Publish & Open PR" button or by asking the agent. Everything they see about an agent — live, or read back months later — is read from the agent's own files.
+**User story**: the user runs one command in a repository, and from then on works entirely in the dashboard: they pick one of the project's commands [4] or type what they want, an agent [2] does it in a checkout [5] of its own, stops when it has a question, and leaves its work committed on its branch, on this machine; nothing is published until the user says so, with the agent page's "Open PR" button or by asking the agent. Everything they see about an agent — live, or read back months later — is read from the agent's own files.
 
 **Business logic story**: The Framework runs no agent. Pressing Start runs the project's start hook [3], one shell line the project itself names, and whatever tool that line names begins the agent and owns it from there. The daemon never learns what that tool is: it reads the agent's card [6] and diary [7] off disk to show the agent, writes a line into the agent's inbox [8] when the user says something to it, runs the resume hook [9] when the agent has already ended, and signals the agent's own process to stop it.
 

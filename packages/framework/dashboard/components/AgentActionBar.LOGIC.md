@@ -53,7 +53,7 @@ See `## Context`.
 At the end of the row, in order:
 
 - the count of errors the agent [1] hit (`AgentErrorCount.tsx`), kept here with the controls rather than among the branch facts because a count is only useful when it is whole and the facts give up width;
-- the next step [2], passed in by the caller once the agent has ended ("Publish & Open PR", or "Merge PR", or the reason there is nothing to press; for a subagent, an agent started for another agent, no button, and "landed" or "not landed" in its place, `AgentHandoff.tsx`): the one control that moves the work forward, so it stays visible instead of going into the menu;
+- the next step [2], passed in by the caller once the agent has ended ("Open PR", or "Merge PR", or the reason there is nothing to press; for a subagent, an agent started for another agent, no button, and "landed" or "not landed" in its place, `AgentHandoff.tsx`): the one control that moves the work forward, so it stays visible instead of going into the menu;
 - the "⋮" menu (`AgentActionsMenu.tsx`) with every other action.
 
 ### Facts shown together

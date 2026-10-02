@@ -2,7 +2,7 @@ The `github` skill [1]: the project's git host [2] is GitHub, and this package i
 
 ## Context
 
-**User story**: an agent whose task or person asked for a pull request, or asked it to publish its work, pushes its branch as its branches skill says, then runs `npx github open --title … --body …` and the user finds a pull request open for it; with `--merge`, the request lands by itself once its checks pass. An agent nobody asked opens nothing: its work stays on this machine until the user publishes it. The dashboard shows a run's pull request, the Human Queue's open requests and the "Open on GitHub" link, and its "Publish & Open PR" and "Merge PR" buttons work, all through this one command, so a project on another git host swaps the package and nothing else.
+**User story**: an agent whose task or person asked for a pull request, or asked it to publish its work, pushes its branch as its branches skill says, then runs `npx github open --title … --body …` and the user finds a pull request open for it; with `--merge`, the request lands by itself once its checks pass. An agent nobody asked opens nothing: its work stays on this machine until the user publishes it. The dashboard shows a run's pull request, the Human Queue's open requests and the "Open on GitHub" link, and its "Open PR" and "Merge PR" buttons work, all through this one command, so a project on another git host swaps the package and nothing else.
 
 ## Glossary
 

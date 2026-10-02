@@ -4,12 +4,12 @@ A read-through cache for the dashboard's slow reads: the pull request facts that
 
 **User story**: the user opens an agent [1] in the dashboard and sees the agent's branch and its pull request in the git status bar and in the handoff [2] summary of its agent view [3], and the same row on project home [4]; the page re-reads those rows every few seconds. Reading a pull request is a run of the git host provider's command, hundreds of milliseconds where the git facts beside it take around ten, so without this cache every panel would wait on the git host on every poll and the same answer would be bought several times over.
 
-**Problem**: a caller deciding whether to offer "Publish & Open PR" must never mistake "not known yet" for "there is no pull request", or it opens a second one. The cache therefore answers with two facts: the value, and whether a read is still running with no value known yet.
+**Problem**: a caller deciding whether to offer "Open PR" must never mistake "not known yet" for "there is no pull request", or it opens a second one. The cache therefore answers with two facts: the value, and whether a read is still running with no value known yet.
 
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[2] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself only when its task or the person asks; on a finished agent's page the "Publish & Open PR" and "Merge" buttons do it by hand.
+[2] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself only when its task or the person asks; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
 [3] agent view: one agent's page.
 [4] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
 
@@ -67,7 +67,7 @@ A fetch that fails is not cached. When a value was already known, it stays exact
 
 #### Context
 
-**Business logic story**: opening a pull request or merging one (`agent-handoff.ts`) changes the answer for that branch immediately, and a cached "no pull request" would keep the git status bar offering "Publish & Open PR" for up to a minute.
+**Business logic story**: opening a pull request or merging one (`agent-handoff.ts`) changes the answer for that branch immediately, and a cached "no pull request" would keep the git status bar offering "Open PR" for up to a minute.
 
 #### Business logic
 

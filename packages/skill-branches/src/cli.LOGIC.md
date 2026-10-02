@@ -2,7 +2,7 @@ Gives an agent [1] in a shell, the user, and the dashboard's server the `branche
 
 ## Context
 
-**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, `npx branches name <name>` to name its work, and, when its task or the person asks it to publish its work, `npx branches push` to push it, as its `branches` skill [3] instructs. The user runs `create`, `attach`, `list`, `remove` and `prune` from the project's checkout or from inside any agent's checkout. The dashboard's server runs `list` and `show` to show a run's checkout and what its branch holds, `push --branch` when the user presses "Push" on a finished run, or "Publish & Open PR", whose first half is this push, and `remove`, with `--discard` for a run the user throws away. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
+**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, `npx branches name <name>` to name its work, and, when its task or the person asks it to publish its work, `npx branches push` to push it, as its `branches` skill [3] instructs. The user runs `create`, `attach`, `list`, `remove` and `prune` from the project's checkout or from inside any agent's checkout. The dashboard's server runs `list` and `show` to show a run's checkout and what its branch holds, `push --branch` when the user picks "Publish branch" on a finished run, or presses "Open PR", whose first half is this push, and `remove`, with `--discard` for a run the user throws away. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
 
 ## Glossary
 
@@ -140,7 +140,7 @@ See `## Context`.
 
 #### Context
 
-**User story**: an agent [1] asked to publish its work has committed it and its checkout [2] is clean; it runs `npx branches push` and its branch is on `origin`, where the next skill it reads takes it from. A run ended without pushing, as every run nobody asked to publish does; the user presses "Push", or "Publish & Open PR" whose first half is this push, on its page, and the branch the run worked on reaches the remote, whether or not its checkout is still on disk.
+**User story**: an agent [1] asked to publish its work has committed it and its checkout [2] is clean; it runs `npx branches push` and its branch is on `origin`, where the next skill it reads takes it from. A run ended without pushing, as every run nobody asked to publish does; the user picks "Publish branch", or presses "Open PR" whose first half is this push, on its page, and the branch the run worked on reaches the remote, whether or not its checkout is still on disk.
 
 #### Business logic
 

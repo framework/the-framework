@@ -38,7 +38,7 @@ Carries out every action the user takes on an agent [1] or a project from the da
 - **Deleting an agent** - refused while the agent is still going; the checkout goes with whatever it holds, the finished agent's record goes through the runs provider [26], and its branch stays.
 - **Opening a checkout in the file manager or an editor** - a local command against the agent's own checkout, or the project's; the editor is the one the preferences name, else the environment's, else VS Code.
 - **Opening a pull request** - a subagent (an agent started for another agent, which lands its work) is refused; the agent's existing pull request is returned when it has one; a gone branch or an agent that committed nothing is refused; otherwise the branch is pushed through the branches provider [30] and its pull request opened through the git host provider [31], ready for review, and the pull request is recorded on the finished agent through the runs provider [26].
-- **Pushing** - an ended agent's branch is pushed through the branches provider [30], the last step where the project has no git host; an agent still going has no Push.
+- **Pushing** - an ended agent's branch is pushed through the branches provider [30] and no pull request is opened; an agent still going is refused.
 - **Merging** - an ended agent's open pull request is landed through the git host provider [31], and "already merged" is an answer, not an action; an agent still going has no Merge.
 - **Controlling the bridge browser** - show, hide or restart; anything else is refused.
 - **Actions about a relayed agent go to the device** - stop, a message, an answer, open pull request and merge are forwarded to the device that runs the agent; start, remove, delete and everything local-only never are.
@@ -143,11 +143,11 @@ The agent must be known in a known project, by a path-safe id, else the answer i
 
 #### Context
 
-**User story**: on a project with no git host package, an agent has ended and the user pushes its branch with one button: the work is on the remote, and that is the handoff's end there.
+**User story**: an agent has ended and the user picks "Publish branch" on its page: the work is on the remote and no pull request is opened. On a project with no git host package that is the handoff's end.
 
 #### Business logic
 
-Same target rule ("unknown session"). An agent that is still running has no Push: it is still writing its branch, and the call answers "that session is still going". For an agent that has ended, its recorded branch is pushed through the branches provider [30] (`dashboard/agent-handoff.ts`), under the agent's lock so the push cannot race a removal of the same checkout: refused when the agent recorded no branch ("this session recorded no branch to push") or the project has no branches provider; the provider's own refusal is the answer.
+Same target rule ("unknown session"). An agent that is still running is refused: it is still writing its branch, and the call answers "that session is still going". For an agent that has ended, its recorded branch is pushed through the branches provider [30] (`dashboard/agent-handoff.ts`), under the agent's lock so the push cannot race a removal of the same checkout: refused when the agent recorded no branch ("this session recorded no branch to push") or the project has no branches provider; the provider's own refusal is the answer.
 
 ### Merging
 

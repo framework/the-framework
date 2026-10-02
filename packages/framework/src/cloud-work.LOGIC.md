@@ -16,7 +16,7 @@ Cloud work adoption [1]: the sweep [2] that, once per tick [3] of the daemon's c
 [6] run: only the record of one finished agent, as the project's runs provider answers it (`store/runs.ts`): a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
 [7] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it, which is how the daemon recognises that branch as the agent's.
 [11] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[12] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself only when its task or the person asks; on a finished agent's page the "Publish & Open PR" and "Merge" buttons do it by hand. A web agent's record may say what its handoff was armed to do: push, open a pull request, merge.
+[12] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself only when its task or the person asks; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand. A web agent's record may say what its handoff was armed to do: push, open a pull request, merge.
 
 ## Business logic — TL;DR
 
@@ -79,7 +79,7 @@ The matched branch's whole pull request history is listed through the project's 
 
 #### Business logic
 
-When the listing succeeded and found no pull request, the agent [5] ended done, its handoff [12] was armed for a pull request, and the branch's head is beyond the anchor itself (so the session committed something), a draft pull request is opened for the remote branch through the project's branches provider and git host provider, with the same title and body rules as the "Publish & Open PR" button, draft so that a pull request The Framework opens by itself never puts a review request in anyone's inbox (`dashboard/agent-handoff.ts`). A failure to open it is reported as "could not open the armed draft PR for <branch>: <error>" and the branch is still recorded. An agent not armed for a pull request gets its branch recorded and nothing else.
+When the listing succeeded and found no pull request, the agent [5] ended done, its handoff [12] was armed for a pull request, and the branch's head is beyond the anchor itself (so the session committed something), a draft pull request is opened for the remote branch through the project's branches provider and git host provider, with the same title and body rules as the "Open PR" button, draft so that a pull request The Framework opens by itself never puts a review request in anyone's inbox (`dashboard/agent-handoff.ts`). A failure to open it is reported as "could not open the armed draft PR for <branch>: <error>" and the branch is still recorded. An agent not armed for a pull request gets its branch recorded and nothing else.
 
 ### Recording onto the run
 

@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import type { AgentHandoff } from '../../src/index.js'
-import { GitMerge, GitPullRequest, Upload } from 'lucide-react'
+import { ChevronDown, GitMerge, GitPullRequest, Upload } from 'lucide-react'
 import { sendMerge, sendOpenPullRequest, sendPush } from '../rpc/control.js'
 import type { AgentHandoffState } from '../lib/use-agent-handoff.js'
 import { cn } from '../lib/utils.js'
 import { DiffStat } from './DiffStat.js'
-import { Button } from './ui/button.js'
+import { Button, buttonVariants } from './ui/button.js'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu.js'
 
 // The end-of-session handoff (#799): what this session produced, and the next step offered rather
 // than described. Before this, a finished session showed no branch, no commits and no diff, so
@@ -67,7 +68,7 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
  * What is left once a session has ended: its work is on this machine only, since an agent pushes
  * and opens its pull request only when its task or the person asks, and this is how a person
  * publishes it. Both put the agent's work on a shared remote under the user's name, so it is a
- * deliberate click, and the button says so: it publishes. They sit in the
+ * deliberate click, and "not published" beside the button says nothing left yet. They sit in the
  * bar rather than behind the disclosure, because the point of the handoff is to be offered without
  * being looked for. Once a PR exists neither shows — the bar links the PR, and the interventions
  * queue (#632) has picked it up by then.
@@ -124,6 +125,7 @@ export function HandoffActions({
   // reader's next step is to have the session commit it (the composer is right below).
   if (handoff.empty) return <Uncommitted paths={handoff.pendingFiles ?? []} />
   if (!handoff.hasRemote) return <Reason>No remote to push to.</Reason>
+  const push = () => act('push', () => sendPush(projectId, agentId), 'Could not push the branch.')
   // No git host package (#1820): nothing opens a pull request for this project, so the last step is
   // the push, and a pushed branch is where the handoff ends.
   if (!handoff.gitHost) {
@@ -131,29 +133,51 @@ export function HandoffActions({
     return (
       <>
         <NotPublished />
-        <Button size="xs" disabled={busy} onClick={() => act('push', () => sendPush(projectId, agentId), 'Could not push the branch.')}>
+        <Button size="xs" disabled={busy} onClick={push}>
           <Upload className="h-3.5 w-3.5" />
-          {pending === 'push' ? 'Pushing…' : 'Push'}
+          {pending === 'push' ? 'Publishing…' : 'Publish branch'}
         </Button>
       </>
     )
   }
-  // One button, not two (#1173). "Push branch" and "Open PR" sat side by side as equals, and
-  // nobody could say what pushing without a PR was for — a control nobody can
-  // explain is a control nobody should have to read. Opening a PR pushes the branch on the way,
-  // so the one that names the outcome is the one that stays, and it names the push too: nothing
-  // left this machine before the click.
+  // A split button: "Open PR" names the outcome and pushes the branch on the way, and the menu
+  // beside it holds the push alone, for work that should reach the remote with no pull request
+  // yet. Once the branch is pushed the menu has nothing left to offer, so the button stands alone.
   return (
     <>
       {!handoff.pushed && <NotPublished />}
-      <Button
-        size="xs"
-        disabled={busy}
-        onClick={() => act('pr', () => sendOpenPullRequest(projectId, agentId), 'Could not open the pull request.')}
-      >
-        <GitPullRequest className="h-3.5 w-3.5" />
-        {pending === 'pr' ? 'Publishing…' : 'Publish & Open PR'}
-      </Button>
+      <span className="inline-flex">
+        <Button
+          size="xs"
+          className={cn(!handoff.pushed && 'rounded-r-none')}
+          disabled={busy}
+          onClick={() => act('pr', () => sendOpenPullRequest(projectId, agentId), 'Could not open the pull request.')}
+        >
+          <GitPullRequest className="h-3.5 w-3.5" />
+          {pending === 'pr' ? 'Opening PR…' : pending === 'push' ? 'Publishing…' : 'Open PR'}
+        </Button>
+        {!handoff.pushed && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              type="button"
+              aria-label="More ways to publish"
+              disabled={busy}
+              className={cn(
+                buttonVariants({ size: 'xs' }),
+                'rounded-l-none border-l border-[var(--color-primary-foreground)]/30 px-1 data-[popup-open]:bg-[var(--color-primary)] data-[popup-open]:text-[var(--color-primary-foreground)] data-[popup-open]:opacity-90',
+              )}
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[10rem]">
+              <DropdownMenuItem onClick={push}>
+                <Upload className="h-3.5 w-3.5" />
+                Publish branch
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </span>
     </>
   )
 }

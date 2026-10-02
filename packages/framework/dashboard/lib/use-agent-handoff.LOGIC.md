@@ -2,14 +2,14 @@ Reads what an agent's [1] branch holds once its work has stopped — the commits
 
 ## Context
 
-**User story**: an agent ends, or ends waiting [3] on a question, and its page offers the one step that moves the work forward: "Publish & Open PR" when the branch has commits and a remote, "Merge PR" once a pull request exists, "Push" where the project has no git host package. While that step runs the button says what it is doing ("Publishing…", "Merging…", "Pushing…"), and when it fails the reason is shown instead of the button silently doing nothing. The summary above the button says what the branch holds, and expanding it lists the commits and files.
+**User story**: an agent ends, or ends waiting [3] on a question, and its page offers the one step that moves the work forward: "Open PR" when the branch has commits and a remote, "Merge PR" once a pull request exists, "Publish branch" for the push alone. While that step runs the button says what it is doing ("Opening PR…", "Merging…", "Publishing…"), and when it fails the reason is shown instead of the button silently doing nothing. The summary above the button says what the branch holds, and expanding it lists the commits and files.
 
 **Problem**: the same facts are needed in two places at once — the summary line and the actions in the action bar, and the commits and files the bar expands. Read separately they disagree with each other and cost twice the traffic.
 
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[2] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself only when its task or the person asks; on a finished agent's page the "Push", "Publish & Open PR" and "Merge" buttons do it by hand.
+[2] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself only when its task or the person asks; on a finished agent's page the "Publish branch", "Open PR" and "Merge" buttons do it by hand.
 [3] waiting: how an agent that ended on a question reads: not working, its checkout kept, resumed by the answer or by the user's next message.
 [4] project: a repository the user registered in the dashboard, identified by an id derived from its path.
 
@@ -43,7 +43,7 @@ The branch is read only while the agent is not running: an agent that has ended 
 
 #### Business logic
 
-The branch state is re-read every 15 seconds. While the answer says the pull request lookup has not finished — which is what holds the "Publish & Open PR" offer back — it is re-read every 0.3 seconds instead, so the offer appears as soon as the lookup lands. The cadence returns to 15 seconds once the lookup has answered.
+The branch state is re-read every 15 seconds. While the answer says the pull request lookup has not finished — which is what holds the "Open PR" offer back — it is re-read every 0.3 seconds instead, so the offer appears as soon as the lookup lands. The cadence returns to 15 seconds once the lookup has answered.
 
 ### The last answer stays on screen
 
@@ -59,11 +59,11 @@ A read that fails leaves the last answer in place; the next read usually succeed
 
 #### Context
 
-**User story**: clicking "Publish & Open PR" must show that something is happening. A button that only greys out looks broken, especially when opening a pull request takes several seconds.
+**User story**: clicking "Open PR" must show that something is happening. A button that only greys out looks broken, especially when opening a pull request takes several seconds.
 
 #### Business logic
 
-Three steps can be carried out from here: opening the pull request (which pushes the branch on the way), merging it, and, where the project has no git host, pushing the branch alone. While one is in flight, that specific step is named, so the button reads "Publishing…", "Merging…" or "Pushing…", and every step's button is unavailable until it finishes. Only one step is ever in flight.
+Three steps can be carried out from here: opening the pull request (which pushes the branch on the way), merging it, and pushing the branch alone. While one is in flight, that specific step is named, so the button reads "Opening PR…", "Merging…" or "Publishing…", and every step's button is unavailable until it finishes. Only one step is ever in flight.
 
 ### A step that succeeds re-reads the branch at once
 

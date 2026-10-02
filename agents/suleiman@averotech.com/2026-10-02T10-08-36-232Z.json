@@ -6,7 +6,6 @@
   "intent": "Hand test. Change nothing, commit nothing, run no command. Reply with the single word ok.",
   "driver": "claude-code",
   "model": "claude-opus-5-5",
-  "branch": "agent-2026-10-02T10-08-36-232Z",
   "cost": 0.0423802,
   "caller": {
     "runner": {

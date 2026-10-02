@@ -148,7 +148,7 @@ function HumanQueue({
                       }
                     >
                       <GitBranch className="h-4 w-4 shrink-0 text-info" />
-                      <span className="shrink-0 text-xs font-medium text-info">Unpushed</span>
+                      <span className="shrink-0 text-xs font-medium text-info">Not published</span>
                       <span className="truncate text-sm font-medium">{item.title}</span>
                       {/* An unknown count says nothing rather than the contradictory "0 commits". */}
                       {item.commits !== undefined && item.commits > 0 && (
@@ -158,7 +158,7 @@ function HumanQueue({
                       )}
                       <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.projectName}</span>
                     </TooltipTrigger>
-                    <TooltipContent>{`Open the session: work on ${item.branch ?? ''} was never pushed`}</TooltipContent>
+                    <TooltipContent>{`Open the session: work on ${item.branch ?? ''} is not published`}</TooltipContent>
                   </Tooltip>
                 ) : (
                   <Tooltip>

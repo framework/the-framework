@@ -40,13 +40,14 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   prompt once, and the agent's own loop to the end. No system prompt, no gates, no
   steering: the command's skill file is the whole instruction. Picked over carrying The
   Framework's run child over: its flow is the dashboard's, not a scheduled run's.
-- The agent publishes its own work through the skills in its checkout; the run reads the
-  pull request back off the branch for the record, through the command the project's git host
-  package declares, never through a git host's own client. Picked over the run opening the
+- The agent publishes its own work, when asked to, through the skills in its checkout; the
+  run publishes nothing, and reads the pull request back off the branch for the record,
+  through the command the project's git host package declares, never through a git host's
+  own client. Picked over the run opening the
   request from the branch's commits, and over the agent leaving a title and body in a file.
-- A run with a follow-up tells its agent, in a line after the prompt, to open the pull request
-  without arming its merge, and the tool merges it through the git host once the follow-up ends
-  done. Picked over a hold on the checkout that the agent's publish honoured, which put the
+- A run with a follow-up tells its agent, in a line after the prompt, to publish its work
+  without arming the pull request's merge, and the tool merges it through the git host
+  once the follow-up ends done. Picked over a hold on the checkout that the agent's publish honoured, which put the
   git host inside the branches package.
 - The live record is agent-driver's log, written in the run record's shape, and the run
   copies the two files onto the branch unchanged. Picked over the tool's own live log in
@@ -62,8 +63,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   piece of work, and the first left waiting for ever) and over a process that waits for
   the answer (nothing waits; state in files).
 - A run is on Claude Code, or on Codex with `run --driver codex`. The person picks.
-- Either coding agent does the same: it works, pushes its branch and opens its pull
-  request itself. For that, neither may be restricted: Claude Code runs with permissions
+- Either coding agent does the same: it works and, when asked to publish, pushes its
+  branch and opens its pull request itself. For that, neither may be restricted: Claude Code runs with permissions
   bypassed, Codex with full access. Codex's default lets it write only in its checkout, so
   it could not push. Picked over a restricted Codex with agent-runner pushing for it: a
   run would then end in two different ways, and agent-runner would do the agent's work.
@@ -94,8 +95,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   are measured from it. Picked over the base's name: a branch is renamed, moves on, and is
   deleted once merged. Picked over recording it for every run: a run from the default
   branch is measured against that branch as it is now, which stays right after a rebase.
-- The run records itself and reclaims its own checkout when the agent stops; the sweep on
-  the tick catches what a dead process left, on this machine only.
+- The run records itself and reclaims its own checkout when the agent stops, pushing
+  nothing: a clean checkout goes, its branch stays on this machine; the sweep on the tick
+  catches what a dead process left, on this machine only.
 - A run stops on SIGINT or SIGTERM to its process: the agent's process tree is ended, the
   run is recorded `stopped`, the checkout reclaimed. The pid is in the live log, so a
   dashboard's Stop is that signal. Picked over the run reading the dashboard's control file

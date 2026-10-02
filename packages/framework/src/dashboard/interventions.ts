@@ -149,9 +149,9 @@ export async function buildInterventions(
     // that committed real code and stopped produced neither, and nothing told anyone: the overview
     // drops it (it filters on `running`) and the handoff panel is behind clicking into that agent.
     //
-    // Surfacing only: this says there is a decision waiting, it does not take it. Since #1102 a
-    // session usually pushes itself, so what reaches here is the remainder — an agent told that
-    // whoever started it publishes for it, or a publish that failed or never ran.
+    // Surfacing only: this says there is a decision waiting, it does not take it. A run publishes
+    // nothing by itself, so every finished run with work of its own reaches here until a person
+    // publishes it, or the agent does on their ask.
     for (const item of await unpushedFor(project, deps, unread).catch(unread)) items.push(item)
     if (sawEverything) whole.push(project.id)
   }

@@ -15,8 +15,8 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
 /**
  * One run (#1774): a checkout from the branches package, a session from agent-driver, the prompt
  * once, and the agent's own loop to the end. No system prompt and no gates: the
- * command's skill file is the whole instruction, and the agent publishes its own work through
- * the skills in its checkout. This process records the run and reclaims the checkout when the
+ * command's skill file is the whole instruction, and the agent publishes its own work, when asked
+ * to, through the skills in its checkout. This process records the run and reclaims the checkout when the
  * agent stops; a run that dies is caught by the sweep, which a scheduler runs on every tick.
  *
  * The session keeps the run's live record itself, the card and the diary under `.the-framework/`
@@ -36,8 +36,8 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
  *
  * A run may name a follow-up (`run --then <prompt>`): once it ends done with a pull request, a
  * fresh agent, a run of its own with its own record, works on the same branch from the prompt,
- * the first run's id after it. The first agent is told, in a line after its prompt, to open the
- * pull request without arming its merge; the follow-up ending done is when this process merges
+ * the first run's id after it. The first agent is told, in a line after its prompt, to publish its
+ * work without arming the pull request's merge; the follow-up ending done is when this process merges
  * it, through the project's git host (`git-host.ts`). A follow-up that fails or is stopped leaves the
  * request open, for a person.
  *
@@ -53,8 +53,8 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
 /** The detail a stopped run's record carries. */
 export const STOPPED_DETAIL = 'stopped by a signal to its process'
 
-/** The line after a prompt when a follow-up is coming: the agent opens the request, this process merges it later. */
-export const HOLD_MERGE_LINE = 'Open the pull request but do not arm its merge: it is merged for you once a follow-up is done.'
+/** The line after a prompt when a follow-up is coming: the agent publishes its work, this process merges the request later. */
+export const HOLD_MERGE_LINE = 'Publish your work when you finish: push your branch and open its pull request, but do not arm its merge: it is merged for you once a follow-up is done.'
 
 /** The prompt an agent gets: the run's own, and the line above when the run names a follow-up. */
 export function agentPrompt(prompt: string, then: string | undefined): string {
@@ -489,20 +489,21 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
     await tellParent(repo, parent, line, run.telling)
   }
 
-  // The checkout goes once the remote has everything it holds (the branches rule); a dirty tree
-  // or a branch that could not be pushed keeps it, and the sweep tries again later. A
-  // waiting run keeps it on purpose: the answer resumes the run there.
+  // The checkout goes once its branch holds everything in it (the branches rule), and the branch
+  // stays on this machine: nothing is pushed here, publishing is the person's call. A dirty tree
+  // keeps the checkout, and the sweep tries again later. A waiting run keeps it on purpose: the
+  // answer resumes the run there.
   if (status === 'waiting') {
     await tell(true)
     return outcomeOf(run.id, status, branch, pr, card.cost, { reclaimed: false, reason: 'waiting' }, detail)
   }
-  const reclaimed = await reclaimWorktree(repo, run.checkout.path, { mayPush: true, birthBranch: agentBranchName(run.id), ...startOf(run.card), git: run.git })
+  const reclaimed = await reclaimWorktree(repo, run.checkout.path, { birthBranch: agentBranchName(run.id), ...startOf(run.card), git: run.git })
   if (reclaimed.ok) {
     const rewritten = await recordBranchGone(repo, card, diary, reclaimed.branchesDeleted, run.logs)
     if (rewritten && !rewritten.ok && !rewritten.committed) run.log(`[agent-runner] the run's record could not be written: ${rewritten.error}`)
   }
   await tell(!(reclaimed.ok && reclaimed.branchesDeleted?.includes(branch)))
-  return outcomeOf(run.id, status, branch, pr, card.cost, reclaimed.ok ? { reclaimed: true } : { reclaimed: false, reason: reclaimReason(reclaimed) }, detail)
+  return outcomeOf(run.id, status, branch, pr, card.cost, reclaimed.ok ? { reclaimed: true } : { reclaimed: false, reason: reclaimed.reason }, detail)
 }
 
 /** The commit a checkout just made is at: where the run's own work begins. Nothing when git cannot say. */
@@ -521,10 +522,6 @@ function outcomeOf(id: string, status: Exclude<RunStatus, 'running'>, branch: st
     checkout,
     ...(detail !== undefined ? { detail } : {}),
   }
-}
-
-function reclaimReason(outcome: { ok: false; reason: string; detail?: string }): string {
-  return outcome.detail ? `${outcome.reason}: ${outcome.detail}` : outcome.reason
 }
 
 function errorMessage(err: unknown): string {

@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises'
 import { gitReason, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
-import { isAgentBranch, removeWorktree, repoHasRemote, worktreeBranch, worktreeClean, worktreePath } from '@gemstack/skill-branches'
+import { isAgentBranch, removeWorktree, worktreeBranch, worktreeClean, worktreePath } from '@gemstack/skill-branches'
 import { agentLines, findRun, listRuns, publicCard, readDiary, type RunCard } from '@gemstack/skill-logs'
 import { AGENT_ID_ENV, isDriverName, markerCard, readLiveCard, recordRun, runIdFrom, runnerMark, type DriverName, type readyToRun, type spawnRun } from 'agent-runner'
 import { APPROVE, planApproved, planQuestion, readPlan, writePlan } from './plan.js'
@@ -17,14 +17,14 @@ import { APPROVE, planApproved, planQuestion, readPlan, writePlan } from './plan
  * of its own and named on its record.
  */
 
-/** The ref a landed subagent's last commit is kept under, here and on origin, so git never drops it. */
+/** The ref a landed subagent's last commit is kept under, on this machine, so git never drops it. */
 export function landedRef(id: string): string {
   return `refs/landed/${id}`
 }
 
 /** What every subagent is told after its task: where its work goes, and that nobody answers it. */
 export const SUBAGENT_LINES =
-  'You are a subagent: another agent started you for this one task and reads your last reply as its result. Commit your work to your branch and do not open a pull request. Nobody will answer a question: decide yourself, and say in your last reply what you did and what you decided.'
+  'You are a subagent: another agent started you for this one task and reads your last reply as its result. Commit your work to your branch and publish nothing: no push, no pull request. Nobody will answer a question: decide yourself, and say in your last reply what you did and what you decided.'
 
 /** The prompt a subagent gets: the task, then the lines above. */
 export function subagentPrompt(task: string): string {
@@ -181,12 +181,13 @@ export async function showPlan(repo: string, env: NodeJS.ProcessEnv, deps: Subag
 
 /**
  * Land one of the caller's subagents: its branch merged into the branch the caller's checkout is
- * on, then deleted here and on origin, and taken off its record, so the work lives on the main
- * agent's branch alone. A merge that conflicts is undone and refused: the main agent merges by
+ * on, then deleted and taken off its record, so the work lives on the main agent's branch
+ * alone. Origin is never touched: a subagent's branch is not published, and neither is anything
+ * landing writes. A merge that conflicts is undone and refused: the main agent merges by
  * hand and lands again, which then only deletes. Nothing is deleted before the merge is in.
  *
- * The subagent's last commit outlives its branch: it is kept under {@link landedRef}, here and on
- * origin, and written on its record as `landed`, beside the commit its work began at. The main
+ * The subagent's last commit outlives its branch: it is kept under {@link landedRef}, on this
+ * machine, and written on its record as `landed`, beside the commit its work began at. The main
  * agent's branch is squashed and deleted one day, and what this one subagent changed is still read
  * from those two commits.
  */
@@ -208,13 +209,9 @@ export async function landSubagent(repo: string, env: NodeJS.ProcessEnv, id: str
     if (!(await worktreeClean(theirs, git).catch(() => false))) throw new Refused({ ok: false, reason: 'uncommitted-there', id, path: theirs }, `${id} left uncommitted changes in ${theirs}: commit them there on its branch, then land`)
   }
 
-  const has = (ref: string) => git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], repo).then(out => out.trim() !== '', () => false)
-  await git(['fetch', '--quiet', '--no-write-fetch-head', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`], repo).catch(() => {})
-  const local = await has(`refs/heads/${branch}`)
-  const remote = await has(`refs/remotes/origin/${branch}`)
-  if (!local && !remote) throw new Refused({ ok: false, reason: 'nothing-to-land', id }, `the branch ${branch} of ${id} is gone: there is nothing to land`)
-  const ref = local ? `refs/heads/${branch}` : `refs/remotes/origin/${branch}`
-  const tip = (await git(['rev-parse', '--verify', `${ref}^{commit}`], repo)).trim()
+  const ref = `refs/heads/${branch}`
+  const tip = await git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], repo).then(out => out.trim(), () => '')
+  if (!tip) throw new Refused({ ok: false, reason: 'nothing-to-land', id }, `the branch ${branch} of ${id} is gone: there is nothing to land`)
 
   const merged = !(await git(['merge-base', '--is-ancestor', ref, 'HEAD'], checkout).then(() => true, () => false))
   if (merged) {
@@ -224,26 +221,18 @@ export async function landSubagent(repo: string, env: NodeJS.ProcessEnv, id: str
       const files = (await git(['diff', '--name-only', '--diff-filter=U'], checkout).catch(() => '')).split('\n').filter(Boolean)
       await git(['merge', '--abort'], checkout).catch(() => {})
       if (files.length === 0) throw new Error(`merging ${branch} failed: ${gitReason(err)}`)
-      throw new Refused({ ok: false, reason: 'conflict', id, branch, files }, `merging ${branch} conflicts in ${files.join(', ')}: merge it yourself with \`git merge ${local ? branch : `origin/${branch}`}\`, resolve, commit, and land again`)
+      throw new Refused({ ok: false, reason: 'conflict', id, branch, files }, `merging ${branch} conflicts in ${files.join(', ')}: merge it yourself with \`git merge ${branch}\`, resolve, commit, and land again`)
     }
   }
 
   // Kept before anything is deleted: the commit must never be held by nothing.
   await git(['update-ref', landedRef(id), tip], repo)
-  if (await repoHasRemote(repo, git)) await git(['push', '--quiet', 'origin', `${tip}:${landedRef(id)}`], repo)
 
   // Only an agent's branch is ever deleted, as in the branches package.
   const gone = isAgentBranch(branch)
   if (gone) {
     if (kept) await removeWorktree(repo, theirs, git)
-    if (local) await git(['branch', '-D', branch], repo)
-    if (remote) {
-      // A branch origin lost meanwhile is as gone as one deleted here: only the stale copy of it is left to drop.
-      await git(['push', '--quiet', 'origin', `:refs/heads/${branch}`], repo).catch(async err => {
-        if (!/remote ref does not exist/i.test(gitReason(err))) throw err
-        await git(['update-ref', '-d', `refs/remotes/origin/${branch}`], repo)
-      })
-    }
+    await git(['branch', '-D', branch], repo)
   }
   const { branch: _gone, ...branchless } = card
   const recorded = await recordRun(repo, { ...(gone ? branchless : card), caller: { ...card.caller, landed: tip } }, (await readDiary(repo, id)) ?? [])

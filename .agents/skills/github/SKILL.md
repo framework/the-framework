@@ -1,6 +1,6 @@
 ---
 name: github
-description: "The project's git host is GitHub: how to open your pull request once your branch is pushed, how to land it, and how to read and close the project's issues."
+description: "The project's git host is GitHub: how to open your pull request when you are asked to, how to land it, and how to read and close the project's issues."
 ---
 
 # GitHub
@@ -13,7 +13,7 @@ The project's pull requests and issues are on GitHub. This skill is how you reac
 
 ## Your pull request
 
-Once your branch is pushed (your branches skill says how), open its pull request, unless whoever started you said they publish for you: then you open nothing.
+Open a pull request only when your task or the person asks for one, or asks you to publish your work. Push your branch first (your branches skill says how), then:
 
 ```
 npx github open --title "<one line naming what the change does>" --body "<what changed, and why>"

@@ -53,9 +53,11 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
       <span>·</span>
       <span>{files}</span>
       <DiffStat added={handoff.insertions} removed={handoff.deletions} className="text-xs" />
-      {/* Whether the work is on the remote yet is the first handoff question — say it. The PR
-          itself is not repeated here: the bar already links it. */}
-      {!subagent && handoff.pushed && !handoff.pr && <span>· pushed</span>}
+      {/* Whether the work is on the remote yet is the first handoff question — say it, both ways:
+          a run publishes nothing by itself, so work still only on this machine is the usual
+          answer and must not read as silence. The PR itself is not repeated here: the bar already
+          links it. Where there is no remote there is nowhere to publish to, and nothing to say. */}
+      {!subagent && !handoff.pr && handoff.hasRemote && <span>· {handoff.pushed ? 'pushed' : 'not published'}</span>}
     </span>
   )
 }
@@ -63,9 +65,10 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
 /**
  * The next step, as a button, at the end of the action bar.
  *
- * What is left once a session has ended without publishing its own work: the agent opens its own
- * pull request when its command says to, and when it did not, this is how a person does. Both
- * publish the agent's work to a shared remote under the user's name, so it is a deliberate click. They sit in the
+ * What is left once a session has ended: its work is on this machine only, since an agent pushes
+ * and opens its pull request only when its task or the person asks, and this is how a person
+ * publishes it. Both put the agent's work on a shared remote under the user's name, so it is a
+ * deliberate click, and the button says so: it publishes. They sit in the
  * bar rather than behind the disclosure, because the point of the handoff is to be offered without
  * being looked for. Once a PR exists neither shows — the bar links the PR, and the interventions
  * queue (#632) has picked it up by then.
@@ -136,7 +139,8 @@ export function HandoffActions({
   // One button, not two (#1173). "Push branch" and "Open PR" sat side by side as equals, and
   // nobody could say what pushing without a PR was for — a control nobody can
   // explain is a control nobody should have to read. Opening a PR pushes the branch on the way,
-  // so the one that names the outcome is the one that stays.
+  // so the one that names the outcome is the one that stays, and it names the push too: nothing
+  // left this machine before the click.
   return (
     <Button
       size="xs"
@@ -144,7 +148,7 @@ export function HandoffActions({
       onClick={() => act('pr', () => sendOpenPullRequest(projectId, agentId), 'Could not open the pull request.')}
     >
       <GitPullRequest className="h-3.5 w-3.5" />
-      {pending === 'pr' ? 'Opening PR…' : 'Open PR'}
+      {pending === 'pr' ? 'Publishing…' : 'Publish & Open PR'}
     </Button>
   )
 }

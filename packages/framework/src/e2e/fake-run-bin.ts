@@ -96,7 +96,7 @@ async function session(id: string, checkout: string, prompt: string, card: Omit<
   const written = parseRunCard(await readFile(join(dir, `${id}.json`), 'utf8'))
   const diary = (await readFile(join(dir, logDiaryFile(id)), 'utf8')).split('\n').filter(Boolean).map(line => JSON.parse(line) as AnyDiaryLine)
   if (written) await writeRun(repo, written, diary)
-  if (status !== 'waiting') await reclaimWorktree(repo, checkout, { mayPush: true, birthBranch: agentBranchName(id), git })
+  if (status !== 'waiting') await reclaimWorktree(repo, checkout, { birthBranch: agentBranchName(id), git })
 }
 
 async function main(): Promise<void> {

@@ -1,11 +1,11 @@
 ---
 name: branches
-description: Where your work goes (a branch named agent-<name>), how to name it, what must be true before you finish, and how to push it.
+description: Where your work goes (a branch named agent-<name>), how to name it, what must be true before you finish, and how to push it when you are asked to.
 ---
 
 # Branch management
 
-Your work goes on a branch named `agent-<name>`, unless whoever started you continued you on another. When you finish, you push it yourself; what happens to a pushed branch next, if anything, is another skill's. Unless whoever started you said they publish for you: then you never push.
+Your work goes on a branch named `agent-<name>`, unless whoever started you continued you on another. It stays on this machine until you are asked to push it.
 
 ## The command
 
@@ -51,7 +51,7 @@ It must report `"clean": true`. `clean` is false while anything is uncommitted o
 
 ## Push
 
-Once clean, unless whoever started you said they publish for you:
+Only when your task or the person asks you to push or publish your work, and once clean:
 
 ```
 npx branches push

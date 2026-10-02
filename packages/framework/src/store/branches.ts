@@ -17,7 +17,7 @@ import { isRunId } from './runs.js'
  *                                                       measured from `<commit>`, where the branches started, in place of the default branch;
  *                                                       a full commit id in place of a branch is read as a branch that ends there
  *   `<command> push --branch <b>`                       push the branch to the remote; a branch only the remote has is answered as it is
- *   `<command> remove <id> [--from <commit>] [--discard]`  reclaim a run's checkout once the remote has everything, its branch measured from the commit it started from; `--discard` drops uncommitted work
+ *   `<command> remove <id> [--from <commit>] [--discard]`  reclaim a run's checkout once its branch holds everything, pushing nothing, its branch measured from the commit it started from; `--discard` drops uncommitted work
  * `list` and `show` read this machine, no network: the framework polls. `show` answers the branch's
  * git facts only; its pull request is the git host provider's (`git-host.ts`), as every pull request is.
  *

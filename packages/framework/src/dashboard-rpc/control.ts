@@ -237,7 +237,7 @@ export async function sendPush(projectId: string, agentId: string): Promise<Hand
 
 /**
  * The user's Merge action (#1391): merge a finished run's open pull request, directly. A run
- * that is still working has no Merge: its agent publishes its own work, and the button comes
+ * that is still working has no Merge: its agent is still writing its branch, and the button comes
  * with the ended view.
  */
 export async function sendMerge(projectId: string, agentId: string): Promise<HandoffResult> {

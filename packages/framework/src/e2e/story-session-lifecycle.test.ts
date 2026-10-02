@@ -41,11 +41,12 @@ test('start a run through the project\'s start hook, watch it live, and read the
     assert.equal(meta.driver, 'codex')
     assert.equal(meta.model, 'gpt-5')
 
-    // The run's tool published the work and reclaimed the checkout: nothing is left to remove,
-    // and the branch is on the remote.
+    // The run's tool reclaimed the checkout and published nothing: nothing is left to remove,
+    // and the branch is on this machine only.
     await world.waitRetired(project, agentId)
     assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [])
-    assert.ok((await git(project.cwd, 'ls-remote', '--heads', 'origin')).includes(`agent-${agentId}`), 'the run\'s branch is on origin')
+    assert.ok((await git(project.cwd, 'branch', '--list', `agent-${agentId}`)).includes(`agent-${agentId}`), 'the run\'s branch is still here')
+    assert.equal((await git(project.cwd, 'ls-remote', '--heads', 'origin')).includes(`agent-${agentId}`), false, 'and not on origin')
     // Its header then says only what is true of the run: the branch it recorded, and no checkout
     // to be clean or dirty. Never the user's own checkout's branch and "clean".
     assert.deepEqual(await rpc(onAgentWorktree)(project.id, agentId), { branch: `agent-${agentId}` })
@@ -63,12 +64,13 @@ test('start a run through the project\'s start hook, watch it live, and read the
     assert.ok(activity.whole.includes(project.id))
     assert.ok((await rpc(onRecentAgents)()).some(r => r.projectId === project.id && r.agent.id === agentId))
 
-    // The handoff panel reads the branch off the repository: it exists and it is pushed.
+    // The handoff panel reads the branch off the repository: it exists, and it is not pushed.
     const handoff = await waitFor(async () => {
       const panel = await rpc(onAgentHandoff)(project.id, agentId)
-      return panel?.pushed ? panel : undefined
-    }, 'the panel to report the branch pushed')
+      return panel?.exists ? panel : undefined
+    }, 'the panel to report the branch')
     assert.equal(handoff.branch, `agent-${agentId}`)
+    assert.equal(handoff.pushed, false, 'the run published nothing')
   } finally {
     await world.close()
   }

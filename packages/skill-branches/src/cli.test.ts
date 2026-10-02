@@ -210,7 +210,7 @@ test('list: every checkout with the branch it is on now, sized on request', asyn
   }
 })
 
-test('remove: a dirty checkout is kept and says so; a committed one is pushed and reclaimed', async () => {
+test('remove: a dirty checkout is kept and says so; a committed one is reclaimed, its branch kept and not pushed', async () => {
   const repo = await repoWithOrigin()
   try {
     await run(repo, 'create', 'a1')
@@ -228,27 +228,10 @@ test('remove: a dirty checkout is kept and says so; a committed one is pushed an
     assert.equal(removed.code, 0)
     assert.deepEqual(removed.out, { ok: true })
     await assert.rejects(() => stat(path), 'the checkout is gone')
-    assert.match(await git(['show', 'refs/remotes/origin/agent-add-auth:index.html'], repo), /Welcome/, 'the work reached the remote first')
+    assert.match(await git(['show', 'agent-add-auth:index.html'], repo), /Welcome/, 'the work stays on its branch')
+    await assert.rejects(() => git(['rev-parse', '--verify', 'refs/remotes/origin/agent-add-auth'], repo), 'and nothing reached the remote')
     assert.equal(await isSymlink(join(repo, '.branches', 'agent-add-auth')), false, 'its link went with it')
     assert.deepEqual((await run(repo, 'remove', 'a1')).out, { ok: false, reason: 'no-checkout', agentId: 'a1' })
-  } finally {
-    await rm(repo, { recursive: true, force: true })
-  }
-})
-
-test('remove --no-push: a checkout whose tip the remote lacks is kept, and nothing is pushed', async () => {
-  const repo = await repoWithOrigin()
-  try {
-    await run(repo, 'create', 'a1')
-    const path = worktreePath(repo, 'a1')
-    await commitWork(path)
-    const kept = await run(repo, 'remove', 'a1', '--no-push')
-    assert.equal(kept.code, 1)
-    assert.deepEqual(kept.out, { ok: false, reason: 'not-on-remote', branch: 'agent-a1' })
-    assert.equal((await stat(path)).isDirectory(), true)
-    await assert.rejects(() => git(['rev-parse', '--verify', 'refs/remotes/origin/agent-a1'], repo), 'nothing reached the remote')
-    await git(['push', '-q', '--set-upstream', 'origin', 'agent-a1'], path)
-    assert.deepEqual((await run(repo, 'remove', 'a1', '--no-push')).out, { ok: true })
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

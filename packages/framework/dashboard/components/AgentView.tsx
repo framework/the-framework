@@ -145,10 +145,10 @@ export function AgentView({
   // the agent stops rather than once the process does: while it is still writing to the branch
   // there is nothing to hand off yet, but a parked session's branch is finished work. While the
   // card says saving, the checkout is being cleaned up, and an empty branch is deleted with it, so
-  // an Open PR offered then turned into "Branch gone" moments later: the answer is only shown then
-  // for a branch already on the remote with commits of its own, which the clean-up keeps.
+  // a publish offered then turned into "Branch gone" moments later: the answer is only shown then
+  // for a branch with commits of its own, which the clean-up keeps.
   const read = useAgentHandoff(projectId, agentId, live === false, card?.saving === true)
-  const kept = read.handoff !== null && read.handoff.exists && read.handoff.pushed && !read.handoff.empty
+  const kept = read.handoff !== null && read.handoff.exists && !read.handoff.empty
   const handoff = card?.saving && !kept ? { ...read, handoff: null, loaded: false } : read
   // A run started for another run: it opens no pull request, its main agent lands its work.
   const subagent = card?.parent !== undefined
@@ -268,7 +268,7 @@ export function AgentView({
         onToggle={toggle}
         ready={ready}
         actions={
-          // A run that is working publishes its own work; the next step is offered once it has ended,
+          // A run that is working is still writing its branch; the next step is offered once it has ended,
           // and a run whose subagents still work has not: it goes on as each of them ends.
           live === false && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} subagent={subagent} /> : undefined
         }

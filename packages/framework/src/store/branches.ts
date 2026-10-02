@@ -13,7 +13,9 @@ import { isRunId } from './runs.js'
  * The command line a provider answers, each printing one JSON document and exiting 0 (a refusal
  * exits 1 with its reason on stderr):
  *   `<command> list [--sizes]`                          every checkout, as an array of {@link Checkout}
- *   `<command> show <branch>...`                        what each branch holds and where it stands, as an array of {@link BranchState}, in the order asked
+ *   `<command> show [--from <commit>] <branch>...`      what each branch holds and where it stands, as an array of {@link BranchState}, in the order asked;
+ *                                                       measured from `<commit>`, where the branches started, in place of the default branch;
+ *                                                       a full commit id in place of a branch is read as a branch that ends there
  *   `<command> push --branch <b>`                       push the branch to the remote; a branch only the remote has is answered as it is
  *   `<command> remove <id> [--discard]`                 reclaim a run's checkout once the remote has everything; `--discard` drops uncommitted work
  * `list` and `show` read this machine, no network: the framework polls. `show` answers the branch's
@@ -63,7 +65,7 @@ export interface BranchState {
   name?: string
   /** The branch exists on this machine. Gone: every list below is empty, and only the remote can say more. */
   exists: boolean
-  /** What it is measured against, the project's default branch, when one was found. */
+  /** What it is measured against: the commit asked with `--from`, else the project's default branch, when one was found. */
   base?: string
   /** The branch's own commits beyond the base, newest first. */
   commits: BranchCommit[]
@@ -94,8 +96,13 @@ export interface BranchesSource {
    * checkout is not a process every second.
    */
   list(opts?: { sizes?: boolean; fresh?: boolean }): Promise<Checkout[]>
-  /** Each branch's state, in the order asked; a branch the provider did not answer for is missing. `[]` when nothing can be read. */
-  show(branches: readonly string[]): Promise<BranchState[]>
+  /**
+   * Each branch's state, in the order asked; a branch the provider did not answer for is missing.
+   * `[]` when nothing can be read. `from` is the commit the branches started from, which their
+   * commits and files are then measured from. A full commit id in place of a branch reads what a
+   * branch that ended there held.
+   */
+  show(branches: readonly string[], from?: string): Promise<BranchState[]>
   /** Push a branch to the remote: the checkout on it under its clean rule, else the branch itself. */
   push(branch: string): Promise<PushOutcome>
   /** Reclaim a run's checkout, or why it stayed. `discard` drops its uncommitted work instead of refusing over it. */
@@ -208,14 +215,14 @@ function commandBranches(root: string, command: ProvidedCommand, now: () => numb
       listed.set(key, read)
       return read.rows
     },
-    show(branches) {
+    show(branches, from) {
       const asked = branches.filter(branch => branch !== '')
       if (asked.length === 0) return Promise.resolve([])
-      const key = asked.join('\0')
+      const key = [from ?? '', ...asked].join('\0')
       const known = shown.get(key)
       if (known && now() - known.at < CACHE_MS) return known.states
       const read: { at: number; states: Promise<BranchState[]> } = { at: now(), states: Promise.resolve([]) }
-      read.states = runPackageCommand(root, command, ['show', ...asked]).then(result => {
+      read.states = runPackageCommand(root, command, ['show', ...(from ? ['--from', from] : []), ...asked]).then(result => {
         if (!result.ok || !Array.isArray(result.output)) {
           if (shown.get(key) === read) shown.delete(key)
           return []

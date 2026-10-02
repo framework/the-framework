@@ -2,9 +2,9 @@ The Files module [4] of the OpenAgent dashboard: a project's files, or an agent'
 
 ## Context
 
-**User story**: the user browses the project's files beside the agent they are watching, sees which files the agent changed, and hovers one to read its diff; for an agent that finished days ago, the tree still shows its change, read from its branch or from the commit its pull request merged as, for as long as git holds it.
+**User story**: the user browses the project's files beside the agent they are watching, sees which files the agent changed, and hovers one to read its diff; for an agent that finished days ago, the tree still shows its change, read from its branch or from the commit its pull request merged as, for as long as git holds it. For a subagent, an agent another agent started on a branch made from its own, the tree marks what the subagent itself changed, and still does once its main agent landed its work and its branch is gone.
 
-**Business logic story**: the dashboard knows nothing of files. It offers slots (a tab in the side rail, a summary in an agent's action bar, details under it) and tells a module's server part the facts about a project's agents: an agent's checkout [2], its record, whether it finished on this machine having changed nothing, and which commit its pull request merged as. This module decides from those facts where an agent's files are, and reads them with git. The daemon relays a read about an agent that works on a connected device to that device, whose own copy of the module answers it.
+**Business logic story**: the dashboard knows nothing of files. It offers slots (a tab in the side rail, a summary in an agent's action bar, details under it) and tells a module's server part the facts about a project's agents: an agent's checkout [2], its record (with the commit its own work begins at, and the last commit of its work once its main agent landed it), whether it finished on this machine having changed nothing, and which commit its pull request merged as. This module decides from those facts where an agent's files are, and reads them with git. The daemon relays a read about an agent that works on a connected device to that device, whose own copy of the module answers it.
 
 ## Glossary
 

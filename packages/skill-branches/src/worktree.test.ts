@@ -261,6 +261,7 @@ test('a continued agent whose branch is gone gets it back from the base named: t
   try {
     const local = await attachWorktree(repo, { agentId: 'run1', branch: 'agent-run1', base: 'my-feature' }, git)
     assert.equal((await git(['rev-parse', 'HEAD'], local.path)).trim(), feature, 'the base as this clone has it')
+    assert.equal(local.again, true, 'made again: the answer says so')
     assert.equal(await git(['config', '--get', 'branch.agent-run1.remote'], repo).catch(() => ''), '', 'no upstream')
 
     // The base is gone here and origin has it.
@@ -268,15 +269,18 @@ test('a continued agent whose branch is gone gets it back from the base named: t
     await git(['fetch', '-q', 'origin'], repo)
     const remote = await attachWorktree(repo, { agentId: 'run2', branch: 'agent-run2', base: 'agent-main-run' }, git)
     assert.equal((await git(['rev-parse', 'HEAD'], remote.path)).trim(), feature, 'the base as origin has it')
+    assert.equal(remote.again, true)
 
     const gone = await attachWorktree(repo, { agentId: 'run3', branch: 'agent-run3', base: 'agent-no-such' }, git)
     assert.equal((await git(['rev-parse', 'HEAD'], gone.path)).trim(), main, 'a base gone everywhere: origin’s default branch')
+    assert.equal(gone.again, true)
 
     // The branch itself, where origin still has it, wins over the base.
     await git(['push', '-q', 'origin', `${main}:refs/heads/agent-pushed`], repo)
     await git(['fetch', '-q', 'origin'], repo)
     const kept = await attachWorktree(repo, { agentId: 'run4', branch: 'agent-pushed', base: 'my-feature' }, git)
     assert.equal((await git(['rev-parse', 'HEAD'], kept.path)).trim(), main, 'origin’s copy of the branch, not the base')
+    assert.equal(kept.again, undefined, 'it came back with what it held: not made again')
   } finally {
     await rm(base, { recursive: true, force: true })
   }

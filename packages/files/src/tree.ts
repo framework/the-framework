@@ -9,7 +9,11 @@ import { cutToPreview, readFileContent, safeRepoPath, type FileContent } from '.
 
 // A run's files, for the agent page's Files tab, for as long as git still has them. The run's
 // checkout while it exists; once it is reclaimed, the run's branch, local or on origin; once the
-// branch is gone too, the commit its pull request merged as. A run that ended `done`, `failed`
+// branch is gone too, the commit its pull request merged as, or, for a run its main agent landed,
+// the last commit its record kept. A run started from a branch other than the default one (a
+// subagent starts from its main agent's) is measured from the commit its record says its own work
+// begins at: measured from the default branch, the other branch's work would read as its own.
+// A run that ended `done`, `failed`
 // or `stopped` on this machine and left no checkout, no branch and no pull request changed nothing:
 // its branch went with its checkout because the remote already had everything on it, so the tab
 // shows the project as it is, nothing marked. Any other run is never judged so: one from another
@@ -22,6 +26,8 @@ export type AgentFilesAt =
   | { source: 'checkout'; path: string; base?: string }
   | { source: 'branch'; branch: string; ref: string; base?: string }
   | { source: 'merge'; number: number; ref: string; base?: string }
+  /** The run's main agent landed its work and its branch went: the last commit of its work. */
+  | { source: 'landed'; ref: string; base?: string }
   /** The run changed nothing: the project's default branch, where no path is marked. */
   | { source: 'unchanged'; ref: string }
   /** The run is starting here, its checkout not made yet: the commit it will be made from, where no path is marked. */
@@ -41,6 +47,7 @@ export type AgentTree =
   | { source: 'checkout'; files: string[]; changes: Record<string, FileMark> }
   | { source: 'branch'; branch: string; files: string[]; changes: Record<string, FileMark> }
   | { source: 'merge'; number: number; files: string[]; changes: Record<string, FileMark> }
+  | { source: 'landed'; files: string[]; changes: Record<string, FileMark> }
   | { source: 'unchanged'; files: string[]; changes: Record<string, FileMark> }
   | { source: 'starting'; files: string[]; changes: Record<string, FileMark> }
   | { source: 'pending' }
@@ -64,16 +71,21 @@ async function defaultBranch(ask: (args: string[]) => Promise<string>): Promise<
   return undefined
 }
 
-/** Where `tip` forked from the default branch: what the run's changes are measured from. */
-async function forkPoint(ask: (args: string[]) => Promise<string>, tip: string): Promise<string | undefined> {
-  const base = await defaultBranch(ask)
+/**
+ * What the run's changes are measured from: where `tip` left `from`, the commit the run's record
+ * says its own work begins at, when it names one this machine has; else where it forked from the
+ * default branch.
+ */
+async function forkPoint(ask: (args: string[]) => Promise<string>, tip: string, from: string | undefined): Promise<string | undefined> {
+  const base = (from !== undefined && (await commitOf(ask, from))) || (await defaultBranch(ask))
   return base ? (await ask(['merge-base', base, tip])) || undefined : undefined
 }
 
 /**
  * Where the run `agentId` of the project the host reads has its files: its checkout, else its
  * recorded branch (local, then origin's copy), else the commit its recorded pull request merged
- * as, else, for a run the host says changed nothing, the default branch, else gone. A branch the
+ * as, else the commit its record kept when it was landed, else, for a run the host says changed
+ * nothing, the default branch, else gone. A branch the
  * default branch already contains (a true merge) shows no change, so there the merge commit is
  * preferred when this machine has it.
  */
@@ -85,7 +97,7 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
   // source, and the run is not starting either: it just ended, and its record may not say so yet.
   const reclaimed = run?.checkout !== undefined && !existsSync(run.checkout)
   if (run?.checkout && !reclaimed) {
-    const base = await forkPoint(asker(git, run.checkout), 'HEAD')
+    const base = await forkPoint(asker(git, run.checkout), 'HEAD', run.record?.baseCommit)
     return { source: 'checkout', path: run.checkout, ...(base ? { base } : {}) }
   }
   // Nothing known of the run yet: it is starting. A run writes its record, then makes its checkout
@@ -99,7 +111,7 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
     for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
       const tip = await commitOf(ask, ref)
       if (!tip) continue
-      const base = await forkPoint(ask, tip)
+      const base = await forkPoint(ask, tip, record.baseCommit)
       onBranch = { source: 'branch', branch, ref: tip, ...(base ? { base } : {}) }
       if (base !== tip) return onBranch
       break
@@ -117,6 +129,12 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
     }
   }
   if (onBranch) return onBranch
+  // Landed: its branch went once its work was merged into its main agent's, and its record kept the last commit.
+  const landed = record.landed !== undefined ? await commitOf(ask, record.landed) : undefined
+  if (landed) {
+    const base = await forkPoint(ask, landed, record.baseCommit)
+    return { source: 'landed', ref: landed, ...(base ? { base } : {}) }
+  }
   // Its branch is gone and nothing else holds its work: the one rule for a run that changed nothing.
   if (run.changedNothing) {
     const main = await defaultBranch(ask)
@@ -168,8 +186,8 @@ function withDeleted(files: string[], changes: Record<string, FileMark>): string
 /**
  * The Files tab's answer for a resolved source. A checkout lists every file git sees in it and
  * marks both what the run committed since it forked and what is on disk uncommitted, the
- * uncommitted mark winning a path marked both: it is what the file is now. A branch or a merge
- * lists the commit's tree and marks what it changed, all committed. A run that changed nothing
+ * uncommitted mark winning a path marked both: it is what the file is now. A branch, a merge or a
+ * landed commit lists the commit's tree and marks what it changed, all committed. A run that changed nothing
  * lists the default branch's tree and marks nothing.
  */
 export async function readAgentTree(root: string, at: AgentFilesAt, git: GitRunner = nodeGitRunner()): Promise<AgentTree> {
@@ -187,14 +205,15 @@ export async function readAgentTree(root: string, at: AgentFilesAt, git: GitRunn
   if (at.source === 'unchanged' || at.source === 'starting') return { source: at.source, files: await treeAt(git, root, at.ref), changes: {} }
   const [files, changes] = await Promise.all([treeAt(git, root, at.ref), at.base ? committedChanges(git, root, at.base, at.ref) : ({} as Record<string, FileMark>)])
   const tree = { files: withDeleted(files, changes), changes }
+  if (at.source === 'landed') return { source: 'landed', ...tree }
   return at.source === 'branch' ? { source: 'branch', branch: at.branch, ...tree } : { source: 'merge', number: at.number, ...tree }
 }
 
 /**
  * One changed file's diff, from the same source the tree was read from. In a checkout an
  * uncommitted file diffs as it always has (against its last commit); a committed one diffs from
- * the fork point to the checkout's last commit. On a branch or a merge it is the commit's own
- * change. Null for a path that is unsafe or not changed there.
+ * the fork point to the checkout's last commit. On a branch, a merge or a landed commit it is the
+ * commit's own change. Null for a path that is unsafe or not changed there.
  */
 export async function readAgentFileDiff(root: string, at: AgentFilesAt, path: string, git: GitRunner = nodeGitRunner()): Promise<FileDiff | null> {
   if (at.source === 'pending' || at.source === 'gone' || at.source === 'unchanged' || at.source === 'starting' || !safeRepoPath(path)) return null

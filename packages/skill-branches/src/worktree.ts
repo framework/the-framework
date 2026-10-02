@@ -80,6 +80,8 @@ export interface AddWorktreeOptions {
 export interface AddedWorktree {
   path: string
   branch: string
+  /** The branch was gone everywhere and was made again, from the base or origin's default branch: nothing it held before is on it. */
+  again?: true
 }
 
 /** How long a new agent branch waits for origin's default branch to be fetched: Claude Code's own cap. */
@@ -134,7 +136,8 @@ export async function addWorktree(
  * last time. The branch as this clone has it; else origin's copy, as a new local branch with no
  * upstream set, as in {@link addWorktree}; else, gone everywhere, a new branch where the agent's
  * first one started: the base the caller names, as this clone has it or else as origin does, and
- * with none, or one that is gone too, where a new agent branch starts ({@link freshStart}). The
+ * with none, or one that is gone too, where a new agent branch starts ({@link freshStart}); the
+ * answer then says the branch was made again. The
  * only branch the package deletes is one that held nothing past a commit the remote already had,
  * so nothing of the agent's is lost. Anything git refuses — the branch checked out elsewhere, say —
  * rejects, like {@link addWorktree}: a continued agent needs its checkout.
@@ -149,14 +152,16 @@ export async function attachWorktree(
   const has = (ref: string) => git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], repo).then(out => out.trim() !== '', () => false)
   if (await has(`refs/heads/${opts.branch}`)) {
     await git(['worktree', 'add', path, opts.branch], repo)
-  } else {
-    const starts = [`refs/remotes/origin/${opts.branch}`, ...(opts.base !== undefined ? [opts.base, `refs/remotes/origin/${opts.base}`] : [])]
-    let start: string | undefined
-    for (const ref of starts) if (start === undefined && (await has(ref))) start = ref
-    start ??= await freshStart(repo, git)
-    await git(['worktree', 'add', '--no-track', '-b', opts.branch, path, ...(start ? [start] : [])], repo)
+    return { path, branch: opts.branch }
   }
-  return { path, branch: opts.branch }
+  const theirs = `refs/remotes/origin/${opts.branch}`
+  const starts = [theirs, ...(opts.base !== undefined ? [opts.base, `refs/remotes/origin/${opts.base}`] : [])]
+  let start: string | undefined
+  for (const ref of starts) if (start === undefined && (await has(ref))) start = ref
+  const again = start !== theirs
+  start ??= await freshStart(repo, git)
+  await git(['worktree', 'add', '--no-track', '-b', opts.branch, path, ...(start ? [start] : [])], repo)
+  return { path, branch: opts.branch, ...(again ? { again: true } : {}) }
 }
 
 /**

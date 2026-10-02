@@ -56,6 +56,7 @@ test('a project with no branches provider has no checkouts; one with a provider 
     assert.deepEqual(await branches.list({ sizes: true }), [{ id: 'run-1', path: ROW.path, branch: ROW.branch }])
     assert.deepEqual(await branches.show(['agent-run-1', 'agent-run-2']), [STATE])
     assert.deepEqual(await branches.show([]), [], 'nothing asked is nothing run')
+    assert.deepEqual(await branches.show(['agent-run-1'], 'abc123'), [STATE], 'measured from the commit the branch started at')
     assert.deepEqual(await branches.push('agent-run-1'), { ok: true, pushed: true })
     assert.deepEqual(await branches.push('remote-only'), { ok: true, pushed: false }, 'a branch only the remote has: nothing to push, and nothing missing')
     assert.deepEqual(await branches.push('dirty'), { ok: false, error: 'agent-dirty has uncommitted work; commit or delete it, then push' }, "a refusal is the provider's own line")
@@ -67,6 +68,7 @@ test('a project with no branches provider has no checkouts; one with a provider 
       'list',
       'list --sizes',
       'show agent-run-1 agent-run-2',
+      'show --from abc123 agent-run-1',
       'push --branch agent-run-1',
       'push --branch remote-only',
       'push --branch dirty',
@@ -103,6 +105,11 @@ test('reads within the window share one call; a write and changed() forget them;
     reader.changed(root)
     await branches.list()
     assert.equal((await calls(root, 'branches')).length, 6, 'changed() runs the command again')
+    await branches.show(['agent-run-1'])
+    await branches.show(['agent-run-1'], 'abc123')
+    await branches.show(['agent-run-1'], 'abc123')
+    await branches.show(['agent-run-1'])
+    assert.equal((await calls(root, 'branches')).length, 8, 'the same branch measured from a commit is a read of its own, kept the same way')
     clock += 6_000
     await writeFile(join(root, 'node_modules', 'branches', 'list.json'), 'not json')
     assert.deepEqual(await (await reader(root))!.list(), [], 'a provider printing no JSON is no checkouts')

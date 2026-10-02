@@ -13,4 +13,7 @@ What the tests cover, for what an agent left behind as shown in the agent's acti
 - **A landed pull request offers nothing** - a merged or closed pull request offers neither "Merge PR" nor "Open PR".
 - **No git host package** - a project with no git host package offers "Push" and no "Open PR"; pressing it pushes the branch; once the branch is pushed the bar says "Pushed — no git host package to open a pull request with." and offers nothing.
 - **No remote** - a repository without a remote says "No remote to push to" and offers no push.
+- **A subagent is offered no button** - a subagent with one commit on a pushed branch reads "1 commit" and "not landed", never "· pushed", with no button at all; the same with an open pull request on its branch, and on a project with no git host package: "not landed" and no button.
+- **A landed subagent** - reads "landed" with its commit count and, expanded, its changed file, and no button; when its last commit is not on this machine it still reads "landed", never "branch gone", "no changes" or a sentence about a pull request.
+- **A subagent that committed nothing** - with uncommitted files it says "Nothing committed — handtest/one.md left uncommitted." beside "no changes", never "not landed", with no button; with its branch gone it reads "branch gone" and no sentence about a pull request.
 - **Nothing before the first read** - until the branch read answers, nothing at all is rendered, so no wrong empty state flashes.

@@ -25,7 +25,7 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 [16] project home: a project's own page with the launcher (the Start form) and its composer.
 [17] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [18] run slot: a place on an agent's page a module fills: the summary, a few words in the action bar, shown until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the bar. Each is told the agent, whether it is still working, and whether the bar is open.
-[19] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent.
+[19] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent. A subagent opens no pull request: its main agent lands its work, which merges it into the main agent's own branch.
 
 ## Business logic — TL;DR
 
@@ -37,7 +37,7 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 - **Loading and empty states** - on a first visit the feed stays blank until the agent's own events are in, then fills in one step; a finished agent whose archive is still being read after a second says "Loading agent…"; a finished agent with no events at all says "This agent has no events."; a running agent with nothing yet simply waits for its first event.
 - **Working means running** - the agent counts as working exactly while the daemon's list says it runs; everything that asks "is there more coming?" asks this, so an agent that is not working gets its next step offered. Before the list is read, whether the agent runs is not known, and nothing that depends on it is read or offered.
 - **Live as the feed knows it** - the feed follows new output, and the composer offers Stop, as soon as new events stream in, even during the seconds before the daemon's list of agents notices a resumed agent.
-- **What the action bar says** - the agent's name with its project as a breadcrumb; the one status word, from the events shown and the agent's card; until the branch's verdict is read, the installed modules' summaries (the Files module's count of what the checkout has changed); once not working, the verdict on what the branch holds and the offered next step.
+- **What the action bar says** - the agent's name with its project as a breadcrumb; the one status word, from the events shown and the agent's card; until the branch's verdict is read, the installed modules' summaries (the Files module's count of what the checkout has changed); once not working, the verdict on what the branch holds and the offered next step; for a subagent [19], no next step, and in its place whether its main agent landed its work.
 - **Switching between agents** - the bar names the agent at once and shows its facts together once its own reads are in (at most a second later); an agent seen before shows its archive, its branch verdict and its facts at once, as last read, while they are read again.
 - **The disclosure** - opening the bar's disclosure adds the agent's details strip and, once stopped, the commits and files its branch holds; the installed modules' details sit under the bar in every state, told whether it is open (the Files module shows a working agent's changed files there).
 - **Removing a kept checkout** - a finished agent that kept its checkout (it failed or was stopped) is offered a Remove, which disappears at once when used.
@@ -152,6 +152,7 @@ The bar's action slot:
 
 - Nothing while working.
 - Once not working: the next step [9] (open a pull request, or merge the one it has) with the state of the branch read (`AgentHandoff.tsx`).
+- For a subagent [19], an agent whose card [3] names a parent: no next step, whatever its branch holds. The page tells the verdict and the action slot that the agent is a subagent, and the slot then says "landed" or "not landed", or names the work the subagent left uncommitted (`AgentHandoff.tsx`). The verdict never says "pushed" for it.
 - Nothing, still, while a subagent [19] holds the agent's job: the agent has ended its own turn but goes on as each subagent ends, and a next step offered then appeared and disappeared between its turns.
 
 ### The disclosure

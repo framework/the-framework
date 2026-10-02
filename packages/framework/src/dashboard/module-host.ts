@@ -12,7 +12,7 @@ import type { MergeLookup, ModuleRead, ModuleReadInput, ModuleServer, ModuleServ
 /** What {@link serverHost} reads through; each defaults to the production reader. */
 export interface ServerHostDeps {
   branches?: BranchesFor
-  agent?: (root: string, agentId: string) => Promise<{ id: string; status?: string; host?: string; branch?: string; pr?: { number: number } } | undefined>
+  agent?: (root: string, agentId: string) => Promise<{ id: string; status?: string; host?: string; branch?: string; pr?: { number: number }; baseCommit?: string; landed?: string } | undefined>
   /** This machine's name, against a run's `host`. */
   host?: string
   prs?: (root: string, branch: string) => Promise<Cached<LinkedPr[]>>
@@ -37,6 +37,8 @@ export function serverHost(root: string, deps: ServerHostDeps = {}): ModuleServe
                 ...(agent.host !== undefined ? { host: agent.host } : {}),
                 ...(branch !== undefined ? { branch } : {}),
                 ...(agent.pr ? { pr: { number: agent.pr.number } } : {}),
+                ...(agent.baseCommit !== undefined ? { baseCommit: agent.baseCommit } : {}),
+                ...(agent.landed !== undefined ? { landed: agent.landed } : {}),
               },
             }
           : {}),

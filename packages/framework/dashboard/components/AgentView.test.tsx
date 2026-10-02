@@ -186,6 +186,21 @@ describe('the next step of a run whose subagents still work', () => {
   })
 })
 
+describe('a subagent’s own page', () => {
+  test('a run started for another run is offered no pull request: it says whether it is landed, and nothing of pushed', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValue(PUSHED)
+    const { rerender } = render(view({ card: { status: 'done', parent: 'run-0' } }))
+    await waitFor(() => expect(screen.getByText('not landed')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: /Open PR/ })).toBeNull()
+    expect(screen.queryByText('· pushed')).toBeNull()
+    // The same branch on a run nobody started for another is offered its pull request.
+    rerender(view({ card: { status: 'done' } }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Open PR/ })).toBeTruthy())
+    expect(screen.queryByText('not landed')).toBeNull()
+  })
+})
+
 // The Resume offer (#1391) moved into the composer's submit slot (#1455): its when-offered rules
 // are AgentComposer's now, tested there — AgentView only hands `outcome` down.
 

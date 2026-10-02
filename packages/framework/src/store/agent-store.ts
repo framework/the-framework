@@ -47,6 +47,18 @@ export interface AgentMeta {
    * card by the tool that started it; absent on a run a person or a schedule started.
    */
   parent?: string
+  /**
+   * The commit the run's own work begins at: where its branch was made, for a run started from a
+   * branch other than the default one (a subagent starts from its main agent's). Its changes are
+   * measured from it; absent, from the default branch. Written on the card by the tool that
+   * started it.
+   */
+  baseCommit?: string
+  /**
+   * The last commit of the run's work, written on the card when its main agent landed it: its
+   * branch is gone, and its changes are read from this commit. Absent on a run that is not landed.
+   */
+  landed?: string
   /** The wrapped agent (from the `session` event). */
   driver?: string
   /** The workspace the agent builds in (from the `session` event). */

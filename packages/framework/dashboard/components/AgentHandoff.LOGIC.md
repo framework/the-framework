@@ -1,4 +1,4 @@
-What an agent [2] left behind, as the user meets it in the agent's action bar: a one-line verdict of what the agent's branch holds, the next step offered as a button once the agent has ended (or the reason there is nothing to press), and the commits and files the bar expands to. The verdict and the next step ride in the bar beside the branch they are about; the lists are behind the bar's disclosure.
+What an agent [2] left behind, as the user meets it in the agent's action bar: a one-line verdict of what the agent's branch holds, the next step offered as a button once the agent has ended (or the reason there is nothing to press), and the commits and files the bar expands to. The verdict and the next step ride in the bar beside the branch they are about; the lists are behind the bar's disclosure. A subagent [5] is offered no next step: where the button would be, its bar says "landed" or "not landed".
 
 ## Context
 
@@ -6,16 +6,20 @@ What an agent [2] left behind, as the user meets it in the agent's action bar: a
 
 **Problem**: what the branch holds is read by branch name, not from the agent's checkout [3], because a clean agent's checkout is removed when it ends; the branch survives it.
 
+**User story**: the user opens a subagent's [5] page. A subagent opens no pull request and nobody pushes its branch by hand: its main agent lands its work on the main agent's own branch. So the page offers no button; it says what the subagent changed and whether its main agent landed it yet.
+
 ## Glossary
 
 [1] next step: what a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has; on a project with no git host package, push the branch.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps. An agent publishes its own work — pushes its branch, opens its pull request — when its command says to.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [4] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
+[5] subagent: an agent another agent, its main agent, started for one task, on a branch started from the main agent's. It opens no pull request. Its main agent lands its work: merges it into the main agent's own branch and deletes the subagent's branch; the subagent's record keeps its last commit, which the daemon reads its commits and files by from then on. The caller says whether the agent is a subagent (`AgentView.tsx`); the daemon's read says whether it is landed.
 
 ## Business logic — TL;DR
 
-- **The one-line verdict** - what the branch holds, in a phrase: "branch gone" (or "no changes" when the agent changed nothing), "merged", "no changes", or the commit and file counts with the lines added and removed, plus "pushed" when the branch is on the remote and has no pull request.
+- **The one-line verdict** - what the branch holds, in a phrase: "branch gone" (or "no changes" when the agent changed nothing), "merged", "no changes", or the commit and file counts with the lines added and removed, plus "pushed" when the branch is on the remote and has no pull request; a subagent's [5] verdict never says "pushed", and a landed one whose last commit is not on this machine has no verdict.
+- **A subagent: landed or not landed** - a subagent is offered no "Open PR", no "Merge PR" and no "Push"; where the button would be, the bar says "landed" once its main agent landed its work and "not landed" while its branch holds commits that are not landed; work it left uncommitted is still named.
 - **The next step, or why there is none** - once the agent has stopped: "Open PR", or "Merge PR" for an open pull request, or "Push" where the project has no git host package, or one sentence saying why nothing can be pressed; never a button the git host would refuse, and nothing at all while the pull request lookup is still out.
 - **The lists behind the disclosure** - the commits (up to 6), the changed files (up to 10) and the uncommitted files (up to 10), the rest counted as "and N more"; shown only when there is something to list.
 
@@ -35,6 +39,26 @@ Nothing is shown until the read of the branch has answered. Then, in the bar, mu
 - When the branch carries no commit the base branch does not already have: "merged" when the branch is merged into the base, otherwise "no changes". A merged branch also reads as empty, since all its commits are on the base, but "merged" and "no changes" are opposite verdicts and only one of them is true.
 - Otherwise the counts: "<N> commit" or "<N> commits", a middle dot, "<N> file" or "<N> files", and the lines added and removed. When the branch is on the remote at the same commit and no pull request is linked to it, "· pushed" follows: whether the work is on the remote is the first question about its next step [1]. The pull request itself is not repeated here, because the bar already links it.
 
+For a subagent [5] the verdict is the same, with two differences. "· pushed" never follows the counts: whether a subagent's branch is on the remote is no step toward anything, since its work goes to its main agent's branch. And a landed subagent whose last commit is not on this machine has no verdict at all, where another agent would read "branch gone": its branch is gone on purpose, there is nothing to count, and "landed" is said where the next step would be (below). A landed subagent whose last commit is on this machine reads its counts as any branch with work does.
+
+### A subagent: landed or not landed
+
+#### Context
+
+See the second user story in `## Context`.
+
+**Problem**: "Open PR" on a subagent would open a pull request for a part of the work, beside the one its main agent opens for the whole. "Branch gone — nothing to open a PR from." on a landed subagent would read as lost work.
+
+#### Business logic
+
+Shown once the agent has ended, in the place of the next step [1] (the caller's decision, in `AgentView.tsx`). A subagent is offered no button, whatever its branch holds: not "Open PR", not "Merge PR" even when its branch has an open pull request, not "Push" even where the project has no git host package. Nothing is rendered until the read of the branch has answered. Then, the first rule that applies:
+
+- The daemon's read says the subagent is landed: "landed".
+- The branch is gone, or carries no commit beyond the commit the subagent's own work begins at: nothing when the checkout [3] holds no uncommitted files; otherwise the same "Nothing committed — <files> left uncommitted." sentence as for any other agent (below), since nothing lands uncommitted work.
+- Otherwise: "not landed".
+
+The line does not wait for the pull request lookup: no rule of a subagent's reads a pull request.
+
 ### The next step, or why there is none
 
 #### Context
@@ -45,7 +69,7 @@ Nothing is shown until the read of the branch has answered. Then, in the bar, mu
 
 #### Business logic
 
-Shown once the agent has ended (the caller's decision, in `AgentView.tsx`); an agent that is still working offers no next step [1], since it publishes its own work. Nothing is rendered until the read of the branch has answered, and nothing while the pull request lookup is still running: acting on "not known yet" is how a second pull request gets opened. Then, the first rule that applies:
+Shown once the agent has ended (the caller's decision, in `AgentView.tsx`); an agent that is still working offers no next step [1], since it publishes its own work. A subagent [5] is never offered one (above); the rules here are for every other agent. Nothing is rendered until the read of the branch has answered, and nothing while the pull request lookup is still running: acting on "not known yet" is how a second pull request gets opened. Then, the first rule that applies:
 
 - The branch has a pull request: when it is open and the branch is not merged, a "Merge PR" button, reading "Merging…" while the merge is in flight; a merged or closed pull request, or a merged branch, offers nothing, because landed is an answer, not an action. An agent opens its pull request and leaves the merge to a person: it takes one click to land.
 - The branch is gone: "Branch gone — nothing to open a PR from.", or nothing when the daemon marks it as belonging to an agent that changed nothing.

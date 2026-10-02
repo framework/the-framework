@@ -164,3 +164,57 @@ test('show: the name the agent gave its work is the branch minus the prefix; non
     await rm(repo, { recursive: true, force: true })
   }
 })
+
+test('show --from: a branch started from another branch is measured from the commit it started at, not from the default branch', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    // A main agent's branch with work of its own, and a subagent's branch started from it.
+    const main = await createCheckout(repo, { agentId: 'm1' })
+    await commit(main.path, 'feature.md', 'feature\n', 'the main agent\'s work')
+    const start = (await git(['rev-parse', 'HEAD'], main.path)).trim()
+    const sub = await createCheckout(repo, { agentId: 's1', base: 'agent-m1' })
+    await commit(sub.path, 'part.md', 'part\n', 'the subagent\'s part')
+    const tip = (await git(['rev-parse', 'HEAD'], sub.path)).trim()
+
+    const [fromDefault] = await readBranchStates(repo, ['agent-s1'], git)
+    assert.deepEqual(fromDefault!.files.map(f => f.path), ['feature.md', 'part.md'], 'beyond the default branch it holds the main agent\'s work too')
+
+    const [state] = await readBranchStates(repo, ['agent-s1'], git, start)
+    assert.equal(state!.base, start)
+    assert.deepEqual(state!.commits.map(c => c.subject), ['the subagent\'s part'])
+    assert.deepEqual(state!.files, [{ path: 'part.md', insertions: 1, deletions: 0, binary: false }])
+    assert.equal(state!.merged, false, 'merged is still the default branch\'s answer: a branch that holds nothing beyond its start is not merged')
+    const [empty] = await readBranchStates(repo, ['agent-m1'], git, start)
+    assert.deepEqual(empty!.commits, [])
+    assert.equal(empty!.merged, false)
+
+    // The command line says the same.
+    const printed: string[] = []
+    assert.equal(await runCli(['show', '--from', start, 'agent-s1'], { cwd: repo, stdout: line => printed.push(line), stderr: () => {} }, git), 0)
+    assert.deepEqual(JSON.parse(printed.join('\n'))[0].files.map((f: { path: string }) => f.path), ['part.md'])
+
+    // A commit this machine does not have is no base: the default branch is.
+    const [unknown] = await readBranchStates(repo, ['agent-s1'], git, '0'.repeat(40))
+    assert.equal(unknown!.base, 'origin/main')
+    assert.equal(unknown!.files.length, 2)
+
+    // The branch gone, its last commit kept: the commit id in its place reads what the branch held.
+    await git(['update-ref', 'refs/landed/s1', tip], repo)
+    await git(['worktree', 'remove', '--force', sub.path], repo)
+    await git(['branch', '-D', 'agent-s1'], repo)
+    const [gone] = await readBranchStates(repo, ['agent-s1'], git, start)
+    assert.equal(gone!.exists, false)
+    const [kept] = await readBranchStates(repo, [tip], git, start)
+    assert.equal(kept!.exists, true)
+    assert.equal(kept!.branch, tip)
+    assert.deepEqual(kept!.commits.map(c => c.subject), ['the subagent\'s part'])
+    assert.deepEqual(kept!.files.map(f => f.path), ['part.md'])
+    assert.equal(kept!.pushed, false)
+    assert.equal(kept!.pendingFiles, undefined)
+    // Only a full commit id is read so: a short one, or any other name, is a branch that is gone.
+    const [short] = await readBranchStates(repo, [tip.slice(0, 12)], git, start)
+    assert.equal(short!.exists, false)
+  } finally {
+    await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })
+  }
+})

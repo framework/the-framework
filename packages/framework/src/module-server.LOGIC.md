@@ -9,6 +9,6 @@
 ## Business logic — TL;DR
 
 - **What a server part exports** - an object whose `reads` maps each read's name to a function.
-- **What a read is given** - the project's folder; the facts about one agent on request: its checkout [3] while it has one, its record (status, machine, branch, pull request number) and whether it ended on this machine without a pull request, so that a branch it no longer has held nothing; and the commit a branch's pull request merged as, or that the git host is still being asked.
+- **What a read is given** - the project's folder; the facts about one agent on request: its checkout [3] while it has one, its record (status, machine, branch, pull request number, the commit its own work begins at for an agent started from a branch other than the default one, which its changes are measured from, and the last commit of its work once its main agent landed it, where its work is read once its branch is gone) and whether it ended on this machine without a pull request and was not landed, so that a branch it no longer has held nothing; and the commit a branch's pull request merged as, or that the git host is still being asked.
 - **What a read is sent** - a JSON object from the module's browser part; its `agentId`, when present, names the agent the read is about, and a read about an agent relayed to a connected device is made on that device.
 - **Facts, not verdicts** - the core says what it knows about an agent; what a module makes of it (where an agent's files are, for the Files module) is the module's own.

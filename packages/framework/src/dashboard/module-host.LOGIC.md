@@ -12,7 +12,7 @@ The daemon's side of a module's [1] server part: the host a read is given, the p
 
 ## Business logic — TL;DR
 
-- **An agent's facts** - its checkout [3] while the project's branches provider lists one, its record (status, machine, branch, pull request number), and whether it finished on this machine having changed nothing; nothing for an id that is not an agent id, or for an agent with neither a checkout nor a record.
+- **An agent's facts** - its checkout [3] while the project's branches provider lists one, its record (status, machine, branch, pull request number, the commit its own work begins at, the last commit of its work once its main agent landed it), and whether it finished on this machine having changed nothing; nothing for an id that is not an agent id, or for an agent with neither a checkout nor a record.
 - **A pull request's merge commit** - asked of the git host through the dashboard's shared cache: "still asking" only while the git host has not answered at all, else the commit when that pull request of the branch merged, else none.
 - **Calling a read** - the server part is imported once per daemon; a read gets the host and the input; a missing or broken part, an unknown read, an input that is not an object or is over 16 KB, a read that throws and a read that takes over 20 seconds each answer an error in words.
 
@@ -26,7 +26,7 @@ See `## Context`.
 
 #### Business logic
 
-The id must look like an agent id (letters, digits, `-` and `_`); anything else is never looked up. The checkout is the one the project's branches provider lists for the agent, asked afresh on a miss; the project's root is never given in its place. The record is the agent's as the project keeps it. "Changed nothing" is the dashboard's one rule, the same the handoff read uses (`agent-handoff.ts`): the agent ended `done`, `failed` or `stopped` on this machine, by its record's machine, and has no pull request. An agent with neither a checkout nor a record has no facts.
+The id must look like an agent id (letters, digits, `-` and `_`); anything else is never looked up. The checkout is the one the project's branches provider lists for the agent, asked afresh on a miss; the project's root is never given in its place. The record is the agent's as the project keeps it: its status, its machine, its branch, its pull request's number, and, each when the record has it, `baseCommit`, the commit the agent's own work begins at (an agent started from a branch other than the default one, as a subagent is from its main agent's: its changes are measured from that commit), and `landed`, the last commit of the agent's work once its main agent landed it (its branch is gone, and its work is read at that commit). "Changed nothing" is the dashboard's one rule, the same the handoff read uses (`agent-handoff.ts`): the agent ended `done`, `failed` or `stopped` on this machine, by its record's machine, has no pull request, and was not landed. An agent with neither a checkout nor a record has no facts.
 
 ### A pull request's merge commit
 

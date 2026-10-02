@@ -1,4 +1,4 @@
-Reads an agent's [1] files for the Files module's side-rail tab on the agent's page, for as long as git still holds them: from the agent's checkout [2] while it exists, then from the agent's branch, then from the commit its pull request merged as. It answers the tree of files with each file the agent changed marked, one changed file's diff, and one unchanged file's content, all from the same source. An agent that finished on this machine [4], with none of the three left and no recorded pull request, changed nothing, and its answer is the project's default branch with nothing marked. When none of the three is left otherwise, the answer is that the agent's changes are gone.
+Reads an agent's [1] files for the Files module's side-rail tab on the agent's page, for as long as git still holds them: from the agent's checkout [2] while it exists, then from the agent's branch, then from the commit its pull request merged as, or, for a subagent [6] its main agent landed, from the last commit its record kept. It answers the tree of files with each file the agent changed marked, one changed file's diff, and one unchanged file's content, all from the same source. An agent started from a branch other than the default one (a subagent starts from its main agent's branch) is measured from the commit its record says its own work begins at, so the other branch's work is not marked as its own. An agent that finished on this machine [4], with none of those sources left and no recorded pull request, changed nothing, and its answer is the project's default branch with nothing marked. When none of the three is left otherwise, the answer is that the agent's changes are gone.
 
 ## Context
 
@@ -8,19 +8,23 @@ Reads an agent's [1] files for the Files module's side-rail tab on the agent's p
 
 **Business logic story**: an agent works on branch `fix-login`, commits two files, and its pull request #42 is squash-merged; the checkout is reclaimed. While the branch `fix-login` still exists, the tab shows the project's files at the branch's last commit, the two files marked, captioned "From branch fix-login". Once the branch is deleted, the tab shows the files at the squash commit, the same two files marked, captioned "From the merge of #42". Another agent finished `done` on this machine without opening a pull request: when its checkout was reclaimed, its branch was deleted with it because origin already had everything on it, so the tab shows the project's files on the default branch, nothing marked, captioned "This run changed no files". The same agent read from the user's other machine, which never saw its branch, says its changes are gone from that machine. A third agent opened pull request #50, which was merged on the git host after this machine last fetched, and its branch is deleted: the tab says its changes are gone from this machine.
 
+**Business logic story**: a main agent on branch `agent-plan` commits `plan.txt` and starts a subagent [6] from that branch; the subagent commits `part.txt`. The subagent's record names the commit of `agent-plan` its branch was made from. In the subagent's checkout, and later on its branch, the tab marks `part.txt` only: measured from the default branch, `plan.txt` would be marked too, as if the subagent had written it. The main agent lands the subagent: its work is merged into `agent-plan`, its branch is deleted, and its record keeps its last commit. The tab now shows the files at that commit, `part.txt` marked, captioned "From its last commit, landed on its main agent’s branch", and still does once `agent-plan` is squashed and deleted.
+
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory. The user's own working copy is the project's checkout.
-[3] fork point: the commit where an agent's branch left the project's default branch: the default branch is origin's `HEAD`, else a local `main`, else a local `master`. An agent's changes are what differs between the fork point and the agent's last commit.
-[4] finished on this machine: said of an agent whose record names this machine's hostname as its `host` and whose status is `done`, `failed` or `stopped`, the endings its own tool records (a Stop included), or that the sweep records only for an agent that left no checkout, and that recorded no pull request. A record with any other status, or with no status or no `host`, has not. The dashboard judges it, not this module: it hands the answer over as one of the agent's facts [5].
-[5] the agent's facts: what the dashboard tells a module's server part about one agent when asked: its checkout while it has one, its record (status, machine, branch, pull request number), and whether it finished on this machine [4]; and, on request, the commit a pull request of a branch merged as, or that the git host is still being asked.
+[3] fork point: the commit an agent's changes are measured from. For an agent whose record names the commit its own work begins at (`baseCommit`: an agent started from a branch other than the default one), and when this machine has that commit: the commit where the agent's last commit left it, which is that commit itself for a branch made from it. Otherwise the commit where the agent's branch left the project's default branch: the default branch is origin's `HEAD`, else a local `main`, else a local `master`. An agent's changes are what differs between the fork point and the agent's last commit.
+[4] finished on this machine: said of an agent whose record names this machine's hostname as its `host` and whose status is `done`, `failed` or `stopped`, the endings its own tool records (a Stop included), or that the sweep records only for an agent that left no checkout, and that recorded no pull request and was not landed by a main agent. A record with any other status, or with no status or no `host`, has not. The dashboard judges it, not this module: it hands the answer over as one of the agent's facts [5].
+[5] the agent's facts: what the dashboard tells a module's server part about one agent when asked: its checkout while it has one, its record (status, machine, branch, pull request number, the commit its own work begins at, and the last commit of its work once its main agent landed it), and whether it finished on this machine [4]; and, on request, the commit a pull request of a branch merged as, or that the git host is still being asked.
+[6] subagent: an agent another agent, its main agent, started for one task, on a branch started from the main agent's. It opens no pull request: its main agent lands its work, which merges it into the main agent's branch, deletes the subagent's branch, and writes the subagent's last commit on its record (`skill-orchestration`).
 
 ## Business logic — TL;DR
 
-- **Where the files are read from** - the checkout the agent's facts [5] name; else the branch the agent recorded, this machine's copy first, then origin's copy; else the commit the agent's recorded pull request merged as; else, for an agent that finished on this machine [4], the default branch with nothing marked; else, for an agent starting on this machine (the dashboard does not know it yet, or it is recorded `running` here with no checkout yet), origin's default branch with nothing marked, since its checkout is made from it (the project's HEAD in a repository with no remote); else, for one recorded `running` on another machine, pending; else gone. Nothing is fetched and nothing is copied.
+- **Where the files are read from** - the checkout the agent's facts [5] name; else the branch the agent recorded, this machine's copy first, then origin's copy; else the commit the agent's recorded pull request merged as; else, for a subagent [6] its main agent landed, the last commit its record kept; else, for an agent that finished on this machine [4], the default branch with nothing marked; else, for an agent starting on this machine (the dashboard does not know it yet, or it is recorded `running` here with no checkout yet), origin's default branch with nothing marked, since its checkout is made from it (the project's HEAD in a repository with no remote); else, for one recorded `running` on another machine, pending; else gone. Nothing is fetched and nothing is copied.
 - **A branch already merged into the default branch** - it shows no change against the default branch, so the merge commit is read instead when this machine has it.
-- **What is marked** - in a checkout, what the agent committed since the fork point [3] and what is on disk uncommitted, apart; on a branch, what changed since the fork point; at a merge commit, that commit's own change.
+- **Measured from where the agent's own work begins** - an agent whose record names the commit its own work begins at is measured from that commit, in its checkout, on its branch and at its landed commit; a commit this machine does not have is ignored, and the default branch is measured from.
+- **What is marked** - in a checkout, what the agent committed since the fork point [3] and what is on disk uncommitted, apart; on a branch, what changed since the fork point; at a merge commit, that commit's own change; at a landed commit, what changed since the fork point.
 - **What is listed** - every file at the source's last state, plus the files the agent deleted.
 - **An agent that changed nothing** - an agent that finished on this machine [4] with no checkout, no branch and no pull request left nothing to lose, so the default branch's files are listed, nothing marked, with no diff for any file; an agent from another machine, or one with any status but `done` or `failed`, is never judged so.
 - **One file's diff and content** - read from the same source as the tree, so the preview shows the change the tree marked.
@@ -41,9 +45,10 @@ The sources are tried in this order, and the first one that exists answers:
 1. The agent's checkout [2], as the agent's facts [5] name it, while its directory is there. The project's root is never used in its place. A checkout named a moment ago may have been reclaimed since, as the agent ended: it is then no source, and the agent is not starting either, so where nothing below answers, the answer is pending rather than starting, and never an empty tree.
 2. The branch the agent recorded: this machine's branch of that name, else origin's copy of it (`origin/<branch>`) as this machine last fetched it.
 3. The commit the agent's pull request merged as. The agent must have recorded a pull request. The dashboard is asked which commit that pull request, by its number, of the agent's branch merged as, and it must name one. That commit must be on this machine: a pull request merged on the git host after this machine last fetched is not read yet.
-4. The project's default branch [3], as its last commit on this machine, when the agent finished on this machine [4]: the agent changed nothing (see "An agent that changed nothing").
-5. Starting: an agent with neither a checkout nor a record, and one recorded `running` on this machine: its checkout is being made, seconds after its page opened, from origin's default branch (`agent-data`'s rule: origin's `HEAD`, else `origin/main`, else `origin/master`; the project's HEAD in a repository with none), so that commit's files are its files, nothing marked. Nothing is fetched: this clone's copy is read. One recorded `running` on another machine is pending instead: its branch is not here yet. Asked again, a later read finds the checkout or the branch.
-6. Gone: an agent that did not finish on this machine, including one `waiting`, one from another machine and one whose record names no machine; an agent with a recorded pull request whose branch and merge commit are not on this machine; and an agent for which no default branch is found.
+4. The commit the agent's record kept when its main agent landed it (`landed`), for a subagent [6] whose branch is gone. That commit must be on this machine.
+5. The project's default branch [3], as its last commit on this machine, when the agent finished on this machine [4]: the agent changed nothing (see "An agent that changed nothing").
+6. Starting: an agent with neither a checkout nor a record, and one recorded `running` on this machine: its checkout is being made, seconds after its page opened, from origin's default branch (`agent-data`'s rule: origin's `HEAD`, else `origin/main`, else `origin/master`; the project's HEAD in a repository with none), so that commit's files are its files, nothing marked. Nothing is fetched: this clone's copy is read. One recorded `running` on another machine is pending instead: its branch is not here yet. Asked again, a later read finds the checkout or the branch.
+7. Gone: an agent that did not finish on this machine, including one `waiting`, one from another machine and one whose record names no machine; an agent with a recorded pull request whose branch and merge commit are not on this machine; a landed subagent whose landed commit is not on this machine, which is never read as having changed nothing; and an agent for which no default branch is found.
 
 Nothing is ever fetched: the tab polls, and a fetch on every poll would be a network call. The git host is asked through the dashboard, which keeps its answers in the shared cache its other pull request reads use.
 
@@ -56,6 +61,16 @@ Nothing is ever fetched: the tab polls, and a fetch on every poll would be a net
 #### Business logic
 
 When the branch's fork point is the branch's own last commit, the merge commit is read instead, if the agent has a pull request whose merge commit is on this machine. Otherwise the branch still answers, with nothing marked.
+
+### Measured from where the agent's own work begins
+
+#### Context
+
+**Problem**: a subagent's [6] branch is made from its main agent's branch, so beyond the default branch it holds the main agent's work as well as its own. Measured from the default branch, every file the main agent changed before it started the subagent would be marked as the subagent's change.
+
+#### Business logic
+
+When the agent's record names the commit its own work begins at (`baseCommit`, written by the tool that started the agent), and this machine has that commit, the fork point [3] is where the agent's last commit left that commit, instead of where it left the default branch. This holds for all three sources that have a fork point: the checkout, the branch, and the landed commit. A record that names no such commit, or one this machine does not have, is measured from the default branch as before: the other branch's files are then marked too.
 
 ### What is marked
 
@@ -70,6 +85,7 @@ Each changed file is marked added, untracked, modified or deleted, and committed
 - In a checkout: every file that differs between the fork point [3] and the checkout's last commit is marked committed (added, modified or deleted). Every file `git status` reports is marked not committed (untracked, modified or deleted). A file marked both keeps the uncommitted mark, because that is what the file is on disk now.
 - On a branch: every file that differs between the fork point and the branch's last commit, all committed.
 - At a merge commit: every file that differs between the merge commit's first parent and the merge commit, all committed. The first parent is the default branch before the merge, for a squash commit and a true merge commit alike.
+- At a landed commit: every file that differs between the fork point and the landed commit, all committed.
 - A renamed file is marked as the old path deleted and the new path added.
 - With no fork point (no default branch found), a checkout marks only its uncommitted files and a branch marks nothing.
 
@@ -81,7 +97,7 @@ See `## Context`.
 
 #### Business logic
 
-A checkout lists every file git sees in it, tracked and untracked, honoring the ignore rules. A branch or a merge commit lists every file in that commit. The files the agent deleted are added to the list, so a deletion stays visible in the tree. The list is sorted by path.
+A checkout lists every file git sees in it, tracked and untracked, honoring the ignore rules. A branch, a merge commit or a landed commit lists every file in that commit. The files the agent deleted are added to the list, so a deletion stays visible in the tree. The list is sorted by path.
 
 ### An agent that changed nothing
 
@@ -91,7 +107,7 @@ A checkout lists every file git sees in it, tracked and untracked, honoring the 
 
 #### Business logic
 
-It applies only to an agent that finished on this machine [4], with no checkout, no branch ref of its recorded branch (local or origin's copy) or no recorded branch at all, and no recorded pull request. The answer lists every file in the default branch's [3] last commit, and marks nothing. Every file's content is read from that commit, as on a branch; no file has a diff.
+It applies only to an agent that finished on this machine [4], with no checkout, no branch ref of its recorded branch (local or origin's copy) or no recorded branch at all, no recorded pull request, and no landed commit on its record: a landed subagent's [6] branch went because its work moved to its main agent's branch, not because it held nothing. The answer lists every file in the default branch's [3] last commit, and marks nothing. Every file's content is read from that commit, as on a branch; no file has a diff.
 
 ### One file's diff and content
 
@@ -104,10 +120,10 @@ It applies only to an agent that finished on this machine [4], with no checkout,
 The diff (the capping and counting rules are `diff.ts`'s):
 
 - In a checkout, a file changed on disk diffs against the checkout's last commit, as it always has. A file changed only by the agent's commits diffs from the fork point [3] to the checkout's last commit.
-- On a branch, from the fork point to the branch's last commit. At a merge commit, from its first parent to the merge commit.
+- On a branch, from the fork point to the branch's last commit. At a merge commit, from its first parent to the merge commit. At a landed commit, from the fork point to the landed commit.
 - A file the source did not change has no diff, and neither does an unsafe path (`read.ts`'s rule).
 
-The content: in a checkout, the file on disk (`read.ts`). On a branch, at a merge commit, or on the default branch for an agent that changed nothing, the file as that commit holds it, capped at 500 lines, flagged binary when it holds a NUL byte, and nothing for an unsafe path or a path the commit does not hold.
+The content: in a checkout, the file on disk (`read.ts`). On a branch, at a merge commit, at a landed commit, or on the default branch for an agent that changed nothing, the file as that commit holds it, capped at 500 lines, flagged binary when it holds a NUL byte, and nothing for an unsafe path or a path the commit does not hold.
 
 When the agent's changes are gone, or still being looked up, there is no diff and no content.
 

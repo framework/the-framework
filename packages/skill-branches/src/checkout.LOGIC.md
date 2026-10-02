@@ -44,7 +44,7 @@ Given the project's checkout, an agent id [7] and, optionally, a base revision a
 
 #### Business logic
 
-Given the project's checkout, an agent id [7], the branch to continue on and, optionally, a base revision and further skills [3] to link, a worktree is created at `.branches/agent-<agent id>` with that branch checked out, whatever the branch's name (the rules for a branch gone locally or gone everywhere, where the base is used, are in `worktree.ts`). The checkout [1] is then settled exactly as a new agent's, and the caller gets the checkout's path and branch back.
+Given the project's checkout, an agent id [7], the branch to continue on and, optionally, a base revision and further skills [3] to link, a worktree is created at `.branches/agent-<agent id>` with that branch checked out, whatever the branch's name (the rules for a branch gone locally or gone everywhere, where the base is used, are in `worktree.ts`). The checkout [1] is then settled exactly as a new agent's, and the caller gets the checkout's path and branch back, and, when the branch was gone everywhere and was made again, that it was made again (`worktree.ts`).
 
 ### What a checkout gets besides its files
 

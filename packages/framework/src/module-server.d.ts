@@ -17,8 +17,12 @@ export interface RunFacts {
     /** The branch the run left its work on, by its last recorded name. */
     branch?: string
     pr?: { number: number }
+    /** The commit the run's own work begins at, for a run started from a branch other than the default one: what its changes are measured from. */
+    baseCommit?: string
+    /** The last commit of the run's work, once its main agent landed it: its branch is gone, and its work is read here. */
+    landed?: string
   }
-  /** The run ended on this machine without a pull request, so a branch it no longer has held nothing. */
+  /** The run ended on this machine without a pull request and was not landed, so a branch it no longer has held nothing. */
   changedNothing: boolean
 }
 

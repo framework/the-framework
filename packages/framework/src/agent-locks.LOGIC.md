@@ -1,8 +1,8 @@
-Serializes the dashboard's own actions against one finished agent [1]'s checkout [2] inside the daemon: "Publish & Open PR", Remove and Delete all take one lock keyed by the checkout, run one at a time in arrival order, and never inherit each other's failures. The lock is in-process by design: the dashboard's actions are served inside the daemon. It does not coordinate with the tool that runs the agent, which is another process and reclaims [4] the checkout itself when the agent ends: the dashboard offers these actions only once the agent has ended, and that tool's reclaim refuses a checkout it cannot take cleanly.
+Serializes the dashboard's own actions against one finished agent [1]'s checkout [2] inside the daemon: "Open PR", Remove and Delete all take one lock keyed by the checkout, run one at a time in arrival order, and never inherit each other's failures. The lock is in-process by design: the dashboard's actions are served inside the daemon. It does not coordinate with the tool that runs the agent, which is another process and reclaims [4] the checkout itself when the agent ends: the dashboard offers these actions only once the agent has ended, and that tool's reclaim refuses a checkout it cannot take cleanly.
 
 ## Context
 
-**User story**: the moment an agent ends, the user clicks "Publish & Open PR", then Remove or Delete on it. Whatever they clicked works.
+**User story**: the moment an agent ends, the user clicks "Open PR", then Remove or Delete on it. Whatever they clicked works.
 
 **Problem**: each of these actions runs git against the same checkout [2]. Two of them at once make one fail on the ref, and a removal that loses keeps a checkout it should have removed.
 
@@ -34,7 +34,7 @@ The key is the checkout [2]'s path, resolved, so two spellings of one path are o
 
 #### Context
 
-**Business logic story**: who takes the lock: "Publish & Open PR", Remove and Delete (`dashboard-rpc/control.ts`).
+**Business logic story**: who takes the lock: "Open PR", Remove and Delete (`dashboard-rpc/control.ts`).
 
 #### Business logic
 

@@ -12,7 +12,7 @@ Builds the cross-project "needs you" list, the interventions [1] feed: every reg
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [5] the Overview: the dashboard's cross-project page at `/`.
-[6] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself only when its task or the person asks; on a finished agent's page the "Publish & Open PR" and "Merge" buttons do it by hand.
+[6] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself only when its task or the person asks; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
 [7] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [9] branches provider: the package of the project that declares it provides the checkouts and branches; The Framework reads a branch's state and moves branches through the command that package declares (`../store/branches.ts`).
 [10] subagent: an agent another agent, its main agent, started for one task; its record names the main agent as its `parent`. Its branch is never pushed by a person: its main agent lands its work on the main agent's own branch.

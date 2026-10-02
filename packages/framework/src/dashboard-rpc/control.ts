@@ -223,8 +223,8 @@ export async function sendOpenPullRequest(projectId: string, agentId: string): P
 }
 
 /**
- * The user's Push action (#1820): push a finished run's branch, the last step where the project has
- * no git host package. Under the agent lock, as Open PR is, so the push cannot race a Remove.
+ * The user's Publish branch action (#1820): push a finished run's branch and open no pull request,
+ * the last step where the project has no git host package. Under the agent lock, as Open PR is, so the push cannot race a Remove.
  */
 export async function sendPush(projectId: string, agentId: string): Promise<HandoffResult> {
   return relayOr(agentId, 'sendPush', [projectId, agentId], async () => {

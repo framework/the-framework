@@ -1,0 +1,16 @@
+{
+  "id": "2026-10-02T13-59-45-767Z",
+  "startedAt": "2026-10-02T13:59:45.831Z",
+  "status": "running",
+  "intent": "Hand test. Create the file handtest/split-button.md holding the one line: hand test of the split button. Commit it on your branch. Then stop. Do not push and do not open a pull request.",
+  "driver": "claude-code",
+  "model": "opus",
+  "caller": {
+    "runner": {
+      "host": "Suleimans-MacBook-Pro.local",
+      "pid": 83740,
+      "base": "split-open-pr-button"
+    },
+    "host": "Suleimans-MacBook-Pro.local"
+  }
+}

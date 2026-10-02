@@ -11,7 +11,7 @@ The browser's typed stubs for every action the dashboard takes on an agent [1], 
 [7] resume hook: the one shell line under `resume:` in the project's `.the-framework/hooks.yml`, which continues an ended agent with the user's text or answer.
 [8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [9] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id.
-[10] the user's picks: the coding agent and the model chosen in the preferences, and the device chosen in "Run on".
+[10] the user's picks: the coding agent and the model chosen in the preferences, how far the agent publishes its work (the publish level of the option saved from the launcher's publish menu: `branch`, `pr` or `merge`, none for "Nothing"), and the device chosen in "Run on".
 [11] agent id: an agent's stable id, answered by the start hook; it names the agent's checkout directory, its branch until the agent names it, and its record.
 [12] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [13] claim: a ticket's lock file naming the holder working it, so two agents never work the same ticket.

@@ -25,7 +25,7 @@ function running(id: string, command: string, host = 'other-box'): RunCard {
 interface Seen {
   markers: RunCard[]
   withdrawn: string[]
-  spawned: { id: string; prompt: string; model: string }[]
+  spawned: { id: string; prompt: string; model: string; publish?: string }[]
   checks: string[]
 }
 
@@ -103,6 +103,23 @@ test('a due command under its cap with quota to spare is marked on the branch, t
   assert.deepEqual(marker.caller, { runner: { host: 'this-box' }, host: 'this-box' })
   assert.equal(marker.intent, '/work-queue')
   assert.deepEqual(seen.spawned, [{ id: marker.id, prompt: '/work-queue', model: 'opus' }])
+})
+
+test('a line with a publish level: the marker and the spawned run carry it, and the state lists it; a line without one says nothing of it', async () => {
+  const { deps: d, seen } = deps({ md: '- work-queue: when `npx queue`, publish merge\n- triage quick: every 6h\n' })
+  const record = await tick(d)
+  assert.deepEqual(seen.markers.map(m => m.caller), [
+    { runner: { host: 'this-box', publish: 'merge' }, host: 'this-box' },
+    { runner: { host: 'this-box' }, host: 'this-box' },
+  ])
+  assert.deepEqual(seen.spawned, [
+    { id: seen.markers[0]!.id, prompt: '/work-queue', model: 'opus', publish: 'merge' },
+    { id: seen.markers[1]!.id, prompt: '/triage quick', model: 'opus' },
+  ])
+  assert.deepEqual(record.schedule, [
+    { command: 'work-queue', when: 'npx queue', on: true, publish: 'merge' },
+    { command: 'triage quick', every: '6h', on: true },
+  ])
 })
 
 test('a command with a word after its folder name: the folder is looked up, the whole name is what the switch, the interval, the marker and the decision carry, and the prompt is the name with a slash', async () => {

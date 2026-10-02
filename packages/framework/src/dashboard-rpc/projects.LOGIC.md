@@ -1,4 +1,4 @@
-Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder), the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], whether an agent can be started there at all, and what would stop an agent before it is started; and switching one of the project's scheduled commands on or off on this machine, through the project's switch hook [9].
+Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder), the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], whether an agent can be started there at all, whether a pull request can be opened there, and what would stop an agent before it is started; and switching one of the project's scheduled commands on or off on this machine, through the project's switch hook [9].
 
 ## Context
 
@@ -25,7 +25,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 - **Adding a project** - a path is registered only after it has been installed as a project; an empty path is refused outright.
 - **The folder dialog is the daemon's** - the machine's own choose-a-folder dialog is opened by the daemon, because a browser cannot learn an absolute path; dismissing it is an ordinary answer, not a failure.
 - **The onboarding's first suggestion** - the directory the daemon was started in is offered as the first project, together with whether it is already registered.
-- **What the launcher offers** - the project's commands [3], read off its skills folders, and whether its hooks file has a start hook [7]; an unknown project answers nothing.
+- **What the launcher offers** - the project's commands [3], read off its skills folders, whether its hooks file has a start hook [7], and whether one of its packages provides a git host; an unknown project answers nothing.
 - **What would stop an agent** - the project's check hook [8], run with the coding agent the user picked: its problems and its warnings; a check hook that fails is one warning; no check hook, or an unknown project, answers nothing.
 - **A schedule switch** - the project's switch hook [9], run with the command and `on` or `off`: done, or the error in words; a project with no switch hook, and an unknown project, are each an error.
 
@@ -83,11 +83,11 @@ The daemon answers with the directory it is running in, and with that directory'
 
 #### Context
 
-**User story**: a project's launcher [2] lists every command [3] the project has under `/` and in its Commands menu; on a project with no start hook [7], Start is off and the launcher says why.
+**User story**: a project's launcher [2] lists every command [3] the project has under `/` and in its Commands menu; on a project with no start hook [7], Start is off and the launcher says why; on a project where no package provides a git host, the launcher's publish menu offers "Nothing" and "Publish branch" only.
 
 #### Business logic
 
-For a given project [1] the daemon answers two things, read fresh each time: the project's commands (the rule is `project-commands.ts`'s: the skills written to be run by a person, each with its name and description), and whether the project's `.the-framework/hooks.yml` names a `start` line (`project-hooks.ts`; a hooks file that is missing or refused counts as no start line). A project id that names no registered project answers nothing at all.
+For a given project [1] the daemon answers three things, read fresh each time: the project's commands (the rule is `project-commands.ts`'s: the skills written to be run by a person, each with its name and description), and whether the project's `.the-framework/hooks.yml` names a `start` line (`project-hooks.ts`; a hooks file that is missing or refused counts as no start line), and whether one of the project's packages declares that it provides the git host (`../store/git-host.ts`; a declaration that cannot be read counts as none): without one no pull request can be opened, so the launcher's publish menu stops at "Publish branch". A project id that names no registered project answers nothing at all.
 
 ### What would stop an agent
 

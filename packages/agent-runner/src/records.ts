@@ -13,6 +13,14 @@ import { deleteRun, writeRun, type AnyDiaryLine, type LogsDeps, type RunCard } f
  * it. A machine that never comes back leaves its card running, on purpose: nothing here guesses that a run it cannot see is dead.
  */
 
+/** How far a run publishes its work when its agent finishes: its branch, its pull request, or the request set to merge once its checks pass. */
+export const PUBLISH_LEVELS = ['branch', 'pr', 'merge'] as const
+export type Publish = (typeof PUBLISH_LEVELS)[number]
+
+export function isPublish(value: unknown): value is Publish {
+  return (PUBLISH_LEVELS as readonly unknown[]).includes(value)
+}
+
 /** This tool's mark on a card, under `caller.runner`. */
 export interface RunnerMark {
   /** The machine that started it. */
@@ -21,6 +29,8 @@ export interface RunnerMark {
   pid?: number
   /** The prompt a fresh agent is given once the run ends done with a pull request, the run's id after it (`run --then`). */
   then?: string
+  /** How far the run publishes when its agent finishes (`run --publish`): the branch, its pull request, or the request set to merge; absent, only what its prompt asks. */
+  publish?: Publish
   /** The run this one was started for, told when this one ends (`run --parent`). */
   parent?: string
   /** The branch this run's own branch started from (`run --base`); origin's default branch when absent. */
@@ -33,15 +43,16 @@ export interface RunnerMark {
 export function runnerMark(card: RunCard): RunnerMark | undefined {
   const mark = card.caller?.['runner']
   if (!mark || typeof mark !== 'object') return undefined
-  const { host, pid, then, parent, base, baseCommit } = mark as Record<string, unknown>
+  const { host, pid, then, publish, parent, base, baseCommit } = mark as Record<string, unknown>
   if (typeof host !== 'string') return undefined
-  return { host, ...(typeof pid === 'number' ? { pid } : {}), ...lasting({ then, parent, base, baseCommit }) }
+  return { host, ...(typeof pid === 'number' ? { pid } : {}), ...lasting({ then, publish, parent, base, baseCommit }) }
 }
 
-/** What a mark keeps for the run's whole life, a resume included: its follow-up, its parent, where it started. */
-export function lasting(mark: { then?: unknown; parent?: unknown; base?: unknown; baseCommit?: unknown }): Pick<RunnerMark, 'then' | 'parent' | 'base' | 'baseCommit'> {
+/** What a mark keeps for the run's whole life, a resume included: its follow-up, its publish level, its parent, where it started. */
+export function lasting(mark: { then?: unknown; publish?: unknown; parent?: unknown; base?: unknown; baseCommit?: unknown }): Pick<RunnerMark, 'then' | 'publish' | 'parent' | 'base' | 'baseCommit'> {
   return {
     ...(typeof mark.then === 'string' ? { then: mark.then } : {}),
+    ...(isPublish(mark.publish) ? { publish: mark.publish } : {}),
     ...(typeof mark.parent === 'string' ? { parent: mark.parent } : {}),
     ...(typeof mark.base === 'string' ? { base: mark.base } : {}),
     ...(typeof mark.baseCommit === 'string' ? { baseCommit: mark.baseCommit } : {}),

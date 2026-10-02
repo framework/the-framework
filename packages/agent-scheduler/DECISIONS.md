@@ -43,6 +43,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   empty), over the tool reading the queue (the tool would know a skill), and over a bare
   clock (empty runs). A list line the parser cannot read is skipped and named, never
   guessed.
+- A schedule line may say `publish <branch|pr|merge>`; a line that says nothing publishes
+  nothing, as a person's run does. In the tracked schedule, like the cap, because the level
+  is the team's. Picked over a per-machine setting in the state file.
 - A schedule line paces a command two ways, alone or together: `when` says there is work
   (the check's output), `every` says how often at most (the least time since the command's
   last recorded start, read off the run records on the branch, so every machine agrees and

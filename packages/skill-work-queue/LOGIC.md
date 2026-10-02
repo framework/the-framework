@@ -8,4 +8,4 @@ The `@gemstack/skill-work-queue` npm package: the `work-queue` command skill [1]
 
 ## Business logic — TL;DR
 
-- **Working the queue** (`SKILL.md`) - one queued task off the agent queue, unattended, claimed first, published by the agent as a pull request that merges on green and names its ticket, the entry marked done after the publish, the ticket put in review and closed only at the merge; the job the scheduler fires while the queue has entries.
+- **Working the queue** (`SKILL.md`) - one queued task off the agent queue, unattended, claimed first, published by the agent as far as whoever started it said, nothing when they said nothing, a pull request naming its ticket, the entry marked done after the publish, the ticket put in review and closed only at the merge; the job the scheduler fires while the queue has entries.

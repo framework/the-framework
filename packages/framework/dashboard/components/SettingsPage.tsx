@@ -410,7 +410,7 @@ function ScheduleSwitchRows() {
           <ToggleRow
             key={`${row.projectId}/${command.command}`}
             label={`Run /${command.command} on a schedule`}
-            description={`${row.projectName} · ${pace(command)}. On this machine only; agent-schedule.md sets the default.`}
+            description={`${row.projectName} · ${pace(command)} · ${publishes(command)}. On this machine only; agent-schedule.md sets the default, and how far a run publishes.`}
             checked={command.on}
             disabled={saving === `${row.projectId}/${command.command}`}
             onChange={next => flip(row.projectId, command.command, next)}
@@ -431,6 +431,14 @@ export function pace(command: SchedulerCommand): string {
   if (command.every && command.when) return `every ${command.every} at most, when its check finds work`
   if (command.every) return `every ${command.every}`
   return 'when its check finds work'
+}
+
+/** How far a scheduled command's runs publish, in words: what its schedule line says, nothing when it says none. */
+export function publishes(command: SchedulerCommand): string {
+  if (command.publish === 'branch') return 'publishes its branch'
+  if (command.publish === 'pr') return 'opens a pull request'
+  if (command.publish === 'merge') return 'opens a pull request that merges on green'
+  return 'publishes nothing'
 }
 
 function NumberRow({

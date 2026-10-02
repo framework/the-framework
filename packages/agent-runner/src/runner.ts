@@ -8,6 +8,7 @@ import { CodexDriver, codexReady } from '@agent-driver/codex'
 import { findRun } from '@gemstack/skill-logs'
 import { readPersonal } from './config.js'
 import { resumeRun, runCommand, runIdFrom, type RunOutcome } from './run.js'
+import type { Publish } from './records.js'
 import { acquireRunLock, handOverRunLock, isPidAlive, releaseRunLock, runStderrPath } from './run-lock.js'
 
 /**
@@ -48,13 +49,14 @@ export async function readyToRun(repo: string, driver: DriverName, deps: { probe
   }
 }
 
-/** The command line of a spawned run: the model, the coding agent, the follow-up, the parent and the base named only when the run has them, so the run's own defaults apply otherwise. */
+/** The command line of a spawned run: the model, the coding agent, the follow-up, the publish level, the parent and the base named only when the run has them, so the run's own defaults apply otherwise. */
 export function runArgs(run: SpawnedRun): string[] {
   const args = ['run', run.prompt, '--id', run.id]
   if (run.mark) args.push('--mark')
   if (run.model !== undefined) args.push('--model', run.model)
   if (run.driver !== undefined) args.push('--driver', run.driver)
   if (run.then !== undefined) args.push('--then', run.then)
+  if (run.publish !== undefined) args.push('--publish', run.publish)
   if (run.parent !== undefined) args.push('--parent', run.parent)
   if (run.base !== undefined) args.push('--base', run.base)
   return args
@@ -70,6 +72,8 @@ export interface SpawnedRun {
   driver?: DriverName
   /** The follow-up's prompt (`run --then`); a person's start only. */
   then?: string
+  /** How far the run publishes (`run --publish`): a schedule line's level for a scheduler's run, the person's pick for a detached start. */
+  publish?: Publish
   /** The run this one is started for (`run --parent`). */
   parent?: string
   /** The branch this run's branch starts from (`run --base`). */
@@ -133,14 +137,14 @@ async function spawnDetached(repo: string, id: string, args: string[]): Promise<
  */
 export async function detachRun(
   repo: string,
-  opts: { prompt: string; model?: string; driver?: DriverName; then?: string; parent?: string; base?: string; now?: () => Date },
+  opts: { prompt: string; model?: string; driver?: DriverName; then?: string; publish?: Publish; parent?: string; base?: string; now?: () => Date },
   deps: { spawn?: typeof spawnRun } = {},
 ): Promise<{ id: string; driver: DriverName; model?: string }> {
   const now = opts.now ?? (() => new Date())
   const id = runIdFrom(now().toISOString())
   const driver = opts.driver ?? 'claude-code'
   const model = opts.model
-  const named = { ...(opts.then !== undefined ? { then: opts.then } : {}), ...(opts.parent !== undefined ? { parent: opts.parent } : {}), ...(opts.base !== undefined ? { base: opts.base } : {}) }
+  const named = { ...(opts.then !== undefined ? { then: opts.then } : {}), ...(opts.publish !== undefined ? { publish: opts.publish } : {}), ...(opts.parent !== undefined ? { parent: opts.parent } : {}), ...(opts.base !== undefined ? { base: opts.base } : {}) }
   await (deps.spawn ?? spawnRun)(repo, { id, prompt: opts.prompt, mark: true, driver, ...(model !== undefined ? { model } : {}), ...named })
   return { id, driver, ...(model !== undefined ? { model } : {}) }
 }
@@ -167,7 +171,7 @@ export async function detachResume(
  * one given; none given, the coding agent starts on its own default. A parent it names that has
  * ended by the time this run ends is continued in a process of its own.
  */
-export async function runProject(repo: string, opts: { prompt: string; id?: string; mark?: boolean; model?: string; driver?: DriverName; then?: string; parent?: string; base?: string; log?: (line: string) => void }): Promise<RunOutcome> {
+export async function runProject(repo: string, opts: { prompt: string; id?: string; mark?: boolean; model?: string; driver?: DriverName; then?: string; publish?: Publish; parent?: string; base?: string; log?: (line: string) => void }): Promise<RunOutcome> {
   const id = opts.id ?? runIdFrom(new Date().toISOString())
   const driver = opts.driver ?? 'claude-code'
   const setup = await readPersonal(repo, opts.log ?? (() => {}))
@@ -179,6 +183,7 @@ export async function runProject(repo: string, opts: { prompt: string; id?: stri
     ...(opts.model !== undefined ? { model: opts.model } : {}),
     driver: driverFor(driver, id, setup),
     ...(opts.then !== undefined ? { then: opts.then, nextDriver: (next: string) => driverFor(driver, next, setup) } : {}),
+    ...(opts.publish !== undefined ? { publish: opts.publish } : {}),
     ...(opts.parent !== undefined ? { parent: opts.parent } : {}),
     ...(opts.base !== undefined ? { base: opts.base } : {}),
     resume: resumeDetached(repo),

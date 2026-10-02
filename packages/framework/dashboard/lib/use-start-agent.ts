@@ -1,14 +1,21 @@
-import type { Preferences } from '../../src/index.js'
+import type { Preferences, PublishLevel } from '../../src/index.js'
+import { publishLevelOf } from '../../src/client.js'
 import { sendStart } from '../rpc/control.js'
 import { useAction } from './use-action.js'
 
 type StartArgs = Parameters<typeof sendStart>
 
-/** The person's picks a start carries to the project's start hook; an unset one is left to the hook's own default. */
-export function startPicks(preferences: Preferences): { driver?: string; model?: string } {
+/**
+ * The person's picks a start carries to the project's start hook; an unset one is left to the
+ * hook's own default. The publish pick is carried as its level, and not at all when it is Nothing
+ * or was never made.
+ */
+export function startPicks(preferences: Preferences): { driver?: string; model?: string; publish?: PublishLevel } {
+  const publish = preferences.publish ? publishLevelOf(preferences.publish) : undefined
   return {
     ...(preferences.driver ? { driver: preferences.driver } : {}),
     ...(preferences.model ? { model: preferences.model } : {}),
+    ...(publish ? { publish } : {}),
   }
 }
 

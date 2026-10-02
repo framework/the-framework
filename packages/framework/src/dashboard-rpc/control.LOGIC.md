@@ -95,7 +95,7 @@ The pick goes neither to an inbox [14] nor to a resume hook [4]: it goes to the 
 
 #### Business logic
 
-The prompt is trimmed; an empty one is refused with "a non-empty prompt is required". The prompt, the user's picks (the coding agent, the model, and a device [12] when one is the target) and the project id go to the daemon's start (`daemon-runtime.ts`), which runs the project's start hook [4] or forwards to the device. The answer is the id of the agent the hook began, or the refusal in words ("this project has no start hook", "unknown project: …", the hook's own error). There is no busy refusal: a person's Start has no cap.
+The prompt is trimmed; an empty one is refused with "a non-empty prompt is required". The prompt, the user's picks (the coding agent, the model, the publish level, `branch`, `pr` or `merge`, when the launcher's publish menu says one, and a device [12] when one is the target) and the project id go to the daemon's start (`daemon-runtime.ts`), which runs the project's start hook [4] or forwards to the device. The answer is the id of the agent the hook began, or the refusal in words ("this project has no start hook", "unknown project: …", the hook's own error). There is no busy refusal: a person's Start has no cap.
 
 ### Removing a retained checkout
 

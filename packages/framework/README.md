@@ -41,7 +41,7 @@ agent is running **one shell line the project itself names** — its `start` hoo
 project's own `.the-framework/hooks.yml`:
 
 ```yaml
-start: npx agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"}
+start: npx agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"} ${PUBLISH:+--publish "$PUBLISH"}
 resume: npx agent-runner run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}
 check: npx agent-runner check ${DRIVER:+--driver "$DRIVER"}
 offset: npx agent-scheduler offset -- "$POINTS"

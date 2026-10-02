@@ -10,6 +10,8 @@ import { tailAgentEvents } from './dashboard-rpc/events-tail.js'
 import { addProject, listProjects, projectId } from './registry.js'
 import { installProject } from './install.js'
 import { runProjectHooks, runStartHook } from './project-hooks.js'
+import { publishLevelOf, publishPickIn } from './publish-levels.js'
+import { projectGitHost } from './store/git-host.js'
 
 /**
  * What the daemon does for a project (#393): start a run, add a project, and relay a run to and
@@ -101,11 +103,14 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
     }
     const projectCwd = await resolveProject(targetProjectId)
     if (!projectCwd) return { ok: false, error: `unknown project: ${targetProjectId}` }
+    // A project with no git host package can open no pull request: the furthest its run publishes is the branch.
+    const publish = options.publish !== undefined ? publishLevelOf(publishPickIn(options.publish, (await projectGitHost(projectCwd).catch(() => undefined)) !== undefined)) : undefined
     const started = await runStartHook(projectCwd, {
       prompt,
       ...(options.driver !== undefined ? { driver: options.driver } : {}),
       ...(options.model !== undefined ? { model: options.model } : {}),
       ...(options.then !== undefined ? { then: options.then } : {}),
+      ...(publish !== undefined ? { publish } : {}),
     })
     // The line made a checkout (or is about to): the project's checkouts are read again on the
     // next look rather than a few seconds from now, so the new run's page finds its own.

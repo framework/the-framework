@@ -8,4 +8,4 @@ The `@gemstack/skill-maintainability` npm package: the `maintainability` command
 
 ## Business logic — TL;DR
 
-- **The job** (`SKILL.md`) - refactoring a part of the code to make it as maintainable as possible, published as a pull request a person reviews.
+- **The job** (`SKILL.md`) - refactoring a part of the code to make it as maintainable as possible, published as far as whoever started the agent said.

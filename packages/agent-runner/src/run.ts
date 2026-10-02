@@ -6,7 +6,7 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary, type AnyDiaryLine, type LogsDeps, type RunCard, type RunStatus } from '@gemstack/skill-logs'
 import { hideLiveDir, inboxPath, liveDir, readLiveCard, readLiveDiary } from './live-card.js'
-import { forReaders, lasting, markerCard, recordBranchGone, recordRun, runnerMark, startOf, writeMarker, type RunnerMark } from './records.js'
+import { forReaders, lasting, markerCard, recordBranchGone, recordRun, runnerMark, startOf, writeMarker, type Publish, type RunnerMark } from './records.js'
 import { projectGitHost, type GitHost, type MergeOutcome } from './git-host.js'
 import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
 import { runEndedLine } from './ended.js'
@@ -16,7 +16,10 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
  * One run (#1774): a checkout from the branches package, a session from agent-driver, the prompt
  * once, and the agent's own loop to the end. No system prompt and no gates: the
  * command's skill file is the whole instruction, and the agent publishes its own work, when asked
- * to, through the skills in its checkout. This process records the run and reclaims the checkout when the
+ * to, through the skills in its checkout. How far it publishes is the run's publish level
+ * (`run --publish <branch|pr|merge>`), said in one sentence after the prompt: push the branch, open
+ * its pull request, or set it to merge once its checks pass. A run with no level gets its prompt as
+ * written. This process records the run and reclaims the checkout when the
  * agent stops; a run that dies is caught by the sweep, which a scheduler runs on every tick.
  *
  * The session keeps the run's live record itself, the card and the diary under `.the-framework/`
@@ -37,9 +40,10 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
  * A run may name a follow-up (`run --then <prompt>`): once it ends done with a pull request, a
  * fresh agent, a run of its own with its own record, works on the same branch from the prompt,
  * the first run's id after it. The first agent is told, in a line after its prompt, to publish its
- * work without arming the pull request's merge; the follow-up ending done is when this process merges
- * it, through the project's git host (`git-host.ts`). A follow-up that fails or is stopped leaves the
- * request open, for a person.
+ * work without arming the pull request's merge, whatever level the run was given; the follow-up
+ * is given no level, its prompt says what it publishes; the follow-up ending done is when this
+ * process merges it, through the project's git host (`git-host.ts`). A follow-up that fails or is
+ * stopped leaves the request open, for a person.
  *
  * The pull request a run's branch has is read back the same way, through the git host the project
  * declares; a project with no git host package records none.
@@ -53,12 +57,22 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
 /** The detail a stopped run's record carries. */
 export const STOPPED_DETAIL = 'stopped by a signal to its process'
 
-/** The line after a prompt when a follow-up is coming: the agent publishes its work, this process merges the request later. */
-export const HOLD_MERGE_LINE = 'Publish your work when you finish: push your branch and open its pull request, but do not arm its merge: it is merged for you once a follow-up is done.'
+const PUBLISH_OPENING = 'When you finish, if you committed anything, push your branch'
 
-/** The prompt an agent gets: the run's own, and the line above when the run names a follow-up. */
-export function agentPrompt(prompt: string, then: string | undefined): string {
-  return then !== undefined ? `${prompt}\n\n${HOLD_MERGE_LINE}` : prompt
+/** The sentence after a prompt that says how far to publish; how is the business of the skills in the checkout. */
+export const PUBLISH_LINES: Readonly<Record<Publish, string>> = {
+  branch: `${PUBLISH_OPENING} and open no pull request.`,
+  pr: `${PUBLISH_OPENING} and open its pull request.`,
+  merge: `${PUBLISH_OPENING} and open its pull request, set to merge on its own once its checks pass.`,
+}
+
+/** The sentence when a follow-up is coming: the agent publishes its work, this process merges the request later. */
+export const HOLD_MERGE_LINE = `${PUBLISH_OPENING} and open its pull request, but do not arm its merge: it is merged for you once a follow-up is done.`
+
+/** The prompt an agent gets: the run's own, then the sentence of its publish level; the hold sentence instead when the run names a follow-up. */
+export function agentPrompt(prompt: string, publish: Publish | undefined, then: string | undefined): string {
+  const line = then !== undefined ? HOLD_MERGE_LINE : publish !== undefined ? PUBLISH_LINES[publish] : undefined
+  return line !== undefined ? `${prompt}\n\n${line}` : prompt
 }
 
 /** Filesystem-safe, time-ordered id from an ISO start: the shape the dashboard sorts runs by. */
@@ -87,6 +101,8 @@ export interface RunOptions {
   branchPr?: { number: number; url: string }
   /** The follow-up's prompt: a fresh agent's once this run ends done with a pull request, this run's id after it. */
   then?: string
+  /** How far the agent publishes when it finishes; absent, only what the prompt itself asks. */
+  publish?: Publish
   /** The coding agent a follow-up run is on, given its id; this run's own when absent. */
   nextDriver?: (id: string) => Driver
   /** The run this one is started for: told when this one ends. */
@@ -174,7 +190,7 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
       id,
       checkout,
       card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { runner: mark, pid, host, ...forReaders(mark), kind: 'prompt', workspace: checkout.path } },
-      prompt: agentPrompt(opts.prompt, opts.then),
+      prompt: agentPrompt(opts.prompt, opts.publish, opts.then),
       driver: opts.driver,
       ...modelOf(opts.model),
       ...(opts.branchPr ? { prBefore: opts.branchPr } : {}),
@@ -222,9 +238,9 @@ export interface ResumeOptions {
  * the run kept, or a new one attached to its branch; a branch that went with the checkout, for
  * holding nothing, starts again from the base the record names. The session resumes by the id the
  * record carries; the diary goes on from where it stopped. The prompt is the user's text, or the
- * continuation of the question the run ended on with the given answer. A follow-up the record
- * names is still owed: the agent is told again not to arm the merge, and the follow-up runs once
- * this ends done.
+ * continuation of the question the run ended on with the given answer. The sentence of the publish
+ * level the record keeps is said again after it. A follow-up the record names is still owed: the
+ * agent is told again not to arm the merge, and the follow-up runs once this ends done.
  */
 export async function resumeRun(repo: string, opts: ResumeOptions): Promise<RunOutcome> {
   const resumed = await resumeOnce(repo, opts)
@@ -289,7 +305,7 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
       checkout,
       card: { ...runningCard },
       priorDiary: diary,
-      prompt: agentPrompt(prompt, previous.then),
+      prompt: agentPrompt(prompt, previous.publish, previous.then),
       driver: opts.driver,
       ...modelOf(model),
       continued: true,
@@ -490,7 +506,7 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
   }
 
   // The checkout goes once its branch holds everything in it (the branches rule), and the branch
-  // stays on this machine: nothing is pushed here, publishing is the person's call. A dirty tree
+  // stays on this machine: nothing is pushed here, publishing is the agent's when it was asked, the person's otherwise. A dirty tree
   // keeps the checkout, and the sweep tries again later. A waiting run keeps it on purpose: the
   // answer resumes the run there.
   if (status === 'waiting') {

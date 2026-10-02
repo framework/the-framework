@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { DriverQuota, DriverReadiness } from 'agent-driver'
-import { markerCard, runnerMark, type RunnerMark } from 'agent-runner'
+import { markerCard, runnerMark, type Publish, type RunnerMark } from 'agent-runner'
 import type { FileBranchWrite } from '@gemstack/agent-data'
 import type { RunCard } from '@gemstack/skill-logs'
 import { COMMANDS_DIR } from './names.js'
@@ -49,7 +49,7 @@ export interface TickDeps {
   writeMarker: (card: RunCard) => Promise<FileBranchWrite>
   withdrawMarker: (id: string) => Promise<unknown>
   /** Start the run's process, detached; resolves once it is spawned. */
-  spawn: (run: { id: string; prompt: string; model: string }) => Promise<void>
+  spawn: (run: { id: string; prompt: string; model: string; publish?: Publish }) => Promise<void>
   /** The driver's id, for the marker's card. */
   driver: string
   /** Whether the scheduler was told to stop while this tick runs: then nothing more is started. */
@@ -125,7 +125,9 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     }
     const id = deps.mint()
     const prompt = commandPrompt(command.name)
-    const mark: RunnerMark = { host: deps.host }
+    // The line's publish level, when it has one, goes on the marker and to the run: the agent is told it after its prompt.
+    const publish = command.publish !== undefined ? { publish: command.publish } : {}
+    const mark: RunnerMark = { host: deps.host, ...publish }
     const marked = await deps.writeMarker(markerCard({ id, startedAt: deps.now().toISOString(), prompt, driver: deps.driver, model: deps.state.model, mark }))
     if (!marked.ok) {
       // The commit stayed local and would ride a later push: taken back, so no record says running for a run that never was.
@@ -144,7 +146,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       continue
     }
     try {
-      await deps.spawn({ id, prompt, model: deps.state.model })
+      await deps.spawn({ id, prompt, model: deps.state.model, ...publish })
       decide(`started ${id}`, id)
     } catch (err) {
       decide(`could not start: ${err instanceof Error ? err.message : String(err)}`)
@@ -155,7 +157,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
 
 /** A command as a dashboard lists it: what the line says, not this machine's switch, which the state carries. */
 function scheduleLine(command: ScheduledCommand): ScheduleLine {
-  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), on: command.on }
+  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), on: command.on, ...(command.publish !== undefined ? { publish: command.publish } : {}) }
 }
 
 /** An age for a decision line: `less than a minute`, `12m`, `3h`, `2d`, floored. */

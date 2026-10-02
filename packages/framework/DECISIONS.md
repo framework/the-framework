@@ -76,9 +76,12 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   answers the new run's id. The dashboard names no tool. Picked over the dashboard calling
   the tool by name: the person picks what starts their runs, and a project that starts its
   runs some other way is not a special case.
-- The line gets the prompt, and the coding agent and the model when the person picked
-  them; anything else is the line's own business. Picked over handing over every option
-  the launcher once had, which is how the options became the thing to maintain.
+- The line gets the prompt, and the coding agent, the model and how far to publish when the
+  person picked them; anything else is the line's own business. The publish pick is one menu
+  beside Start: Nothing, Publish branch, Open PR, Merge on green. It is saved like the coding
+  agent. A project with no git host package is offered Nothing and Publish branch only.
+  Picked over handing over every option the launcher once had, which is how the options
+  became the thing to maintain.
 - A project with no `start` line cannot start a run from the dashboard, and the launcher
   says so. Picked over a built-in fallback, which would be The Framework running agents
   again.

@@ -55,3 +55,9 @@ test('a run started for another run names its parent beside the host, where a re
   assert.equal(card.caller?.['parent'], 'p1')
   assert.equal(runnerMark(card)?.parent, 'p1', 'and in the mark, as before')
 })
+
+test('the mark keeps the publish level a run was given, and drops a word that is no level', () => {
+  const card = markerCard({ id: 'c2', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'claude-code', mark: { ...mark, publish: 'merge' } })
+  assert.equal(runnerMark(card)?.publish, 'merge')
+  assert.equal(runnerMark({ ...card, caller: { runner: { ...mark, publish: 'push' } } })?.publish, undefined)
+})

@@ -8,4 +8,4 @@ The `@gemstack/skill-ux` npm package: the `ux` command skill [1], one `SKILL.md`
 
 ## Business logic — TL;DR
 
-- **The job** (`SKILL.md`) - reviewing every UI flow of a part of the product, rating its user experience and improving the badly rated flows, published as a pull request a person reviews.
+- **The job** (`SKILL.md`) - reviewing every UI flow of a part of the product, rating its user experience and improving the badly rated flows, published as far as whoever started the agent said.

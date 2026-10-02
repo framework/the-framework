@@ -8,4 +8,4 @@ The `@gemstack/skill-security-audit` npm package: the `security-audit` command s
 
 ## Business logic — TL;DR
 
-- **The job** (`SKILL.md`) - auditing a part of the code for security issues, exhaustively, each issue fixed in its own commit, published as a pull request a person reviews.
+- **The job** (`SKILL.md`) - auditing a part of the code for security issues, exhaustively, each issue fixed in its own commit, published as far as whoever started the agent said.

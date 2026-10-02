@@ -37,7 +37,7 @@ vi.mock('../rpc/reads.js', async importOriginal => ({
   onSchedulers: schedulers,
 }))
 
-import { SettingsPage, pace } from './SettingsPage.js'
+import { SettingsPage, pace, publishes } from './SettingsPage.js'
 
 afterEach(() => {
   cleanup()
@@ -149,7 +149,7 @@ describe('SettingsPage run on a schedule', () => {
     keepAlive: false,
     running: true,
     commands: [
-      { command: 'work-queue', when: 'npx queue', on: true },
+      { command: 'work-queue', when: 'npx queue', on: true, publish: 'merge' as const },
       { command: 'post-merge-cleanup', every: '1d', on: false },
     ],
   }
@@ -161,7 +161,8 @@ describe('SettingsPage run on a schedule', () => {
     const queue = screen.getByLabelText('Run /work-queue on a schedule') as HTMLElement
     expect(cleanup.getAttribute('aria-checked')).toBe('false')
     expect(queue.getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByText(/gemstack · every 1d\./)).toBeTruthy()
+    expect(screen.getByText(/gemstack · every 1d · publishes nothing\./)).toBeTruthy()
+    expect(screen.getByText(/gemstack · when its check finds work · opens a pull request that merges on green\./), 'the level its schedule line says, shown and not edited here').toBeTruthy()
     cleanup.click()
     await waitFor(() => expect(sendScheduleSwitch).toHaveBeenCalledWith('p1', 'post-merge-cleanup', true))
   })
@@ -178,5 +179,12 @@ describe('SettingsPage run on a schedule', () => {
     expect(pace({ command: 'a', every: '1d', on: true })).toBe('every 1d')
     expect(pace({ command: 'a', when: 'npx queue', on: true })).toBe('when its check finds work')
     expect(pace({ command: 'a', every: '6h', when: 'x', on: true })).toBe('every 6h at most, when its check finds work')
+  })
+
+  test('how far a scheduled command publishes, in words: what its line says, nothing when it says none', () => {
+    expect(publishes({ command: 'a', every: '1d', on: true })).toBe('publishes nothing')
+    expect(publishes({ command: 'a', every: '1d', on: true, publish: 'branch' })).toBe('publishes its branch')
+    expect(publishes({ command: 'a', every: '1d', on: true, publish: 'pr' })).toBe('opens a pull request')
+    expect(publishes({ command: 'a', every: '1d', on: true, publish: 'merge' })).toBe('opens a pull request that merges on green')
   })
 })

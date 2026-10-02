@@ -20,8 +20,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A command is marked `disable-model-invocation`: a person or a runner fires it, the agent
   never picks it on its own.
 - A runner fires a command by its name, `/work-queue`; the agent's harness expands the
-  skill. The command's words are the rules of the job — one task, commit, publish as a
-  pull request that merges on green; the pull request naming the ticket it closes, then
+  skill. The command's words are the rules of the job — one task, commit, publish as far
+  as whoever started the run said; the pull request naming the ticket it closes, then
   mark done, the `PR:` line and the release are the ticketing system's own rule for queued
   work — never a skill's name or command. Picked over the run that started the agent
   publishing for it: the agent pushes through the branches skill and opens the pull

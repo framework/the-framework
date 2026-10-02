@@ -1,6 +1,7 @@
 import { basename, dirname, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isDriverName } from './driver-names.js'
+import { isPublishPick, type PublishPick } from './publish-levels.js'
 import { nodeFs } from './node-fs.js'
 
 /**
@@ -67,6 +68,8 @@ export interface Preferences {
   model?: string
   /** Which coding agent a run starts on (#650): `claude-code` or `codex`, handed to the project's start hook. Absent = the hook's own default. */
   driver?: string
+  /** How far a run started from the dashboard publishes its work: `nothing`, or the level handed to the project's start hook, `branch`, `pr` or `merge`. The launcher's menu shows it and writes it. Absent = nothing. */
+  publish?: PublishPick
   /**
    * Post-merge cleanup: a run started from the launcher, in a project that has the
    * `post-merge-cleanup` command, is followed by a fresh agent running it on the run's branch
@@ -253,6 +256,8 @@ function sanitizePreferences(value: unknown): Preferences {
   // `driver` (#650) is constrained to the known set so junk never reaches the agent; the set is the
   // shared node-free vocabulary (driver-names.ts).
   if (isDriverName(input['driver'] as string | undefined)) preferences.driver = input['driver'] as string
+  // `publish` is constrained to the picks the launcher's menu lists.
+  if (isPublishPick(input['publish'])) preferences.publish = input['publish']
   // `editor` (#727) is a free-form CLI name, trimmed and length-capped so junk / a huge string
   // never lands in the file. A blank string is "no choice" (fall back to env / `code`), so dropped.
   if (typeof input['editor'] === 'string' && input['editor'].trim())

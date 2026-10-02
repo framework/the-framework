@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { PUBLISH_LEVELS, type Publish } from 'agent-runner'
 import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
 
 /**
@@ -23,6 +24,9 @@ import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
  * command may be in flight at once, across every machine that shares the repository. `off` lists
  * a command that runs only on a machine where a person switched it on; every other command runs
  * unless a person switched it off there. The switches are per machine, in the tool's state.
+ * `publish` says how far a run of the command publishes its work: push its `branch`, open its
+ * `pr`, or set the request to `merge` once its checks pass; a line that says nothing publishes
+ * nothing, as a person's run does.
  *
  * Every other line — headings, blank lines, prose — is the person's, and is not read. A list line
  * the parser cannot read is skipped and named, so a typo stands down one command and says so
@@ -41,6 +45,8 @@ export interface ScheduledCommand {
   cap: number
   /** Whether the command runs on a machine where nobody switched it: the line says `off` when it does not. */
   on: boolean
+  /** How far a run of the command publishes its work; absent when the line says nothing: the run publishes nothing. */
+  publish?: Publish
   /** The file's line number, for a message. */
   line: number
 }
@@ -57,6 +63,7 @@ const EVERY = /^every\s+(\d+)(m|h|d)$/
 const WHEN = /^when\s+`([^`]+)`$/
 const CAP = /^cap\s+(\d+)$/
 const OFF = /^off$/
+const PUBLISH = new RegExp(`^publish\\s+(${PUBLISH_LEVELS.join('|')})$`)
 const UNIT_MS = { m: 60_000, h: 3_600_000, d: 86_400_000 } as const
 
 /** The schedule out of the file's markdown. Pure. */
@@ -78,19 +85,21 @@ export function parseSchedule(md: string): Schedule {
 
 /**
  * The clauses after the name, in any order, each at most once: `every <N><m|h|d>`, `when \`…\``,
- * `cap <N>`, `off`. At least one of `every` and `when`, else nothing says when. `every 0` is refused
- * rather than read as "always", which is the clause being absent.
+ * `cap <N>`, `off`, `publish <branch|pr|merge>`. At least one of `every` and `when`, else nothing
+ * says when. `every 0` is refused rather than read as "always", which is the clause being absent.
  */
 function parseRule(name: string, rule: string, line: number): ScheduledCommand | undefined {
   let when: string | undefined
   let every: { ms: number; text: string } | undefined
   let cap: number | undefined
   let off = false
+  let publish: Publish | undefined
   for (const clause of clauses(rule)) {
     const asEvery = EVERY.exec(clause)
     const asWhen = WHEN.exec(clause)
     const asCap = CAP.exec(clause)
     const asOff = OFF.exec(clause)
+    const asPublish = PUBLISH.exec(clause)
     if (asEvery && every === undefined && Number(asEvery[1]) > 0) {
       every = { ms: Number(asEvery[1]) * UNIT_MS[asEvery[2] as keyof typeof UNIT_MS], text: `${asEvery[1]}${asEvery[2]}` }
     } else if (asWhen && when === undefined) {
@@ -99,12 +108,14 @@ function parseRule(name: string, rule: string, line: number): ScheduledCommand |
       cap = Math.max(1, Number(asCap[1]))
     } else if (asOff && !off) {
       off = true
+    } else if (asPublish && publish === undefined) {
+      publish = asPublish[1] as Publish
     } else {
       return undefined
     }
   }
   if (when === undefined && every === undefined) return undefined
-  return { name, ...(when !== undefined ? { when } : {}), ...(every ? { every } : {}), cap: cap ?? DEFAULT_CAP, on: !off, line }
+  return { name, ...(when !== undefined ? { when } : {}), ...(every ? { every } : {}), cap: cap ?? DEFAULT_CAP, on: !off, ...(publish !== undefined ? { publish } : {}), line }
 }
 
 /** The rule split on the commas outside backticks, each piece trimmed. */

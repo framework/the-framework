@@ -15,11 +15,12 @@ Starting an agent [1] from the dashboard, the same way on every surface that doe
 [5] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`).
 [6] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [7] follow-up: a prompt a start carries besides its own: once the agent ends done with a pull request, the tool the start hook names starts a fresh agent on the same branch with that prompt and the first agent's id, and holds the pull request's merge until that one is done.
+[8] publish level: how far an agent publishes its work when it finishes: `branch` (push the branch and open no pull request), `pr` (push the branch and open its pull request) or `merge` (push the branch and open its pull request, set to merge on its own once its checks pass). An agent given none publishes only what its prompt asks.
 
 ## Business logic — TL;DR
 
 - **What a start sends** - the project, the prompt, and the options: the user's picks, the launcher's follow-up [7] when its box is ticked, and a device [6] when the launcher picked one.
-- **The user's picks** - the coding agent [4] and the model from the preferences [5]; one that was never picked is left out, so the start hook's own default applies.
+- **The user's picks** - the coding agent [4] and the model from the preferences [5], each left out when never picked, so the start hook's own default applies; and the publish level [8] of the saved option of the launcher's publish menu, left out when that option is "Nothing" or none is saved.
 - **The post-merge cleanup pick** - offered only where the project has the `post-merge-cleanup` command; with the preference on there, the start's follow-up [7] is `/post-merge-cleanup`.
 - **A refusal keeps its own words** - the reason the daemon answered, or the surface's fallback wording when there is none.
 - **How the started agent is selected** - a successful start answers the started agent's id, and the dashboard opens that agent.
@@ -44,7 +45,7 @@ A start names the project, carries the prompt as typed or as the surface compose
 
 #### Business logic
 
-The picks are read off the preferences: the coding agent when the user picked one, the model when the user picked one. One that was never picked is not part of the start at all, so the project's start hook applies its own default rather than being handed a value nobody chose. Every surface that starts an agent sends these same picks; the launcher adds the picked device [6].
+The picks are read off the preferences: the coding agent when the user picked one, the model when the user picked one. One that was never picked is not part of the start at all, so the project's start hook applies its own default rather than being handed a value nobody chose. The preferences also hold the option the user picked in the launcher's publish menu (`publish`: "Nothing", "Publish branch", "Open PR" or "Merge on green"). It is carried as its publish level [8], `branch`, `pr` or `merge`; "Nothing", or no saved option, carries none, so the agent publishes only what its prompt asks. Every surface that starts an agent sends these same picks. The launcher sends the level of the option its publish menu shows, which in a project with no git host provider is `branch` for a saved pull request option (`components/StartAgentForm.tsx`), and adds the picked device [6].
 
 ### The post-merge cleanup pick
 

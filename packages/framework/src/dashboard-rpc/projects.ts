@@ -2,6 +2,7 @@ import { contextAddProject, contextProjectErrors, contextProjects, resolveProjec
 import { readProjectCommands, type ProjectCommand } from '../project-commands.js'
 import { readProjectHooks, runCheckHook, runSwitchHook, type StartReadiness } from '../project-hooks.js'
 import { pickDirectory, type PickDirectoryResult } from '../pick-directory.js'
+import { projectGitHost } from '../store/git-host.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
 import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.js'
 
@@ -61,17 +62,19 @@ export interface ProjectLauncher {
   commands: ProjectCommand[]
   /** Whether the project's `.the-framework/hooks.yml` has a `start` line; without one Start is off. */
   startHook: boolean
+  /** Whether one of the project's packages provides a git host; without one no pull request can be opened, so the publish menu stops at the branch. */
+  gitHost: boolean
 }
 
 /**
- * The project's commands (#1774), read off its skills folders, and whether it has a start hook.
+ * The project's commands (#1774), read off its skills folders, whether it has a start hook, and whether it has a git host.
  * `null` when the project is unknown here.
  */
 export async function onCommands(projectId: string): Promise<ProjectLauncher | null> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return null
-  const [commands, hooks] = await Promise.all([readProjectCommands(cwd), readProjectHooks(cwd)])
-  return { commands, startHook: hooks.start !== undefined }
+  const [commands, hooks, gitHost] = await Promise.all([readProjectCommands(cwd), readProjectHooks(cwd), projectGitHost(cwd).catch(() => undefined)])
+  return { commands, startHook: hooks.start !== undefined, gitHost: gitHost !== undefined }
 }
 
 /**

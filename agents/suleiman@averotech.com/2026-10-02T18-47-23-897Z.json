@@ -1,0 +1,15 @@
+{
+  "id": "2026-10-02T18-47-23-897Z",
+  "startedAt": "2026-10-02T18:47:23.981Z",
+  "status": "running",
+  "intent": "/post-merge-cleanup 1913",
+  "driver": "claude-code",
+  "caller": {
+    "runner": {
+      "host": "Suleimans-MacBook-Pro.local",
+      "pid": 77771,
+      "base": "publish-level"
+    },
+    "host": "Suleimans-MacBook-Pro.local"
+  }
+}

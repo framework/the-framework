@@ -20,7 +20,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A subagent's branch starts from the main agent's branch, not from origin's default
   branch: it works on what the main agent already committed.
 - A subagent starts no subagents. Picked over a tree of any depth.
-- What every subagent must be told (commit to its branch, open no pull request, ask
+- What every subagent must be told (commit to its branch, publish nothing, ask
   nobody) is added to its task by the command. Picked over the skill file asking the
   main agent to write it into every task: a rule that lives only as prose is forgotten.
 - Until a setting says which models subagents use, a subagent runs on the main agent's
@@ -38,11 +38,15 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## Landing
 - A subagent's work reaches the main agent's branch through `land`: a plain merge, then
-  the subagent's branch is deleted here and on origin. Picked over a squash per task, and
-  over the skill file telling the agent to merge and delete by hand: a branch left on
-  origin makes the main agent's branch look empty, and it is deleted with its checkout.
-- `land` keeps the subagent's last commit, under `refs/landed/<run id>` here and on origin,
+  the subagent's branch is deleted. Picked over a squash per task, and over the skill file
+  telling the agent to merge and delete by hand: a rule that lives only as prose is
+  forgotten, and a branch would stay behind for every task.
+- `land` keeps the subagent's last commit, under `refs/landed/<run id>` on this machine,
   and on its record. Picked over the commit id alone: git drops the commit once the main
   agent's branch is squashed and deleted. Picked over saving the list of changed files:
-  the counts would stay and the diffs would go.
-- The main agent opens the one pull request, once every task is landed.
+  the counts would stay and the diffs would go. Pushing the ref to origin was the earlier
+  rule and was dropped: nothing leaves the machine without the person's word.
+- The plan ends as one pull request, of the main agent's branch, opened like any run's: by
+  the person's click or ask, and not before every task is landed. The main agent opening
+  it by itself was the earlier rule and was dropped: approving a plan is a yes to starting
+  subagents, not to publishing.

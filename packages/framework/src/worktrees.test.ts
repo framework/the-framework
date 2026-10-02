@@ -47,16 +47,14 @@ async function commitWork(path: string): Promise<void> {
   await git(['commit', '-q', '-m', 'work'], path)
 }
 
-test('a worktree whose branch cannot reach the remote is kept, and says so (E5)', async () => {
-  // No remote configured: nothing is recoverable, so nothing is deleted.
-  const { repo, path } = await repoWithDirtyWorktree({ remote: false })
+test('a worktree whose agent committed goes, remote or none, and its branch keeps the work (E5)', async () => {
+  const { repo, path, branch } = await repoWithDirtyWorktree({ remote: false })
+  const git = nodeGitRunner()
   try {
     await commitWork(path)
-    const result = await removeProjectWorktree(repo, RUN_ID)
-    assert.equal(result.ok, false)
-    assert.match(result.ok === false ? result.error : '', /not on the remote/)
-    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
-    assert.match(await readFile(join(path, 'index.html'), 'utf8'), /Welcome!/, 'with the work still in it')
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
+    await assert.rejects(() => stat(path), 'the checkout is gone')
+    assert.match(await git(['show', `${branch}:index.html`], repo), /Welcome!/, 'the work is on its branch')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
@@ -98,7 +96,8 @@ test('the run-id branch the agent branched away from goes with the checkout when
     await git(['checkout', '-q', '-b', 'agent-cool-name'], path)
     await commitWork(path)
     assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true, branchesDeleted: [runBranch] })
-    assert.match(await git(['show', 'refs/remotes/origin/agent-cool-name:index.html'], repo), /Welcome!/, 'the work branch stays, pushed')
+    assert.match(await git(['show', 'agent-cool-name:index.html'], repo), /Welcome!/, 'the work branch stays')
+    await assert.rejects(() => git(['rev-parse', '--verify', 'refs/remotes/origin/agent-cool-name'], repo), 'not pushed')
     await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/${runBranch}`], repo), 'the run-id branch is gone')
   } finally {
     await rm(repo, { recursive: true, force: true })

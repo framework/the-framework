@@ -19,7 +19,7 @@ The rules and the processes of `agent-scheduler`: the schedule [1] a person writ
 [9] the scheduler's process: the tool's own process between `start` and `stop`, ticking every minute; the state holds its pid.
 [10] cap: how many runs of one command may be in flight at once, across every machine that shares the repository; 1 when the schedule line names none.
 [11] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[12] reclaim: removing a finished agent's checkout once its work is on the remote.
+[12] reclaim: removing a finished agent's checkout once its branch holds everything in it.
 [13] command: a schedule line's name, a skill folder's name under `.claude/skills/` and at most one word the skill takes as its argument (`triage quick`), which the coding agent's harness expands from the slash command `/<name>`.
 [14] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the schedule. The schedule line is the default where nobody switched the command: on, unless the line says `off`.
 

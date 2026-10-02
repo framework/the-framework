@@ -3,7 +3,7 @@ How The Framework reads a project's pull requests and acts on them: through the 
 ## Context
 
 **User story**:
-- The user opens a pull request for an ended agent's branch ("Open PR") or merges the one it has ("Merge PR"); the dashboard finds the pull requests a project has. A project on GitHub has the GitHub package installed; a project on another git host installs that git host's package instead, and nothing in The Framework changes.
+- The user opens a pull request for an ended agent's branch ("Publish & Open PR") or merges the one it has ("Merge PR"); the dashboard finds the pull requests a project has. A project on GitHub has the GitHub package installed; a project on another git host installs that git host's package instead, and nothing in The Framework changes.
 - A project none of whose packages provides a git host has no pull requests: nothing is opened or landed for it, and an ended agent's last step is the push. The answer is "no git host", never an error.
 
 **Business logic story**: The Framework names no git host. A project picks the package that speaks to its git host by listing it as a dependency; that package says, in its own package.json, which of its commands answers for the git host. The branches provider (`branches.ts`) pushes; this provider opens and lands. Opening a pull request from the dashboard is the two composed: the push, then the open (`../dashboard/agent-handoff.ts`).

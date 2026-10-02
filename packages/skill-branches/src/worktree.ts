@@ -419,19 +419,14 @@ export async function worktreeSize(path: string, size: SizeRunner = nodeSizeRunn
 /**
  * Whether a branch is on the remote, with the local tip already there.
  *
- * The one predicate the whole retention story is built on: nothing local is ever the last copy of
- * work, so anything the remote has may be deleted and anything it does not have stays. It replaced
- * three interacting rules — a clean finish removes the checkout, a failure keeps it, a merged
- * branch reclaims it later — each of which asked *what state did this session end in* rather than
- * *is this recoverable*.
+ * What a caller asks to say whether a branch's work is published yet.
  *
  * `git rev-parse` of the remote-tracking ref, then a merge-base check: the ref existing is not
  * enough, because a branch pushed and then committed to again has a tip the remote has never seen.
- * Reads only local refs (no fetch), so it is cheap enough to ask on every teardown — the remote ref
+ * Reads only local refs (no fetch), so it is cheap enough to ask on every poll — the remote ref
  * is written by the push this is checking for, which is what makes that sound.
  *
- * Anything unreadable answers `false`. A repo with no remote configured therefore keeps every
- * checkout, which is the honest outcome: there is nowhere for the work to be recoverable from.
+ * Anything unreadable answers `false`, and so does a repo with no remote configured.
  */
 export async function branchPushed(
   repo: string,
@@ -461,11 +456,9 @@ export async function worktreeClean(path: string, git: GitRunner = nodeGitRunner
 }
 
 /**
- * Whether the repo has any remote configured at all. What a caller asks once per project before reclaiming its checkouts: with
- * no remote, {@link branchPushed} is false for every checkout and the push cannot land, so the
- * whole per-checkout probe-and-push cycle is doomed before it starts — and that answer cannot
- * change between two checkouts of the same pass. Anything unreadable answers `false`, like
- * {@link branchPushed}: keeping a checkout is the safe direction.
+ * Whether the repo has any remote configured at all: with none there is nowhere to publish a
+ * branch to, and a caller offers no push. Anything unreadable answers `false`, like
+ * {@link branchPushed}.
  */
 export async function repoHasRemote(repo: string, git: GitRunner = nodeGitRunner()): Promise<boolean> {
   try {

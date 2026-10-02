@@ -18,10 +18,12 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   one `publish` that pushed and opened, which was one skill naming another.
 
 ## Flow: open
-- The agent opens its own pull request when it finishes: `npx github open` with the title
-  and body the agent wrote, and the merge armed on green when whoever started it says the
-  work may land on its own. Picked over whoever started the agent opening it, which needed
-  a run process that knew the agent's words: the agent knows them.
+- The agent opens its pull request only when asked to publish, by its task or by the
+  person: `npx github open` with the title and body the agent wrote, and the merge armed
+  on green when whoever asked says the work may land on its own. Opening it when it
+  finishes was the earlier rule and was dropped: a pull request is the person's act.
+  Picked over whoever started the agent opening it, which needed a run process that knew
+  the agent's words: the agent knows them.
 - `open` opens no second request for a branch that has one open, and never opens a draft
   when the merge is armed.
 - The branch must be on the remote already; `open` neither pushes nor checks, GitHub's own

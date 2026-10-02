@@ -2,7 +2,7 @@ Gives an agent [1] in a shell, the user, and the dashboard's server the `branche
 
 ## Context
 
-**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, `npx branches name <name>` to name its work, and `npx branches push` to push it, as its `branches` skill [3] instructs. The user runs `create`, `attach`, `list`, `remove` and `prune` from the project's checkout or from inside any agent's checkout. The dashboard's server runs `list` and `show` to show a run's checkout and what its branch holds, `push --branch` when the user presses "Push" on a finished run, or "Open PR", whose first half is this push, and `remove`, with `--discard` for a run the user throws away. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
+**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, `npx branches name <name>` to name its work, and, when its task or the person asks it to publish its work, `npx branches push` to push it, as its `branches` skill [3] instructs. The user runs `create`, `attach`, `list`, `remove` and `prune` from the project's checkout or from inside any agent's checkout. The dashboard's server runs `list` and `show` to show a run's checkout and what its branch holds, `push --branch` when the user presses "Push" on a finished run, or "Publish & Open PR", whose first half is this push, and `remove`, with `--discard` for a run the user throws away. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
 
 ## Glossary
 
@@ -14,7 +14,7 @@ Gives an agent [1] in a shell, the user, and the dashboard's server the `branche
 [6] branch link: a symbolic link under `.branches/`, named as the branch a checkout is on now and pointing at that checkout's directory, so `.branches/<branch>` reaches the checkout by its current branch name.
 [7] worktree root: a directory that is itself the top level of a git worktree: the project's checkout, or an agent's checkout that git still knows as a worktree.
 [8] agent branch: a branch whose name starts with `agent-`, other than `agent-data`: the branch a checkout is created on, or the `agent-<session name>` it is renamed to. The only branches this package renames or deletes.
-[9] reclaim: removing a finished agent's checkout once its work is on the remote.
+[9] reclaim: removing a finished agent's checkout once its branch holds everything in it.
 [10] birth branch: the branch a checkout is created on, `agent-<agent id>`, which also names the checkout's directory; the agent's branch until the agent names its work.
 
 ## Business logic — TL;DR
@@ -31,7 +31,7 @@ Gives an agent [1] in a shell, the user, and the dashboard's server the `branche
 - **`show`: what each branch holds and where it stands** - a bare JSON array, one state per branch named in the order named, gone branches included, each with the name the agent gave its work when it has one (`branch-state.ts`); at least one branch, else a usage error. With `--from <commit>`, the commits and files are measured from that commit, the one the branches started from, instead of the default branch. A full commit id in place of a branch is read as a branch that ends there.
 - **`push`: the agent's branch reaches the remote** - a bare `push` pushes the branch of the checkout the command runs in to `origin`, once the checkout is clean; a directory git does not know as a worktree, a checkout on no branch, a dirty tree and a push that did not land are refusals with a line each (`push.ts`). With `--branch <b>`, a person pushes branch `<b>` from anywhere in the project, through the checkout on it when one is, else the branch itself, left as it is when only `origin` has it; a branch neither here nor on `origin` is `no-branch`.
 - **`list`: every checkout under `.branches/`** - a bare JSON array, one row per checkout directory, with its branch when git knows it, the name the agent gave its work (`name`: the branch minus `agent-`, absent while the checkout is still on the branch it was created on) and its size on request.
-- **`remove`: reclaim one checkout** - under the reclaim rule, pushing unless `--no-push`, with a line for each refusal and `no-checkout` for a missing one; with `--discard`, the checkout goes whatever it holds, nothing pushed, the branch kept; the branch links follow at once.
+- **`remove`: reclaim one checkout** - under the reclaim rule, the branch kept on this machine and nothing pushed, with a line for each refusal and `no-checkout` for a missing one; with `--discard`, the checkout goes whatever it holds, uncommitted work included, the branch kept; the branch links follow at once.
 - **`prune`: reclaim every checkout** - `remove` for each checkout directory, reporting the removed and the skipped, never refusing as a whole.
 
 ## Business logic
@@ -130,7 +130,7 @@ See `## Context`.
 
 #### Context
 
-**User story**: the dashboard shows a finished run's page: its commits and changed files, whether the work is pushed or landed, what was left uncommitted, and offers the next step from that; and lists in "needs you" the finished runs whose branch was never pushed. The dashboard's server asks this command, for one run's branch or for several runs' branches at once. For a run started from a branch other than the default one (a subagent starts from its main agent's branch), the server names the commit the run's branch was made from, so the page shows the run's own work and not the other branch's. For a subagent whose branch is gone because its main agent landed its work, the server asks by the last commit the run's record kept.
+**User story**: the dashboard shows a finished run's page: its commits and changed files, whether the work is pushed or landed, what was left uncommitted, and offers the next step from that; and lists in "needs you" the finished runs whose branch is not published. The dashboard's server asks this command, for one run's branch or for several runs' branches at once. For a run started from a branch other than the default one (a subagent starts from its main agent's branch), the server names the commit the run's branch was made from, so the page shows the run's own work and not the other branch's. For a subagent whose branch is gone because its main agent landed its work, the server asks by the last commit the run's record kept.
 
 #### Business logic
 
@@ -140,7 +140,7 @@ See `## Context`.
 
 #### Context
 
-**User story**: an agent [1] has committed its work and its checkout [2] is clean; it runs `npx branches push` and its branch is on `origin`, where the next skill it reads takes it from. A run ended without pushing (it failed, was stopped, or was told someone else publishes); the user presses "Push", or "Open PR" whose first half is this push, on its page, and the branch the run worked on reaches the remote, whether or not its checkout is still on disk.
+**User story**: an agent [1] asked to publish its work has committed it and its checkout [2] is clean; it runs `npx branches push` and its branch is on `origin`, where the next skill it reads takes it from. A run ended without pushing, as every run nobody asked to publish does; the user presses "Push", or "Publish & Open PR" whose first half is this push, on its page, and the branch the run worked on reaches the remote, whether or not its checkout is still on disk.
 
 #### Business logic
 
@@ -162,13 +162,13 @@ A bare `push` acts on the checkout [2] the command runs in and pushes its branch
 
 #### Context
 
-**Business logic story**: the reclaim [9] decision and its refusals live in `reclaim.ts`; the command adds the missing-checkout case, the person's line for each refusal, the push option, and the commit the branch started from.
+**Business logic story**: the reclaim [9] decision and its refusals live in `reclaim.ts`; the command adds the missing-checkout case, the person's line for each refusal, and the commit the branch started from.
 
 #### Business logic
 
-`remove <id> [--no-push] [--from <commit>]` reclaims [9] the checkout [2] at `.branches/agent-<id>` under the rule that only what is on the remote may go, naming `agent-<id>` as the birth branch [10], with a push to `origin` allowed unless `--no-push` is given; the command line vouches for no pushed commit and passes no hook. `--from <commit>` names the commit the checkout's branch started from, in place of `origin`'s default branch: a branch with no commit past it holds nothing of its own and goes with the checkout (`reclaim.ts`). A blank `--from` is a usage error ("--from names a commit"). A missing `.branches/agent-<id>` directory is its own refusal, `no-checkout` ("no checkout for agent <id>"). The reclaim rule's refusals come through with one line each: `not-a-worktree` ("agent <id>'s directory is not a git worktree; left alone"), `no-branch` ("agent <id>'s checkout is on no branch; kept"), `dirty` ("<branch> has uncommitted work; the checkout was kept") and `not-on-remote` ("<branch> is not on the remote (<what git said, or "not pushed">); the checkout was kept"). On success the result carries the branches that went with the checkout as `branchesDeleted`, when any did, and the branch links [6] are reconciled at once, since a link named after a branch that just went is stale from this moment.
+`remove <id> [--from <commit>]` reclaims [9] the checkout [2] at `.branches/agent-<id>` under the rule that only what is committed may go, naming `agent-<id>` as the birth branch [10]; the branch stays on this machine and nothing is pushed; the command line passes no hook. `--from <commit>` names the commit the checkout's branch started from, in place of `origin`'s default branch: a branch with no commit past it holds nothing of its own and goes with the checkout (`reclaim.ts`). A blank `--from` is a usage error ("--from names a commit"). A missing `.branches/agent-<id>` directory is its own refusal, `no-checkout` ("no checkout for agent <id>"). The reclaim rule's refusals come through with one line each: `not-a-worktree` ("agent <id>'s directory is not a git worktree; left alone"), `no-branch` ("agent <id>'s checkout is on no branch; kept") and `dirty` ("<branch> has uncommitted work; the checkout was kept"). On success the result carries the branches that went with the checkout as `branchesDeleted`, when any did, and the branch links [6] are reconciled at once, since a link named after a branch that just went is stale from this moment.
 
-`remove <id> --discard` is the person's way out where the rule keeps the checkout: the checkout goes whatever it holds, uncommitted work included, nothing is pushed and no branch is deleted (`reclaim.ts`); `--no-push` or `--from` beside it changes nothing. The same `no-checkout` and `not-a-worktree` refusals apply, and the branch links are reconciled the same way.
+`remove <id> --discard` is the person's way out where the rule keeps the checkout: the checkout goes whatever it holds, uncommitted work included, and no branch is deleted (`reclaim.ts`); `--from` beside it changes nothing. The same `no-checkout` and `not-a-worktree` refusals apply, and the branch links are reconciled the same way.
 
 ### `prune`: reclaim every checkout
 
@@ -178,4 +178,4 @@ See `## Context`.
 
 #### Business logic
 
-`prune [--no-push]` runs `remove`'s reclaim [9] for every checkout [2] directory under `.branches/`, with the same push rule for all, and never refuses as a whole: the result is `{"ok": true, "removed": [ids], "skipped": [{agentId, reason, detail}]}`, each skipped entry carrying the refusal's reason and its one-line explanation, and the exit code is 0 even when every checkout was skipped. A git failure inside a removal itself ends the pass as `git-failed`. The branch links [6] are reconciled once for the whole pass, after the last checkout, and only when something was removed.
+`prune` runs `remove`'s reclaim [9] for every checkout [2] directory under `.branches/`, each measured from `origin`'s default branch, and never refuses as a whole: the result is `{"ok": true, "removed": [ids], "skipped": [{agentId, reason, detail}]}`, each skipped entry carrying the refusal's reason and its one-line explanation, and the exit code is 0 even when every checkout was skipped. A git failure inside a removal itself ends the pass as `git-failed`. The branch links [6] are reconciled once for the whole pass, after the last checkout, and only when something was removed.

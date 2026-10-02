@@ -84,7 +84,7 @@ function committingDriver(): Driver {
   }
 }
 
-test('a run: marker, checkout, the live card, the prompt once, the record, the checkout reclaimed once the branch is on origin', async () => {
+test('a run: marker, checkout, the live card, the prompt once, the record, the checkout reclaimed, its branch kept and not pushed', async () => {
   const repo = await testRepo()
   try {
     const seen: { cwd: string; card?: unknown } = { cwd: '' }
@@ -119,9 +119,10 @@ test('a run: marker, checkout, the live card, the prompt once, the record, the c
     assert.equal(card['branch'], 'agent-2026-09-16T14-01-00-000Z')
     assert.deepEqual(card['caller'], { runner: { host: 'this-box', pid: 4242 }, pid: 4242, host: 'this-box', kind: 'prompt', workspace: seen.cwd })
 
-    // The checkout went: the branch reached origin, the record is the only trace.
+    // The checkout went: the branch stays here, unpushed, and the record says where the work is.
     assert.equal(await stat(worktreePath(repo, outcome.id)).then(() => true, () => false), false)
-    assert.equal((await git(['rev-parse', '--verify', 'refs/remotes/origin/agent-fix-it'], repo)).trim().length, 40)
+    assert.equal((await git(['rev-parse', '--verify', 'refs/heads/agent-fix-it'], repo)).trim().length, 40)
+    await assert.rejects(() => git(['rev-parse', '--verify', 'refs/remotes/origin/agent-fix-it'], repo), 'nothing is pushed for the agent')
     const recorded = await findRun(repo, outcome.id)
     assert.equal(recorded?.status, 'done')
     assert.equal(recorded?.branch, 'agent-fix-it')
@@ -638,13 +639,14 @@ test("a run whose commit another run's pushed branch holds keeps its branch: sta
     const branch = (await findRun(repo, main.id))?.branch
     assert.equal(branch, `agent-${main.id}`, 'the branch is still on the record')
     assert.match(await git(['show', `refs/heads/${branch}:main.txt`], repo), /own work/, 'and still here')
-    assert.match(await git(['show', `refs/remotes/origin/${branch}:main.txt`], repo), /own work/, 'pushed under its own name')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo), 'and not pushed: publishing is the person\'s call')
 
     const based = await runCommand(repo, { prompt: 'Do the rest', base: branch!, driver: withSubagent('based'), now: () => new Date(NOW.getTime() + 60_000), gitHost: noGitHost })
     assert.deepEqual(based.checkout, { reclaimed: true })
     const basedBranch = (await findRun(repo, based.id))?.branch
     assert.equal(basedBranch, `agent-${based.id}`)
-    assert.match(await git(['show', `refs/remotes/origin/${basedBranch}:based.txt`], repo), /own work/)
+    assert.match(await git(['show', `refs/heads/${basedBranch}:based.txt`], repo), /own work/)
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${basedBranch}`], repo))
   } finally {
     await removeRepo(repo)
   }
@@ -672,11 +674,13 @@ test('a run started from a base, continued on the branch its work is on, keeps t
     }
     const first = await runCommand(repo, { prompt: 'Do task one', base: 'agent-plan', driver: working, now: () => NOW, gitHost: noGitHost })
     assert.deepEqual(first.checkout, { reclaimed: true })
-    // The record lost its branch's name, and this clone the branch: only origin still has it.
+    // A person published the branch; then the record lost its branch's name, and this clone the
+    // branch: only origin still has it.
     const ended = (await findRun(repo, first.id))!
     const { branch, ...branchless } = ended
     assert.equal(branch, `agent-${first.id}`)
     await recordRun(repo, branchless, (await readDiary(repo, first.id)) ?? [])
+    await git(['push', '-q', 'origin', branch!], repo)
     await git(['branch', '-D', branch!], repo).catch(() => {})
 
     await git(['checkout', '-q', 'agent-plan'], repo)

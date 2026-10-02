@@ -219,7 +219,7 @@ export async function resumeProject(
 
 /**
  * The coding agent a run is on, unrestricted either way: Claude Code with permissions bypassed, Codex
- * with full access. The run's agent pushes its branch and opens its pull request itself, which
+ * with full access. The run's agent, when asked to publish, pushes its branch and opens its pull request itself, which
  * Codex's default sandbox (the workspace only) does not allow. The run's id is in the agent's
  * environment, so the claim it makes names the run (the tickets skill reads `AGENT_ID`).
  *

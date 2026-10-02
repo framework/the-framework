@@ -84,7 +84,7 @@ The word is "failed". When the agent's [1] ending carries a detail text, that te
 
 #### Context
 
-**Problem**: an agent that finished clean has usually already opened its pull request. During the seconds in which the tool that runs it records the agent and pushes its branch, showing "ready for merge" would describe what is about to be true rather than what is happening.
+**Problem**: an agent that finished clean may already have opened its pull request, when it was asked to publish. During the seconds in which the tool that runs it records the agent and cleans up its checkout, showing "ready for merge" would describe what is about to be true rather than what is happening.
 
 #### Business logic
 

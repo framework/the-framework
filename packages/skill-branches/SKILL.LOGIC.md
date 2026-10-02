@@ -1,8 +1,8 @@
-The instructions every agent [1] reads as its `branches` skill [2]: its work goes on a branch named `agent-<name>`, which it names before its first change; it reads and writes only in its checkout [3]; it commits as it goes; it finishes only when `npx branches status` reports the checkout clean; and then it pushes its own branch with `npx branches push`, unless whoever started it said they publish for it. What happens to a pushed branch next is another skill's.
+The instructions every agent [1] reads as its `branches` skill [2]: its work goes on a branch named `agent-<name>`, which it names before its first change; it reads and writes only in its checkout [3]; it commits as it goes; it finishes only when `npx branches status` reports the checkout clean. Its branch stays on this machine: it pushes its branch with `npx branches push` only when its task or the person asks it to push or publish its work.
 
 ## Context
 
-**User story**: an agent [1] starts in a checkout [3] with no explanation of the layout it sits in. The user later sees its branch as `agent-<session name>`, the dashboard labels the agent by that session name [4], and the push of its branch is the agent's own last step once its work is committed, or happens on its behalf when whoever started it said so.
+**User story**: an agent [1] starts in a checkout [3] with no explanation of the layout it sits in. The user later sees its branch as `agent-<session name>`, the dashboard labels the agent by that session name [4], and the branch stays on this machine: nothing is published until the user says so, by publishing the branch themselves or by asking the agent to.
 
 **Problem**: the agent is a coding agent [5] driven as a black box, so the only way to make it behave in its checkout is to tell it, in text it reads when it starts. Left untold, it cannot know that the dependency files and skill directories in its checkout are links to the user's copies, that a branch differing from its directory's name means it was continued and already named, or that an uncommitted file keeps its checkout from ever being reclaimed [6].
 
@@ -13,12 +13,12 @@ The instructions every agent [1] reads as its `branches` skill [2]: its work goe
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as the branch it was created on.
 [4] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[6] reclaim: removing a finished agent's checkout once its work is on the remote.
+[6] reclaim: removing a finished agent's checkout once its branch holds everything in it.
 [7] cloud session: a Claude Code session hosted on claude.ai rather than on this machine.
 
 ## Business logic — TL;DR
 
-- **The work goes on `agent-<name>`, and the agent pushes it itself** - the branch and its push are the agent's, unless whoever started it said they publish for it; what happens to a pushed branch next is another skill's.
+- **The work goes on `agent-<name>`, and stays on this machine** - the branch is the agent's, and it is pushed only once the agent is asked to push it.
 - **How the command is run** - `npx branches` inside the checkout, after an install with the lockfile's package manager when `node_modules` is missing; `status`, `name` and `push` with no flag are the agent's commands, the rest are the caller's.
 - **Where the agent is** - `npx branches status` prints JSON whose `branch` is the branch the agent is on, and that branch decides everything below.
 - **On an `agent-` branch, the checkout is all the agent touches** - read and write only there, never edit the linked dependency files and skill directories, and stop when something needed lies outside.
@@ -27,19 +27,19 @@ The instructions every agent [1] reads as its `branches` skill [2]: its work goe
 - **In a plain clone, make an `agent-<name>` branch with git** - before the first change, and another name when that one exists locally or on `origin`.
 - **Commit as you go** - nothing is committed for the agent.
 - **Finish only clean** - `status` must report `"clean": true`; commit or delete what was added, and when what remains is not the agent's, say so and finish.
-- **Push** - once clean, `npx branches push` pushes the branch to origin and prints it in `branch`; a checkout that is not clean is refused as `dirty`.
+- **Push** - only when the agent's task or the person asks it to push or publish its work, and once clean: `npx branches push` pushes the branch to origin and prints it in `branch`; a checkout that is not clean is refused as `dirty`.
 
 ## Business logic
 
-### The work goes on `agent-<name>`, and the agent pushes it itself
+### The work goes on `agent-<name>`, and stays on this machine
 
 #### Context
 
-**User story**: the user starts an agent [1] and later finds its branch pushed; the agent did it as its last step.
+**User story**: the user starts an agent [1] and later finds its work committed on its branch, on this machine; nothing reached the remote unless the user asked for it.
 
 #### Business logic
 
-The agent [1] is told that its work goes on a branch named `agent-<name>`, unless whoever started it continued it on another branch. When it finishes, it pushes the branch itself; what happens to a pushed branch next, a pull request say, is another skill's. One exception: whoever started the agent may say they publish for it, and then the agent never pushes.
+The agent [1] is told that its work goes on a branch named `agent-<name>`, unless whoever started it continued it on another branch, and that the branch stays on this machine until the agent is asked to push it.
 
 ### How the command is run
 
@@ -95,7 +95,7 @@ When the branch does not start with `agent-` and the checkout [3] sits under `.b
 
 #### Context
 
-**User story**: an agent [1] started outside The Framework's checkouts [3], a cloud session [7] on a plain clone of the repository say, still ends on a branch of its own, named the same way, so its work is pushed like any agent's.
+**User story**: an agent [1] started outside The Framework's checkouts [3], a cloud session [7] on a plain clone of the repository say, still ends on a branch of its own, named the same way, so its work is found and published like any agent's.
 
 #### Business logic
 
@@ -105,7 +105,7 @@ When the branch does not start with `agent-` and the checkout [3] is not under `
 
 #### Context
 
-**Problem**: nothing is committed on the agent's [1] behalf; an uncommitted change is never pushed and keeps the checkout [3] from being reclaimed [6] (`src/reclaim.ts`).
+**Problem**: nothing is committed on the agent's [1] behalf; an uncommitted change is on no branch, and keeps the checkout [3] from being reclaimed [6] (`src/reclaim.ts`).
 
 #### Business logic
 
@@ -115,7 +115,7 @@ The agent [1] is told that nothing is committed for it, so it commits as it goes
 
 #### Context
 
-**Business logic story**: a checkout [3] is reclaimed [6] only when it is clean and its tip is on the remote; `clean` in `status` is that same read (`src/cli.ts`).
+**Business logic story**: a checkout [3] is reclaimed [6] only when it is clean; `clean` in `status` is that same read (`src/cli.ts`).
 
 #### Business logic
 
@@ -125,8 +125,8 @@ Before finishing, the agent [1] runs `npx branches status` again, and it must re
 
 #### Context
 
-**User story**: the user finds the agent's branch on origin without anyone pushing on the agent's behalf.
+**User story**: the user asks the agent to publish its work, in the task or in a later message, and finds the agent's branch on origin; an agent nobody asked leaves origin as it was.
 
 #### Business logic
 
-Once clean, and unless whoever started it said they publish for it, the agent [1] runs `npx branches push`. The command pushes the branch to origin and prints it in `branch`. A checkout that is not clean is refused as `dirty`: the agent commits or deletes first.
+The agent [1] pushes only when its task or the person asks it to push or publish its work. Then, once clean, it runs `npx branches push`. The command pushes the branch to origin and prints it in `branch`. A checkout that is not clean is refused as `dirty`: the agent commits or deletes first.

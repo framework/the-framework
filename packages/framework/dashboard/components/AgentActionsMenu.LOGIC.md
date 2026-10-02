@@ -19,7 +19,7 @@ One "⋮" menu at the end of an agent's [1] action bar, holding everything the u
 
 - **Opening the agent somewhere** - "Open on <git host name>" when the project's git host names a page; a folder item named for what it will open; an "Open in editor" submenu with the preferred-editor picker; "Open session (<id>)" when the driver session has a real link.
 - **Copying the resume command** - when the driver session id is known, one item copies the terminal command that reopens the conversation, or just the id when the directory it ran in is unknown, and confirms with "Copied".
-- **Stop, while the agent works** - "Stop agent", which reads "Stopping…" until the agent's end arrives. There is no merge here: an agent that is working publishes its own work.
+- **Stop, while the agent works** - "Stop agent", which reads "Stopping…" until the agent's end arrives. There is no merge here: an agent that is working is still writing its branch.
 - **Remove and delete, once the agent has ended** - "Remove worktree" only while the agent's checkout is kept; "Delete session" only for a finished agent, behind a confirmation that says the history is gone for good while the branch and pull request stay in git.
 - **Failures are said in the menu** - a failed action's reason is shown at the bottom of the menu instead of nothing happening.
 
@@ -58,7 +58,7 @@ Offered only when the agent's [1] events carry a driver session id. The item sho
 
 **User story**: the user wants to end an agent [1] that is working.
 
-**Problem**: the daemon runs no agent itself, so a stop is a signal to the process the agent's own record names. And a merge decided ahead of time has no place here: an agent that is working publishes its own work, and merging its pull request is offered once it has ended, as the bar's next step [2].
+**Problem**: the daemon runs no agent itself, so a stop is a signal to the process the agent's own record names. And a merge decided ahead of time has no place here: an agent that is working is still writing its branch, and merging its pull request is offered once it has ended, as the bar's next step [2].
 
 #### Business logic
 

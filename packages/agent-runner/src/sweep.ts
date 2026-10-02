@@ -14,7 +14,7 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
  * A checkout whose live card says `running` under a dead pid is a run that died mid-work: its
  * record is written `failed` from what it left, and the checkout is reclaimed under the branches
  * rule (a dirty tree stays). A checkout whose card says the run ended is one whose process died
- * between the end and the record, or whose reclaim could not push: recorded again, idempotent,
+ * between the end and the record, or whose checkout held uncommitted work: recorded again, idempotent,
  * and reclaimed again; a run that ended `waiting` keeps its checkout for the answer. A running
  * card on the branch from this machine with no checkout behind it is a run that never started:
  * `failed` with the stderr the spawn left, else `stopped`.
@@ -73,11 +73,11 @@ export async function sweep(repo: string, deps: SweepDeps): Promise<SweepResult>
       result.kept.push({ id: card.id, reason: 'waiting' })
       continue
     }
-    const reclaimed = await reclaimWorktree(repo, entry.path, { mayPush: true, birthBranch: agentBranchName(entry.agentId), ...startOf(card), git })
+    const reclaimed = await reclaimWorktree(repo, entry.path, { birthBranch: agentBranchName(entry.agentId), ...startOf(card), git })
     if (reclaimed.ok) {
       result.reclaimed.push(card.id)
       await recordBranchGone(repo, card, diary, reclaimed.branchesDeleted, logs)
-    } else result.kept.push({ id: card.id, reason: 'detail' in reclaimed && reclaimed.detail ? `${reclaimed.reason}: ${reclaimed.detail}` : reclaimed.reason })
+    } else result.kept.push({ id: card.id, reason: reclaimed.reason })
     if (died) await tell(card, DIED_DETAIL, reclaimed.ok && card.branch !== undefined && reclaimed.branchesDeleted?.includes(card.branch) ? undefined : card.branch)
   }
 

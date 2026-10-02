@@ -4,7 +4,7 @@ Reads what a branch holds and where it stands: the commits and files it carries 
 
 **User story**: a run has ended, and the user looks at its page: how many commits, which files, whether the work is pushed or already landed, whether something was left uncommitted, and, from that, whether there is a pull request to open or a merge to land. The "needs you" list names the finished runs whose branch was never pushed.
 
-**Problem**: a finished agent's checkout is usually gone (reclaimed once its work reached the remote), so a read addressed to the checkout would fall back to the user's own working copy and report the user's branch as the agent's. The branch is what outlives the agent, so the branch is the subject.
+**Problem**: a finished agent's checkout is usually gone (reclaimed once its work was committed), so a read addressed to the checkout would fall back to the user's own working copy and report the user's branch as the agent's. The branch is what outlives the agent, so the branch is the subject.
 
 **Problem**: a branch started from another branch (a subagent's branch starts from its main agent's) holds, beyond the default branch, that other branch's work as well as its own. Measured from the default branch, the other branch's commits and files would read as this branch's.
 

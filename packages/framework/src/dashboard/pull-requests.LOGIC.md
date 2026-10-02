@@ -2,7 +2,7 @@ Every pull request the dashboard reads, in one place, all through the project's 
 
 ## Context
 
-**User story**: the user sees an agent's pull request in the git status bar and in the handoff summary, the project's open pull requests in the Human Queue, and the "Open PR" button only when the agent has none yet, whether the project is on GitHub or on another git host whose package answers the same command.
+**User story**: the user sees an agent's pull request in the git status bar and in the handoff summary, the project's open pull requests in the Human Queue, and the "Publish & Open PR" button only when the agent has none yet, whether the project is on GitHub or on another git host whose package answers the same command.
 
 **Business logic story**: the git status bar (`git-status.ts`), the handoff (`agent-handoff.ts`), the interventions feed (`interventions.ts`), cloud work adoption (`../cloud-work.ts`) and the cloud scratch sweep (`../cloud-scratch-refs.ts`) each ask here; the slow reads come through the read-through cache (`cache.ts`).
 
@@ -54,7 +54,7 @@ The git host provider [1] is asked for the branch's pull requests in every state
 
 #### Business logic
 
-The branch's pull request and the branch's history are each read through the read-through cache (`cache.ts`), under a key made of the checkout and the branch, so the worktree bar and the handoff summary share one answer and it is refreshed behind whoever asks. The cache answers with the value and whether a read is still running with no value known yet; "pending" means "not known yet", not "there is none", which matters to a caller deciding whether to offer "Open PR". A read asked with no branch answers nothing at once, not pending: there is nothing to ask the git host about. After an action that changes the answer, opening or landing a pull request, the caller forgets the branch's pull request and its history, so the next read is fresh.
+The branch's pull request and the branch's history are each read through the read-through cache (`cache.ts`), under a key made of the checkout and the branch, so the worktree bar and the handoff summary share one answer and it is refreshed behind whoever asks. The cache answers with the value and whether a read is still running with no value known yet; "pending" means "not known yet", not "there is none", which matters to a caller deciding whether to offer "Publish & Open PR". A read asked with no branch answers nothing at once, not pending: there is nothing to ask the git host about. After an action that changes the answer, opening or landing a pull request, the caller forgets the branch's pull request and its history, so the next read is fresh.
 
 ### Which pull request is the agent's
 

@@ -80,7 +80,7 @@ The prompt is handed to the action as an input, verbatim and never through a she
 
 #### Context
 
-**Problem**: the runner and its checkout vanish when the job ends, so the only way the driver [3] can read the agent's work, or run the next turn on top of it, is a branch on the remote. The action creates no branch for a dispatched run, so the workflow pushes one itself, to the name the driver chose. On this machine it is the other way round: the agent pushes its own branch, with the `branches` skill.
+**Problem**: the runner and its checkout vanish when the job ends, so the only way the driver [3] can read the agent's work, or run the next turn on top of it, is a branch on the remote. The action creates no branch for a dispatched run, so the workflow pushes one itself, to the name the driver chose. On this machine it is the other way round: the agent's branch stays on the machine, and the agent pushes it itself, with the `branches` skill, when it is asked to.
 
 #### Business logic
 

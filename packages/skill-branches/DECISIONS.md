@@ -48,7 +48,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - Continuing an agent puts it back on the branch its work is on, even one the package did
   not make; a branch gone locally comes back from origin's copy, and one gone everywhere is
   recreated where the agent's first branch started: the base the caller names, else
-  origin's default branch: every branch the package deletes held nothing the remote lacked.
+  origin's default branch: every branch the package deletes held no commit of its own.
 - The user's installed dependencies are linked into the checkout, not copied or
   reinstalled: one link per entry of the folder, absolute, so an install in the checkout
   writes into the checkout. A scope like `@acme` is mirrored the same way one level down,
@@ -62,29 +62,24 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   run, not a failed one.
 
 ## Flow: reclaim
-Deleting an agent's checkout to free disk, only after the remote has everything in it. It
-pushes the agent's branch the checkout ended on when the caller allows a push. A checkout
-on the user's own branch the remote lacks is kept: pushing that branch is the user's call.
-Pushing it too was the earlier rule and was dropped: a cleanup could publish `main`.
+Deleting an agent's checkout to free disk, only once its branch holds everything in it: a
+clean tree. The branch stays on this machine. Nothing is pushed: publishing is a person's
+call, never a cleanup's. Pushing the branch first, so the remote had everything before the
+checkout went, was the earlier rule and was dropped: every run published its work by
+ending.
 
 - Nothing is committed on the agent's behalf: a checkout with uncommitted work, untracked
   files included, is kept until a person commits or deletes it, and nothing of it is
   pushed.
 - An `agent-*` branch with no commit past where it started holds nothing of its own: it
-  goes with its checkout unpushed, deleted with `-D`: git's own merged test asks the wrong
-  question. Where it started is the commit the caller names (`remove --from`), which
-  another name's remote-tracking ref must hold; with none named, origin's default branch.
+  goes with its checkout, deleted with `-D`: git's own merged test asks the wrong
+  question. Where it started is the commit the caller names (`remove --from`); with none
+  named, origin's default branch, read from the local remote-tracking ref, never a fetch.
   Any other name's remote-tracking ref holding the tip was the earlier rule and was
   dropped: a branch another agent was started from lost its branch once that agent's
-  branch was pushed. Its own copy does not count: any
-  remote-tracking ref whose name ends in `/<branch>` or `/<birth branch>`. Not its
-  upstream: no push here sets one, since that writes the shared `.git/config` a running
-  agent's own git command may hold the lock on. Pushed means on
-  `origin`, the only remote the package pushes to. Both reads take the local
-  remote-tracking refs, never a fetch: the push that put a tip there wrote them.
-- The caller may name a pushed commit through the library, not from the command line: the
-  commit a cloud session pushed on the agent's behalf. A checkout whose tip is an ancestor
-  of it goes without a push and keeps its branch, even one the rule above would delete.
+  branch was pushed. The named commit having to be on the remote was dropped too: nothing
+  is on the remote before a person publishes, so a subagent that committed nothing kept
+  its branch for good.
 - An agent that switched to another branch leaves `agent-<id>` behind; it goes with the
   checkout once the branch the agent ended on contains it.
 - A folder under `.branches/` that git no longer knows as a worktree is left alone, and
@@ -92,15 +87,15 @@ Pushing it too was the earlier rule and was dropped: a cleanup could publish `ma
   user's own checkout.
 - A removal git refuses as unclean after the clean check passed is forced, and says so on
   stderr: an ignored build artifact must not strand a checkout for good.
-- `remove` and `prune` push by default; `--no-push` opts out. A removal judges the birth
-  branch before anything goes, then removes the checkout, then the branches, since git
-  will not delete a branch a worktree has out.
-- `remove --discard` drops a checkout whatever it holds, pushing nothing and deleting no
-  branch: the person's way past the reclaim rule for a run they throw away. Picked over
+- `remove` and `prune` never push. A removal judges the birth branch before anything
+  goes, then removes the checkout, then the branches, since git will not delete a branch
+  a worktree has out.
+- `remove --discard` drops a checkout whatever it holds, uncommitted work included,
+  deleting no branch: the person's way past the reclaim rule for a run they throw away. Picked over
   the dashboard forcing the removal through git itself.
 - The package reads no configuration and never asks whether an agent still runs: the
-  caller says whether it may push, and may pass a hook that runs just before the checkout
-  goes, to stop whatever serves the tree; the command line passes no hook.
+  caller may pass a hook that runs just before the checkout goes, to stop whatever serves
+  the tree; the command line passes no hook.
 
 ## The skill
 - The package knows git and nothing beyond it: it pushes a branch and never opens or
@@ -109,10 +104,11 @@ Pushing it too was the earlier rule and was dropped: a cleanup could publish `ma
   agent through its skills, the dashboard through the two declared commands. Picked over
   the package opening the request itself, which put the git host's tool inside the git skill
   and made another git host a change to this package.
-- The agent pushes its own work when it finishes: `npx branches push` pushes its branch
-  once its checkout is clean. Picked over whoever started the agent pushing for it.
-  Whoever started the agent may still say they publish for it; then the agent never
-  pushes.
+- The agent pushes its branch only when asked to publish, by its task or by the person:
+  `npx branches push`, once its checkout is clean. Until then its work stays on this
+  machine. Pushing when it finishes was the earlier rule and was dropped: a branch on the
+  remote is in front of everyone who watches the repository, and that is the person's
+  act. Picked over whoever started the agent pushing for it.
 - A person pushes a finished agent's branch through the same `push`, by name
   (`--branch`): the checkout on it under the agent's clean rule, else the branch itself,
   pushed when this machine has it and left as it is when only origin has it. Picked over

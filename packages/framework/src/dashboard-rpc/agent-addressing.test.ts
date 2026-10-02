@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { mkdtemp, rm, mkdir, writeFile, readFile, realpath } from 'node:fs/promises'
+import { mkdtemp, rm, mkdir, writeFile, readFile, realpath, stat } from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
 import { sendStop, sendMessage, sendChoice, sendRemoveWorktree } from './control.js'
 import { onRetainedWorktrees, onAgents } from './reads.js'
@@ -262,8 +262,7 @@ async function projectWithDirtyWorktree(): Promise<{
   await writeFile(join(dir, 'index.html'), '<h1>Hello, world!</h1>\n')
   await git(['add', '-A'], dir)
   await git(['commit', '-m', 'init'], dir)
-  // A real bare `origin`: the removal rule is "only what is on the remote may go" (E5), so the
-  // checkout cannot be reclaimed without somewhere to push it.
+  // A real bare `origin`, as a project has: an agent's branch starts from its default branch.
   await git(['init', '-q', '--bare', join(dir, 'origin.git')], dir)
   await git(['remote', 'add', 'origin', join(dir, 'origin.git')], dir)
 
@@ -308,7 +307,7 @@ test('the dashboard Remove keeps a checkout holding uncommitted work, and says s
   }
 })
 
-test('the dashboard Remove pushes and takes away a checkout whose agent committed (#982/E5)', async () => {
+test('the dashboard Remove takes away a checkout whose agent committed, keeps its branch and pushes nothing (#982/E5)', async () => {
   const ctx = await projectWithDirtyWorktree()
   try {
     const git = nodeGitRunner()
@@ -318,11 +317,8 @@ test('the dashboard Remove pushes and takes away a checkout whose agent committe
     await git(['commit', '-q', '-m', 'work'], ctx.worktree)
     assert.deepEqual(await sendRemoveWorktree(ctx.projectId, ctx.agentId), { ok: true })
     assert.match(await git(['show', `${ctx.branch}:index.html`], ctx.dir), /Welcome!/, 'the committed edit survived on the run branch')
-    assert.match(
-      await git(['show', `refs/remotes/origin/${ctx.branch}:index.html`], ctx.dir),
-      /Welcome!/,
-      'and reached the remote, which is what made the removal recoverable',
-    )
+    await assert.rejects(() => stat(ctx.worktree), 'the checkout is gone')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${ctx.branch}`], ctx.dir), 'and nothing reached the remote: publishing is the person\'s call')
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })

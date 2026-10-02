@@ -95,7 +95,7 @@ Every `view` event in the events given contributes one entry, keyed by the view'
 
 An agent is still going when its current segment holds at least one event and none of them is an `end`. An empty stream is not going. This fact drives:
 
-- the actions menu: whether Stop is offered, and whether the agent still has a checkout [9] of its own (a going agent always does; a finished one only while its work has not reached the remote), which decides whether the menu's folder item opens the agent's own folder;
+- the actions menu: whether Stop is offered, and whether the agent still has a checkout [9] of its own (a going agent always does; a finished one only while its checkout was kept: it holds uncommitted work, or the agent waits on an answer), which decides whether the menu's folder item opens the agent's own folder;
 - the agent view's own verdict that its feed is live, so a resumed agent's continuation renders and Stop takes over from Resume the moment its first event lands, before the daemon's agent list notices;
 - the status words in `agent-status.ts`.
 

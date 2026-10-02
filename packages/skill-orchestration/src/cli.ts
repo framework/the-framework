@@ -23,7 +23,7 @@ export const USAGE = `usage: orchestration <command>
   list              your subagents, newest first
   read <id>         one subagent: how it stands, its branch, and its last reply as \`result\`
   stop <id>         stop a subagent that is running
-  land <id>         merge an ended subagent's branch into yours, then delete that branch here and on origin
+  land <id>         merge an ended subagent's branch into yours, then delete that branch
 
 JSON on stdout. Exit code 1 for a refusal or a failure (\`reason\` in the JSON, why on stderr), 2 for a usage error.`
 

@@ -136,7 +136,7 @@ test('a run started for a working parent, from the parent\'s branch: it sees the
 
     const recorded = await findRun(repo, child!.id)
     // Where the child's own work begins: the parent's commit its branch was made from.
-    const planCommit = (await git(['rev-parse', `origin/agent-${child!.id}~1`], repo)).trim()
+    const planCommit = (await git(['rev-parse', `agent-${child!.id}~1`], repo)).trim()
     assert.equal((await git(['log', '-1', '--format=%s', planCommit], repo)).trim(), 'The plan')
     assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: process.pid, parent: parentId, base: `agent-${parentId}`, baseCommit: planCommit })
     assert.equal(recorded?.caller?.['parent'], parentId, 'the parent beside the host too, where a reader of the record looks for it')

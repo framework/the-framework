@@ -54,11 +54,10 @@ export const USAGE = `usage: branches <command>
                                measured from <commit>, the one the branches started from, in place of the default branch; a full commit id in place of a branch is read as a branch that ends there
   push [--branch <b>]          push this checkout's branch, or branch <b>, to origin; a dirty checkout is refused
   list [--sizes]               every agent checkout under .branches/
-  remove <id> [--no-push] [--from <commit>]
-                               reclaim agent <id>'s checkout, once the remote has everything it holds;
+  remove <id> [--from <commit>] reclaim agent <id>'s checkout, once its branch holds everything in it; the branch stays, nothing is pushed;
                                <commit> is the one its branch started from, in place of the default branch
-         [--discard]           ... or drop it whatever it holds, nothing pushed; the branch stays
-  prune [--no-push]            remove, for every checkout
+         [--discard]           ... or drop it whatever it holds, uncommitted work included; the branch stays
+  prune                        remove, for every checkout
 
 JSON on stdout. Exit code 1 for a refusal or a git failure (the reason on stderr), 2 for a usage error.`
 
@@ -183,11 +182,11 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async remove(args, cwd, git) {
-    const { positionals, values } = parse(args, { 'no-push': { type: 'boolean' }, discard: { type: 'boolean' }, from: { type: 'string' } }, 1)
+    const { positionals, values } = parse(args, { discard: { type: 'boolean' }, from: { type: 'string' } }, 1)
     if (values.from !== undefined && !values.from.trim()) throw new Usage('--from names a commit')
     const agentId = agentIdArg(positionals[0]!)
     const repo = await project(cwd, git)
-    const outcome = values.discard ? await discard(repo, agentId, git) : await reclaim(repo, agentId, !values['no-push'], git, values.from)
+    const outcome = values.discard ? await discard(repo, agentId, git) : await reclaim(repo, agentId, git, values.from)
     if (!outcome.ok) throw new Refused(outcome, refusalLine(agentId, outcome))
     // A link named after a branch that just went with its checkout is stale from this moment.
     await reconcileBranchLinks(repo, { git })
@@ -195,12 +194,12 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async prune(args, cwd, git) {
-    const { values } = parse(args, { 'no-push': { type: 'boolean' } }, 0)
+    parse(args, {}, 0)
     const repo = await project(cwd, git)
     const removed: string[] = []
     const skipped: { agentId: string; reason: string; detail: string }[] = []
     for (const { agentId } of await worktreeDirEntries(repo)) {
-      const outcome = await reclaim(repo, agentId, !values['no-push'], git)
+      const outcome = await reclaim(repo, agentId, git)
       if (outcome.ok) removed.push(agentId)
       else skipped.push({ agentId, reason: outcome.reason, detail: refusalLine(agentId, outcome) })
     }
@@ -219,11 +218,11 @@ type RemoveRefusal = { ok: false; reason: 'no-checkout'; agentId: string }
  * branch is read off the checkout's own directory, never off the argument (#1757): a link's
  * name is the branch the agent chose, and that one is not the birth branch.
  */
-async function reclaim(repo: string, agentId: string, mayPush: boolean, git: GitRunner, from?: string): Promise<ReclaimOutcome | RemoveRefusal> {
+async function reclaim(repo: string, agentId: string, git: GitRunner, from?: string): Promise<ReclaimOutcome | RemoveRefusal> {
   const path = worktreePath(repo, agentId)
   if (!(await stat(path).then(s => s.isDirectory(), () => false))) return { ok: false, reason: 'no-checkout', agentId }
   const checkout = await realpath(path)
-  return reclaimWorktree(repo, checkout, { birthBranch: agentBranchName(agentIdFromWorktreeDir(basename(checkout))), mayPush, ...(from !== undefined ? { from } : {}), git })
+  return reclaimWorktree(repo, checkout, { birthBranch: agentBranchName(agentIdFromWorktreeDir(basename(checkout))), ...(from !== undefined ? { from } : {}), git })
 }
 
 /** One agent's checkout dropped whatever it holds; a missing checkout is its own refusal. */
@@ -245,13 +244,10 @@ function refusalLine(agentId: string, outcome: (ReclaimOutcome & { ok: false }) 
       return `agent ${agentId}'s checkout is on no branch; kept`
     case 'dirty':
       return `${branchOf(outcome)} has uncommitted work; the checkout was kept`
-    case 'not-on-remote':
-      return `${branchOf(outcome)} is not on the remote (${detailOf(outcome) ?? 'not pushed'}); the checkout was kept`
   }
 }
 
 const branchOf = (outcome: object): string => String((outcome as { branch?: string }).branch)
-const detailOf = (outcome: object): string | undefined => (outcome as { detail?: string }).detail
 
 /** Why a branch was not pushed, as one line for a person. */
 function pushRefusalLine(subject: string, outcome: PushOutcome & { ok: false }): string {

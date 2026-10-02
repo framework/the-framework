@@ -1,4 +1,4 @@
-Runs git's worktree mechanism for agents [1]: where an agent's checkout [2] lives, creating one on a fresh branch or on an existing branch, telling a real checkout from a directory git no longer knows, renaming the branch to the session name [3] the agent picks, removing and pruning, and the reads every keep-or-remove decision needs: whether a checkout is clean, whether its branch is on the remote, how big it is. The decision itself is not made here; `reclaim.ts` makes it from these reads.
+Runs git's worktree mechanism for agents [1]: where an agent's checkout [2] lives, creating one on a fresh branch or on an existing branch, telling a real checkout from a directory git no longer knows, renaming the branch to the session name [3] the agent picks, removing and pruning, and the reads its callers need: whether a checkout is clean, whether its branch is on the remote, how big it is. The keep-or-remove decision itself is not made here; `reclaim.ts` makes it from the clean read.
 
 ## Context
 
@@ -16,7 +16,7 @@ Runs git's worktree mechanism for agents [1]: where an agent's checkout [2] live
 [6] agent branch: a branch whose name starts with `agent-`, other than `agent-data`: the branch a checkout is created on, or the `agent-<session name>` it is renamed to. The only branches this package renames or deletes.
 [7] branch link: a symbolic link under `.branches/`, named as the branch a checkout is on now and pointing at that checkout's directory, so `.branches/<branch>` reaches the checkout by its current branch name.
 [8] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[9] reclaim: removing a finished agent's checkout once its work is on the remote.
+[9] reclaim: removing a finished agent's checkout once its branch holds everything in it.
 [10] worktree root: a directory that is itself the top level of a git worktree: the project's checkout, or an agent's checkout that git still knows as a worktree.
 
 ## Business logic — TL;DR
@@ -29,7 +29,7 @@ Runs git's worktree mechanism for agents [1]: where an agent's checkout [2] live
 - **The project a directory belongs to** - two levels up from a checkout under `.branches/`, else the checkout itself, read from the layout rather than from git's notion of the main repository.
 - **Naming the work** - the branch is renamed to `agent-<name>`, a taken name gets `-2`, `-3`, and so on, and only an agent branch is ever renamed.
 - **Removing a checkout and what it leaves** - a plain removal, forced only when git calls unclean a checkout the package found clean, and said so; a branch that held nothing is force-deleted; stale worktree records are pruned.
-- **What the remote has** - a branch is on the remote when `origin` has its tip or a descendant of it, read from local remote-tracking refs, and a repository with no remote keeps everything.
+- **What the remote has** - a branch is on the remote when `origin` has its tip or a descendant of it, read from local remote-tracking refs; in a repository with no remote no branch is.
 - **When a checkout is clean** - nothing uncommitted and nothing untracked; a status git cannot read is never taken as clean.
 - **The worktrees git knows** - every worktree registered with git, with its path, its commit and its branch when not detached.
 - **A checkout's size on disk** - measured on request, and unknown rather than wrong whenever it cannot be read.
@@ -62,7 +62,7 @@ A checkout on disk is a directory, not a symbolic link and not a file, directly 
 
 **User story**: the user starts an agent while their own checkout is on a feature branch with commits they have not pushed; the agent gets its own checkout on a branch of its own, started from origin's default branch, so none of the user's unpushed work is in it and none is published when the agent's branch is pushed. The caller may name another base (the `--base` option of `create`).
 
-**Problem**: the commit the project's checkout is on is whatever the user has checked out right now, which the dashboard does not show. A branch started there carries the user's unpushed commits, and the push at the agent's end publishes them.
+**Problem**: the commit the project's checkout is on is whatever the user has checked out right now, which the dashboard does not show. A branch started there carries the user's unpushed commits, and publishing the agent's branch publishes them.
 
 #### Business logic
 
@@ -134,11 +134,11 @@ From any directory, the root of the checkout [2] containing it is found through 
 
 #### Context
 
-**Problem**: nothing local must ever be the last copy of work. The one question every keep-or-remove decision reduces to is "is this recoverable from the remote", not "how did the agent end".
+**User story**: nothing is published until the user says so, so the user must be able to see, for any branch, whether its work has reached the remote yet. `branches status` answers it for the agent's own checkout as `onRemote` (`cli.ts`).
 
 #### Business logic
 
-A branch is on the remote when the local branch exists, the remote-tracking branch `origin/<branch>` exists, and the local tip is the remote tip or an ancestor of it (the remote may be ahead, when someone pushed on top). A branch pushed and then committed to again is not on the remote. Only the local remote-tracking refs are read, never the network: the push that put a tip on the remote is what writes them, so the answer is at most behind, never ahead of the truth. Anything unreadable answers "not on the remote". A repository with no remote therefore keeps every checkout [2], which is the honest outcome: there is nowhere to recover the work from. Whether the repository has any remote configured at all is a separate read, false when unreadable, so a caller can skip a whole pass of doomed pushes rather than fail one checkout at a time.
+A branch is on the remote when the local branch exists, the remote-tracking branch `origin/<branch>` exists, and the local tip is the remote tip or an ancestor of it (the remote may be ahead, when someone pushed on top). A branch pushed and then committed to again is not on the remote. Only the local remote-tracking refs are read, never the network: the push that put a tip on the remote is what writes them, so the answer is at most behind, never ahead of the truth. Anything unreadable answers "not on the remote". In a repository with no remote, therefore, no branch is on the remote. Whether the repository has any remote configured at all is a separate read, false when unreadable, so a caller can tell a branch that is not pushed yet from one that has nowhere to be pushed to (`branch-state.ts`).
 
 ### When a checkout is clean
 

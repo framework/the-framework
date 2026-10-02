@@ -1,4 +1,4 @@
-Opening a branch's pull request: the agent's own step after its branch is pushed, and the dashboard's on a person's "Open PR". The words are the caller's; pushing is not here, the branches package pushes.
+Opening a branch's pull request: the agent's step after its branch is pushed, when it is asked to publish its work, and the dashboard's on a person's "Publish & Open PR". The words are the caller's; pushing is not here, the branches package pushes.
 
 ## Business logic — TL;DR
 

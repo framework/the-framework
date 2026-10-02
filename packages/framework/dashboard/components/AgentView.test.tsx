@@ -127,7 +127,7 @@ describe('AgentView event source (#1026/#1383)', () => {
   })
 })
 
-/** A branch on the remote with a commit of its own and no pull request: what Open PR is offered for. */
+/** A branch with a commit of its own and no pull request: what Publish & Open PR is offered for. */
 const PUSHED = {
   branch: 'agent-add-hello2',
   exists: true,
@@ -141,25 +141,25 @@ const PUSHED = {
 
 describe('AgentView branch read', () => {
   test('while the card says saving, an empty branch is not offered, and the branch is read again once it stops', async () => {
-    // The checkout is cleaned up while saving, and an empty branch is deleted with it: an Open PR
+    // The checkout is cleaned up while saving, and an empty branch is deleted with it: a publish
     // offered in that window turned into "Branch gone" moments later.
     onAgent.mockResolvedValue(ARCHIVED)
     onAgentHandoff.mockResolvedValue({ ...PUSHED, empty: true, pushed: false })
     const { rerender } = render(view({ card: { status: 'done', saving: true } }))
     await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledWith('p1', 'run-1'))
-    expect(screen.queryByRole('button', { name: /Open PR/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Publish & Open PR/ })).toBeNull()
     const reads = onAgentHandoff.mock.calls.length
     onAgentHandoff.mockResolvedValue(PUSHED)
     rerender(view({ card: { status: 'done' } }))
     await waitFor(() => expect(onAgentHandoff.mock.calls.length).toBeGreaterThan(reads))
-    await waitFor(() => expect(screen.getByRole('button', { name: /Open PR/ })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: /Publish & Open PR/ })).toBeTruthy())
   })
 
-  test('a branch already pushed with commits is offered while the card still says saving: the clean-up keeps it', async () => {
+  test('a branch with commits, pushed or not, is offered while the card still says saving: the clean-up keeps it', async () => {
     onAgent.mockResolvedValue(ARCHIVED)
-    onAgentHandoff.mockResolvedValue(PUSHED)
+    onAgentHandoff.mockResolvedValue({ ...PUSHED, pushed: false })
     render(view({ card: { status: 'done', saving: true } }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /Open PR/ })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: /Publish & Open PR/ })).toBeTruthy())
   })
 })
 
@@ -172,9 +172,9 @@ describe('the next step of a run whose subagents still work', () => {
     const { rerender } = render(view({ card: { status: 'done' }, subagents: [sub({ status: 'running' })] }))
     await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledWith('p1', 'run-1'))
     await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'))
-    expect(screen.queryByRole('button', { name: /Open PR/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Publish & Open PR/ })).toBeNull()
     rerender(view({ card: { status: 'done' }, subagents: [sub({ status: 'done', endedAt: '2026-10-01T10:02:00.000Z' })] }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /Open PR/ })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: /Publish & Open PR/ })).toBeTruthy())
   })
 
   test('nor right after a subagent ended: its main agent is about to go on', async () => {
@@ -182,7 +182,7 @@ describe('the next step of a run whose subagents still work', () => {
     onAgentHandoff.mockResolvedValue(PUSHED)
     render(view({ card: { status: 'done' }, subagents: [sub({ status: 'done', endedAt: new Date().toISOString() })] }))
     await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'))
-    expect(screen.queryByRole('button', { name: /Open PR/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Publish & Open PR/ })).toBeNull()
   })
 })
 
@@ -192,11 +192,11 @@ describe('a subagent’s own page', () => {
     onAgentHandoff.mockResolvedValue(PUSHED)
     const { rerender } = render(view({ card: { status: 'done', parent: 'run-0' } }))
     await waitFor(() => expect(screen.getByText('not landed')).toBeTruthy())
-    expect(screen.queryByRole('button', { name: /Open PR/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Publish & Open PR/ })).toBeNull()
     expect(screen.queryByText('· pushed')).toBeNull()
     // The same branch on a run nobody started for another is offered its pull request.
     rerender(view({ card: { status: 'done' } }))
-    await waitFor(() => expect(screen.getByRole('button', { name: /Open PR/ })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: /Publish & Open PR/ })).toBeTruthy())
     expect(screen.queryByText('not landed')).toBeNull()
   })
 })

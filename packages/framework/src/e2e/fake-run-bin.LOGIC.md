@@ -46,7 +46,7 @@ See the intro.
 
 #### Business logic
 
-The agent's checkout [3] is created through the branches skill, and its `.the-framework/` is hidden from git in that checkout alone, by a `.gitignore` of `*` unless the project tracks one there, so the tree stays clean. The card [5] starts with the id, the start time, the prompt, the driver (`DRIVER`, else "fake"), the model when given, the branch, and this process's id, this machine and the checkout path as the caller. One session of the fake driver runs the prompt with the inbox [4] in the checkout, so a line waiting when the turn ends becomes a further turn; each turn answers "done: <what it was told>". A SIGINT or SIGTERM aborts the session. The agent ends `stopped` when aborted, `failed` when the session threw, `waiting` when its last turn ended on a question, else `done`. The branch the checkout is on is written on the card, the log is closed with the status, the card and the diary are recorded on the `agent-data` branch, and, unless the agent is waiting, the checkout is reclaimed by the branches rule with a push allowed.
+The agent's checkout [3] is created through the branches skill, and its `.the-framework/` is hidden from git in that checkout alone, by a `.gitignore` of `*` unless the project tracks one there, so the tree stays clean. The card [5] starts with the id, the start time, the prompt, the driver (`DRIVER`, else "fake"), the model when given, the branch, and this process's id, this machine and the checkout path as the caller. One session of the fake driver runs the prompt with the inbox [4] in the checkout, so a line waiting when the turn ends becomes a further turn; each turn answers "done: <what it was told>". A SIGINT or SIGTERM aborts the session. The agent ends `stopped` when aborted, `failed` when the session threw, `waiting` when its last turn ended on a question, else `done`. The branch the checkout is on is written on the card, the log is closed with the status, the card and the diary are recorded on the `agent-data` branch, and, unless the agent is waiting, the checkout is reclaimed by the branches rule: its branch stays on this machine and nothing is pushed.
 
 ### The continuation
 
@@ -62,8 +62,8 @@ The agent's recorded card is looked up; none is an error. The checkout the agent
 
 #### Context
 
-A story needs an agent that is certainly still working, one that asks, and one that leaves work to push.
+A story needs an agent that is certainly still working, one that asks, and one that leaves work to publish.
 
 #### Business logic
 
-A prompt containing "hold" makes the agent wait, before its first turn, until a file named `go` appears under its checkout's `.the-framework/`, or until it is stopped. A prompt containing "ask" makes the first turn of a fresh agent end on the question "Which way?" with the options "Left" (recommended, with a detail line) and "Right". A prompt containing "commit" makes a fresh agent write `work.txt` and commit it before its turn, so its branch holds work to push.
+A prompt containing "hold" makes the agent wait, before its first turn, until a file named `go` appears under its checkout's `.the-framework/`, or until it is stopped. A prompt containing "ask" makes the first turn of a fresh agent end on the question "Which way?" with the options "Left" (recommended, with a detail line) and "Right". A prompt containing "commit" makes a fresh agent write `work.txt` and commit it before its turn, so its branch holds work to publish.

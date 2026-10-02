@@ -67,8 +67,8 @@ export async function listProjectWorktrees(cwd: string, opts: { sizes?: boolean 
  * removes one: the dashboard's Remove button (#982). The run's own tool reclaims a finished run's
  * checkout by the same rule; this is for the checkouts that rule kept.
  *
- * **One rule: only what is on the remote may go**: the rule is the branches provider's, whose
- * `remove` pushes the branch first when the remote lacks it and refuses what it cannot push
+ * **One rule: only what is committed may go**: the rule is the branches provider's, whose
+ * `remove` takes a clean checkout and leaves its branch on this machine, pushing nothing
  * (#1774); its refusal is answered in its own words.
  *
  * Refuses while the agent is still going — an agent's checkout is where its agent is working, and Stop

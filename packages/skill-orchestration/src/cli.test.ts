@@ -316,62 +316,58 @@ test('plan: saved beside the run\'s record, read back, and no subagent starts un
   }
 })
 
-/** A subagent that ended: its record, and its branch one commit past the main agent's, here and on origin unless said otherwise. */
-async function endedSubagent(repo: string, id: string, file: string, opts: { status?: RunStatus; branch?: string; pushed?: boolean; local?: boolean } = {}): Promise<string> {
+/** A subagent that ended: its record, and its branch one commit past the main agent's, on this machine as a subagent's is. */
+async function endedSubagent(repo: string, id: string, file: string, opts: { status?: RunStatus; branch?: string } = {}): Promise<string> {
   const branch = opts.branch ?? agentBranchName(id)
   const path = (await addWorktree(repo, { agentId: id, branch, base: agentBranchName(MAIN) }, git)).path
   await writeFile(join(path, file), `${id}\n`)
   await git(['add', '-A'], path)
   await git(['commit', '-q', '-m', `Add ${file}`], path)
-  if (opts.pushed !== false) await git(['push', '-q', 'origin', branch], path)
   await git(['worktree', 'remove', '--force', path], repo)
-  if (opts.local === false) {
-    // Gone from this clone altogether, its copy of origin's branch too.
-    await git(['branch', '-D', branch], repo)
-    await git(['update-ref', '-d', `refs/remotes/origin/${branch}`], repo)
-  }
   await record(repo, id, { status: opts.status ?? 'done', mark: { parent: MAIN, base: agentBranchName(MAIN) }, branch })
   return branch
 }
 
 const hasRef = (repo: string, ref: string) => git(['rev-parse', '--verify', '--quiet', ref], repo).then(() => true, () => false)
 
-test('land: the subagent\'s branch merged into the caller\'s, then gone here, on origin and from its record', async () => {
+test('land: the subagent\'s branch merged into the caller\'s, then gone, here and from its record, and nothing reaches origin', async () => {
   const repo = await testRepo()
   const origin = join(dirname(repo), 'origin.git')
   try {
     const checkout = await mainAgent(repo)
     const branch = await endedSubagent(repo, FIRST, 'tests.txt')
-    // A second one from the same start, which only origin has: this clone holds no copy of it.
-    const remoteOnly = await endedSubagent(repo, SECOND, 'docs.txt', { local: false })
+    // A second one from the same start.
+    const second = await endedSubagent(repo, SECOND, 'docs.txt')
     const landed = await run(checkout, MAIN, ['land', FIRST])
     assert.deepEqual([landed.code, landed.out, landed.err], [0, { ok: true, id: FIRST, branch, merged: true }, ''])
     assert.equal(await readFile(join(checkout, 'tests.txt'), 'utf8'), `${FIRST}\n`, 'the work is on the main agent\'s branch')
-    assert.deepEqual([await hasRef(repo, `refs/heads/${branch}`), await hasRef(origin, `refs/heads/${branch}`), await hasRef(repo, `refs/remotes/origin/${branch}`)], [false, false, false])
+    assert.equal(await hasRef(repo, `refs/heads/${branch}`), false)
     const card = await findRun(repo, FIRST)
     assert.equal(card?.branch, undefined, 'the record names no branch that is gone')
-    // Its last commit outlives the branch: kept under a ref here and on origin, and named on the record.
+    // Its last commit outlives the branch: kept under a ref on this machine, and named on the record.
     const tip = (await git(['rev-parse', 'HEAD'], checkout)).trim()
     assert.equal((await git(['log', '-1', '--format=%s', tip], repo)).trim(), 'Add tests.txt')
-    assert.deepEqual([(await git(['rev-parse', landedRef(FIRST)], repo)).trim(), (await git(['rev-parse', landedRef(FIRST)], origin)).trim()], [tip, tip])
+    assert.equal((await git(['rev-parse', landedRef(FIRST)], repo)).trim(), tip)
     assert.equal(card?.caller?.['landed'], tip)
     assert.deepEqual(card?.caller?.['runner'], { host: HOST, parent: MAIN, base: agentBranchName(MAIN) }, 'the rest of the record is as it was')
     const again = await run(checkout, MAIN, ['land', FIRST])
     assert.deepEqual([again.code, again.out], [1, { ok: false, reason: 'nothing-to-land', id: FIRST }])
 
-    // It is landed from origin's copy, as a merge: the main agent's branch has moved on.
-    assert.deepEqual((await run(checkout, MAIN, ['land', SECOND])).out, { ok: true, id: SECOND, branch: remoteOnly, merged: true })
+    // The next is landed as a merge: the main agent's branch has moved on.
+    assert.deepEqual((await run(checkout, MAIN, ['land', SECOND])).out, { ok: true, id: SECOND, branch: second, merged: true })
     assert.equal(await readFile(join(checkout, 'docs.txt'), 'utf8'), `${SECOND}\n`)
-    assert.equal((await git(['log', '-1', '--format=%s'], checkout)).trim(), `Merge branch '${remoteOnly}'`)
-    assert.equal(await hasRef(origin, `refs/heads/${remoteOnly}`), false)
+    assert.equal((await git(['log', '-1', '--format=%s'], checkout)).trim(), `Merge branch '${second}'`)
 
-    // One the main agent merged by hand is only deleted; one that never reached origin is deleted here.
-    const byHand = await endedSubagent(repo, OTHERS, 'notes.txt', { pushed: false })
+    // One the main agent merged by hand is only deleted.
+    const byHand = await endedSubagent(repo, OTHERS, 'notes.txt')
     await git(['merge', '-q', '--no-edit', byHand], checkout)
     assert.deepEqual((await run(checkout, MAIN, ['land', OTHERS])).out, { ok: true, id: OTHERS, branch: byHand, merged: false })
     assert.equal(await hasRef(repo, `refs/heads/${byHand}`), false)
     assert.equal((await findRun(repo, OTHERS))?.caller?.['landed'], (await git(['rev-parse', landedRef(OTHERS)], repo)).trim(), 'merged by hand, its last commit is kept all the same')
     assert.equal((await git(['log', '-1', '--format=%s', landedRef(OTHERS)], repo)).trim(), 'Add notes.txt')
+
+    // Landing is this machine's: no branch and no landed ref was ever written to origin.
+    assert.equal((await git(['for-each-ref', '--format=%(refname)', 'refs/heads/agent-2*', 'refs/landed'], origin)).trim(), '')
   } finally {
     await removeRepo(repo)
   }
@@ -379,7 +375,6 @@ test('land: the subagent\'s branch merged into the caller\'s, then gone here, on
 
 test('land is refused, and nothing deleted, on a conflict, a running subagent, uncommitted work, and a run that is not the caller\'s', async () => {
   const repo = await testRepo()
-  const origin = join(dirname(repo), 'origin.git')
   try {
     const checkout = await mainAgent(repo)
     const branch = await endedSubagent(repo, FIRST, 'shared.txt')
@@ -394,7 +389,7 @@ test('land is refused, and nothing deleted, on a conflict, a running subagent, u
     assert.deepEqual([conflict.code, conflict.out], [1, { ok: false, reason: 'conflict', id: FIRST, branch, files: ['shared.txt'] }])
     assert.match(conflict.err, new RegExp(`git merge ${branch}`))
     assert.deepEqual([(await git(['rev-parse', 'HEAD'], checkout)).trim(), (await git(['status', '--porcelain'], checkout)).trim()], [head, ''], 'the merge is undone')
-    assert.deepEqual([await hasRef(repo, `refs/heads/${branch}`), await hasRef(origin, `refs/heads/${branch}`)], [true, true], 'and the branch is still there')
+    assert.equal(await hasRef(repo, `refs/heads/${branch}`), true, 'and the branch is still there')
     assert.equal((await findRun(repo, FIRST))?.branch, branch)
     assert.deepEqual([await hasRef(repo, landedRef(FIRST)), (await findRun(repo, FIRST))?.caller?.['landed']], [false, undefined], 'not landed: nothing says it is')
 

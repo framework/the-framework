@@ -54,7 +54,8 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
       <span>{files}</span>
       <DiffStat added={handoff.insertions} removed={handoff.deletions} className="text-xs" />
       {/* Whether the work is on the remote yet is the first handoff question — say it. The PR
-          itself is not repeated here: the bar already links it. */}
+          itself is not repeated here: the bar already links it. That it is not there yet is said
+          beside the button that publishes it ({@link HandoffActions}), where it is always in view. */}
       {!subagent && handoff.pushed && !handoff.pr && <span>· pushed</span>}
     </span>
   )
@@ -63,9 +64,10 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
 /**
  * The next step, as a button, at the end of the action bar.
  *
- * What is left once a session has ended without publishing its own work: the agent opens its own
- * pull request when its command says to, and when it did not, this is how a person does. Both
- * publish the agent's work to a shared remote under the user's name, so it is a deliberate click. They sit in the
+ * What is left once a session has ended: its work is on this machine only, since an agent pushes
+ * and opens its pull request only when its task or the person asks, and this is how a person
+ * publishes it. Both put the agent's work on a shared remote under the user's name, so it is a
+ * deliberate click, and the button says so: it publishes. They sit in the
  * bar rather than behind the disclosure, because the point of the handoff is to be offered without
  * being looked for. Once a PR exists neither shows — the bar links the PR, and the interventions
  * queue (#632) has picked it up by then.
@@ -127,26 +129,42 @@ export function HandoffActions({
   if (!handoff.gitHost) {
     if (handoff.pushed) return <Reason>Pushed — no git host package to open a pull request with.</Reason>
     return (
-      <Button size="xs" disabled={busy} onClick={() => act('push', () => sendPush(projectId, agentId), 'Could not push the branch.')}>
-        <Upload className="h-3.5 w-3.5" />
-        {pending === 'push' ? 'Pushing…' : 'Push'}
-      </Button>
+      <>
+        <NotPublished />
+        <Button size="xs" disabled={busy} onClick={() => act('push', () => sendPush(projectId, agentId), 'Could not push the branch.')}>
+          <Upload className="h-3.5 w-3.5" />
+          {pending === 'push' ? 'Pushing…' : 'Push'}
+        </Button>
+      </>
     )
   }
   // One button, not two (#1173). "Push branch" and "Open PR" sat side by side as equals, and
   // nobody could say what pushing without a PR was for — a control nobody can
   // explain is a control nobody should have to read. Opening a PR pushes the branch on the way,
-  // so the one that names the outcome is the one that stays.
+  // so the one that names the outcome is the one that stays, and it names the push too: nothing
+  // left this machine before the click.
   return (
-    <Button
-      size="xs"
-      disabled={busy}
-      onClick={() => act('pr', () => sendOpenPullRequest(projectId, agentId), 'Could not open the pull request.')}
-    >
-      <GitPullRequest className="h-3.5 w-3.5" />
-      {pending === 'pr' ? 'Opening PR…' : 'Open PR'}
-    </Button>
+    <>
+      {!handoff.pushed && <NotPublished />}
+      <Button
+        size="xs"
+        disabled={busy}
+        onClick={() => act('pr', () => sendOpenPullRequest(projectId, agentId), 'Could not open the pull request.')}
+      >
+        <GitPullRequest className="h-3.5 w-3.5" />
+        {pending === 'pr' ? 'Publishing…' : 'Publish & Open PR'}
+      </Button>
+    </>
   )
+}
+
+/**
+ * The work is on this machine only. A run publishes nothing by itself, so this is the usual answer
+ * of a finished run, and it must not read as silence: said beside the button that publishes, at
+ * the end of the bar, where it is in view at every width.
+ */
+function NotPublished() {
+  return <Reason>not published</Reason>
 }
 
 /** The work an empty branch's checkout holds uncommitted, named; nothing when the tree is clean. */

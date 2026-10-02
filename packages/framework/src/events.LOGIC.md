@@ -11,7 +11,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2]
 ## Glossary
 
 [1] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
-[2] agent: the unit of work: one task worked by a coding agent, in its own checkout, on its own branch, keeping a card and a diary, publishing its own work when it ends. Begun by the project's own start hook.
+[2] agent: the unit of work: one task worked by a coding agent, in its own checkout, on its own branch, keeping a card and a diary, publishing its own work only when asked to. Begun by the project's own start hook.
 [3] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [4] pick: the answer to a gate: the option or options chosen, by the user or automatically.
 [6] agent view: one agent's page.

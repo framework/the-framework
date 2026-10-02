@@ -2,7 +2,7 @@ Gives an agent [1] in a shell, the user, the dashboard's server and `agent-runne
 
 ## Context
 
-**User story**: an agent runs `npx github open --title … --body …` after pushing, as its `github` skill instructs, and reads the request back. The dashboard's server runs `requests` to show a run's pull request and the Human Queue's open ones, `open` and `merge` when the user presses "Open PR" or "Merge PR", and `home` for the project bar's link; `agent-runner` runs `requests` to record a run's pull request and `merge` to land it once a follow-up run is done. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
+**User story**: an agent asked to publish its work runs `npx github open --title … --body …` after pushing, as its `github` skill instructs, and reads the request back. The dashboard's server runs `requests` to show a run's pull request and the Human Queue's open ones, `open` and `merge` when the user presses "Publish & Open PR" or "Merge PR", and `home` for the project bar's link; `agent-runner` runs `requests` to record a run's pull request and `merge` to land it once a follow-up run is done. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
 
 ## Glossary
 

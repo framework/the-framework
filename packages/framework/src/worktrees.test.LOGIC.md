@@ -1,8 +1,8 @@
 What the tests cover, against real git with a bare repository standing in for the remote, the `branches` skill's package installed as the project's branches provider (`store/test-branches.ts`):
 
-- **Only what is on the remote may go** - with no remote at all, a checkout holding committed work is kept, the refusal says the branch is not on the remote, and the work is still on disk.
+- **Only what is committed may go** - with no remote at all, a checkout holding committed work goes, and the work is still on its branch.
 - **A directory git does not know as a worktree** - is refused before any git command runs in it: nothing is committed on the user's own checkout, the user's uncommitted edit survives, nothing is pushed, and the directory is left where it is.
-- **The birth branch** - when the agent branched away to a named branch and committed there, removal pushes the named branch, deletes the birth branch, and reports that deletion.
+- **The birth branch** - when the agent branched away to a named branch and committed there, removal keeps the named branch with its work, does not push it, deletes the birth branch, and reports that deletion.
 - **An agent started from another agent's branch** - its card names the commit its branch started from, on the remote under the other agent's branch; having committed nothing, its checkout goes with its branch, reported as deleted, and nothing is pushed.
 - **An unknown agent** - an id with no checkout is refused in the provider's words, "no checkout for agent <id>", and the real checkout is untouched.
 - **No provider** - a project none of whose packages provides its checkouts has nothing to remove, and says so, the checkout untouched.

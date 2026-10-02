@@ -1,8 +1,8 @@
-Pushes a branch to `origin`: the last git step of an agent's [1] work, and the step before whatever the project's git host package does with the branch. This package knows git and nothing beyond it: what becomes of a pushed branch on the git host, a pull request or anything else, is another package's command, composed after the push by whoever runs both. Two doors onto one rule: the agent pushes the checkout [2] it is in; a person, or the dashboard's server on the person's behalf, pushes a finished agent's branch by name, whether or not its checkout is still on disk.
+Pushes a branch to `origin`: the git step that publishes an agent's [1] work, taken only when a person asks for it, and the step before whatever the project's git host package does with the branch. This package knows git and nothing beyond it: what becomes of a pushed branch on the git host, a pull request or anything else, is another package's command, composed after the push by whoever runs both. Two doors onto one rule: the agent pushes the checkout [2] it is in; a person, or the dashboard's server on the person's behalf, pushes a finished agent's branch by name, whether or not its checkout is still on disk.
 
 ## Context
 
-**User story**: an agent finishes its work, commits it, and runs `npx branches push`; its branch is on the remote, and the next skill it reads takes it from there. A run ended without pushing (it failed, was stopped, or was told someone else publishes); the user presses the button on its page and the branch the run worked on reaches the remote, checkout or no checkout.
+**User story**: an agent whose task or person asked it to publish its work commits it and runs `npx branches push`; its branch is on the remote, and the next skill it reads takes it from there. A run ended without pushing, as every run nobody asked to publish does; the user presses the button on its page and the branch the run worked on reaches the remote, checkout or no checkout.
 
 **Problem**: what is pushed is what is committed, and nothing is committed on the agent's behalf; so a checkout holding uncommitted work must be refused rather than pushed half-done.
 

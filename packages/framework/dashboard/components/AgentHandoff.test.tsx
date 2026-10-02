@@ -223,16 +223,24 @@ describe('run handoff (#799)', () => {
     expect(screen.queryByText('Push branch')).toBeNull()
   })
 
-  test('work still only on this machine says not published; once pushed with no pull request it says pushed; with no remote it says neither', async () => {
+  test('work still only on this machine says not published beside its button; once pushed it says pushed; with no remote it says neither', async () => {
     onAgentHandoff.mockResolvedValue(worked)
     render(<Harness />)
-    await waitFor(() => expect(screen.getByText('· not published')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('not published')).toBeTruthy())
+    expect(screen.getByText('Publish & Open PR')).toBeTruthy()
+    cleanup()
+
+    // No git host package: the same word beside Push.
+    onAgentHandoff.mockResolvedValue({ ...worked, gitHost: false })
+    render(<Harness />)
+    await waitFor(() => expect(screen.getByText('Push')).toBeTruthy())
+    expect(screen.getByText('not published')).toBeTruthy()
     cleanup()
 
     onAgentHandoff.mockResolvedValue({ ...worked, pushed: true })
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('· pushed')).toBeTruthy())
-    expect(screen.queryByText('· not published')).toBeNull()
+    expect(screen.queryByText('not published')).toBeNull()
     cleanup()
 
     onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false })
@@ -247,7 +255,7 @@ describe('run handoff (#799)', () => {
     await waitFor(() => expect(screen.getByText('not landed')).toBeTruthy())
     expect(screen.getByText('1 commit')).toBeTruthy()
     expect(screen.queryByText('· pushed')).toBeNull()
-    expect(screen.queryByText('· not published')).toBeNull()
+    expect(screen.queryByText('not published')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
     cleanup()
 

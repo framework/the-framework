@@ -1,10 +1,10 @@
-Decides what becomes of an agent's [1] work once the agent has ended, its handoff [2]: reads what the agent left on its branch (commits, changed files, whether the branch is pushed or merged, what it left uncommitted in its checkout [3]) through the project's branches provider [14], works out which pull request is the agent's, and backs the "Push", "Open PR" and "Merge" buttons on a finished agent's page. It runs no git and no git host tool itself: pushing a branch is the branches provider's, opening a pull request and landing it are the git host provider's [19], each asked through the command its package declares; opening a pull request is the two composed, the push then the open. It publishes nothing on its own: an agent publishes its own work, and the automatic handoff the daemon's former run process ran when an agent ended is gone with that process. Nothing here commits on the agent's behalf, and every read is forgiving: a project with no branches provider, no git host, or no remote yields a handoff with less in it, never an error; without a git host, the last step is the push. An agent started from a branch other than the default one is read from the commit its own work begins at [21], so the other branch's work is not counted as its own. A subagent [20] its main agent landed is read by the last commit its record kept, its branch being gone, and no pull request is ever opened for a subagent.
+Decides what becomes of an agent's [1] work once the agent has ended, its handoff [2]: reads what the agent left on its branch (commits, changed files, whether the branch is pushed or merged, what it left uncommitted in its checkout [3]) through the project's branches provider [14], works out which pull request is the agent's, and backs the "Push", "Publish & Open PR" and "Merge" buttons on a finished agent's page. It runs no git and no git host tool itself: pushing a branch is the branches provider's, opening a pull request and landing it are the git host provider's [19], each asked through the command its package declares; opening a pull request is the two composed, the push then the open. It publishes nothing on its own: an agent's work stays on its branch, on this machine, until the user presses one of those buttons or asks the agent to publish it, and the automatic handoff the daemon's former run process ran when an agent ended is gone with that process. Nothing here commits on the agent's behalf, and every read is forgiving: a project with no branches provider, no git host, or no remote yields a handoff with less in it, never an error; without a git host, the last step is the push. An agent started from a branch other than the default one is read from the commit its own work begins at [21], so the other branch's work is not counted as its own. A subagent [20] its main agent landed is read by the last commit its record kept, its branch being gone, and no pull request is ever opened for a subagent.
 
 ## Context
 
 **User story**:
-- The user starts an agent [1] and walks away. The agent publishes its own work: it pushes its branch and opens its pull request itself. Nothing here does it for the agent.
-- On a finished agent's page the user sees what the agent produced — its commits, the files it changed, the files it left uncommitted — and opens the pull request ("Open PR") or merges it ("Merge") with one press; on a project with no git host package, pushes the branch ("Push"). The user is never handed an empty pull request or a second pull request for the same branch.
+- The user starts an agent [1] and walks away. The agent commits its work to its branch, which stays on this machine: nothing is published until the user says so. An agent whose task or user asked it to publish pushes its branch and opens its pull request itself. Nothing here publishes on its own.
+- On a finished agent's page the user sees what the agent produced — its commits, the files it changed, the files it left uncommitted — and publishes the work, which pushes the branch and opens its pull request ("Publish & Open PR"), or merges the pull request ("Merge") with one press; on a project with no git host package, pushes the branch ("Push"). The user is never handed an empty pull request or a second pull request for the same branch.
 - The user opens a subagent's [20] page. It shows the commits and files that subagent itself made, not those of the main agent whose branch it started from, and it still shows them once the main agent landed the subagent's work and the subagent's branch is gone.
 
 **Business logic story**: the dashboard's buttons run the manual actions on a finished agent (`../dashboard-rpc/control.ts`); cloud work adoption opens the pull request for a branch that exists only on the remote (`../cloud-work.ts`); the intervention [8] feed reads branch states through the same provider to list unpushed work (`interventions.ts`). Every pull request read goes through the git host provider [19] by the rules in `pull-requests.ts`; every push goes through the branches provider [14] by the contract in `../store/branches.ts`, and every pull request opened or landed through the git host provider [19] by the contract in `../store/git-host.ts`.
@@ -12,7 +12,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[2] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
+[2] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself only when its task or the person asks; on a finished agent's page the "Publish & Open PR" and "Merge" buttons do it by hand.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [7] cloud anchor: an empty commit unique to a `web` agent, pushed before its task left this machine and recorded on the agent: the branch the cloud session later pushes descends from it, which is how the daemon recognises that branch as the agent's (cloud work adoption).
 [8] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds.
@@ -37,7 +37,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 - **Which pull request is the agent's** - out of the branch's whole pull request history: an open one always, a closed one only when created after the agent started; the first for identity, the latest for handoff decisions.
 - **The pull request the agent recorded** - the number the agent wrote down is the fact; its state is read live, and when nothing live is known the record stands on its own.
 - **Publishing a branch** - the branches provider pushes the branch, then the git host provider opens its pull request, or answers the open one it already has; a project missing either provider, or a push the branches provider refuses, ends the action before the git host is asked; the answer's URL and number come back, and the cached "no pull request" is forgotten.
-- **The "Open PR" button** - refused for a subagent [20]; the agent's existing pull request first, even for a gone branch, unless the agent moved past it; a gone branch and an empty branch are refused with a reason; otherwise the branch is published ready for review.
+- **The "Publish & Open PR" button** - refused for a subagent [20]; the agent's existing pull request first, even for a gone branch, unless the agent moved past it; a gone branch and an empty branch are refused with a reason; otherwise the branch is published ready for review.
 - **The "Push" button** - the branches provider pushes the agent's recorded branch, nothing more: the last step where the project has no git host; refused for an agent with no branch or a project with no branches provider.
 - **A pull request for a branch only the remote has** - a cloud session's own branch is published as a draft, through the same two providers.
 - **The "Merge" button on a finished agent** - refused when the agent has no pull request or it is no longer open, or the project has no git host; otherwise the git host provider lands the pull request.
@@ -73,7 +73,7 @@ An agent changed nothing when its record names this machine's hostname as its `h
 
 **User story**: a finished agent's [1] page shows what the agent produced and offers the next step, whether or not the agent's checkout [3] still exists.
 
-**Problem**: a finished agent's checkout is usually gone, removed once its work is on the remote. A read addressed by checkout would fall back to the project's own working copy and report the project's branch as if it were the agent's. So the read is addressed by branch name, and every answer degrades rather than fails.
+**Problem**: a finished agent's checkout is usually gone, removed once its work is committed. A read addressed by checkout would fall back to the project's own working copy and report the project's branch as if it were the agent's. So the read is addressed by branch name, and every answer degrades rather than fails.
 
 #### Business logic
 
@@ -117,13 +117,13 @@ A caller that knows the commit the agent's own work begins at [21] passes it wit
 
 #### Business logic
 
-A branch is empty when it has no commit the base does not already have, or when its change since the branch point touches no file: commits that net to no change leave nothing to hand off. Uncommitted work never makes a branch non-empty. An empty branch is refused by every step that would publish it, by the rule of the "Open PR" button below.
+A branch is empty when it has no commit the base does not already have, or when its change since the branch point touches no file: commits that net to no change leave nothing to hand off. Uncommitted work never makes a branch non-empty. An empty branch is refused by every step that would publish it, by the rule of the "Publish & Open PR" button below.
 
 ### Uncommitted work is named, never committed
 
 #### Context
 
-**Problem**: the agent [1] is told to commit its work, but an agent that ends without doing so holds its whole output in an uncommitted tree in its checkout [3]. What gets published is what the agent committed; The Framework commits nothing on its behalf, so that work stays in the checkout and has to be named on the agent's page, or the page offers an "Open PR" that GitHub can only refuse for a branch with no diff.
+**Problem**: the agent [1] is told to commit its work, but an agent that ends without doing so holds its whole output in an uncommitted tree in its checkout [3]. What gets published is what the agent committed; The Framework commits nothing on its behalf, so that work stays in the checkout and has to be named on the agent's page, or the page offers an "Publish & Open PR" that GitHub can only refuse for a branch with no diff.
 
 #### Business logic
 
@@ -143,7 +143,7 @@ The branch's whole pull request history is read — through the dashboard's read
 
 #### Context
 
-**Problem**: the pull request's number is a fact about the agent [1]. Re-deriving it later from branch names and creation times mistakes a predecessor's pull request on a shared branch name for the agent's, so the number is written down on the agent's run [12] card — by the tool that runs the agent when the agent opened the pull request itself, by the dashboard when its "Open PR" button did — and every surface reads that one integer.
+**Problem**: the pull request's number is a fact about the agent [1]. Re-deriving it later from branch names and creation times mistakes a predecessor's pull request on a shared branch name for the agent's, so the number is written down on the agent's run [12] card — by the tool that runs the agent when the agent opened the pull request itself, by the dashboard when its "Publish & Open PR" button did — and every surface reads that one integer.
 
 #### Business logic
 
@@ -159,11 +159,11 @@ An agent [1] with no recorded pull request has none. For an agent with one, the 
 
 Two providers, in order. A project with no branches provider refuses with "this project has no branches provider to push with"; one with no git host provider refuses with "this project has no git host package to open a pull request with"; both are checked before anything moves. The branches provider [14] is asked to push the branch: the checkout on it under the provider's clean rule, else the branch itself, and a branch only the remote has counts as pushed already. A refusal of its own (a checkout on the branch holding uncommitted work, a push that failed, a branch nowhere) ends the action with the provider's own line as the error, and the git host is never asked. Then the git host provider [19] is asked to open the branch's pull request with the given title and body, and as a draft when asked; it answers the open pull request the branch already has when there is one; a refusal of its own (the git host's own line) is the error. The pull request's URL and number come back from the git host. The branch's cached "no pull request" answers — the single view and the history — are forgotten, so the page stops offering to open one.
 
-### The "Open PR" button
+### The "Publish & Open PR" button
 
 #### Context
 
-**User story**: on a finished agent's [1] page the user presses "Open PR" and gets the pull request: the existing one when there is one, a new one otherwise, or a clear reason why there is none.
+**User story**: on a finished agent's [1] page the user presses "Publish & Open PR" and gets the pull request: the existing one when there is one, a new one otherwise, or a clear reason why there is none.
 
 #### Business logic
 
@@ -207,7 +207,7 @@ The agent's [1] recorded pull request is resolved by the rule above. No pull req
 
 #### Business logic
 
-Two rungs, each a name for the work the agent [1] did: the agent's branch (the name the agent gave its work, as `branches name` spelled it), else "Session <agent id [9]>", which says little but says it honestly. The prompt the agent was given is never the title. An agent that publishes its own work titles its own pull request; this is only the title of one opened for it.
+Two rungs, each a name for the work the agent [1] did: the agent's branch (the name the agent gave its work, as `branches name` spelled it), else "Session <agent id [9]>", which says little but says it honestly. The prompt the agent was given is never the title. An agent asked to publish its own work titles its own pull request; this is only the title of one opened for it.
 
 ### The pull request's body
 
@@ -227,4 +227,4 @@ What the agent [1] was asked for at the start, which is all The Framework knows 
 
 #### Business logic
 
-A button action answers with success — and, when a pull request is involved, its URL and number — or with failure and one error line. The dashboard's "Open PR" button records the pull request on the agent's run [12] card (`../dashboard-rpc/control.ts`). The number rides along with the URL because the number is the fact worth recording: every later surface reads it off the agent instead of re-deriving it from branch names and timestamps.
+A button action answers with success — and, when a pull request is involved, its URL and number — or with failure and one error line. The dashboard's "Publish & Open PR" button records the pull request on the agent's run [12] card (`../dashboard-rpc/control.ts`). The number rides along with the URL because the number is the fact worth recording: every later surface reads it off the agent instead of re-deriving it from branch names and timestamps.

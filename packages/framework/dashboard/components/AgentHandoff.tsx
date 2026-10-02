@@ -53,11 +53,10 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
       <span>·</span>
       <span>{files}</span>
       <DiffStat added={handoff.insertions} removed={handoff.deletions} className="text-xs" />
-      {/* Whether the work is on the remote yet is the first handoff question — say it, both ways:
-          a run publishes nothing by itself, so work still only on this machine is the usual
-          answer and must not read as silence. The PR itself is not repeated here: the bar already
-          links it. Where there is no remote there is nowhere to publish to, and nothing to say. */}
-      {!subagent && !handoff.pr && handoff.hasRemote && <span>· {handoff.pushed ? 'pushed' : 'not published'}</span>}
+      {/* Whether the work is on the remote yet is the first handoff question — say it. The PR
+          itself is not repeated here: the bar already links it. That it is not there yet is said
+          beside the button that publishes it ({@link HandoffActions}), where it is always in view. */}
+      {!subagent && handoff.pushed && !handoff.pr && <span>· pushed</span>}
     </span>
   )
 }
@@ -130,10 +129,13 @@ export function HandoffActions({
   if (!handoff.gitHost) {
     if (handoff.pushed) return <Reason>Pushed — no git host package to open a pull request with.</Reason>
     return (
-      <Button size="xs" disabled={busy} onClick={() => act('push', () => sendPush(projectId, agentId), 'Could not push the branch.')}>
-        <Upload className="h-3.5 w-3.5" />
-        {pending === 'push' ? 'Pushing…' : 'Push'}
-      </Button>
+      <>
+        <NotPublished />
+        <Button size="xs" disabled={busy} onClick={() => act('push', () => sendPush(projectId, agentId), 'Could not push the branch.')}>
+          <Upload className="h-3.5 w-3.5" />
+          {pending === 'push' ? 'Pushing…' : 'Push'}
+        </Button>
+      </>
     )
   }
   // One button, not two (#1173). "Push branch" and "Open PR" sat side by side as equals, and
@@ -142,15 +144,27 @@ export function HandoffActions({
   // so the one that names the outcome is the one that stays, and it names the push too: nothing
   // left this machine before the click.
   return (
-    <Button
-      size="xs"
-      disabled={busy}
-      onClick={() => act('pr', () => sendOpenPullRequest(projectId, agentId), 'Could not open the pull request.')}
-    >
-      <GitPullRequest className="h-3.5 w-3.5" />
-      {pending === 'pr' ? 'Publishing…' : 'Publish & Open PR'}
-    </Button>
+    <>
+      {!handoff.pushed && <NotPublished />}
+      <Button
+        size="xs"
+        disabled={busy}
+        onClick={() => act('pr', () => sendOpenPullRequest(projectId, agentId), 'Could not open the pull request.')}
+      >
+        <GitPullRequest className="h-3.5 w-3.5" />
+        {pending === 'pr' ? 'Publishing…' : 'Publish & Open PR'}
+      </Button>
+    </>
   )
+}
+
+/**
+ * The work is on this machine only. A run publishes nothing by itself, so this is the usual answer
+ * of a finished run, and it must not read as silence: said beside the button that publishes, at
+ * the end of the bar, where it is in view at every width.
+ */
+function NotPublished() {
+  return <Reason>not published</Reason>
 }
 
 /** The work an empty branch's checkout holds uncommitted, named; nothing when the tree is clean. */

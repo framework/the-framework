@@ -12,7 +12,7 @@ The run's lock [1]: one process per run [2] at a time. A run's process holds its
 [2] run: one agent this tool starts: a process of the tool's own (`agent-runner run`), a checkout, one prompt to the coding agent, and a run record when it ends.
 [3] run record: the `logs` skill's record of a run on the `agent-data` branch: a card (`<id>.json`) and a diary (`<id>.jsonl`).
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[5] reclaim: removing a finished agent's checkout once its work is on the remote.
+[5] reclaim: removing a finished agent's checkout once its branch holds everything in it.
 [6] sweep: the pass that records and reclaims the runs of this machine whose process died, and only this machine's; the scheduler runs it on every tick.
 
 ## Business logic — TL;DR

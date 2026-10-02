@@ -239,9 +239,8 @@ export async function makeWorld(): Promise<StoryWorld> {
         })
         if (!result.ok) throw new Error(`could not seed the ${DATA_BRANCH} branch: ${result.error}`)
       }
-      // A bare repo standing in for `origin`, because a real project has one and the retention
-      // rule is about it (E5): a session's checkout is reclaimed once its work reaches the remote,
-      // so a fixture with nowhere to push would keep every checkout forever.
+      // A bare repo standing in for `origin`, because a real project has one: an agent's branch
+      // starts from its default branch, and whether a run's work reached it is what a story reads.
       const origin = join(cwd, 'origin.git')
       await git(cwd, 'init', '-q', '--bare', origin)
       await git(cwd, 'remote', 'add', 'origin', origin)

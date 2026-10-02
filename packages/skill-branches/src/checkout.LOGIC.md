@@ -15,7 +15,7 @@ Makes a checkout [1] as an agent [2] gets it, in one sequence whichever surface 
 [5] branch link: a symbolic link under `.branches/`, named as the branch a checkout is on now and pointing at that checkout's directory, so `.branches/<branch>` reaches the checkout by its current branch name.
 [6] birth branch: the branch a checkout is created on, `agent-<agent id>`, which also names the checkout's directory; the agent's branch until the agent names its work.
 [7] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[8] reclaim: removing a finished agent's checkout once its work is on the remote.
+[8] reclaim: removing a finished agent's checkout once its branch holds everything in it.
 
 ## Business logic — TL;DR
 

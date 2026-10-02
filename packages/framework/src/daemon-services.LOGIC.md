@@ -4,7 +4,7 @@ Everything the daemon runs in the background beside serving the dashboard, wired
 
 **User story**: what other machines and cloud sessions pushed to the `agent-data` branch shows up within a minute. Ctrl-C stops all of it.
 
-**Business logic story**: the daemon runs no agent, so nothing here starts one, reclaims an agent's checkout or watches an agent's pull request: an agent publishes its own work, and the tool that runs it reclaims its checkout.
+**Business logic story**: the daemon runs no agent, so nothing here starts one, reclaims an agent's checkout or watches an agent's pull request: an agent publishes its own work when asked to, and the tool that runs it reclaims its checkout.
 
 ## Glossary
 

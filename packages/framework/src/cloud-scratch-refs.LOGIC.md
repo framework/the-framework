@@ -15,7 +15,7 @@ The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon
 [5] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [6] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [7] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
-[8] reclaim: removing a finished agent's checkout once its work is on the remote; the tool that runs the agent does it, the daemon never does.
+[8] reclaim: removing a finished agent's checkout once its branch holds everything in it; the tool that runs the agent does it, the daemon never does.
 [9] cloud anchor: an empty commit a web agent pushes before its task leaves this machine, unique to the agent: the branch the cloud session later pushes descends from it.
 
 ## Business logic — TL;DR
@@ -35,7 +35,7 @@ The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon
 
 #### Context
 
-**Business logic story**: a web agent's driver pushed a `cloud-<number>-<tag>` ref so the cloud session [5] had a slash-free ref to clone at (that driver is gone; no web agent is started today, and the sweep stays for their return), and the reclaim [8] of the agent [4]'s checkout pushes its `agent-<id>` branch before removing the checkout; the session does its work on its own `claude/*` branch and opens its pull request from there, so both refs are dead names once provisioning settles.
+**Business logic story**: a web agent's driver pushed a `cloud-<number>-<tag>` ref so the cloud session [5] had a slash-free ref to clone at (that driver is gone; no web agent is started today, and the sweep stays for their return), and the agent [4]'s `agent-<id>` branch is on origin too, pushed with the agent's cloud anchor [9]; the session does its work on its own `claude/*` branch and opens its pull request from there, so both refs are dead names once provisioning settles.
 
 #### Business logic
 

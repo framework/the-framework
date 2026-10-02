@@ -1,10 +1,10 @@
-Builds the cross-project "needs you" list, the interventions [1] feed: every registered project's open pull requests waiting for review, every agent [2] waiting on the gate [3] it ended on, and every recently finished agent whose branch holds commits that never left the machine, newest first, each with one stable identity so the browser notifications announce it exactly once. It also reports which projects it could read completely.
+Builds the cross-project "needs you" list, the interventions [1] feed: every registered project's open pull requests waiting for review, every agent [2] waiting on the gate [3] it ended on, and every recently finished agent whose branch holds commits that have not left the machine, newest first, each with one stable identity so the browser notifications announce it exactly once. It also reports which projects it could read completely.
 
 ## Context
 
-**User story**: the user sees, on one card across all projects, what is waiting for a human right now: a pull request to merge (confirm) or close (reject), a question an agent [2] stopped to ask, or work an agent committed but never pushed. The dashboard's card renders the list, and the browser notifications announce each new item once, deciding what is new by the rule in `keyed-watcher.ts`.
+**User story**: the user sees, on one card across all projects, what is waiting for a human right now: a pull request to merge (confirm) or close (reject), a question an agent [2] stopped to ask, or work an agent committed that is not published yet. The dashboard's card renders the list, and the browser notifications announce each new item once, deciding what is new by the rule in `keyed-watcher.ts`.
 
-**Problem**: proposals and finished work are both pull requests, so the bulk of what needs a human is the set of open pull requests across the registered projects. Two more kinds would otherwise stay invisible: an agent parked on a gate [3] only shows on its own page, and a finished agent that committed real code and stopped without pushing shows nowhere, since the Overview [5] lists running agents only and the handoff [6] panel sits behind clicking into that agent.
+**Problem**: proposals and finished work are both pull requests, so the bulk of what needs a human is the set of open pull requests across the registered projects. Two more kinds would otherwise stay invisible: an agent parked on a gate [3] only shows on its own page, and a finished agent that committed real code, which stays on this machine until a person publishes it, shows nowhere, since the Overview [5] lists running agents only and the handoff [6] panel sits behind clicking into that agent.
 
 ## Glossary
 
@@ -12,7 +12,7 @@ Builds the cross-project "needs you" list, the interventions [1] feed: every reg
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [5] the Overview: the dashboard's cross-project page at `/`.
-[6] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.
+[6] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself only when its task or the person asks; on a finished agent's page the "Publish & Open PR" and "Merge" buttons do it by hand.
 [7] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [9] branches provider: the package of the project that declares it provides the checkouts and branches; The Framework reads a branch's state and moves branches through the command that package declares (`../store/branches.ts`).
 [10] subagent: an agent another agent, its main agent, started for one task; its record names the main agent as its `parent`. Its branch is never pushed by a person: its main agent lands its work on the main agent's own branch.
@@ -51,7 +51,7 @@ For each project, every agent [2] with a checkout whose status is `waiting` is l
 
 #### Context
 
-**Problem**: an agent [2] that committed real code and stopped without pushing produces neither a pull request nor a gate, and nothing would tell anyone. Agents usually push themselves as part of their handoff [6], so what reaches here is the remainder: an agent told that whoever started it publishes for it, or a handoff that failed or never ran. The feed only says that a decision is waiting; it does not take it.
+**Problem**: an agent [2] that committed real code and stopped produces neither a pull request nor a gate, and nothing would tell anyone. An agent publishes nothing by itself, so every finished agent with work of its own reaches here until a person publishes it, or the agent does on their ask. The feed only says that a decision is waiting; it does not take it.
 
 #### Business logic
 

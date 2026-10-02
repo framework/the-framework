@@ -4,7 +4,7 @@ Builds the one-line shell command that reopens an agent's [1] driver session [2]
 
 **User story**: an agent has finished, and the user wants to carry on the same conversation by hand, outside the dashboard. One click copies a command; pasting it into a terminal reopens the coding agent [3] on that exact conversation.
 
-**Problem**: the coding agent finds a driver session [2] by the directory it ran in, and that directory is usually gone by the time the user wants it — an agent whose work reached the remote has its checkout [4] reclaimed. The session id alone therefore cannot reopen anything, and the dashboard knew the id but never showed it, which left a finished conversation unreachable.
+**Problem**: the coding agent finds a driver session [2] by the directory it ran in, and that directory is usually gone by the time the user wants it — an agent whose work is committed has its checkout [4] reclaimed. The session id alone therefore cannot reopen anything, and the dashboard knew the id but never showed it, which left a finished conversation unreachable.
 
 ## Glossary
 

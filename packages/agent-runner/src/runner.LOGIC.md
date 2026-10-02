@@ -20,7 +20,7 @@ The tool's process side: a run [1] in this process, the same run detached in its
 - **A detached start on demand** - `run --detach <prompt>`: the run's process spawned as above, told to write its own marker, and the id answered at once, before any git work; the coding agent is Claude Code unless `--driver codex`; a follow-up given with `--then`, a parent given with `--parent` and a base given with `--base` are passed to the run's process.
 - **A detached continuation on demand** - `run --detach --resume <id>`: the run's process spawned to continue it, its id answered at once; the line a dashboard's resume hook runs. A run the project has no record of is refused there and then.
 - **A run in this process** - the id given or minted now, marked already when the id was given, on Claude Code or, with `--driver codex`, on Codex; a follow-up it names runs on the same coding agent, made for the follow-up's own id; a resumed run, and the follow-up its record names, on the coding agent its record names.
-- **Either coding agent, unrestricted** - Claude Code with permissions bypassed, Codex with full access, `AGENT_ID` in the agent's environment: whichever coding agent runs, it pushes its branch and opens its pull request itself.
+- **Either coding agent, unrestricted** - Claude Code with permissions bypassed, Codex with full access, `AGENT_ID` in the agent's environment: whichever coding agent runs, it pushes its branch and opens its pull request itself when asked to publish.
 - **The person's own setup** - either coding agent starts with the three parts of the person's own setup, `memory`, `connectors` and `skills`, as when started by hand; each part is left out when this machine's `.agent-runner/config.yml` turns it off under `personal:`; the project's own instructions and skills always load; how a part is turned off is the coding agent's driver's business, and a part Codex cannot turn off is a warning before the run.
 - **The model** - the one given, to either coding agent; none given, none is named, on the marker or to the coding agent, which starts on its own default. Once the coding agent names the model it runs on, its full id takes the given one's place on the card (`run.ts`).
 
@@ -76,9 +76,9 @@ A run given an id by a scheduler comes with its marker already on the branch, so
 
 #### Context
 
-**User story**: the user picks Claude Code or Codex for a run, on the command line or in a dashboard's launcher, and gets the same thing from either: the agent does the work, pushes its branch and opens its pull request.
+**User story**: the user picks Claude Code or Codex for a run, on the command line or in a dashboard's launcher, and gets the same thing from either: the agent does the work and, when asked to publish, pushes its branch and opens its pull request.
 
-**Problem**: Codex's default sandbox lets the agent write in its checkout only, which is enough when something outside the sandbox publishes the work. Here nothing does: the agent publishes itself.
+**Problem**: Codex's default sandbox lets the agent write in its checkout only, which is enough when something outside the sandbox publishes the work. Here nothing does: an agent asked to publish does it itself.
 
 #### Business logic
 

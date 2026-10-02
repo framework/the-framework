@@ -13,7 +13,7 @@ Reads the git status bar of a project or of an agent's [1] checkout [2]: the cur
 ## Business logic — TL;DR
 
 - **Branch and dirty flag** - the branch the checkout is on and whether anything is uncommitted; no git repository means no status, and a failed status read reads as clean.
-- **The linked pull request, best effort** - for a project the cached pull request of its current branch, reported as pending while the first lookup is still running; a failed lookup simply omits the pull request. For an agent's checkout the lookup is cached by the project's folder, as the agent's handoff reads it, so the lookup made while the agent worked is warm when it ends and its Open PR is asked about.
+- **The linked pull request, best effort** - for a project the cached pull request of its current branch, reported as pending while the first lookup is still running; a failed lookup simply omits the pull request. For an agent's checkout the lookup is cached by the project's folder, as the agent's handoff reads it, so the lookup made while the agent worked is warm when it ends and its "Publish & Open PR" is asked about.
 - **An agent's own pull request** - when the status is read for an agent's checkout, the pull request is picked from the branch's whole history with the agent's start time, so a reused branch name never wears a predecessor's merged pull request as the agent's badge.
 
 ## Business logic

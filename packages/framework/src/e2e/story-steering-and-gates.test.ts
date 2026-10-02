@@ -86,7 +86,7 @@ test('say something to a working run: the message is its next turn; said to an e
   }
 })
 
-test('stop a run; its checkout is reclaimed once the work is on the remote, then the run is deleted (#737/#1032/E5)', async () => {
+test('stop a run; its checkout is reclaimed, then the run is deleted (#737/#1032/E5)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {

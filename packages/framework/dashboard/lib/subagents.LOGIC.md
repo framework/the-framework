@@ -63,7 +63,7 @@ A subagent [2] whose status is `running` (it is working) or `waiting` (it ended 
 
 #### Context
 
-**Problem**: a main agent never waits in a process: it ends its turn after starting its subagents [2] and is continued each time one of them ends. So its own record says `done` while the job it was given is still going. And the continuation comes a few seconds after the subagent's card says it ended: for that moment the main agent and all its subagents read as ended, and everything that says "the job is over" (the main agent's row, its status word, its Open PR button) appeared and went away again between the main agent's turns.
+**Problem**: a main agent never waits in a process: it ends its turn after starting its subagents [2] and is continued each time one of them ends. So its own record says `done` while the job it was given is still going. And the continuation comes a few seconds after the subagent's card says it ended: for that moment the main agent and all its subagents read as ended, and everything that says "the job is over" (the main agent's row, its status word, its "Publish & Open PR" button) appeared and went away again between the main agent's turns.
 
 #### Business logic
 

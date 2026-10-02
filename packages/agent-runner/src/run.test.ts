@@ -616,6 +616,40 @@ test('a run started from a base, continued after its empty branch went with its 
   }
 })
 
+test("a run whose commit another run's pushed branch holds keeps its branch: started from the default branch, or from a base", async () => {
+  const repo = await testRepo()
+  try {
+    // A main agent commits, a subagent starts from its branch, and the subagent's branch reaches
+    // origin before the main agent's turn ends: origin has the main agent's commit under another name.
+    const withSubagent = (name: string): Driver => ({
+      id: 'fake',
+      start: async opts =>
+        wrap(await new FakeDriver({ turns: [{ text: 'Committed, and started a subagent.' }] }).start(opts), async () => {
+          await git(['config', 'user.email', 'agent@example.com'], opts.cwd)
+          await git(['config', 'user.name', 'agent'], opts.cwd)
+          await writeFile(join(opts.cwd, `${name}.txt`), 'own work\n')
+          await git(['add', '-A'], opts.cwd)
+          await git(['commit', '-q', '-m', 'Own work'], opts.cwd)
+          await git(['push', '-q', 'origin', `HEAD:refs/heads/agent-sub-of-${name}`], opts.cwd)
+        }),
+    })
+    const main = await runCommand(repo, { prompt: 'Do the plan', driver: withSubagent('main'), now: () => NOW, gitHost: noGitHost })
+    assert.deepEqual(main.checkout, { reclaimed: true })
+    const branch = (await findRun(repo, main.id))?.branch
+    assert.equal(branch, `agent-${main.id}`, 'the branch is still on the record')
+    assert.match(await git(['show', `refs/heads/${branch}:main.txt`], repo), /own work/, 'and still here')
+    assert.match(await git(['show', `refs/remotes/origin/${branch}:main.txt`], repo), /own work/, 'pushed under its own name')
+
+    const based = await runCommand(repo, { prompt: 'Do the rest', base: branch!, driver: withSubagent('based'), now: () => new Date(NOW.getTime() + 60_000), gitHost: noGitHost })
+    assert.deepEqual(based.checkout, { reclaimed: true })
+    const basedBranch = (await findRun(repo, based.id))?.branch
+    assert.equal(basedBranch, `agent-${based.id}`)
+    assert.match(await git(['show', `refs/remotes/origin/${basedBranch}:based.txt`], repo), /own work/)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
 test('a run started from a base, continued on the branch its work is on, keeps the commit its own work begins at, however the base moved', async () => {
   const repo = await testRepo()
   try {

@@ -62,6 +62,7 @@ test('a project with no branches provider has no checkouts; one with a provider 
     assert.deepEqual(await branches.push('dirty'), { ok: false, error: 'agent-dirty has uncommitted work; commit or delete it, then push' }, "a refusal is the provider's own line")
     assert.deepEqual(await branches.remove('run-1'), { ok: true, branchesDeleted: ['agent-run-1'] }, 'the branches that went with the checkout ride along')
     assert.deepEqual(await branches.remove('run-1', { discard: true }), { ok: true })
+    assert.deepEqual(await branches.remove('run-2', { from: 'abc123' }), { ok: true }, 'reclaimed under the rule, its branch measured from the commit it started at')
     assert.deepEqual(await branches.remove('kept'), { ok: false, error: 'agent-kept has uncommitted work; the checkout was kept' }, "a refusal is the provider's own line")
     assert.deepEqual(await branches.remove('../x'), { ok: false, error: 'not a run id: ../x' })
     assert.deepEqual(await calls(root, 'branches'), [
@@ -74,6 +75,7 @@ test('a project with no branches provider has no checkouts; one with a provider 
       'push --branch dirty',
       'remove run-1',
       'remove run-1 --discard',
+      'remove run-2 --from abc123',
       'remove kept',
     ])
   } finally {

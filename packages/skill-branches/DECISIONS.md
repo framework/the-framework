@@ -70,9 +70,13 @@ Pushing it too was the earlier rule and was dropped: a cleanup could publish `ma
 - Nothing is committed on the agent's behalf: a checkout with uncommitted work, untracked
   files included, is kept until a person commits or deletes it, and nothing of it is
   pushed.
-- An `agent-*` branch whose tip is reachable from another name's remote-tracking ref, on
-  any remote, holds nothing of its own: it goes with its checkout unpushed, deleted with
-  `-D`: git's own merged test asks the wrong question. Its own copy does not count: any
+- An `agent-*` branch with no commit past where it started holds nothing of its own: it
+  goes with its checkout unpushed, deleted with `-D`: git's own merged test asks the wrong
+  question. Where it started is the commit the caller names (`remove --from`), which
+  another name's remote-tracking ref must hold; with none named, origin's default branch.
+  Any other name's remote-tracking ref holding the tip was the earlier rule and was
+  dropped: a branch another agent was started from lost its branch once that agent's
+  branch was pushed. Its own copy does not count: any
   remote-tracking ref whose name ends in `/<branch>` or `/<birth branch>`. Not its
   upstream: no push here sets one, since that writes the shared `.git/config` a running
   agent's own git command may hold the lock on. Pushed means on

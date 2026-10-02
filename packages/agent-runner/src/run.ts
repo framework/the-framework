@@ -6,7 +6,7 @@ import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary, type AnyDiaryLine, type LogsDeps, type RunCard, type RunStatus } from '@gemstack/skill-logs'
 import { hideLiveDir, inboxPath, liveDir, readLiveCard, readLiveDiary } from './live-card.js'
-import { forReaders, lasting, markerCard, recordBranchGone, recordRun, runnerMark, writeMarker, type RunnerMark } from './records.js'
+import { forReaders, lasting, markerCard, recordBranchGone, recordRun, runnerMark, startOf, writeMarker, type RunnerMark } from './records.js'
 import { projectGitHost, type GitHost, type MergeOutcome } from './git-host.js'
 import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
 import { runEndedLine } from './ended.js'
@@ -496,7 +496,7 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
     await tell(true)
     return outcomeOf(run.id, status, branch, pr, card.cost, { reclaimed: false, reason: 'waiting' }, detail)
   }
-  const reclaimed = await reclaimWorktree(repo, run.checkout.path, { mayPush: true, birthBranch: agentBranchName(run.id), git: run.git })
+  const reclaimed = await reclaimWorktree(repo, run.checkout.path, { mayPush: true, birthBranch: agentBranchName(run.id), ...startOf(run.card), git: run.git })
   if (reclaimed.ok) {
     const rewritten = await recordBranchGone(repo, card, diary, reclaimed.branchesDeleted, run.logs)
     if (rewritten && !rewritten.ok && !rewritten.committed) run.log(`[agent-runner] the run's record could not be written: ${rewritten.error}`)

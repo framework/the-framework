@@ -17,7 +17,7 @@ import { isRunId } from './runs.js'
  *                                                       measured from `<commit>`, where the branches started, in place of the default branch;
  *                                                       a full commit id in place of a branch is read as a branch that ends there
  *   `<command> push --branch <b>`                       push the branch to the remote; a branch only the remote has is answered as it is
- *   `<command> remove <id> [--discard]`                 reclaim a run's checkout once the remote has everything; `--discard` drops uncommitted work
+ *   `<command> remove <id> [--from <commit>] [--discard]`  reclaim a run's checkout once the remote has everything, its branch measured from the commit it started from; `--discard` drops uncommitted work
  * `list` and `show` read this machine, no network: the framework polls. `show` answers the branch's
  * git facts only; its pull request is the git host provider's (`git-host.ts`), as every pull request is.
  *
@@ -105,8 +105,12 @@ export interface BranchesSource {
   show(branches: readonly string[], from?: string): Promise<BranchState[]>
   /** Push a branch to the remote: the checkout on it under its clean rule, else the branch itself. */
   push(branch: string): Promise<PushOutcome>
-  /** Reclaim a run's checkout, or why it stayed. `discard` drops its uncommitted work instead of refusing over it. */
-  remove(id: string, opts?: { discard?: boolean }): Promise<RemoveOutcome>
+  /**
+   * Reclaim a run's checkout, or why it stayed. `from` is the commit the run's branch started
+   * from, when that is not the default branch: what tells a branch with nothing of its own.
+   * `discard` drops its uncommitted work instead of refusing over it.
+   */
+  remove(id: string, opts?: { discard?: boolean; from?: string }): Promise<RemoveOutcome>
 }
 
 /** The checkouts of the project at `root`, or `undefined` when none of its packages provides them. */
@@ -241,7 +245,7 @@ function commandBranches(root: string, command: ProvidedCommand, now: () => numb
     },
     async remove(id, opts = {}) {
       if (!isRunId(id)) return { ok: false, error: `not a run id: ${id}` }
-      const result = await runPackageCommand(root, command, ['remove', id, ...(opts.discard ? ['--discard'] : [])])
+      const result = await runPackageCommand(root, command, ['remove', id, ...(opts.discard ? ['--discard'] : opts.from ? ['--from', opts.from] : [])])
       drop()
       if (!result.ok) return { ok: false, error: result.error }
       const gone = result.output && typeof result.output === 'object' ? (result.output as Record<string, unknown>)['branchesDeleted'] : undefined

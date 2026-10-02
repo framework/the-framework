@@ -22,9 +22,10 @@ function hold(repo: string, id: string, pid: number): Promise<void> {
 const NOW = new Date('2026-09-16T14:30:00.000Z')
 
 /** A checkout with a live card and diary, as a run's session leaves them while it works. */
-async function liveRun(repo: string, id: string, host: string, pid: number, status: RunCard['status'] = 'running', parent?: string): Promise<RunCard> {
-  const checkout = await createCheckout(repo, { agentId: id })
-  const mark = { host, pid, ...(parent !== undefined ? { parent } : {}) }
+async function liveRun(repo: string, id: string, host: string, pid: number, status: RunCard['status'] = 'running', parent?: string, base?: string): Promise<RunCard> {
+  const checkout = await createCheckout(repo, { agentId: id, ...(base !== undefined ? { base } : {}) })
+  const started = base !== undefined ? { base, baseCommit: (await git(['rev-parse', 'HEAD'], checkout.path)).trim() } : {}
+  const mark = { host, pid, ...(parent !== undefined ? { parent } : {}), ...started }
   const card: RunCard = { id, startedAt: '2026-09-16T14:01:00.000Z', status, intent: '/work-queue', driver: 'fake', model: 'opus', branch: checkout.branch, caller: { runner: mark, pid, host, kind: 'prompt' } }
   if (status !== 'running') card.endedAt = '2026-09-16T14:20:00.000Z'
   const dir = liveDir(checkout.path)
@@ -81,6 +82,25 @@ test('a run that ended but whose process died before the record: recorded as it 
     assert.deepEqual(result.kept, [{ id: 'asked', reason: 'waiting' }])
     assert.equal((await findRun(repo, 'asked'))?.status, 'waiting')
     assert.equal(await stat(worktreePath(repo, 'asked')).then(() => true, () => false), true, 'the answer resumes the run there')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test("a run started from another run's branch that committed nothing: its branch goes with the checkout, measured from the commit on its mark", async () => {
+  const repo = await testRepo()
+  try {
+    await git(['checkout', '-q', '-b', 'agent-plan'], repo)
+    await writeFile(join(repo, 'plan.txt'), 'the plan\n')
+    await git(['add', '-A'], repo)
+    await git(['commit', '-q', '-m', 'Plan'], repo)
+    await git(['push', '-q', 'origin', 'agent-plan'], repo)
+    await git(['checkout', '-q', 'main'], repo)
+    await liveRun(repo, 'sub', 'this-box', 999_999, 'done', undefined, 'agent-plan')
+    const result = await sweep(repo, { host: 'this-box', isAlive: () => false, now: () => NOW })
+    assert.deepEqual(result.reclaimed, ['sub'])
+    assert.equal((await findRun(repo, 'sub'))?.branch, undefined, 'the record names no branch')
+    assert.equal((await git(['ls-remote', '--heads', 'origin', 'agent-sub'], repo)).trim(), '', 'and nothing was pushed')
   } finally {
     await removeRepo(repo)
   }

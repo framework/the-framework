@@ -21,12 +21,12 @@ Decides whether a finished agent's [1] checkout [2] may be removed, and removes 
 ## Business logic — TL;DR
 
 - **Only what is on the remote may go** - a checkout is removed only once the remote has everything it holds: a clean tree and a pushed tip; nothing is committed on the agent's behalf, and a refusal names its reason.
-- **What the caller knows and git does not** - whether the branch may be pushed at all, a pushed commit that already holds the checkout's work, the branch the checkout was born on, and a hook to run just before the checkout goes.
+- **What the caller knows and git does not** - whether the branch may be pushed at all, the commit the branch started from, a pushed commit that already holds the checkout's work, the branch the checkout was born on, and a hook to run just before the checkout goes.
 - **A directory git does not know as a worktree is left alone** - refusal `not-a-worktree`, decided before any git command runs in it.
 - **A checkout on no branch is kept** - refusal `no-branch`.
 - **Uncommitted work is kept** - refusal `dirty`, for any modified, staged or untracked file, and for a tree git cannot read; the check is made once, before every way out.
 - **A tip inside a commit the caller vouches for goes without a push** - and keeps its branch.
-- **A branch that holds nothing goes without a push** - its tip is on the remote under another name, so the checkout goes; an agent branch is deleted with it, the user's own branch stays.
+- **A branch that holds nothing goes without a push** - it has no commit past where it started (the commit the caller names, else `origin`'s default branch), so the checkout goes; an agent branch is deleted with it, the user's own branch stays.
 - **Otherwise the branch must be on the remote** - an agent branch is pushed to `origin` here when the caller allows, the user's own branch never; refusal `not-on-remote` when it may not be pushed or the push did not land, with git's own words.
 - **The birth branch goes when the branch that stays contains it** - an agent that branched away leaves `agent-<agent id>` behind, and it goes once judged, before anything is deleted.
 - **How the removal runs and what it reports** - hook, worktree, stale records, then the branches; success lists the branches that went, and only a git failure past the decision is raised.
@@ -48,13 +48,14 @@ A checkout [2] is removed only once the remote has everything it holds: a clean 
 
 #### Context
 
-**Business logic story**: the caller knows whether a push is allowed, the branch the checkout [2] was created on, what serves the tree while the agent [1] runs, and, for a `web` agent, its cloud anchor [6]. None of that is readable from git, so it comes in as the caller's word. The runner and the dashboard's "Remove" button allow the push and name the birth branch [7]; no caller names a cloud anchor. The command line passes whether a push is allowed (`--no-push` in `cli.ts`) and the birth branch its directory names.
+**Business logic story**: the caller knows whether a push is allowed, the branch the checkout [2] was created on, what serves the tree while the agent [1] runs, and, for a `web` agent, its cloud anchor [6]. None of that is readable from git, so it comes in as the caller's word. The runner and the dashboard's "Remove" button allow the push, name the birth branch [7], and name the commit the branch started from when the agent's record has one (an agent started from another branch); no caller names a cloud anchor. The command line passes whether a push is allowed (`--no-push` in `cli.ts`), the commit the branch started from (`--from`), and the birth branch its directory names.
 
 #### Business logic
 
-Four things come from the caller:
+Five things come from the caller:
 
 - Whether the branch may be pushed to satisfy the rule. When not, only a clean tree on a tip the remote already has goes: removing what the remote holds publishes nothing. `branches remove --no-push` is such a caller.
+- The commit the checkout's branch started from, when that is not `origin`'s default branch: a branch started from another branch. It is what tells such a branch with nothing of its own from one that holds its own work (see "A branch that holds nothing goes without a push").
 - A commit the remote already has that provably holds everything the checkout could hold. For a `web` agent that is its cloud anchor [6], the empty commit pushed before the task left this machine: a checkout still at that commit, or before it, holds nothing the remote lacks. Anything short of that proof falls back to the ordinary rules.
 - The birth branch [7], when it may differ from the branch the checkout ended on.
 - A hook to run once removal is decided and just before the checkout goes, to stop whatever serves the tree. The command line passes none.
@@ -105,11 +106,22 @@ When the caller names a commit the remote already has, and the checkout's [2] ti
 
 #### Context
 
-**Problem**: an agent [1] that committed nothing, or whose commits already reached the remote under another branch's name, leaves a branch whose every commit `origin` already has. Pushing it would publish an empty branch; keeping it would strand the checkout [2] behind a push that has nothing to push. The same holds for a leftover checkout on the user's own branch whose tip the remote already has. Git's own "merged" test asks the wrong question, and its refusal to delete a checked-out branch must never be the guard.
+**Problem**: an agent [1] that committed nothing, or whose commits are already on `origin`'s default branch, leaves a branch that holds nothing of its own. Pushing it would publish an empty branch; keeping it would strand the checkout [2] behind a push that has nothing to push. The same holds for a leftover checkout on the user's own branch whose tip `origin`'s default branch already has. Git's own "merged" test asks the wrong question, and its refusal to delete a checked-out branch must never be the guard.
+
+**Problem**: "the tip is on the remote under another name" does not say a branch is empty. An agent started from another agent's branch (a subagent, started from its main agent's branch) carries that agent's commits, so once its branch is pushed the remote holds the first agent's tip under the second one's name. The first agent's branch still holds that agent's own work, and is the only branch the work is its own on.
 
 #### Business logic
 
-A branch holds nothing of its own when its tip is reachable from a remote-tracking branch under another name, on any remote: the remote already has that commit under that other name, so nothing on the branch is unique to it. The branch's own copies do not count: every remote-tracking branch whose name ends in `/<branch>` on any remote (so `origin/feat/<branch>` is dropped too, on the safe side), and likewise every one whose name ends in `/<birth branch>` (a branch renamed after it was pushed left its remote copy under its birth name, and that copy holding the tip proves nothing about another name having it). A pushed branch with a pull request contains its own tip and is exactly the branch that must stay. Such a checkout goes, and nothing is pushed. Its branch goes with it, deleted after the checkout is removed, only when it is an agent branch [10]: a leftover checkout [2] can sit on the user's own branch, and deleting that is never this package's call, even when it holds nothing; that branch stays. The read takes the local remote-tracking refs, never a fetch, so it is at most behind the remote: a tip they do not cover yet reads as holding something, and the next rule applies.
+A branch holds nothing of its own when it has no commit past where it started. Where it started is one of two things:
+
+- When the caller names no commit: `origin`'s default branch (what `origin`'s HEAD points at, else `origin/main`, else `origin/master`), where every agent branch starts unless told otherwise. The branch holds nothing when its tip is that branch's tip or an ancestor of it. A repository with no such branch has no branch that holds nothing.
+- When the caller names the commit the branch started from: the branch holds nothing when its tip is that commit or an ancestor of it, and a remote-tracking branch under another name, on any remote, holds that commit, so the commit is on the remote whatever happens to this branch. A commit this machine does not have proves nothing: the branch reads as holding something. So does a branch started from another branch whose start the caller does not name: measured from the default branch, what it started on reads as its own.
+
+A branch with a commit past where it started holds its own work, whatever other name on the remote holds its tip.
+
+The branch's own copies do not count as another name: every remote-tracking branch whose name ends in `/<branch>` on any remote (so `origin/feat/<branch>` is dropped too, on the safe side), and likewise every one whose name ends in `/<birth branch>` (a branch renamed after it was pushed left its remote copy under its birth name, and that copy holding a commit proves nothing about another name having it).
+
+The checkout of a branch that holds nothing goes, and nothing is pushed. Its branch goes with it, deleted after the checkout is removed, only when it is an agent branch [10]: a leftover checkout [2] can sit on the user's own branch, and deleting that is never this package's call, even when it holds nothing; that branch stays. The read takes the local remote-tracking refs, never a fetch, so it is at most behind the remote: a commit they do not cover yet reads as holding something, and the next rule applies.
 
 ### Otherwise the branch must be on the remote
 

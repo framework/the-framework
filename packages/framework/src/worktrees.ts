@@ -20,8 +20,8 @@ export type RemoveResult =
   | {
       ok: true
       /**
-       * Branches that went with the checkout: the branch it was on, when that held nothing the
-       * remote lacks (#1650); the run-id branch the agent branched away from, when everything on
+       * Branches that went with the checkout: the branch it was on, when that held nothing of
+       * its own (#1650); the run-id branch the agent branched away from, when everything on
        * it is in the branch that stays (#1657). Absent when nothing went.
        */
       branchesDeleted?: string[]
@@ -77,13 +77,16 @@ export async function listProjectWorktrees(cwd: string, opts: { sizes?: boolean 
 export async function removeProjectWorktree(cwd: string, agentId: string, branches: BranchesFor = projectBranches): Promise<RemoveResult> {
   if (!isRunId(agentId)) return { ok: false, error: `invalid session id: ${agentId}` }
   const live = await readLiveMetas(cwd, undefined, branches).catch(() => [])
-  if (live.some(agent => agent.id === agentId && agent.status === 'running')) {
+  const agent = live.find(agent => agent.id === agentId)
+  if (agent?.status === 'running') {
     return { ok: false, error: 'that session is still going; stop it before removing its worktree' }
   }
   const source = await branches(cwd).catch(() => undefined)
   if (!source) return { ok: false, error: 'no package of this project provides its checkouts' }
   try {
-    return await source.remove(agentId)
+    // The commit the run's branch started from, when its card names one: a branch with no commit
+    // past it goes with the checkout, and one with its own work stays.
+    return await source.remove(agentId, agent?.baseCommit !== undefined ? { from: agent.baseCommit } : {})
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
   }

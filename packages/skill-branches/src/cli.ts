@@ -54,7 +54,9 @@ export const USAGE = `usage: branches <command>
                                measured from <commit>, the one the branches started from, in place of the default branch; a full commit id in place of a branch is read as a branch that ends there
   push [--branch <b>]          push this checkout's branch, or branch <b>, to origin; a dirty checkout is refused
   list [--sizes]               every agent checkout under .branches/
-  remove <id> [--no-push]      reclaim agent <id>'s checkout, once the remote has everything it holds
+  remove <id> [--no-push] [--from <commit>]
+                               reclaim agent <id>'s checkout, once the remote has everything it holds;
+                               <commit> is the one its branch started from, in place of the default branch
          [--discard]           ... or drop it whatever it holds, nothing pushed; the branch stays
   prune [--no-push]            remove, for every checkout
 
@@ -181,10 +183,11 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async remove(args, cwd, git) {
-    const { positionals, values } = parse(args, { 'no-push': { type: 'boolean' }, discard: { type: 'boolean' } }, 1)
+    const { positionals, values } = parse(args, { 'no-push': { type: 'boolean' }, discard: { type: 'boolean' }, from: { type: 'string' } }, 1)
+    if (values.from !== undefined && !values.from.trim()) throw new Usage('--from names a commit')
     const agentId = agentIdArg(positionals[0]!)
     const repo = await project(cwd, git)
-    const outcome = values.discard ? await discard(repo, agentId, git) : await reclaim(repo, agentId, !values['no-push'], git)
+    const outcome = values.discard ? await discard(repo, agentId, git) : await reclaim(repo, agentId, !values['no-push'], git, values.from)
     if (!outcome.ok) throw new Refused(outcome, refusalLine(agentId, outcome))
     // A link named after a branch that just went with its checkout is stale from this moment.
     await reconcileBranchLinks(repo, { git })
@@ -216,11 +219,11 @@ type RemoveRefusal = { ok: false; reason: 'no-checkout'; agentId: string }
  * branch is read off the checkout's own directory, never off the argument (#1757): a link's
  * name is the branch the agent chose, and that one is not the birth branch.
  */
-async function reclaim(repo: string, agentId: string, mayPush: boolean, git: GitRunner): Promise<ReclaimOutcome | RemoveRefusal> {
+async function reclaim(repo: string, agentId: string, mayPush: boolean, git: GitRunner, from?: string): Promise<ReclaimOutcome | RemoveRefusal> {
   const path = worktreePath(repo, agentId)
   if (!(await stat(path).then(s => s.isDirectory(), () => false))) return { ok: false, reason: 'no-checkout', agentId }
   const checkout = await realpath(path)
-  return reclaimWorktree(repo, checkout, { birthBranch: agentBranchName(agentIdFromWorktreeDir(basename(checkout))), mayPush, git })
+  return reclaimWorktree(repo, checkout, { birthBranch: agentBranchName(agentIdFromWorktreeDir(basename(checkout))), mayPush, ...(from !== undefined ? { from } : {}), git })
 }
 
 /** One agent's checkout dropped whatever it holds; a missing checkout is its own refusal. */

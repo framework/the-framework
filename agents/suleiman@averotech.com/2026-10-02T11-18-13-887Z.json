@@ -1,12 +1,13 @@
 {
   "id": "2026-10-02T11-18-13-887Z",
   "startedAt": "2026-10-02T11:18:13.977Z",
-  "status": "running",
+  "endedAt": "2026-10-02T11:20:58.170Z",
+  "status": "done",
   "intent": "Add a file named hand-test-1.txt at the repository root containing the single line: no publish test. Commit it. This is a test: change nothing else.",
   "driver": "claude-code",
   "model": "claude-opus-5-5",
-  "branch": "agent-2026-10-02T11-18-13-887Z",
-  "cost": 0.0658942,
+  "branch": "agent-hand-test-1",
+  "cost": 0.1783128,
   "caller": {
     "runner": {
       "host": "Suleimans-MacBook-Pro.local",

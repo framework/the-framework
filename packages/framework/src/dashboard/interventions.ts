@@ -168,7 +168,9 @@ export async function buildInterventions(
  *
  * Only the most recent {@link InterventionsDeps.handoffLimit} finished agents are inspected, and
  * their branches in one read of the project's branches provider: each read is a process, and
- * this runs on a poll. The provider answers git facts only, so the git host PR lookup the handoff
+ * this runs on a poll. A run started from another branch is the exception: its branch is read on
+ * its own, measured from the commit its own work begins at, as its page measures it; counted from
+ * the default branch it would be credited that other branch's commits too. The provider answers git facts only, so the git host PR lookup the handoff
  * summary makes per branch is never paid here: an open PR means the branch was pushed, so
  * `pushed` already excludes it, and the `pr` kind above is what surfaces it.
  */
@@ -194,9 +196,14 @@ async function unpushedFor(
   // No provider: the project has no checkouts and no branch state to read; nothing is waiting.
   const source = await branches(project.path).catch(() => undefined)
   if (!source) return []
+  // One read per commit the branches are measured from; the runs that name none share one.
+  const asks = new Map<string | undefined, string[]>()
+  for (const { agent, branch } of finished) asks.set(agent.baseCommit, [...(asks.get(agent.baseCommit) ?? []), branch])
   const states = new Map<string, BranchState>()
   try {
-    for (const state of await source.show(finished.map(({ branch }) => branch))) states.set(state.branch, state)
+    for (const shown of await Promise.all([...asks].map(([from, asked]) => source.show(asked, from)))) {
+      for (const state of shown) states.set(state.branch, state)
+    }
   } catch {
     unread()
     return []

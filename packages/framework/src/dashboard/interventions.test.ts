@@ -170,14 +170,15 @@ const waiting = (over: Partial<BranchState> = {}): BranchState => ({
 })
 
 /** A branches provider answering `show` from `state`, one answer per branch asked, recording what it was asked. */
-const showing = (state: (branch: string) => BranchState | undefined, asked: string[][] = []): BranchesFor => {
+const showing = (state: (branch: string, from?: string) => BranchState | undefined, asked: string[][] = [], askedFrom: (string | undefined)[] = []): BranchesFor => {
   const unused = () => Promise.reject(new Error('not asked here'))
   return async () => ({
     list: unused,
-    show: async branches => {
+    show: async (branches, from) => {
       asked.push([...branches])
+      askedFrom.push(from)
       return branches.flatMap(branch => {
-        const answer = state(branch)
+        const answer = state(branch, from)
         return answer ? [answer] : []
       })
     },
@@ -281,6 +282,25 @@ test('only the most recent finished runs are inspected (#860)', async () => {
 
   assert.deepEqual(asked, [['b11', 'b10', 'b9']], 'the newest three, by start time, asked at once')
   assert.equal(items.length, 3)
+})
+
+test('a run started from another branch is counted from the commit its own work begins at', async () => {
+  // Measured from the default branch, its branch holds the other branch's commits too: "2 commits" for 1.
+  const own = { sha: 'abc1234', subject: 'add the cart' }
+  const others = { sha: 'def5678', subject: 'the branch it started from' }
+  const asked: string[][] = []
+  const askedFrom: (string | undefined)[] = []
+  const agents = [
+    doneMeta({ id: 'r1', branch: 'based', baseCommit: 'c0ffee', startedAt: '2026-07-16T02:00:00Z' }),
+    doneMeta({ id: 'r2', branch: 'plain-1', startedAt: '2026-07-16T01:00:00Z' }),
+    doneMeta({ id: 'r3', branch: 'plain-2', startedAt: '2026-07-16T00:00:00Z' }),
+  ]
+  const { items } = await buildInterventions(
+    [project('a', '/a')],
+    onlyUnpushed(agents, showing((branch, from) => waiting({ branch, commits: from === 'c0ffee' || branch !== 'based' ? [own] : [others, own] }), asked, askedFrom)),
+  )
+  assert.deepEqual(new Map(asked.map((branches, i) => [askedFrom[i], branches])), new Map([['c0ffee', ['based']], [undefined, ['plain-1', 'plain-2']]]), 'the based run asked on its own, the others in one read')
+  assert.deepEqual(items.map(i => [i.agentId, i.commits]).sort(), [['r1', 1], ['r2', 1], ['r3', 1]])
 })
 
 test('unpushed items key on the run, so each notifies once (#860)', () => {

@@ -70,6 +70,12 @@ export function forReaders(mark: Pick<RunnerMark, 'parent' | 'baseCommit'>): { p
   return { ...(mark.parent !== undefined ? { parent: mark.parent } : {}), ...(mark.baseCommit !== undefined ? { baseCommit: mark.baseCommit } : {}) }
 }
 
+/** What the reclaim of a run's checkout is told: the commit its branch started from, when its mark names one. */
+export function startOf(card: RunCard): { from?: string } {
+  const from = runnerMark(card)?.baseCommit
+  return from !== undefined ? { from } : {}
+}
+
 /** Put the run's card on the branch before its agent exists. The outcome says whether it reached origin. */
 export function writeMarker(repo: string, card: RunCard, deps: LogsDeps = {}): Promise<FileBranchWrite> {
   return writeRun(repo, card, [], deps)

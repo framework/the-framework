@@ -197,6 +197,135 @@ test('a run branch pushed under its own name holds its own work, so it stays (#1
   }
 })
 
+test('a run branch another run was started from, and pushed, still holds its own work, so it stays', async () => {
+  // A main agent commits, starts a subagent from its branch, and ends its turn. The subagent's
+  // pushed branch contains the main agent's tip: another name on the remote, holding work that is
+  // the main agent's own.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await commitWork(path)
+    await git(['push', '-q', 'origin', `${branch}:refs/heads/agent-sub`], path)
+    assert.deepEqual(await reclaimWorktree(repo, path, ORDINARY), { ok: true })
+    await assert.rejects(() => stat(path), 'the checkout is gone')
+    assert.match(await git(['show', `${branch}:index.html`], repo), /Welcome!/, 'the branch stays')
+    assert.match(await git(['show', `refs/remotes/origin/${branch}:index.html`], repo), /Welcome!/, 'pushed under its own name')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+/** A second agent's checkout, on a branch started from the first agent's tip, as a subagent's is; the commit it started from. */
+async function checkoutStartedFrom(repo: string, base: string): Promise<{ path: string; branch: string; from: string }> {
+  const git = nodeGitRunner()
+  const sub = await addWorktree(repo, { agentId: 'run2', branch: agentBranchName('run2'), base }, git)
+  return { ...sub, from: (await git(['rev-parse', 'HEAD'], sub.path)).trim() }
+}
+
+const STARTED: ReclaimOptions = { birthBranch: agentBranchName('run2'), mayPush: true }
+
+test('a run branch with no commit past the commit it started from goes with its checkout, unpushed', async () => {
+  // A subagent that committed nothing: its tip is the main agent's commit, which origin has under
+  // the main agent's name.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await commitWork(path)
+    await git(['push', '-q', 'origin', branch], path)
+    const sub = await checkoutStartedFrom(repo, branch)
+    assert.deepEqual(await reclaimWorktree(repo, sub.path, { ...STARTED, from: sub.from }), { ok: true, branchesDeleted: [sub.branch] })
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${sub.branch}`], repo), 'nothing reached origin')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/${sub.branch}`], repo), 'and the branch went with the checkout')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a run branch with a commit past the commit it started from stays, whatever other name holds its tip', async () => {
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await commitWork(path)
+    await git(['push', '-q', 'origin', branch], path)
+    const sub = await checkoutStartedFrom(repo, branch)
+    await writeFile(join(sub.path, 'sub.txt'), 'own\n')
+    await commitWork(sub.path, 'the subagent\'s own')
+    await git(['push', '-q', 'origin', `${sub.branch}:refs/heads/agent-third`], sub.path)
+    assert.deepEqual(await reclaimWorktree(repo, sub.path, { ...STARTED, from: sub.from }), { ok: true })
+    assert.match(await git(['show', `${sub.branch}:sub.txt`], repo), /own/, 'the branch stays')
+    assert.match(await git(['show', `refs/remotes/origin/${sub.branch}:sub.txt`], repo), /own/, 'pushed under its own name')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a run branch at the commit it started from is pushed and kept while no other name on the remote holds that commit', async () => {
+  // Started from a branch nobody pushed: deleting this one unpushed would lean on a commit the
+  // remote does not have.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await commitWork(path)
+    const sub = await checkoutStartedFrom(repo, branch)
+    assert.deepEqual(await reclaimWorktree(repo, sub.path, { ...STARTED, from: sub.from }), { ok: true })
+    assert.match(await git(['show', `refs/remotes/origin/${sub.branch}:index.html`], repo), /Welcome!/, 'pushed')
+    assert.equal((await git(['rev-parse', '--verify', `refs/heads/${sub.branch}`], repo)).trim(), sub.from, 'and kept')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('its own pushed copy is not another name holding the commit it started from: the branch stays', async () => {
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await commitWork(path)
+    const sub = await checkoutStartedFrom(repo, branch)
+    await git(['push', '-q', 'origin', sub.branch], sub.path)
+    assert.deepEqual(await reclaimWorktree(repo, sub.path, { ...STARTED, from: sub.from }), { ok: true })
+    assert.equal((await git(['rev-parse', '--verify', `refs/heads/${sub.branch}`], repo)).trim(), sub.from, 'kept')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a run branch started off the default branch, its start not named, is pushed and kept even with no commit of its own', async () => {
+  // Without the commit it started from the branch is measured from origin's default branch, and
+  // what it started on reads as its own: the safe side.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await commitWork(path)
+    await git(['push', '-q', 'origin', branch], path)
+    const sub = await checkoutStartedFrom(repo, branch)
+    assert.deepEqual(await reclaimWorktree(repo, sub.path, STARTED), { ok: true })
+    assert.equal((await git(['rev-parse', '--verify', `refs/remotes/origin/${sub.branch}`], repo)).trim(), sub.from, 'pushed')
+    assert.equal((await git(['rev-parse', '--verify', `refs/heads/${sub.branch}`], repo)).trim(), sub.from, 'and kept')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a start commit this machine does not have proves nothing: the branch is pushed and kept', async () => {
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await git(['checkout', '--', '.'], path)
+    assert.deepEqual(await reclaimWorktree(repo, path, { ...ORDINARY, from: '0123456789abcdef0123456789abcdef01234567' }), { ok: true })
+    await git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo)
+    await git(['rev-parse', '--verify', `refs/heads/${branch}`], repo)
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
 test('a leftover checkout on a branch not minted for an agent keeps that branch, empty or not (#1650)', async () => {
   // Found on a rig: a reclaimed checkout sitting on `main`. It held nothing, and `git branch -D
   // main` failed only because the primary checkout had it out — git's refusal is not the guard.

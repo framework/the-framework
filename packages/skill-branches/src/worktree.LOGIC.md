@@ -127,7 +127,7 @@ From any directory, the root of the checkout [2] containing it is found through 
 #### Business logic
 
 - Removal asks git to remove the worktree plainly first. When git refuses, the removal is retried with force, and the line "[branches] forced removal of worktree <path> (git called it unclean)" is written to standard error: after the caller's clean check passed, git's refusal means an ignored build artifact or a state not anticipated, and such a thing must not strand a checkout [2] forever, but forcing past unknown state is said out loud rather than done silently. A path git never registered, or already removed, is not an error, so a removal can run twice.
-- Deleting a branch that holds nothing uses git's forced delete: git's own "merged" test asks the wrong question, since the caller proved the tip to be a commit the remote already has. A branch that will not delete is a leftover name, not lost work, so the failure is ignored.
+- Deleting a branch that holds nothing uses git's forced delete: git's own "merged" test asks the wrong question, since the caller proved the branch to hold no commit of its own, its tip a commit the remote already has. A branch that will not delete is a leftover name, not lost work, so the failure is ignored.
 - Pruning drops git's administrative records of worktrees whose directories are gone (a crash, a directory removed by hand). It never removes a live worktree and never fails the caller.
 
 ### What the remote has

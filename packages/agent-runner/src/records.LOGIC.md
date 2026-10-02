@@ -19,6 +19,7 @@ A run in flight is a run record [1]: the `logs` skill's card on the project's `a
 - **The marker** - a card with the run's id, its start time, `status: running`, the prompt as the intent, the driver, the model when the run has one and the tool's mark, written to the branch with an empty diary; the mark's machine is also on the card as `caller.host`, and the mark's parent, when it names one, as `caller.parent`; the write says whether it reached origin.
 - **What a reader finds beside the host** - the mark's parent and the mark's `baseCommit`, each when the mark has one, are on the card a second time, as `caller.parent` and `caller.baseCommit`, outside the mark, for a reader that does not know the mark.
 - **Reading the mark** - a card carries the tool's mark when `caller.runner` is an object with a `host` string; `pid` is kept only when it is a number, and `then`, `parent`, `base` and `baseCommit` each only when it is a string; a card without it is somebody else's run.
+- **What the reclaim is told** - the mark's `baseCommit`, when the mark has one, as the commit the run's branch started from.
 - **Withdrawing** - a marker whose scheduler lost the cap is deleted from the branch, so no record says running for a run that never was.
 - **The record at the end** - the card and the diary written over the marker, same id, same file; the mark stays on the card.
 - **A branch that is gone** - when the reclaim deleted the branch the card names, the record is written again without the branch.
@@ -54,6 +55,16 @@ Two of the mark's facts are written on the card a second time, beside `caller.ho
 #### Business logic
 
 A card carries the tool's mark when `caller.runner` is an object whose `host` is a string. A card with no such object, or a mark with no `host` string, is somebody else's run. Reading a mark keeps `pid` only when it is a number, and `then`, `parent`, `base` and `baseCommit` each only when it is a string. Those four last for the run's whole life: a resume writes the mark again with its own host and pid and keeps them (`run.ts`). A resume replaces `baseCommit` in one case only: the run's branch was gone everywhere and was made again from the base, so the run's own work begins at the commit the base is at now (`run.ts`).
+
+### What the reclaim is told
+
+#### Context
+
+**Problem**: the `branches` package deletes a branch with its checkout only when the branch has no commit past where it started, and it takes origin's default branch as that start unless told otherwise. A run started from another branch (`run --base`) started somewhere else, and only its record says where.
+
+#### Business logic
+
+For a card whose mark names a `baseCommit`, the reclaim is told that commit as where the run's branch started. A card with no mark, or a mark with none, names nothing: the branch is measured from origin's default branch.
 
 ### Withdrawing
 

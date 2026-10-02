@@ -254,6 +254,24 @@ test('remove --no-push: a checkout whose tip the remote lacks is kept, and nothi
   }
 })
 
+test('remove --from: a checkout with no commit past the commit its branch started from goes, its branch with it, unpushed', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    await run(repo, 'create', 'a1')
+    await commitWork(worktreePath(repo, 'a1'))
+    await git(['push', '-q', 'origin', 'agent-a1'], repo)
+    await run(repo, 'create', 'a2', '--base', 'agent-a1')
+    const from = (await git(['rev-parse', 'agent-a1'], repo)).trim()
+    assert.deepEqual((await run(repo, 'remove', 'a2', '--from', from)).out, { ok: true, branchesDeleted: ['agent-a2'] })
+    await assert.rejects(() => git(['rev-parse', '--verify', 'refs/remotes/origin/agent-a2'], repo), 'nothing reached the remote')
+    const usage = await run(repo, 'remove', 'a1', '--from', ' ')
+    assert.equal(usage.code, 2)
+    assert.match(usage.err, /--from names a commit/)
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
 test('attach: a continued agent is put back on the branch its work is on', async () => {
   const repo = await repoWithOrigin()
   try {

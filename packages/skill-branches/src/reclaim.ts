@@ -1,4 +1,4 @@
-import { nodeGitRunner, pushBranch, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, originDefaultBranch, pushBranch, type GitRunner } from '@gemstack/agent-data'
 import { isAgentBranch } from './branch-names.js'
 import {
   branchPushed,
@@ -22,7 +22,8 @@ import {
  * and the refusal says why.
  *
  * What the caller knows and git does not comes in as options: whether the checkout's branch may
- * be pushed at all, and a pushed commit that already holds everything the checkout could.
+ * be pushed at all, the commit its branch started from, and a pushed commit that already holds
+ * everything the checkout could.
  */
 export interface ReclaimOptions {
   /**
@@ -37,6 +38,11 @@ export interface ReclaimOptions {
    * publishes nothing (#1379).
    */
   mayPush: boolean
+  /**
+   * The commit the checkout's branch started from, when that is not origin's default branch: a
+   * branch started from another branch. A branch with no commit past it holds nothing of its own.
+   */
+  from?: string
   /**
    * A commit the remote already has that provably holds everything this checkout could — the commit a
    * cloud session pushed on the agent's behalf, say (#1601). A clean tree whose tip is inside it goes without a push, and keeps
@@ -63,8 +69,8 @@ export type ReclaimOutcome =
   | {
       ok: true
       /**
-       * Branches that went with the checkout: the branch it was on, when that held nothing the
-       * remote lacks (#1650); the birth branch, when everything on it is in the branch that stays
+       * Branches that went with the checkout: the branch it was on, when that held nothing of
+       * its own (#1650); the birth branch, when everything on it is in the branch that stays
        * (#1657). Absent when nothing went.
        */
       branchesDeleted?: string[]
@@ -97,12 +103,12 @@ export async function reclaimWorktree(repo: string, path: string, opts: ReclaimO
 
   // Whether the checkout's branch goes with it (#1650): only when it provably holds nothing.
   let emptyBranch = false
-  if (opts.heldBy && (await coveredBy(path, branch, opts.heldBy, git))) {
+  if (opts.heldBy && (await isAncestor(path, branch, opts.heldBy, git))) {
     // A tip inside a commit the remote already has: nothing to push (#1601).
-  } else if (await branchHoldsNothing(repo, branch, opts.birthBranch, git)) {
-    // A branch whose tip the remote already has under another name — an agent that committed
-    // nothing (#1650). The rule is satisfied before any push: what the checkout holds *is* on
-    // the remote, so the checkout goes. The branch goes with it only when it was minted for an
+  } else if (await branchHoldsNothing(repo, branch, opts, git)) {
+    // A branch with no commit past where it started — an agent that committed nothing (#1650).
+    // The rule is satisfied before any push: what the checkout holds *is* on the remote, under
+    // another name, so the checkout goes. The branch goes with it only when it was minted for an
     // agent: a leftover checkout can sit on the user's own branch (one was found on `main`), and
     // deleting that is not this code's call even when it holds nothing — git's refusal to delete
     // a checked-out branch must never be the guard.
@@ -121,7 +127,7 @@ export async function reclaimWorktree(repo: string, path: string, opts: ReclaimO
   // The birth branch (#1657) is judged before anything is deleted: the containment reads both refs.
   // Only a branch the package minted: the rule that guards the checkout's own branch guards this one.
   const birthBranchGoes =
-    opts.birthBranch !== undefined && opts.birthBranch !== branch && isAgentBranch(opts.birthBranch) && (await branchContains(repo, branch, opts.birthBranch, git))
+    opts.birthBranch !== undefined && opts.birthBranch !== branch && isAgentBranch(opts.birthBranch) && (await isAncestor(repo, `refs/heads/${opts.birthBranch}`, `refs/heads/${branch}`, git))
   await opts.beforeRemove?.()
   await removeWorktree(repo, path, git)
   await pruneWorktrees(repo, git)
@@ -150,28 +156,33 @@ export async function discardWorktree(repo: string, path: string, opts: Pick<Rec
   return { ok: true }
 }
 
-/** Whether the branch tip is an ancestor of `anchor`. False on any doubt. */
-async function coveredBy(path: string, branch: string, anchor: string, git: GitRunner): Promise<boolean> {
-  return git(['merge-base', '--is-ancestor', branch, anchor], path).then(
-    () => true,
-    () => false,
-  )
-}
-
 /**
- * Whether a branch holds nothing the remote lacks (#1650): the tip is
- * reachable from some remote-tracking branch *other than the branch's own* — a commit `origin`
- * already has under another name, so nothing on the branch is unique to it. Its own remote copy
- * does not count: a pushed branch with a PR contains its own tip and is exactly the branch that
- * must stay. The branch's own copies are the one under its name and the one under its birth
+ * Whether a branch holds nothing of its own (#1650): no commit past where it started. Where it
+ * started is the commit the caller names, which some remote-tracking branch *other than the
+ * branch's own* must hold, so the commit is on the remote whatever happens to this branch; with
+ * none named, origin's default branch, where every agent branch starts unless told otherwise.
+ *
+ * Not "the tip is on the remote under another name", the earlier test: a branch another agent was
+ * started from has its tip inside that agent's branch once that one is pushed, and it is still
+ * the only branch that work is its own on.
+ *
+ * The branch's own copies are the remote-tracking ref under its name and the one under its birth
  * name — a branch renamed after it was pushed (#1725) left its remote copy under the old name,
- * and that copy holding the tip proves nothing about another name having it. Read from the local
- * remote-tracking refs, which are only ever behind the remote: a tip they do not cover yet
+ * and that copy holding a commit proves nothing about another name having it. Read from the local
+ * remote-tracking refs, which are only ever behind the remote: a commit they do not cover yet
  * answers false, and the caller falls back to the push.
  */
-async function branchHoldsNothing(repo: string, branch: string, birthBranch: string | undefined, git: GitRunner): Promise<boolean> {
-  const own = [branch, birthBranch].filter(name => name !== undefined).map(name => `/${name}`)
-  return git(['branch', '--remotes', '--contains', `refs/heads/${branch}`, '--format=%(refname:short)'], repo).then(
+async function branchHoldsNothing(repo: string, branch: string, opts: Pick<ReclaimOptions, 'birthBranch' | 'from'>, git: GitRunner): Promise<boolean> {
+  const tip = `refs/heads/${branch}`
+  if (opts.from === undefined) {
+    const start = await originDefaultBranch(repo, git)
+    return start !== undefined && (await isAncestor(repo, tip, `refs/remotes/${start}`, git))
+  }
+  // The commit itself, never the caller's words handed on to git; one this machine lacks proves nothing.
+  const from = await git(['rev-parse', '--verify', '--quiet', '--end-of-options', `${opts.from}^{commit}`], repo).then(out => out.trim(), () => '')
+  if (!from || !(await isAncestor(repo, tip, from, git))) return false
+  const own = [branch, opts.birthBranch].filter(name => name !== undefined).map(name => `/${name}`)
+  return git(['branch', '--remotes', '--contains', from, '--format=%(refname:short)'], repo).then(
     out =>
       out
         .split('\n')
@@ -181,9 +192,9 @@ async function branchHoldsNothing(repo: string, branch: string, birthBranch: str
   )
 }
 
-/** Whether `inner` exists and is an ancestor of (or equal to) `outer` — everything on it is on `outer` too. */
-async function branchContains(repo: string, outer: string, inner: string, git: GitRunner): Promise<boolean> {
-  return git(['merge-base', '--is-ancestor', `refs/heads/${inner}`, `refs/heads/${outer}`], repo).then(
+/** Whether `inner` is `outer` or an ancestor of it — everything on it is on `outer` too. False on any doubt. */
+async function isAncestor(cwd: string, inner: string, outer: string, git: GitRunner): Promise<boolean> {
+  return git(['merge-base', '--is-ancestor', inner, outer], cwd).then(
     () => true,
     () => false,
   )

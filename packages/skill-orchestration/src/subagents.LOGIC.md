@@ -104,7 +104,7 @@ The id must name a run record whose mark names the caller as `parent`; anything 
 
 **User story**: a subagent ended and its work is on its own branch; the main agent takes it onto its own branch, the one the single pull request is opened from, and the subagent's branch disappears, so the project's branches show one branch for the whole plan.
 
-**Problem**: a subagent's branch left on origin after its work was merged is more than a leftover: when the main agent's branch only moved forward to that branch's tip, the runner finds the main agent's branch holding nothing origin lacks under another name, deletes it with the checkout at the end of the turn, and the next turn starts on a new branch without the landed work. A merge an agent runs by hand also leaves the deleting to its memory.
+**Problem**: a subagent's branch left on origin after its work was merged is a leftover: a second branch holding work that is now the main agent's. A merge an agent runs by hand leaves the deleting to its memory.
 
 **Problem**: once the subagent's branch is deleted, nothing names its last commit. The main agent's branch holds it for now, but that branch is squashed into one commit and deleted when its pull request merges, and git then drops the subagent's commits. The subagent's page could no longer show what that one subagent changed.
 

@@ -20,7 +20,7 @@ Lists, removes and deletes the checkouts [1] that a project's agents [2] leave b
 ## Business logic — TL;DR
 
 - **The retained checkouts, newest first** - every checkout the branches provider lists, joined with its agent's record: the branch, how the agent ended, whether it is still in use, and its size on disk for a finished agent.
-- **Removing one checkout** - refused for an unsafe id, a running agent, or a project with no branches provider; otherwise the provider's `remove` decides, pushing the branch first when the remote lacks it, and its refusal is answered in its own words.
+- **Removing one checkout** - refused for an unsafe id, a running agent, or a project with no branches provider; otherwise the provider's `remove` decides, told the commit the agent's branch started from when the agent's card names one, pushing the branch first when the remote lacks it, and its refusal is answered in its own words.
 - **Deleting an agent** - takes the agent out of the dashboard, its record included, discarding uncommitted work with the checkout through the provider's `remove --discard`; its branch and commits stay.
 
 ## Business logic
@@ -49,7 +49,7 @@ Before the provider is asked, in this order:
 - An agent whose card says it is still running is refused: "that session is still going; stop it before removing its worktree".
 - A project none of whose packages provides its checkouts is refused: "no package of this project provides its checkouts".
 
-The provider's `remove` then runs, with a push allowed. Its answer is the answer: success, with the branches that went with the checkout when any did; or its refusal, in its own words (an unknown agent, a directory it does not know as a checkout, a checkout on no branch, uncommitted work, a branch not on the remote). A failure past that is reported as the error with its own words.
+The provider's `remove` then runs, with a push allowed. When the agent's card in the checkout names the commit the agent's own work begins at (`baseCommit`, written for an agent started from another branch), that commit is passed as where the branch started: a branch with no commit past it goes with the checkout, and one with its own work stays. Without it the provider measures the branch from the default branch. Its answer is the answer: success, with the branches that went with the checkout when any did; or its refusal, in its own words (an unknown agent, a directory it does not know as a checkout, a checkout on no branch, uncommitted work, a branch not on the remote). A failure past that is reported as the error with its own words.
 
 ### Deleting an agent
 

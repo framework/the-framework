@@ -1,4 +1,5 @@
 import type { LinkedPr } from './pull-requests.js'
+import type { PublishLevel } from '../publish-levels.js'
 
 // The dashboard's request/result vocabulary (#345/#396/#475): the shapes the Start / Add /
 // Preview RPCs speak. They live here, on neither the HTTP server nor the RPC mount, so both —
@@ -31,13 +32,15 @@ export interface OnboardingSuggestion {
 
 /**
  * What a Start carries besides its prompt (#1774): the person's picks, handed to the project's
- * `start` hook line as `DRIVER` and `MODEL`. Absent leaves each to the tool the line names.
+ * `start` hook line as `DRIVER`, `MODEL` and `PUBLISH`. Absent leaves each to the tool the line names.
  */
 export interface StartAgentOptions {
   /** The model to run on. */
   model?: string
   /** Which coding agent the run is on: `claude-code` or `codex`. */
   driver?: string
+  /** How far the run publishes its work when the agent finishes: push its branch, open its pull request, or open it set to merge once its checks pass. Absent, nothing unless the prompt asks. A project with no git host package starts a pull request level at `branch`. */
+  publish?: PublishLevel
   /**
    * The follow-up's prompt: once the run ends done with a pull request, a fresh agent works its
    * branch from it before the request merges. The launcher's "Post-merge cleanup" box.

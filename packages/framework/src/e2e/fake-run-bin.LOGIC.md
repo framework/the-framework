@@ -26,7 +26,7 @@ See the intro. The harness writes each fixture project's hooks file with `start:
 
 #### Business logic
 
-`start` reads `PROMPT`, `DRIVER` and `MODEL` from its environment and mints the agent's id from the current time. When a recording file is named in the environment, it appends one line with the hook, the id, the prompt and the picks: the only place a story can see what the hook was handed. A prompt containing "refuse" prints "the project has no such command" on stderr and exits 1. Otherwise the agent's process is spawned detached with the same environment and `{ok, id}` is printed.
+`start` reads `PROMPT`, `DRIVER`, `MODEL` and `PUBLISH` from its environment and mints the agent's id from the current time. When a recording file is named in the environment, it appends one line with the hook, the id, the prompt and the picks: the only place a story can see what the hook was handed. A prompt containing "refuse" prints "the project has no such command" on stderr and exits 1. Otherwise the agent's process is spawned detached with the same environment and `{ok, id}` is printed.
 
 ### Resume
 

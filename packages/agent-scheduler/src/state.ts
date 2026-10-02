@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import type { Publish } from 'agent-runner'
 import { DEFAULT_MODEL, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE } from './names.js'
 
 /**
@@ -33,6 +34,8 @@ export interface ScheduleLine {
   when?: string
   /** Whether the line runs it on a machine where nobody switched it. */
   on: boolean
+  /** How far a run of the command publishes, when the line says: `branch`, `pr` or `merge`. */
+  publish?: Publish
 }
 
 /** One tick as the state remembers it. */

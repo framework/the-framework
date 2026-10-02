@@ -1,4 +1,4 @@
-What the launcher offers for one project, read once per project: its commands [1] and whether it has a start hook [2].
+What the launcher offers for one project, read once per project: its commands [1], whether it has a start hook [2] and whether it has a git host provider [3].
 
 ## Context
 
@@ -8,7 +8,8 @@ What the launcher offers for one project, read once per project: its commands [1
 
 [1] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [2] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id.
+[3] git host provider: the package of the project that declares it provides the git host; The Framework opens and lands pull requests through the command that package declares. A project with none has no git host: no pull request can be opened for it.
 
 ## Business logic
 
-The read asks the daemon for the project's commands [1] and whether the project has a start hook [2]. Its answer is nothing until the daemon has answered, nothing when no project is open, and nothing for a project the daemon does not know. It is asked again when the project changes. A surface therefore says "this project has no start hook" only once it holds an answer that says so.
+The read asks the daemon for the project's commands [1], whether the project has a start hook [2], and whether it has a git host provider [3], which decides the options the launcher's publish menu offers. Its answer is nothing until the daemon has answered, nothing when no project is open, and nothing for a project the daemon does not know. It is asked again when the project changes. A surface therefore says "this project has no start hook" only once it holds an answer that says so.

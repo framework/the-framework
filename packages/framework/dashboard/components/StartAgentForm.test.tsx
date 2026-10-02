@@ -66,7 +66,7 @@ const props = { projectId: 'p1', files: [], context: new Set<string>(), addConte
 
 describe('StartAgentForm (#1774)', () => {
   test('the project\'s commands are no buttons: they are in the box\'s `/` list, and nothing starts', async () => {
-    onCommands.mockResolvedValue({ commands: COMMANDS, startHook: true })
+    onCommands.mockResolvedValue({ commands: COMMANDS, startHook: true, gitHost: true })
     render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onCommands).toHaveBeenCalled())
     expect(screen.queryByRole('button', { name: '/work-queue' })).toBeNull()
@@ -74,7 +74,7 @@ describe('StartAgentForm (#1774)', () => {
   })
 
   test('Start hands the picked coding agent and model to the start hook, and selects the run it answers', async () => {
-    onCommands.mockResolvedValue({ commands: [], startHook: true })
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
     prefs.current = { driver: 'codex', model: 'gpt-5' }
     start.mockResolvedValue({ agentId: 'r1' })
     const onAgentStarted = vi.fn()
@@ -84,8 +84,49 @@ describe('StartAgentForm (#1774)', () => {
     expect(start).toHaveBeenCalledWith('p1', 'do the thing', { driver: 'codex', model: 'gpt-5' })
   })
 
+  test('the publish menu: Nothing until the person picks, and then no level is handed to the start hook; a saved pick is shown and handed over; a change writes the saved setting', async () => {
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
+    start.mockResolvedValue({ agentId: 'r1' })
+    render(<StartAgentForm {...props} />)
+    const menu = (await screen.findByRole('combobox', { name: 'Publish' })) as HTMLSelectElement
+    expect(menu.value).toBe('nothing')
+    expect(Array.from(menu.options).map(o => o.textContent)).toEqual(['Nothing', 'Publish branch', 'Open PR', 'Merge on green'])
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
+
+    fireEvent.change(menu, { target: { value: 'pr' } })
+    expect(updatePreferences).toHaveBeenCalledWith({ publish: 'pr' })
+
+    cleanup()
+    start.mockClear()
+    prefs.current = { publish: 'merge' }
+    render(<StartAgentForm {...props} />)
+    expect(((await screen.findByRole('combobox', { name: 'Publish' })) as HTMLSelectElement).value).toBe('merge')
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', { publish: 'merge' }))
+
+    cleanup()
+    start.mockClear()
+    prefs.current = { publish: 'nothing' }
+    render(<StartAgentForm {...props} />)
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
+  })
+
+  test('a project with no git host package is offered Nothing and Publish branch only, and a saved pull request pick starts it at the branch', async () => {
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: false })
+    prefs.current = { publish: 'merge' }
+    start.mockResolvedValue({ agentId: 'r1' })
+    render(<StartAgentForm {...props} />)
+    const menu = (await screen.findByRole('combobox', { name: 'Publish' })) as HTMLSelectElement
+    await waitFor(() => expect(Array.from(menu.options).map(o => o.textContent)).toEqual(['Nothing', 'Publish branch']))
+    expect(menu.value).toBe('branch')
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', { publish: 'branch' }))
+  })
+
   test('a project with the post-merge-cleanup command shows the box; ticked, the start carries the command as the follow-up', async () => {
-    onCommands.mockResolvedValue({ commands: [...COMMANDS, { name: 'post-merge-cleanup' }], startHook: true })
+    onCommands.mockResolvedValue({ commands: [...COMMANDS, { name: 'post-merge-cleanup' }], startHook: true, gitHost: true })
     prefs.current = { postMergeCleanup: true }
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} />)
@@ -100,7 +141,7 @@ describe('StartAgentForm (#1774)', () => {
   })
 
   test('without the command there is no box, and a saved setting sends nothing; unticked, nothing either', async () => {
-    onCommands.mockResolvedValue({ commands: COMMANDS, startHook: true })
+    onCommands.mockResolvedValue({ commands: COMMANDS, startHook: true, gitHost: true })
     prefs.current = { postMergeCleanup: true }
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} />)
@@ -111,7 +152,7 @@ describe('StartAgentForm (#1774)', () => {
     cleanup()
 
     start.mockClear()
-    onCommands.mockResolvedValue({ commands: [{ name: 'post-merge-cleanup' }], startHook: true })
+    onCommands.mockResolvedValue({ commands: [{ name: 'post-merge-cleanup' }], startHook: true, gitHost: true })
     prefs.current = {}
     render(<StartAgentForm {...props} />)
     const box = await screen.findByRole('checkbox', { name: 'Post-merge cleanup' })
@@ -121,7 +162,7 @@ describe('StartAgentForm (#1774)', () => {
   })
 
   test('no pick made: neither is sent, so the hook decides', async () => {
-    onCommands.mockResolvedValue({ commands: [], startHook: true })
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} />)
     fireEvent.click(screen.getByText('submit-typed'))
@@ -129,7 +170,7 @@ describe('StartAgentForm (#1774)', () => {
   })
 
   test('a project with no start hook cannot start: the submit is off and the form says what to add', async () => {
-    onCommands.mockResolvedValue({ commands: [], startHook: false })
+    onCommands.mockResolvedValue({ commands: [], startHook: false, gitHost: true })
     render(<StartAgentForm {...props} />)
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toBe('This project has no start hook. Run npx agent-runner init in the project, or add a start: line to .the-framework/hooks.yml.')
@@ -137,7 +178,7 @@ describe('StartAgentForm (#1774)', () => {
   })
 
   test('before the project is read, and with a start hook, nothing is said and the submit is on', async () => {
-    onCommands.mockResolvedValue({ commands: [], startHook: true })
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
     render(<StartAgentForm {...props} />)
     expect(screen.queryByRole('alert')).toBeNull()
     await waitFor(() => expect(onCommands).toHaveBeenCalledWith('p1'))
@@ -146,7 +187,7 @@ describe('StartAgentForm (#1774)', () => {
   })
 
   test('a picked device runs its own start hook: the start carries it, and this project\'s missing hook does not block', async () => {
-    onCommands.mockResolvedValue({ commands: [], startHook: false })
+    onCommands.mockResolvedValue({ commands: [], startHook: false, gitHost: true })
     device.current = { id: 'd1', url: 'http://box:4200', token: 't', label: 'box' }
     start.mockResolvedValue({ agentId: 'r2' })
     const onAgentStarted = vi.fn()
@@ -160,7 +201,7 @@ describe('StartAgentForm (#1774)', () => {
   })
 
   test('what would stop the run is said before the Start, for the coding agent picked; a warning is said too, and neither turns Start off', async () => {
-    onCommands.mockResolvedValue({ commands: [], startHook: true })
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
     prefs.current = { driver: 'codex' }
     onStartCheck.mockResolvedValue({ problems: ['`codex` is not logged in. Run `codex login`, then start again.'], warnings: ['`gh` is not logged in.'] })
     render(<StartAgentForm {...props} />)
@@ -174,7 +215,7 @@ describe('StartAgentForm (#1774)', () => {
   })
 
   test('the picked Context rides the prompt as one line at its end, after the command\'s own words', async () => {
-    onCommands.mockResolvedValue({ commands: [], startHook: true })
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} context={new Set(['/repos/other', 'src/app.ts'])} />)
     fireEvent.click(screen.getByText('submit-typed'))

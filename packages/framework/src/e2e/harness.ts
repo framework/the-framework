@@ -142,6 +142,7 @@ export interface HookCall {
   prompt?: string
   driver?: string
   model?: string
+  publish?: string
   text?: string
   answer?: string
 }

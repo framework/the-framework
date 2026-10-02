@@ -65,6 +65,9 @@ test('run --detach on Codex: the spawned run names Codex, no model unless one is
     const followed: unknown[] = []
     const withThen = await detachRun(repo, { prompt: '/work-queue', driver: 'codex', then: '/post-merge-cleanup', now: () => new Date(NOW.getTime() + 2000) }, { spawn: async (_repo, run) => { followed.push(run) } })
     assert.deepEqual(followed, [{ id: withThen.id, prompt: '/work-queue', mark: true, driver: 'codex', then: '/post-merge-cleanup' }])
+    const levelled: unknown[] = []
+    const withLevel = await detachRun(repo, { prompt: 'Fix the typo', publish: 'merge', now: () => new Date(NOW.getTime() + 3000) }, { spawn: async (_repo, run) => { levelled.push(run) } })
+    assert.deepEqual(levelled, [{ id: withLevel.id, prompt: 'Fix the typo', mark: true, driver: 'claude-code', publish: 'merge' }], 'the publish level a person picked reaches the run')
   } finally {
     await removeRepo(repo)
   }
@@ -112,6 +115,7 @@ test('a spawned run is told its tool, and its model only when it has one', () =>
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', model: 'opus' }), ['run', '/work-queue', '--id', 'r1', '--model', 'opus'])
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', driver: 'codex' }), ['run', '/work-queue', '--id', 'r1', '--driver', 'codex'])
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', then: '/post-merge-cleanup' }), ['run', '/work-queue', '--id', 'r1', '--then', '/post-merge-cleanup'])
+  assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', publish: 'merge' }), ['run', '/work-queue', '--id', 'r1', '--publish', 'merge'])
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', mark: true }), ['run', '/work-queue', '--id', 'r1', '--mark'])
   assert.deepEqual(runArgs({ id: 'r1', prompt: 'Do task one', parent: 'p1', base: 'agent-p1' }), ['run', 'Do task one', '--id', 'r1', '--parent', 'p1', '--base', 'agent-p1'])
 })

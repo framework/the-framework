@@ -1,6 +1,6 @@
 ---
 name: readability
-description: Refactor a part of the code to make it as easy as possible for humans to read, rating every file and function before and after, and open a pull request for a person to review.
+description: Refactor a part of the code to make it as easy as possible for humans to read, rating every file and function before and after.
 disable-model-invocation: true
 ---
 
@@ -15,4 +15,4 @@ How to work:
 - Mostly 10s means you were lazy. Scrutinize everything and take the time it takes: work until the result is exceptionally good, without anyone pushing you.
 - One commit per refactor.
 
-Commit each change on your branch. Then publish the work: push your branch and open its pull request, and leave the merge to a person. The pull request's body is your summary, and so is your last message: the list again, each entry with its old rating, its new rating, and the commit that changed it. If nothing needs changing, say so with the ratings and stop, publishing nothing.
+Commit each change on your branch. Then publish the work as far as whoever started you said; when they said nothing, publish nothing. A pull request's body is your summary, and so is your last message: the list again, each entry with its old rating, its new rating, and the commit that changed it. If nothing needs changing, say so with the ratings and stop, publishing nothing.

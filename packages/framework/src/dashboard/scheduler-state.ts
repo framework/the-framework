@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isPidAlive } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
+import { isPublishLevel, type PublishLevel } from '../publish-levels.js'
 
 // The scheduler card's read (#1774): a projection of `.agent-scheduler/state.json`, the file the
 // scheduler writes per project and per user, exactly as it stands. The dashboard reads the file by
@@ -41,6 +42,8 @@ export interface SchedulerCommand {
   when?: string
   /** Whether it runs on this machine: the machine's switch, else what the line says. */
   on: boolean
+  /** How far a run of the command publishes its work, when the line says: `branch`, `pr` or `merge`. A line that says nothing publishes nothing. */
+  publish?: PublishLevel
 }
 
 /** A project's scheduler as the card shows it. */
@@ -121,6 +124,7 @@ function scheduleLines(value: unknown): SchedulerCommand[] {
       ...(typeof l['every'] === 'string' ? { every: l['every'] } : {}),
       ...(typeof l['when'] === 'string' ? { when: l['when'] } : {}),
       on: l['on'],
+      ...(isPublishLevel(l['publish']) ? { publish: l['publish'] } : {}),
     })
   }
   return lines

@@ -8,6 +8,8 @@ What the tests cover, for the launcher on a project home [1]:
 - **A picked device** - the start carries the device's [5] URL, token and label, a project with no start hook of its own does not block it, and the check hook [6] is not asked.
 - **What would stop the agent** - the check hook [6] is asked with the project and the picked coding agent; its problem shows in red and its warning in amber, in the answer's words, and Start stays on.
 - **The "Post-merge cleanup" box** - a project with the `post-merge-cleanup` command shows the box, ticked from the saved setting; the Start then carries `/post-merge-cleanup` as the follow-up; clicking the box writes the setting off. Without the command there is no box and a saved setting on sends no follow-up; with the command and the setting never made, the box is unticked and the Start carries no follow-up.
+- **The publish menu** - with nothing saved the menu shows "Nothing", lists "Nothing", "Publish branch", "Open PR" and "Merge on green" in that order, and a Start sends no publish level; picking "Open PR" writes the saved setting; a saved "Merge on green" is shown and the Start sends `merge`; a saved "Nothing" sends no level.
+- **A project with no git host provider** - the publish menu offers "Nothing" and "Publish branch" only; a saved "Merge on green" shows as "Publish branch", and the Start sends `branch`.
 - **The Context [7] rides the prompt** - with another project's path and a file picked, the Start sends the typed text followed by a blank line and `Context: <project path>, <file>` at its end.
 
 ## Glossary

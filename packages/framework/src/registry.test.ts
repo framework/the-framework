@@ -218,6 +218,9 @@ test('sanitizePreferences reads only the current spellings', async () => {
   assert.deepEqual(await stored({ driver: 'claude' }), {})
   // The key that replaced it still reads, beside the ignored one.
   assert.deepEqual(await stored({ driver: 'claude-code', agent: 'gpt-9000' }), { driver: 'claude-code' })
+  assert.deepEqual(await stored({ publish: 'merge' }), { publish: 'merge' })
+  assert.deepEqual(await stored({ publish: 'nothing' }), { publish: 'nothing' })
+  assert.deepEqual(await stored({ publish: 'push' }), {}, 'a word the launcher\'s menu does not list is dropped')
 })
 
 test('patchPreferences merges only the keys it is given (#1148)', async () => {

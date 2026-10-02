@@ -1,4 +1,4 @@
-The launcher on a project home [1]: the box where the user says what an agent [3] should do, or picks one of the project's commands [2] from its `/` list, and Start. A Start is the project's own start hook [4]: the launcher hands it the prompt, with the Context [11] the user picked on its last line, the coding agent [5] and model the user picked, the follow-up [12] when the "Post-merge cleanup" box is ticked, and the device [6] when one is picked, and selects the agent the hook answers. A project that has no start hook cannot start an agent from here, and the launcher says what to add. What would stop the agent (a coding agent not installed or logged out) is said before the Start, from the project's check hook [10].
+The launcher on a project home [1]: the box where the user says what an agent [3] should do, or picks one of the project's commands [2] from its `/` list, and Start. A Start is the project's own start hook [4]: the launcher hands it the prompt, with the Context [11] the user picked on its last line, the coding agent [5] and model the user picked, the publish level [13] when the publish menu says one, the follow-up [12] when the "Post-merge cleanup" box is ticked, and the device [6] when one is picked, and selects the agent the hook answers. A project that has no start hook cannot start an agent from here, and the launcher says what to add. What would stop the agent (a coding agent not installed or logged out) is said before the Start, from the project's check hook [10].
 
 ## Context
 
@@ -20,13 +20,16 @@ The launcher on a project home [1]: the box where the user says what an agent [3
 [10] check hook: the one shell line under `check:` in the project's `.the-framework/hooks.yml`. The daemon runs it with the picked coding agent in its environment, and the line answers a list of problems, which would stop the agent, and a list of warnings, which are only worth knowing; each names its own fix. The Framework names no tool: the line does.
 [11] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
 [12] follow-up: a prompt a Start carries besides its own: once the agent ends done with a pull request, the tool the start hook names starts a fresh agent on the same branch with that prompt and the first agent's id, and holds the pull request's merge until that one is done. Handed to the start hook as `THEN`.
+[13] publish level: how far an agent publishes its work when it finishes: `branch` (push the branch and open no pull request), `pr` (push the branch and open its pull request) or `merge` (push the branch and open its pull request, set to merge on its own once its checks pass). An agent given none publishes only what its prompt asks. Handed to the start hook as `PUBLISH`.
+[14] git host provider: the package of the project that declares it provides the git host; The Framework opens and lands pull requests through the command that package declares. A project with none has no git host: no pull request can be opened for it.
 
 ## Business logic — TL;DR
 
 - **Commands load, never start** - the commands [2] are in the editor's `/` list and the Commands menu, not buttons; picking one loads `/<name> ` into the editor for review, and the form leaves a note saying so.
 - **The Context picker** - a "Context" menu on the control row lists the other registered projects to tick and the picked files to remove; `@`/`#` mentions and the right rail's file tree feed the same Context [11].
-- **The "Post-merge cleanup" box** - on the control row, after the Context menu, only when the project has the `post-merge-cleanup` command [2] and no device is picked; ticked from the user's saved setting, and a click writes that setting.
-- **What a Start sends** - the text with the Context on one `Context:` line at its end, the coding agent [5] and the model when the user picked them, `/post-merge-cleanup` as the follow-up [12] when the box is offered and ticked, and the picked device's address and token; nothing else.
+- **The "Post-merge cleanup" box** - on the control row, after the publish menu, only when the project has the `post-merge-cleanup` command [2] and no device is picked; ticked from the user's saved setting, and a click writes that setting.
+- **The publish menu** - a menu labelled "Publish" on the control row, after the Context menu: "Nothing", "Publish branch", "Open PR", "Merge on green"; it shows the user's saved setting, "Nothing" when none is saved, and a change writes that setting; a project with no git host provider [14] is offered "Nothing" and "Publish branch" only, and a saved pull request option is shown and started there as "Publish branch".
+- **What a Start sends** - the text with the Context on one `Context:` line at its end, the coding agent [5] and the model when the user picked them, the publish level [13] when the publish menu's option is one, `/post-merge-cleanup` as the follow-up [12] when the box is offered and ticked, and the picked device's address and token; nothing else.
 - **A project with no start hook** - Start is off and the form says to run `npx agent-runner init` in the project, or which line to add to which file; a picked device lifts the block, since the device runs its own hook.
 - **Before the Start: what would stop the agent** - the check hook's [10] problems in red and its warnings in amber, under the editor, for the coding agent picked; read again when the pick changes; not asked for a picked device; neither turns Start off.
 - **Feedback about the start itself** - "Starting…", the refusal in the start hook's own words, the note a loaded command or saved prompt [8] leaves, and an error that clears as soon as the user edits.
@@ -70,7 +73,23 @@ Mentioning a project with `@` in the editor adds that project's path to the Cont
 
 #### Business logic
 
-The form hangs a checkbox labelled "Post-merge cleanup" on the composer's control row, right after the "Context" menu, only when the project's commands (as the launcher read them) include one named `post-merge-cleanup` and no device [6] is picked in "Run on"; otherwise there is no box. Its tooltip reads "Once the run ends with a pull request, a fresh agent runs /post-merge-cleanup on its branch; the merge waits for it." It is ticked when the user's preferences [9] say `postMergeCleanup` is on, and unticked when it is off or was never set. Clicking it writes that preference, the same one Settings → Agent → "Post-merge cleanup" shows, so its state is every next Start's default, in every project. It is disabled while a start is in flight.
+The form hangs a checkbox labelled "Post-merge cleanup" on the composer's control row, right after the publish menu, only when the project's commands (as the launcher read them) include one named `post-merge-cleanup` and no device [6] is picked in "Run on"; otherwise there is no box. Its tooltip reads "Once the run ends with a pull request, a fresh agent runs /post-merge-cleanup on its branch; the merge waits for it." It is ticked when the user's preferences [9] say `postMergeCleanup` is on, and unticked when it is off or was never set. Clicking it writes that preference, the same one Settings → Agent → "Post-merge cleanup" shows, so its state is every next Start's default, in every project. It is disabled while a start is in flight.
+
+### The publish menu
+
+#### Context
+
+**User story**: the user types a task and wants to say, before Start, what happens to the work when the agent is done: nothing published, the branch pushed and left for them, a pull request opened, or the pull request set to merge once its checks pass. They pick once; every next run keeps the pick until they change it.
+
+**Problem**: nothing in a typed prompt says how far to publish, and the agent publishes its own work: with nobody saying it, an agent commits and stops. A project with no git host provider [14] can open no pull request, and a device [6] runs its own project, which this launcher does not read.
+
+#### Business logic
+
+The form hangs a menu labelled "Publish" on the composer's control row, right after the "Context" menu and before the "Post-merge cleanup" box, with four options in this order: "Nothing" (`nothing`), "Publish branch" (`branch`), "Open PR" (`pr`) and "Merge on green" (`merge`); the options and their rules are `../../src/publish-levels.ts`'s. Its tooltip reads "What the agent publishes when it finishes: nothing, its branch, its pull request, or its pull request set to merge once its checks pass." It shows the option the user's preferences [9] hold as `publish`, and "Nothing" when none is saved. Picking an option writes that preference at once, so the pick is every next Start's default, in every project. The menu is disabled while a start is in flight.
+
+A project with no git host provider [14], as the launcher read it, is offered "Nothing" and "Publish branch" only. A saved "Open PR" or "Merge on green" is shown there as "Publish branch" and a Start sends `branch`; the saved preference stays as it is. While the launcher's read of the project has not answered, and when a device [6] is picked in "Run on", all four options are offered: the daemon that starts the agent holds a `pr` or `merge` level to `branch` where its own project has no git host provider (`../../src/daemon-runtime.ts`).
+
+The option shown is sent with the Start as its publish level [13] (below), and the tool the start hook [4] names turns the level into one sentence after the prompt.
 
 ### What a Start sends
 
@@ -86,7 +105,8 @@ A Start sends the project, the text, and:
 
 - the Context [11], when anything is picked, as one line at the end of the text: the text's trailing whitespace trimmed, a blank line, then `Context: ` and the picked paths joined by ", " (`lib/use-context-set.ts`). At the end, because a command's text must begin with `/<command>`;
 
-- the coding agent [5] the user picked, and the model they picked, read off their preferences [9]. One that was never picked is not sent, so the project's start hook [4] applies its own default;
+- the coding agent [5] the user picked and the model they picked, read off their preferences [9]. One that was never picked is not sent, so the project's start hook [4] applies its own default;
+- the publish level [13] of the option the publish menu shows: `branch`, `pr` or `merge`. "Nothing" sends no level, so the start hook is handed none and the agent publishes only what the prompt asks;
 - `/post-merge-cleanup` as the follow-up [12], when the box is offered (the project has the command and no device is picked) and the preference is on. A preference left on sends nothing in a project without the command, or with a device picked;
 - when a device [6] is picked in "Run on": that device's URL, token and label, so the local daemon relays [7] the start to it. The token travels with this one start and is never stored by the daemon.
 

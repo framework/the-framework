@@ -8,4 +8,4 @@ The `@gemstack/skill-post-merge-cleanup` npm package: the `post-merge-cleanup` c
 
 ## Business logic — TL;DR
 
-- **The job** (`SKILL.md`) - writing what merged pull requests decided and taught into the project's knowledge files, in a pull request a person merges; given an agent run's id, doing the same for that run's pull request before it merges, its changes added to that pull request.
+- **The job** (`SKILL.md`) - writing what merged pull requests decided and taught into the project's knowledge files, published as far as whoever started the agent said; given an agent run's id, doing the same for that run's pull request before it merges, its changes added to that pull request.

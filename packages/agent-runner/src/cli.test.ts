@@ -51,6 +51,12 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
     const followed = await run(repo, 'run', '--detach', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--then', '/post-merge-cleanup')
     assert.equal(followed.code, 2)
     assert.match(followed.err, /--resume takes no --then/)
+    const unknownLevel = await run(repo, 'run', 'Read the docs', '--publish', 'push')
+    assert.equal(unknownLevel.code, 2)
+    assert.match(unknownLevel.err, /unknown publish level "push"; the levels are branch, pr, merge/)
+    const relevelled = await run(repo, 'run', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--publish', 'pr')
+    assert.equal(relevelled.code, 2)
+    assert.match(relevelled.err, /--resume takes no --publish/)
     // A run that continues keeps the parent and the branch its record names.
     const reparented = await run(repo, 'run', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--parent', 'p1')
     assert.equal(reparented.code, 2)

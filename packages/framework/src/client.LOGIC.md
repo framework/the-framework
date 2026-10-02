@@ -30,3 +30,4 @@ Names the one set of rules the dashboard [1] runs in the browser: every decision
 - **What is truly local** - whether an address is a loopback address, so the daemon's decision to demand a token and the dashboard [1]'s label for the connection agree.
 - **Rules about the cloud side** - a question the Claude web bridge [9] holds rendered as a gate [10], and the word for what a web agent [3]'s cloud side is doing, so every surface derives the same one.
 - **Small shared renderings** - a driver [11]'s name and label, a byte count as a short label, and an error rendered as a message.
+- **How far an agent publishes** - the options of the launcher's publish menu with their labels ("Nothing", "Publish branch", "Open PR", "Merge on green"), which of them a project is offered, the one in force in a project, and the publish level (`branch`, `pr` or `merge`) it hands the start hook (`publish-levels.ts`), so the launcher and the daemon's Start apply the same rule.

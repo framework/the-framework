@@ -7,7 +7,7 @@ import { worktreePath } from '@gemstack/skill-branches'
 import { findRun, readDiary } from '@gemstack/skill-logs'
 import { inboxPath, readLiveCard } from './live-card.js'
 import { acquireRunLock, lockHolder, releaseRunLock } from './run-lock.js'
-import { HOLD_MERGE_LINE, resumeRun, runCommand, STOPPED_DETAIL } from './run.js'
+import { agentPrompt, HOLD_MERGE_LINE, PUBLISH_LINES, resumeRun, runCommand, STOPPED_DETAIL } from './run.js'
 import { recordRun, runnerMark } from './records.js'
 import type { GitHost } from './git-host.js'
 import { sweep } from './sweep.js'
@@ -479,7 +479,7 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
     const then = outcome.then!
     assert.notEqual(then.id, outcome.id, 'a fresh agent: a run of its own')
     assert.deepEqual(nextIds, [then.id], 'on the coding agent made for its own id')
-    assert.equal(next.prompt, `/post-merge-cleanup ${outcome.id}`)
+    assert.equal(next.prompt, `/post-merge-cleanup ${outcome.id}`, 'the follow-up gets its prompt as written: no publish level')
     assert.equal(next.cwd, worktreePath(repo, then.id))
     assert.equal(next.branch, 'agent-fix-it', 'on the first run\'s branch')
     assert.equal(next.prompt?.includes(HOLD_MERGE_LINE), false, 'the follow-up is the last: it is not told to hold')
@@ -495,6 +495,40 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
     assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242 })
     assert.equal((await git(['rev-parse', 'refs/remotes/origin/agent-fix-it'], repo)).trim(), (await git(['rev-parse', 'agent-fix-it'], repo)).trim(), 'the follow-up\'s commit is on the same branch, pushed')
     assert.deepEqual((await readFile(out, 'utf8')).split('\n').filter(Boolean), ['repo: "/work-queue" opened a pull request: https://example.com/x/y/pull/12'], 'the pull request is announced once, by the run that opened it, not again by its follow-up')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('the prompt an agent gets: as written with no publish level, one sentence after it with one, the hold sentence whenever a follow-up is coming', () => {
+  assert.equal(agentPrompt('Fix the typo', undefined, undefined), 'Fix the typo', 'no level: the prompt as written')
+  assert.equal(agentPrompt('Fix the typo', 'branch', undefined), 'Fix the typo\n\nWhen you finish, if you committed anything, push your branch and open no pull request.')
+  assert.equal(agentPrompt('Fix the typo', 'pr', undefined), 'Fix the typo\n\nWhen you finish, if you committed anything, push your branch and open its pull request.')
+  assert.equal(agentPrompt('Fix the typo', 'merge', undefined), 'Fix the typo\n\nWhen you finish, if you committed anything, push your branch and open its pull request, set to merge on its own once its checks pass.')
+  assert.equal(agentPrompt('/work-queue', 'merge', '/post-merge-cleanup'), `/work-queue\n\n${HOLD_MERGE_LINE}`, 'a follow-up is coming: the merge is this tool\'s, whatever the level')
+  assert.equal(agentPrompt('/work-queue', undefined, '/post-merge-cleanup'), `/work-queue\n\n${HOLD_MERGE_LINE}`)
+})
+
+test('a run with a publish level: its agent is told the sentence, the record keeps the level, and a resumed run is told again; a run with none is told nothing', async () => {
+  const repo = await testRepo()
+  try {
+    const prompts: string[] = []
+    const listening = (text: string): Driver => ({ id: 'fake', start: async opts => wrap(await new FakeDriver({ turns: [{ text }], sessionId: 's-1' }).start(opts), async prompt => void prompts.push(prompt)) })
+    const first = await runCommand(repo, { prompt: 'Fix the typo', publish: 'pr', driver: listening(QUESTION), host: 'this-box', pid: 4242, now: ticking(), gitHost: noGitHost })
+    assert.equal(first.status, 'waiting')
+    assert.deepEqual(prompts, [`Fix the typo\n\n${PUBLISH_LINES.pr}`])
+    const recorded = await findRun(repo, first.id)
+    assert.equal(recorded?.intent, 'Fix the typo', 'the record keeps the bare prompt')
+    assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242, publish: 'pr' })
+
+    const resumed = await resumeRun(repo, { id: first.id, text: 'Go on.', driver: listening('Done.'), host: 'this-box', pid: 4243, now: ticking(), gitHost: noGitHost })
+    assert.equal(resumed.status, 'done')
+    assert.equal(prompts[1], `Go on.\n\n${PUBLISH_LINES.pr}`, 'the resumed run is told its level again')
+    assert.equal(runnerMark((await findRun(repo, first.id))!)?.publish, 'pr', 'and the record still names it')
+
+    const plain = await runCommand(repo, { prompt: 'Fix the typo', driver: listening('Done.'), host: 'this-box', pid: 4242, now: ticking(), gitHost: noGitHost })
+    assert.equal(prompts[2], 'Fix the typo', 'no level: the prompt as written')
+    assert.deepEqual((await findRun(repo, plain.id))?.caller?.['runner'], { host: 'this-box', pid: 4242 })
   } finally {
     await removeRepo(repo)
   }

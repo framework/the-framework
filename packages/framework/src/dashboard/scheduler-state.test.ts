@@ -72,8 +72,8 @@ test("each scheduled command reads with this machine's switch, else what its lin
       at: 't',
       decisions: [],
       schedule: [
-        { command: 'work-queue', when: 'npx queue', on: true },
-        { command: 'triage-quick', every: '6h', on: true },
+        { command: 'work-queue', when: 'npx queue', on: true, publish: 'merge' },
+        { command: 'triage-quick', every: '6h', on: true, publish: 'push' },
         { command: 'post-merge-cleanup', every: '1d', on: false },
         { command: 'plan-tickets', every: '6h', on: false },
         { command: 'odd' },
@@ -83,8 +83,8 @@ test("each scheduled command reads with this machine's switch, else what its lin
   }))
   try {
     assert.deepEqual((await readSchedulerState(cwd, () => true)).commands, [
-      // A switch that is not a boolean is no switch.
-      { command: 'work-queue', when: 'npx queue', on: true },
+      // A switch that is not a boolean is no switch. The publish level is the line's; a word that is no level is left out.
+      { command: 'work-queue', when: 'npx queue', on: true, publish: 'merge' },
       { command: 'triage-quick', every: '6h', on: false },
       { command: 'post-merge-cleanup', every: '1d', on: true },
       { command: 'plan-tickets', every: '6h', on: false },

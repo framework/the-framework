@@ -23,7 +23,7 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 - **Registering a project** - by normalized absolute path, once: a path already registered keeps its record and its registration time.
 - **Reading forgivingly** - a missing, unreadable or malformed file reads as an empty registry, and every value read is validated.
 - **The on/off preferences** - each kept only as a true or false, each with its own meaning when absent.
-- **The choice preferences** - the model, the driver, the editor and the theme, each constrained to the values the dashboard offers.
+- **The choice preferences** - the model, the driver, the publish menu's option, the editor and the theme, each constrained to the values the dashboard offers.
 - **The list preference** - the custom presets, trimmed, bounded and cleared when empty.
 - **Unknown keys are dropped, never migrated** - a key this version does not know is dropped on read and never written back.
 - **Saving preferences: replace or patch** - a save replaces the block, a patch merges only the keys it names; blank clears; the dashboard's store tells the daemon which keys were written.
@@ -100,6 +100,7 @@ Each of these keys of the preferences [2] is kept only when its value is a true 
 
 - `model`: the model agents run on, free text, trimmed; a blank value is dropped, and so is the word "Default" in any casing, which is a picker label and not a model. It is handed to the project's start hook. Absent means the hook's own default.
 - `driver`: `claude-code` or `codex`; anything else is dropped, the old name `claude` included. Absent means the project's start hook decides.
+- `publish`: `nothing`, `branch`, `pr` or `merge`, the option of the launcher's publish menu ("Nothing", "Publish branch", "Open PR", "Merge on green"): how far an agent started from the dashboard publishes its work when it finishes; anything else is dropped (`publish-levels.ts`). The publish menu shows it and writes it. `branch`, `pr` and `merge` are handed to the project's start hook as the publish level; `nothing` hands it none. Absent means nothing.
 - `editor`: the command "Open in editor" runs (`code`, `cursor`, `zed`, ...), trimmed and cut to 100 characters; blank is dropped. Absent means the `FRAMEWORK_EDITOR` environment variable, then `code`.
 - `theme`: `system`, `light` or `dark`; anything else is dropped. Absent means `system`, following the operating system.
 

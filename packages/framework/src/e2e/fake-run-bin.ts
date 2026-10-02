@@ -102,7 +102,7 @@ async function session(id: string, checkout: string, prompt: string, card: Omit<
 async function main(): Promise<void> {
   if (mode === 'start') {
     const id = agentIdFromStartedAt(new Date().toISOString())
-    record({ hook: 'start', id, prompt: process.env['PROMPT'], driver: process.env['DRIVER'], model: process.env['MODEL'] })
+    record({ hook: 'start', id, prompt: process.env['PROMPT'], driver: process.env['DRIVER'], model: process.env['MODEL'], publish: process.env['PUBLISH'] })
     if ((process.env['PROMPT'] ?? '').includes('refuse')) {
       process.stderr.write('the project has no such command\n')
       process.exitCode = 1

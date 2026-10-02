@@ -8,4 +8,4 @@ The `@gemstack/skill-readability` npm package: the `readability` command skill [
 
 ## Business logic — TL;DR
 
-- **The job** (`SKILL.md`) - refactoring a part of the code to make it as easy as possible for humans to read, every file and function rated before and after, published as a pull request a person reviews.
+- **The job** (`SKILL.md`) - refactoring a part of the code to make it as easy as possible for humans to read, every file and function rated before and after, published as far as whoever started the agent said.

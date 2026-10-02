@@ -115,3 +115,24 @@ test('due is a check whose JSON is not empty; a non-JSON answer is due by its te
 test("a command's prompt is its slash command", () => {
   assert.equal(commandPrompt('work-queue'), '/work-queue')
 })
+
+test('a line may say how far its runs publish; a line that says nothing publishes nothing, and a word that is no level makes the line unreadable', () => {
+  const schedule = parseSchedule(`
+- work-queue: when \`npx queue\`, publish merge
+- post-merge-cleanup: publish pr, every 1h
+- readability: every 7d, publish branch
+- triage quick: every 6h
+- ux: every 7d, publish push
+- maintainability: every 7d, publish pr, publish merge
+`)
+  assert.deepEqual(schedule.commands, [
+    { name: 'work-queue', when: 'npx queue', cap: 1, on: true, publish: 'merge', line: 2 },
+    { name: 'post-merge-cleanup', every: { ms: 3_600_000, text: '1h' }, cap: 1, on: true, publish: 'pr', line: 3 },
+    { name: 'readability', every: { ms: 7 * 86_400_000, text: '7d' }, cap: 1, on: true, publish: 'branch', line: 4 },
+    { name: 'triage quick', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1, on: true, line: 5 },
+  ])
+  assert.deepEqual(schedule.unreadable, [
+    { line: 6, text: '- ux: every 7d, publish push' },
+    { line: 7, text: '- maintainability: every 7d, publish pr, publish merge' },
+  ])
+})

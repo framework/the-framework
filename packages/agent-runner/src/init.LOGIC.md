@@ -10,7 +10,7 @@ Writes this tool's lines into a dashboard's hooks file, `.the-framework/hooks.ym
 
 ## Business logic — TL;DR
 
-- **The lines** - `start`: `npx agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"}`; `resume`: `npx agent-runner run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}`; `check`: `npx agent-runner check ${DRIVER:+--driver "$DRIVER"}`; one line each.
+- **The lines** - `start`: `npx agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"} ${PUBLISH:+--publish "$PUBLISH"}`; `resume`: `npx agent-runner run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}`; `check`: `npx agent-runner check ${DRIVER:+--driver "$DRIVER"}`; one line each.
 - **Only where the dashboard is** - without a `.the-framework/` directory in the project nothing is written and the answer is `no-dashboard`: the dashboard makes the directory, and hides it from git, when the project is added.
 - **A person's file is kept** - a one-line key already there keeps its line, whatever it says, and is named in `kept` when it differs from the tool's; a list gains the tool's line only when it lacks it; a key the tool writes as a list but the file holds as something else is kept; other keys and comments stay; no line wraps.
 - **The answer** - the file, the keys that gained a line (`added`), and the ones kept. A second `init` adds nothing and writes nothing.

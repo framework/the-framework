@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { onProjects, onStartCheck } from '../rpc/projects.js'
 import type { ProjectSummary } from '../../src/index.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
+import { PUBLISH_LABELS, isPublishPick, offeredPublishPicks, publishPickIn } from '../../src/client.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId } from '../lib/remote-target.js'
 import { cleanupPick, offersPostMergeCleanup, startPicks, useStartAgent } from '../lib/use-start-agent.js'
@@ -25,6 +26,10 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 // The "Post-merge cleanup" box, where the project has that command: ticked, the run is followed
 // by a fresh agent running the command on its branch before its pull request merges. The box
 // writes the same saved setting as Settings → Agent, so its state is every next run's default.
+// The publish menu: how far the run publishes its work when the agent finishes: Nothing, Publish
+// branch, Open PR, Merge on green. The level is handed to the start hook as `PUBLISH`; Nothing, the
+// pick until the person makes one, hands it none. Saved, so the pick holds for every next run. A
+// project with no git host package is offered Nothing and Publish branch only.
 export function StartAgentForm({
   projectId,
   onAgentStarted,
@@ -64,6 +69,11 @@ export function StartAgentForm({
   // A device starts the run in its own project, whose commands this launcher does not read.
   const commands = remoteDevice ? [] : (launcher?.commands ?? [])
   const offersCleanup = offersPostMergeCleanup(commands)
+  // Whether a pull request can be opened here: unknown until the launcher is read, and a device's
+  // own project is not read at all, so both are offered every pick; the daemon that starts the run
+  // holds a pull request pick to the branch where its project has no git host.
+  const gitHost = remoteDevice ? true : (launcher?.gitHost ?? true)
+  const publishPick = publishPickIn(preferences.publish, gitHost)
 
   // Re-read when the pick changes: `claude` being logged in says nothing about `codex`. A device
   // runs on its own machine, so this one's CLIs say nothing about it.
@@ -89,7 +99,7 @@ export function StartAgentForm({
     if (busy) return
     setNote('Starting…')
     const result = await start(projectId, promptWithContext(text, context), {
-      ...startPicks(preferences),
+      ...startPicks({ ...preferences, publish: publishPick }),
       ...cleanupPick(preferences, commands),
       ...(remoteDevice ? { remote: { url: remoteDevice.url, token: remoteDevice.token, label: remoteDevice.label } } : {}),
     })
@@ -126,6 +136,30 @@ export function StartAgentForm({
               busy={busy}
               onToggle={toggleContext}
             />
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <select
+                    value={publishPick}
+                    disabled={busy}
+                    onChange={e => {
+                      if (isPublishPick(e.target.value)) updatePreferences({ publish: e.target.value })
+                    }}
+                    aria-label="Publish"
+                    className="rounded-md border border-border bg-background px-1.5 py-0.5 text-xs text-muted-foreground"
+                  >
+                    {offeredPublishPicks(gitHost).map(pick => (
+                      <option key={pick} value={pick}>
+                        {PUBLISH_LABELS[pick]}
+                      </option>
+                    ))}
+                  </select>
+                }
+              />
+              <TooltipContent>
+                What the agent publishes when it finishes: nothing, its branch, its pull request, or its pull request set to merge once its checks pass.
+              </TooltipContent>
+            </Tooltip>
             {offersCleanup && (
               <Tooltip>
                 <TooltipTrigger

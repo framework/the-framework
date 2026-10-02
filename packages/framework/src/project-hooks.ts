@@ -134,13 +134,15 @@ export async function runProjectHooks(cwd: string, kind: HookKind, opts: RunHook
   }
 }
 
-/** What a `start` line is given: the prompt, the coding agent and model when the person picked them, and the follow-up when there is one. */
+/** What a `start` line is given: the prompt, the coding agent, model and publish level when the person picked them, and the follow-up when there is one. */
 export interface StartHookInput {
   prompt: string
   driver?: string
   model?: string
   /** A fresh agent's prompt once the run ends done with a pull request; the merge waits for it. */
   then?: string
+  /** How far the run publishes when its agent finishes: `branch`, `pr` or `merge`. */
+  publish?: string
 }
 
 /** What a `resume` line is given: the run, and the person's text or their answer to the question it ended on. */
@@ -149,9 +151,9 @@ export type ResumeHookInput = { runId: string } & ({ text: string } | { answer: 
 export type RunHookResult = { ok: true; id: string } | { ok: false; error: string }
 
 /**
- * Run the project's `start` line: the prompt in `PROMPT`, the picks in `DRIVER` and `MODEL` when
- * made, the follow-up in `THEN` when there is one. The line answers one JSON document on stdout
- * whose `id` names the run it started.
+ * Run the project's `start` line: the prompt in `PROMPT`, the picks in `DRIVER`, `MODEL` and
+ * `PUBLISH` when made, the follow-up in `THEN` when there is one. The line answers one JSON
+ * document on stdout whose `id` names the run it started.
  */
 export function runStartHook(cwd: string, input: StartHookInput, opts: Omit<RunHooksOptions, 'log'> = {}): Promise<RunHookResult> {
   return runRunHook(cwd, 'start', {
@@ -159,6 +161,7 @@ export function runStartHook(cwd: string, input: StartHookInput, opts: Omit<RunH
     ...(input.driver !== undefined ? { DRIVER: input.driver } : {}),
     ...(input.model !== undefined ? { MODEL: input.model } : {}),
     ...(input.then !== undefined ? { THEN: input.then } : {}),
+    ...(input.publish !== undefined ? { PUBLISH: input.publish } : {}),
   }, opts)
 }
 

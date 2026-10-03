@@ -38,4 +38,5 @@ export { pushCheckout, pushBranchByName, type PushOutcome, type PushRefusal } fr
 export { readBranchStates, parseCommits, parseNumstat, parsePorcelain, type BranchState, type BranchCommit, type BranchFile } from './branch-state.js'
 export { runCli, USAGE, type CliIo, type CliRefusal } from './cli.js'
 export { CLI_BIN_DIR } from './bin-dir.js'
+export { linkOwnCommand } from './command-link.js'
 export { linkSkill, HARNESS_SKILL_DIRS, SKILL_DIR, SKILL_NAME, OWN_SKILL, type SkillLink } from './skill-links.js'

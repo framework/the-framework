@@ -4,6 +4,7 @@ import { addWorktree, attachWorktree, type AddedWorktree } from './worktree.js'
 import { linkDependencies } from './worktree-deps.js'
 import { reconcileBranchLinks } from './branch-links.js'
 import { linkSkill, type SkillLink } from './skill-links.js'
+import { linkOwnCommand } from './command-link.js'
 
 /**
  * A checkout as an agent gets it (#1725): the worktree, `.branches/` hidden from git, the parent's
@@ -45,11 +46,14 @@ export async function attachCheckout(
  * directory at the root, `.branches/` would ride any sweeping `git add -A` onto a code branch —
  * through the repository's own exclude file, so no tracked file changes; `node_modules` is
  * gitignored, so a fresh checkout has none and a link that cannot be made is a worse run, not a
- * failed one; a link under `.branches/` is a view, and the next reconcile pass makes it.
+ * failed one; the package's own command is linked into a checkout that has none, so the skill's
+ * `npx branches` runs it and downloads nothing (`command-link.ts`); a link under `.branches/` is a view, and the next reconcile pass makes it.
  */
 async function settle(repo: string, path: string, git: GitRunner, skills: readonly SkillLink[] = []): Promise<void> {
   await excludeFromGit(repo, `/${BRANCHES_DIR}`, undefined, git).catch(() => {})
   await linkDependencies(repo, path).catch(() => [])
+  // After the project's own tools: a project that installed this package keeps its copy of the command.
+  await linkOwnCommand(repo, path, git)
   await linkSkill(repo, path, undefined, git, skills)
   await reconcileBranchLinks(repo, { git }).catch(() => {})
 }

@@ -160,6 +160,12 @@ ending.
   `agent-<name>` branch with git before its first change, another name if that one exists
   locally or on origin. `status`, `name` and a bare `push` are the agent's commands; the
   rest are the caller's.
+- Every checkout holds the package's own command, linked as `node_modules/.bin/branches` and
+  hidden through the repository's exclude, unless the project installed its own copy. The
+  skill says `npx branches`, and in a project with nothing installed `npx` would otherwise
+  download whatever package holds that name on npm and run it. Picked over telling the agent
+  to install first, which an empty project cannot do, and over a bare `branches` in the
+  skill, which a fresh clone on another machine does not have.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the checkout
   root: `.claude/skills`, `.agents/skills`. In every checkout it makes, the package links
   its own folder, which holds `SKILL.md`, into both as `branches`, hidden through the

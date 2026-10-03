@@ -14,6 +14,7 @@
 
 
 ## Priority 3
+- Create tickets/2026-08-05_project-dropdown-multiselect.plan.md
 
 
 ## Priority 2

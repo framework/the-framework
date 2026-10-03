@@ -56,13 +56,17 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   channel is a skill's, fired by the tool that runs the agent when a run ends. Picked over
   the dashboard's Discord watchers, which posted only while the dashboard was running.
 - The dashboard grows by modules: a package among a project's dependencies that adds to the
-  dashboard (pages, Overview cards, link actions, side-rail tabs, a run's summary and details)
-  is a module; a skill that brings pages is a module that is also a skill. The Files tab is
-  the first module that is no skill. Picked over keeping Files a folder inside the framework,
+  dashboard (pages, Overview cards, link actions, side-rail tabs, a run's summary and details,
+  Settings sections) is a module; a skill that brings pages is a module that is also a skill.
+  The Files tab is the first module that is no skill. Picked over keeping Files a folder inside the framework,
   which gave it a boundary but taught the module contract nothing, and named module over widget.
 - The modules every project wants are built in: the framework depends on them and loads them
   for every project through the same contract as any other module, and a project's own copy
   wins. Picked over each project installing Files itself.
+- A module may bring a section of the Settings page, shown after the framework's own
+  sections, where a project has its package. It reads and writes through the package's own
+  command. Picked over the framework's own sections knowing a package's file and a hook line
+  per setting, which made every package's settings a change to the framework.
 - A module may bring a server part (`./server`) that the daemon calls in its own process,
   given the project's folder and the facts about a run, never a verdict about them. Picked
   over reading only through the package's command, a new process for every read of a tree

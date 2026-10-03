@@ -111,6 +111,26 @@ export interface ModuleCard {
   Card: ComponentType<ModuleCardProps>
 }
 
+/** What a Settings section is rendered with: the projects that have its package. */
+export interface ModuleSettingsProps {
+  /** The registered projects whose dependencies include the module's package, in the registry's order. */
+  projects: ModuleProject[]
+}
+
+/**
+ * A section a module adds to the Settings page: the package's own settings, read and written
+ * through its own command, drawn after the dashboard's own sections. A package with no projects
+ * registered shows none.
+ */
+export interface ModuleSettings {
+  /** Which section this is, for the shell's key and its error line; the section draws its own title. */
+  id: string
+  /** Its place among every installed package's sections, lower first; 50 when unsaid, ties by package name. */
+  order?: number
+  /** The section itself, usually a {@link SettingsSection} of rows. */
+  Section: ComponentType<ModuleSettingsProps>
+}
+
 /**
  * The Context as a side-rail tab sees it (#504): the files the next run is pointed at. A tab may
  * show which files are in it and add or remove one.
@@ -187,6 +207,8 @@ export interface ModuleDefinition {
   panels?: ModulePanel[]
   /** What the module adds to a run's page. */
   run?: ModuleRunSlots
+  /** The sections the module adds to the Settings page. */
+  settings?: ModuleSettings[]
   /** A stylesheet to load with the module, relative to the module's browser part's own URL. */
   stylesheet?: string
 }
@@ -302,6 +324,8 @@ export { Markdown } from '../components/Markdown.js'
 export { StartAgentButton } from '../components/StartAgentButton.js'
 export { LinkActions, type ProjectLinks, type LinkTargets } from '../components/LinkActions.js'
 export { cn } from '../lib/utils.js'
+export { SettingsSection, SettingsRow, SettingsSelectRow, type SettingsOption } from '../components/SettingsRows.js'
+export { useCodingAgents, type CodingAgent } from '../lib/models.js'
 export { formatRelative, formatDateTime, formatDuration, formatAge } from '../lib/format-date.js'
 export { usePolled, useLoaded } from '../lib/use-async.js'
 export { useAction } from '../lib/use-action.js'

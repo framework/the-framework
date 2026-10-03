@@ -23,9 +23,25 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - What every subagent must be told (commit to its branch, publish nothing, ask
   nobody) is added to its task by the command. Picked over the skill file asking the
   main agent to write it into every task: a rule that lives only as prose is forgotten.
-- Until a setting says which models subagents use, a subagent runs on the main agent's
-  coding agent and that coding agent's default model, unless the main agent's own task
-  names another.
+- A subagent's coding agent and model come from the person's settings, by how hard its
+  task is: the main agent says simple or hard for each task, and the setting for that level
+  names the coding agent and model. The main agent never names a model. A level nobody set
+  runs on the main agent's own coding agent and model. Picked over the main agent choosing a
+  model per task, which spends the person's money on the agent's guess, and over the coding
+  agent's own default, which may not be the model the person runs on.
+- `start` is refused without a level. Picked over a missing level meaning simple or hard:
+  either is a silent guess, and a rule that lives only as prose is forgotten.
+- At most as many of a main agent's subagents run at once as the person's setting says, 4
+  when unset; `start` is refused past it, and the main agent starts the next when it is told
+  one ended. Picked over the command waiting for a free place, which keeps a process waiting,
+  and over one limit for the whole machine.
+- The settings are this machine's, in a file the orchestration package keeps at the
+  project's root, hidden from git, written by `orchestration settings`. Picked over the
+  dashboard's own settings file, which a skill would have to know, and over the tracked
+  repository, where one person's models would be everyone's.
+- The settings are one section of the Settings page, the same on every project: a coding
+  agent and model for simple tasks and for hard tasks, and how many run at once. The section
+  saves them to every project that has the package. Picked over a setting per project.
 
 ## The plan and the person's yes
 - The plan is one markdown file beside the main agent's run record on the data branch,

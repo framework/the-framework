@@ -6,7 +6,7 @@ A project's modules [1]: which of its packages bring something to the dashboard,
 
 ## Glossary
 
-[1] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command [2], or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
+[1] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command [2], or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [2] command: one of a package's executables, as its `package.json` `bin` lists them, run the way an agent runs it with `npx`.
 [3] provided command: the command [2] a package declares, in its own `package.json` under `"framework": { "<kind>": "<command>" }`, as answering one kind of The Framework's data for the project: the tickets, the agent queue, the runs, the checkouts (`store/`). Resolved by the shared library, which also applies the project's own choice when two packages declare the same kind.
 

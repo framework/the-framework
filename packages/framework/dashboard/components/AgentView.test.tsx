@@ -290,7 +290,7 @@ describe('what the modules add to a run’s page (#817)', () => {
   const Summary = ({ agentId, working, expanded }: ModuleRunProps) => <span>summary {agentId} {String(working)} {String(expanded)}</span>
   const Details = ({ agentId, working }: ModuleRunProps) => <span>details {agentId} {String(working)}</span>
   const withSlots = (ui: ReactNode, projects = ['p1']) => {
-    const modules: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [{ summary: Summary, details: Details, package: '@gemstack/files', projects }], loaded: true }
+    const modules: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [{ summary: Summary, details: Details, package: '@gemstack/files', projects }], settings: [], loaded: true }
     return <ModulesContext.Provider value={modules}>{ui}</ModulesContext.Provider>
   }
 

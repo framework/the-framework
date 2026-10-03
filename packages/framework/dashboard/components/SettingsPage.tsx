@@ -6,9 +6,10 @@ import type { DriverOption } from './DriverModelMenu.js'
 import { useQuota } from '../lib/quota.js'
 import { useSpendOffset } from './Quota.js'
 import { onSchedulers } from '../rpc/reads.js'
-import { sendSchedulePublish, sendScheduleSwitch } from '../rpc/projects.js'
-import { usePolled } from '../lib/use-async.js'
-import type { ProjectScheduler, SchedulerCommand } from '../../src/index.js'
+import { onProjects, sendSchedulePublish, sendScheduleSwitch } from '../rpc/projects.js'
+import { ModuleSettingsSections } from './ModuleSettingsSections.js'
+import { useLoaded, usePolled } from '../lib/use-async.js'
+import type { ProjectScheduler, ProjectSummary, SchedulerCommand } from '../../src/index.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
@@ -20,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Checkbox } from './ui/checkbox.js'
 import { ScrollArea } from './ui/scroll-area.js'
 import { cn } from '../lib/utils.js'
+import { SettingsRow as Row, SettingsSection as Section, SettingsSelectRow as SelectRow, type SettingsOption as SelectOption } from './SettingsRows.js'
 
 // The settings page (#958): every setting in one place, and the Onboarding checklist.
 //
@@ -31,7 +33,8 @@ import { cn } from '../lib/utils.js'
 // Everything here writes your own settings, the same on every project: what is a project's own
 // (how a run is started) lives in that project's hooks file, not here. The Automation section's
 // schedule switches and publish picks are this machine's too, written through each project's
-// `switch` and `publish` hooks.
+// `switch` and `publish` hooks. After the page's own sections come the ones the installed packages
+// bring, each the package's own, read and written through its own command.
 
 export function SettingsPage({
   onAgentStarted,
@@ -44,6 +47,7 @@ export function SettingsPage({
   onDone?: () => void
 }) {
   const preferences = usePreferences()
+  const projects = useLoaded<ProjectSummary[]>(onProjects, [], [])
   const editors = useDetectedEditors()
   const theme = themePreference(preferences)
   // The start menu's own list (#1874), so Settings offers exactly the picks the menu does.
@@ -168,45 +172,11 @@ export function SettingsPage({
             />
           )}
         </Section>
+
+        {/* What the installed packages bring: each its own section, after the page's own. */}
+        <ModuleSettingsSections projects={projects} />
       </div>
     </ScrollArea>
-  )
-}
-
-function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
-      </CardHeader>
-      <CardContent>
-        <div className="divide-y divide-border">{children}</div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function Row({
-  label,
-  description,
-  control,
-  dimmed = false,
-}: {
-  label: string
-  description: string
-  control: ReactNode
-  /** A row the rules turned off: greyed, but still shown with its reason. */
-  dimmed?: boolean
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
-      <div className="min-w-0">
-        <p className={cn('text-sm', dimmed && 'text-muted-foreground')}>{label}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </div>
-      <div className="shrink-0">{control}</div>
-    </div>
   )
 }
 
@@ -299,58 +269,6 @@ function modelOptions(driver: DriverOption | undefined, model: string): SelectOp
     ...(model && !listed.some(m => m.value === model) ? [{ value: model, label: model }] : []),
     ...(listed.length === 0 && driver?.modelsNote ? [{ value: driver.modelsNote, label: driver.modelsNote, disabled: true }] : []),
   ]
-}
-
-interface SelectOption {
-  value: string
-  label: string
-  /** A line in the list that says something rather than being a choice. */
-  disabled?: boolean
-}
-
-/**
- * One setting picked from a list.
- *
- * A row with nothing to pick renders nothing at all (#1172). An empty `<select>` is a control that
- * cannot be operated — it reads as broken rather than as "no choices here", which is exactly the
- * paper cut this guard exists for. Every list on this page has a fixed first entry today ("Auto-detect",
- * the agent's own default), so nothing hits it; it is here because the next list will be added
- * without thinking about the empty case.
- */
-function SelectRow({
-  label,
-  description,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  description: string
-  value: string
-  options: SelectOption[]
-  onChange: (next: string) => void
-}) {
-  if (options.length === 0) return null
-  return (
-    <Row
-      label={label}
-      description={description}
-      control={
-        <select
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          aria-label={label}
-          className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-        >
-          {options.map(o => (
-            <option key={o.value} value={o.value} disabled={o.disabled}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      }
-    />
-  )
 }
 
 /**

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { refreshPreferences } from '../lib/preferences.js'
+import { ModulesContext, byMountOrder, type MountedModules } from '../lib/use-modules.js'
 
 // The reads this page makes, answered as an empty machine: no devices, no editors detected, no
 // stored preferences. The rest of the module is kept, since the onboarding checklist inside the
@@ -23,8 +24,10 @@ vi.mock('../rpc/models.js', () => ({ onModels }))
 const schedulers = vi.hoisted(() => vi.fn(async (): Promise<unknown[]> => []))
 const sendScheduleSwitch = vi.hoisted(() => vi.fn(async (): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true })))
 const sendSchedulePublish = vi.hoisted(() => vi.fn(async (): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true })))
+const onProjects = vi.hoisted(() => vi.fn(async (): Promise<unknown[]> => []))
 vi.mock('../rpc/projects.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../rpc/projects.js')>()),
+  onProjects,
   sendScheduleSwitch,
   sendSchedulePublish,
 }))
@@ -232,5 +235,48 @@ describe('SettingsPage run on a schedule', () => {
     // This machine's pick stands in for the line's level.
     expect(publishes({ command: 'a', every: '1d', on: true, publish: 'merge', publishPick: 'nothing' })).toBe('publishes nothing')
     expect(publishes({ command: 'a', every: '1d', on: true, publishPick: 'pr' })).toBe('opens a pull request')
+  })
+})
+
+describe('Settings sections a module brings (#1902)', () => {
+  const mounted = (settings: MountedModules['settings']): MountedModules => ({ pages: [], cards: [], linkActions: [], panels: [], runSlots: [], settings, loaded: true })
+
+  test('each is drawn after the page\'s own sections, in the order mounted, given only the projects that have its package; one that throws breaks only itself', async () => {
+    onProjects.mockResolvedValue([
+      { id: 'p1', name: 'gemstack', path: '/p1' },
+      { id: 'p2', name: 'other', path: '/p2' },
+    ])
+    const seen: string[][] = []
+    const Subagents = ({ projects }: { projects: { id: string; name: string }[] }) => {
+      seen.push(projects.map(p => p.name))
+      return <section aria-label="Subagents section">Subagents</section>
+    }
+    const Broken = () => {
+      throw new Error('boom')
+    }
+    render(
+      <ModulesContext.Provider
+        value={mounted([
+          { id: 'subagents', Section: Subagents, package: '@gemstack/skill-orchestration', projects: ['p1', 'gone'] },
+          { id: 'broken', Section: Broken, package: '@gemstack/skill-broken', projects: ['p2'] },
+        ])}
+      >
+        <SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />
+      </ModulesContext.Provider>,
+    )
+    const section = await screen.findByLabelText('Subagents section')
+    await waitFor(() => expect(seen.at(-1)).toEqual(['gemstack']))
+    expect(screen.getByText('The broken settings failed: boom')).toBeTruthy()
+    // After the page's last own section.
+    const own = screen.getByText('Claude web')
+    expect(own.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('sections are ordered by their order, 50 when unsaid, then by package name', () => {
+    const a = { package: 'b-pkg', order: 10 }
+    const b = { package: 'a-pkg' }
+    const c = { package: 'c-pkg' }
+    const d = { package: 'z-pkg', order: 60 }
+    expect([d, c, b, a].sort(byMountOrder)).toEqual([a, b, c, d])
   })
 })

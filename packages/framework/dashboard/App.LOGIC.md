@@ -1,4 +1,4 @@
-Composes the dashboard: reads what is selected off the URL, keeps the sidebar, the main pane and the right rail around whichever page the URL names, including the pages the installed modules [19] add, provides the installed modules' pages, side-rail tabs, run slots and link actions to every page, runs the polls that every page shares, holds the selected agent's [1] live event stream [2] and the Context [18] the launcher and the Files tab share, and turns two of the polled feeds into browser notifications.
+Composes the dashboard: reads what is selected off the URL, keeps the sidebar, the main pane and the right rail around whichever page the URL names, including the pages the installed modules [19] add, provides the installed modules' pages, side-rail tabs, run slots, Settings sections and link actions to every page, runs the polls that every page shares, holds the selected agent's [1] live event stream [2] and the Context [18] the launcher and the Files tab share, and turns two of the polled feeds into browser notifications.
 
 ## Context
 
@@ -25,7 +25,7 @@ Composes the dashboard: reads what is selected off the URL, keeps the sidebar, t
 [16] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 [17] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
 [18] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
-[19] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
+[19] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [20] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent.
 
 ## Business logic — TL;DR
@@ -143,7 +143,7 @@ The Context [18] (`lib/use-context-set.ts`) is held here, once, and handed to th
 - The recent agents pooled across every project every 10 seconds, only on the Overview: a selected project's own agents fill the sidebar otherwise.
 - Whether any agent in any project is running, every 5 seconds (`lib/use-working.ts`).
 - Whether the daemon answers at all, every 5 seconds (see "The daemon-unreachable banner").
-- The installed modules [19] every 30 seconds, each module's browser part imported once (`lib/use-modules.ts`): the sidebar's module rows, the module pages, the right rail's module tabs, an agent page's run slots and the link actions every page may show read one list, which the shell provides around everything it renders.
+- The installed modules [19] every 30 seconds, each module's browser part imported once (`lib/use-modules.ts`): the sidebar's module rows, the module pages, the right rail's module tabs, an agent page's run slots, the Settings page's module sections and the link actions every page may show read one list, which the shell provides around everything it renders.
 - A poll that fails keeps what it last showed rather than blanking it, and a list counts as unread until its first answer after the selection changes (`lib/use-async.ts`); that is what lets the main pane tell "not there" from "not read yet".
 
 ### The selected agent's live stream

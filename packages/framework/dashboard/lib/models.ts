@@ -39,3 +39,14 @@ export function modelName(models: DriverModels | undefined, id: string): string 
 }
 
 export type { DriverModels, ModelsView }
+
+/** A coding agent as a module offers it: its name for the run (`claude-code`), its label, its models, and why it lists none. */
+export type CodingAgent = DriverOption
+
+/**
+ * Every coding agent with the models it lists (#1902): the start menu's own list, for a module that
+ * lets a person pick one, so its picks are the ones a run can be given.
+ */
+export function useCodingAgents(): CodingAgent[] {
+  return driverOptions(useModels())
+}

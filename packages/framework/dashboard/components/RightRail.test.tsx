@@ -31,7 +31,7 @@ const FILES: MountedPanel = {
   package: '@gemstack/files',
   projects: ['p1'],
 }
-const mounted = (panels: MountedPanel[]): MountedModules => ({ pages: [], cards: [], linkActions: [], panels, runSlots: [], loaded: true })
+const mounted = (panels: MountedPanel[]): MountedModules => ({ pages: [], cards: [], linkActions: [], panels, runSlots: [], settings: [], loaded: true })
 
 /** Render with the given module tabs installed (the Files module's by default). */
 function render(ui: ReactElement, panels: MountedPanel[] = [FILES]) {

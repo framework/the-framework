@@ -9,7 +9,7 @@ A subagent is another coding agent you start on one part of your task: it works 
 
 ```
 npx orchestration plan <file>    save the file as your plan; answers the `question` to ask the person
-npx orchestration start "<task>" [--model <id>] [--driver <claude-code|codex>]
+npx orchestration start --level <simple|hard> "<task>"
                                  start a subagent on the task; answers its id at once, without waiting for it
 npx orchestration list           your subagents, newest first, as one JSON array
 npx orchestration read <id>      one subagent: its `status`, and once it ended its `branch` and `result`, its last reply
@@ -21,7 +21,7 @@ A refusal exits 1 with a line on stderr saying why.
 
 ## Plan first
 
-Before any subagent, write your plan to a markdown file outside your checkout: one heading per task and, under it, what to change, how to check it, and which tasks must land before it. Save it with `plan <file>`. Then show the plan in your reply and ask the person with this block as the very last thing in it, `<question>` being the `question` the command answered, copied exactly:
+Before any subagent, write your plan to a markdown file outside your checkout: one heading per task and, under it, whether it is simple or hard, what to change, how to check it, and which tasks must land before it. Save it with `plan <file>`. Then show the plan in your reply and ask the person with this block as the very last thing in it, `<question>` being the `question` the command answered, copied exactly:
 
 ```await-choices
 { "title": "<question>", "options": [{ "label": "Approve" }, { "label": "Change the plan" }], "recommended": "Approve" }
@@ -31,7 +31,7 @@ End your reply there. `start` is refused until the person chose Approve for the 
 
 ## Start
 
-Commit first: a subagent's branch starts from your branch's last commit. Quote the task as one argument, and write it for a reader who knows nothing of your conversation: what to change, where, and how to check it. Pass `--driver` or `--model` only when your task names one. A task that needs another task's work starts once that one is landed.
+Commit first: a subagent's branch starts from your branch's last commit. Quote the task as one argument, and write it for a reader who knows nothing of your conversation: what to change, where, and how to check it. Say how hard it is with `--level`, as your plan says: the person's settings pick the model for each level. A task that needs another task's work starts once that one is landed. `start` is refused with `limit` while as many of your subagents run as the person allows: end your reply, and start that task when you are told one ended.
 
 ## Then end your reply
 

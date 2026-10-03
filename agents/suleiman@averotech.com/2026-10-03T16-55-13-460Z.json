@@ -6,7 +6,6 @@
   "intent": "using question-skill, ask me what color i perfer with choices",
   "driver": "codex",
   "model": "gpt-5.6-luna",
-  "branch": "agent-2026-10-03T16-55-13-460Z",
   "caller": {
     "runner": {
       "host": "Suleimans-MacBook-Pro.local",

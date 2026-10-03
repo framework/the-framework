@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CircleHelp } from 'lucide-react'
-import type { DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '../../src/index.js'
-import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '../../src/client.js'
+import type { DriverQuotaWindow, ProjectSummary, QuotaBoundary, QuotaView } from '../../src/index.js'
+import { MAX_SPEND_OFFSET } from '../../src/client.js'
 import { useQuota } from '../lib/quota.js'
-import { sendSpendOffset } from '../rpc/quota.js'
+import { useModuleHost, type ModuleProject, type UsageLimitSaved } from '../module/index.js'
+import { useMountedModules, type MountedUsageLimit } from '../lib/use-modules.js'
+import { usePolled } from '../lib/use-async.js'
+import { ModuleSlot, projectsHaving } from './ModulePageView.js'
 import { formatRelative, formatResetDay, formatResetTooltip, formatDuration, formatDurationLong } from '../lib/format-date.js'
 import {
   weekDays,
@@ -28,6 +31,11 @@ import { cn } from '../lib/utils.js'
 // The week runs edge to edge: the left edge is when the account's quota week began, the right edge
 // is when it resets. The fill is what has been spent, the `|` is the boundary — how much of it may
 // be gone by now — and the colour is the two compared.
+//
+// The stop line is a module's: a package that starts unattended work may put on the bar the line
+// that work stops at, as an offset from the boundary. The bar then draws the room left before it,
+// dimmed, and a handle that moves it; the module reads the offset and saves the one a drag picked.
+// With no such module the bar shows the account only.
 
 /** The bar's colour per tone. Fill and marker share a scale so the comparison reads at a glance. */
 const TONE_FILL: Record<QuotaTone, string> = {
@@ -95,45 +103,48 @@ function LegendItem({ swatch, children }: { swatch: ReactNode; children: ReactNo
 }
 
 /**
- * The week as one track, split in two (#960 Edit): what's already used, at full opacity, and the
- * room left before unattended work stops, dimmed — one bar read left-to-right rather than a used
- * amount plus a handle floating apart from it. Dragging the dim segment's own right edge is what
- * moves that stop, so the control is the bar's shape rather than a slider laid over it.
+ * The week as one track. With a stop line (`offset` given) it is split in two (#960 Edit): what's
+ * already used, at full opacity, and the room left before unattended work stops, dimmed — one bar
+ * read left-to-right rather than a used amount plus a handle floating apart from it. Dragging the
+ * dim segment's own right edge is what moves that stop, so the control is the bar's shape rather
+ * than a slider laid over it. Without one, the bar is what is used and the boundary.
  *
- * The boundary is drawn exactly where it gates the pace — continuous, the same value the schedulers
- * act on (#960 Edit), not a value that jumps once a day, so its position on the bar always names
+ * The boundary is drawn exactly where it gates the pace — continuous (#960 Edit), not a value that
+ * jumps once a day, so its position on the bar always names
  * the actual instant `now` falls on. The limit is continuous too — it is a handle, not a reading.
  */
 function WeekBar({
-  status,
+  boundary,
   percentUsed,
   offset,
   onChangeOffset,
   others,
 }: {
-  status: QuotaBoundaryStatus
+  boundary: QuotaBoundary
   percentUsed: number
-  offset: number
-  onChangeOffset: (offset: number) => void
+  /** The stop line's offset from the boundary, when a module puts one on the bar. */
+  offset?: number
+  onChangeOffset?: (offset: number) => void
   others: DriverQuotaWindow[]
 }) {
-  const { boundary } = status
   // Calendar days (#960 Edit): each segment's width is how much of that day is actually in the
   // week, so the axis places a label where most of that day falls rather than at a fixed seventh
   // regardless of the clock. A mid-day start still leaves one day split into two same-named
   // slivers straddling the reset — see {@link weekDays} — and only the larger keeps its label.
   const days = weekDays(boundary.startsAt, boundary.resetsAt)
   const tone = quotaTone(percentUsed, boundary.percent)
-  const limit = limitPercent(boundary.percent, offset)
-  const projected = projectedRange(percentUsed, limit)
-  const enabled = projected.end > projected.start
+  const limited = offset !== undefined
+  const limit = limitPercent(boundary.percent, offset ?? 0)
+  // With no stop line there is no room to draw: the used fill alone.
+  const projected = projectedRange(percentUsed, limited ? limit : percentUsed)
+  const enabled = limited && projected.end > projected.start
   // How far ahead of the boundary's own pace the knob itself sits, as a duration — the same
   // arithmetic as the main figure's deviation, but of the limit rather than actual consumption.
   const limitDeviationMs = paceDeviationMs(limit, boundary.percent, boundary.resetsAt - boundary.startsAt)
   // A full day above the boundary, not merely past it — the knob already rests half a day ahead
   // by default, so a few points past the boundary is the normal state and only worth flagging
   // once it clears a whole day's worth of pace.
-  const eagerConsumption = limit > boundary.percent + ONE_DAY_PERCENT
+  const eagerConsumption = limited && limit > boundary.percent + ONE_DAY_PERCENT
   const label = `${Math.round(percentUsed)}% of the week used, against a boundary of ${Math.round(boundary.percent)}% on day ${boundary.day} of 7`
   // How far ahead of or behind the boundary's own pace consumption is, as a duration (#960 Edit):
   // "53% used" said almost nothing about whether today's pace was being kept; "2h" does.
@@ -195,7 +206,7 @@ function WeekBar({
             drift from that edge instead of sitting on it. The ±MAX_SPEND_OFFSET reach is enforced
             in the change handler instead, on the offset it produces. Dragging it is what changes
             where the dimmed segment ends. */}
-        <input
+        {limited && <input
           type="range"
           aria-label="Unattended work stops at"
           className={cn(
@@ -215,9 +226,9 @@ function WeekBar({
           value={limit}
           onChange={e => {
             const rawOffset = Math.round(Number(e.target.value) - boundary.percent)
-            onChangeOffset(Math.min(Math.max(rawOffset, -MAX_SPEND_OFFSET), MAX_SPEND_OFFSET))
+            onChangeOffset?.(Math.min(Math.max(rawOffset, -MAX_SPEND_OFFSET), MAX_SPEND_OFFSET))
           }}
-        />
+        />}
       </div>
       <p className="text-xs text-muted-foreground">
         <Tooltip>
@@ -289,7 +300,7 @@ function WeekBar({
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm', TONE_FILL[tone])} aria-hidden />}>Used</LegendItem>
-          <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm opacity-35', TONE_FILL[tone])} aria-hidden />}>Budget for Autonomous AI</LegendItem>
+          {limited && <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm opacity-35', TONE_FILL[tone])} aria-hidden />}>Budget for Autonomous AI</LegendItem>}
           <LegendItem swatch={<span className="h-2 w-0.5 bg-foreground" aria-hidden />}>
             <Tooltip>
               <TooltipTrigger render={<span className="inline-flex cursor-default items-center gap-0.5" />}>
@@ -317,7 +328,7 @@ function WeekBar({
               <TooltipContent>Autonomous AI will spend tokens {formatDurationLong(limitDeviationMs)} faster than the week's pace allows</TooltipContent>
             </Tooltip>
           )}
-          <Tooltip>
+          {limited && <Tooltip>
             <TooltipTrigger render={<span className="cursor-default" />}>
               {enabled ? (
                 <>
@@ -331,10 +342,10 @@ function WeekBar({
             </TooltipTrigger>
             <TooltipContent className="max-w-64">
               {enabled
-                ? "Autonomous AI enabled means that each project's scheduler may start the commands its agent-schedule.md lists while the account is under the line."
-                : "Autonomous AI disabled means that no scheduler starts an agent on its own — every new agentic work is triggered by you manually."}
+                ? 'Autonomous AI enabled means that unattended work may start on its own while the account is under the line.'
+                : 'Autonomous AI disabled means that no agent starts on its own — every new agentic work is triggered by you manually.'}
             </TooltipContent>
-          </Tooltip>
+          </Tooltip>}
         </div>
       </div>
     </div>
@@ -390,21 +401,21 @@ function unavailableNote(view: QuotaView): string | undefined {
   }
 }
 
-/** How long the slider rests before its value is written: a drag is many changes, each a hook line per project. */
+/** How long the handle rests before its value is saved: a drag is many changes, each a save by the module. */
 const OFFSET_WRITE_DELAY_MS = 500
 
 /**
- * The slider's position, held here rather than read straight off the poll, and written through
- * the projects' `offset` hooks once it rests (#960).
+ * The handle's position, held here rather than read straight off the poll, and saved by the
+ * module once it rests (#960). `undefined` until the module's first answer: no handle yet.
  *
- * The stored value only comes back on the next quota read (30s), so a slider bound directly to it
+ * The saved value only comes back on the module's next read, so a handle bound directly to it
  * snapped back after every keypress and each keypress recomputed from the same stale number:
  * twenty presses of the arrow key moved the limit by one. This keeps the user's value until the
- * schedulers' catches up with it, which is the point at which the two agree anyway. A write that
- * fails says why, and the slider follows the schedulers' value again.
+ * module's read catches up with it, which is the point at which the two agree anyway. A save that
+ * fails says why, and the handle follows the module's value again.
  */
-export function useSpendOffset(serverOffset: number | undefined): [number, (offset: number) => void, string | undefined] {
-  const [local, setLocal] = useState(serverOffset ?? DEFAULT_SPEND_OFFSET)
+export function useSpendOffset(serverOffset: number | undefined, save: (offset: number) => Promise<UsageLimitSaved>): [number | undefined, (offset: number) => void, string | undefined] {
+  const [local, setLocal] = useState(serverOffset)
   const [error, setError] = useState<string | undefined>()
   // What we last wrote, while the poll is still behind it. `null` means "follow the server".
   const pending = useRef<number | null>(null)
@@ -426,7 +437,7 @@ export function useSpendOffset(serverOffset: number | undefined): [number, (offs
       pending.current = offset
       clearTimeout(timer.current)
       timer.current = setTimeout(() => {
-        void sendSpendOffset(offset).then(result => {
+        void save(offset).then(result => {
           if (result.ok || pending.current !== offset) return
           pending.current = null
           setError(result.error)
@@ -438,9 +449,27 @@ export function useSpendOffset(serverOffset: number | undefined): [number, (offs
   ]
 }
 
-export function Quota() {
+/** The bar with a module's stop line: the offset the module reads, every 10 seconds, and the handle that saves a new one through it. Rendered inside the module's slot. */
+function LimitedWeekBar({ limit, projects, boundary, percentUsed, others }: { limit: MountedUsageLimit; projects: ModuleProject[]; boundary: QuotaBoundary; percentUsed: number; others: DriverQuotaWindow[] }) {
+  const host = useModuleHost()
+  const key = projects.map(p => p.id).join(',')
+  const { value: saved } = usePolled<number | undefined>(() => limit.read(host, projects), undefined, 10_000, [limit.package, key])
+  const [offset, setOffset, error] = useSpendOffset(saved, points => limit.save(host, projects, points))
+  return (
+    <>
+      <WeekBar boundary={boundary} percentUsed={percentUsed} {...(offset !== undefined ? { offset, onChangeOffset: setOffset } : {})} others={others} />
+      {error && (
+        <p role="alert" className="text-xs text-danger">
+          The limit was not saved: {error}
+        </p>
+      )}
+    </>
+  )
+}
+
+export function Quota({ projects }: { projects: ProjectSummary[] }) {
   const view = useQuota()
-  const [offset, setOffset, offsetError] = useSpendOffset(view?.boundary?.limit.offset)
+  const { usageLimit } = useMountedModules()
   const note = view ? unavailableNote(view) : undefined
   // When the newest attempt failed but earlier numbers are still on screen, say how old they are.
   // A retained reading can now outlive several failures (#960), and an undated bar claims to be now.
@@ -463,14 +492,13 @@ export function Quota() {
             a reset phrasing the parser didn't know just made the panel quietly plainer, and nothing
             anywhere said the boundary was gone. Quote the text that failed: it is the bug report. */}
         {view?.boundary && week ? (
-          <>
-            <WeekBar status={view.boundary} percentUsed={week.percentUsed} offset={offset} onChangeOffset={setOffset} others={others} />
-            {offsetError && (
-              <p role="alert" className="text-xs text-danger">
-                The limit was not saved: {offsetError}
-              </p>
-            )}
-          </>
+          usageLimit ? (
+            <ModuleSlot package={usageLimit.package} label="usage limit">
+              <LimitedWeekBar limit={usageLimit} projects={projectsHaving(usageLimit.projects, projects)} boundary={view.boundary} percentUsed={week.percentUsed} others={others} />
+            </ModuleSlot>
+          ) : (
+            <WeekBar boundary={view.boundary} percentUsed={week.percentUsed} others={others} />
+          )
         ) : view && view.windows.length ? (
           <p role="alert" className="text-sm text-danger">
             {unplaceableWeek(week, others)}

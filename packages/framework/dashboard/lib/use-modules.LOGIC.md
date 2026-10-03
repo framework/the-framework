@@ -1,4 +1,4 @@
-Loads the modules [1] the registered projects have and gives the shell their pages, their Overview cards, their link actions [2], their side-rail tabs, their run slots [3] and their sections of the Settings page, and hands all of them to every component of the shell.
+Loads the modules [1] the registered projects have and gives the shell their pages, their Overview cards, their link actions [2], their side-rail tabs, their run slots [3], their sections of the Settings page and the usage bar's stop line [4], and hands all of them to every component of the shell.
 
 ## Context
 
@@ -6,9 +6,10 @@ Loads the modules [1] the registered projects have and gives the shell their pag
 
 ## Glossary
 
-[1] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
+[1] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections, the usage bar's stop line): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [2] link action: one verb a module offers on any link a dashboard page shows, done by the module package's own command.
 [3] run slot: a place on an agent's page a module fills: the summary, a few words in the action bar, shown until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the bar. Each is told the agent, whether it is still working, and whether the bar is open.
+[4] stop line: where a module's unattended work stops on the Overview's usage bar, as an offset from the quota boundary in percentage points; the module reads the offset and saves a new one, the bar draws the line and its handle.
 
 ## Business logic
 
@@ -17,6 +18,8 @@ The list of modules is read from the daemon now and every 30 seconds. Each modul
 The cards are the definitions' cards, each carrying the package it came from and the projects that have it, sorted by their `order` (50 when unsaid), then by package name: numbers rather than a list the shell keeps, so a third package's card sits between two others without the shell knowing it exists.
 
 The Settings sections are the definitions' sections, each carrying the package it came from and the projects that have it, sorted exactly as the cards are: by `order` (50 when unsaid), then by package name.
+
+The usage bar's stop line [4] is the first definition's that declares one, in package order, carrying the package it came from and the projects that have it; a later module's stop line is not mounted, since the bar has one handle. With no definition declaring one, none is mounted and the bar shows the account only (`components/Quota.tsx`).
 
 The side-rail tabs are every definition's tabs, and the run slots one entry per module that brings a summary or details, both in package order, each carrying the package it came from and the projects that have it: the rail and an agent's page offer them only for a project among those.
 

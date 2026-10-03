@@ -7,6 +7,7 @@ import { startCloudScratchSweep } from './cloud-scratch-refs.js'
 import { adoptCloudWork, startCloudWorkAdoption } from './cloud-work.js'
 import type { ProjectSummary } from './dashboard/projects.js'
 import { providerProblems } from './store/provided.js'
+import { projectGitHost } from './store/git-host.js'
 
 /**
  * Everything the daemon runs in the background beside serving the dashboard: the data sync (#1599),
@@ -81,7 +82,7 @@ export async function checkProviders(path: string, errors: ProjectErrors): Promi
 /** The registered projects as dashboard summaries. */
 async function listSummaries(env: NodeJS.ProcessEnv): Promise<ProjectSummary[]> {
   const records = await listProjects(undefined, env).catch(() => [])
-  return records.map(p => ({ id: p.id, path: p.path, name: basename(p.path), activated: true }))
+  return Promise.all(records.map(async p => ({ id: p.id, path: p.path, name: basename(p.path), activated: true, gitHost: (await projectGitHost(p.path).catch(() => undefined)) !== undefined })))
 }
 
 export function startBackgroundServices(deps: BackgroundServiceDeps): BackgroundServices {

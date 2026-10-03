@@ -9,8 +9,8 @@ import { fakeHost, renderWithHost, NO_MODULES, type Answers, type FakeHost } fro
 // command and the project's runs, and, unless a test mounts one, no other module. Whether a row
 // leads to a queue is the installed modules' business, not the card's.
 
-const alpha = { id: 'p1', name: 'alpha' }
-const beta = { id: 'p2', name: 'beta' }
+const alpha = { id: 'p1', name: 'alpha', gitHost: true }
+const beta = { id: 'p2', name: 'beta', gitHost: true }
 
 const ticket = (file: string, over: Record<string, unknown> = {}) => ({ file, title: file.replace(/\.md$/, ''), summary: '', date: '2026-08-01T00:00:00.000Z', planned: false, ...over })
 

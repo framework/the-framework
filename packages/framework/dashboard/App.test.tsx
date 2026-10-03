@@ -86,7 +86,6 @@ describe('module cards on the Overview (#1818)', () => {
   /** The Overview's own reads, answered empty: the shell's stub answers null otherwise, and a null list is not an empty one. */
   function answerOverview(modules: unknown[]): void {
     answerShell(modules)
-    answers.set('onSchedulers', () => [])
     answers.set('onQuota', () => null)
     answers.set('onDashboard', () => null)
     // Landing on a started run renders its page, whose changes card reads a list.

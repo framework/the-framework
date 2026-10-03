@@ -1,4 +1,4 @@
-`framework/module`: what the dashboard offers a module [1]. It is at once the module author's contract (the shapes a module exports, the services it may call, the building blocks it may use) and, at runtime, the dashboard's own running module, which a module reaches by the bare name `framework/module`. A module adds pages, Overview cards, tabs in the side rail, what an agent's page shows and sections of the Settings page, offers actions on the links [3] the dashboard's pages show, and may read through its own server part.
+`framework/module`: what the dashboard offers a module [1]. It is at once the module author's contract (the shapes a module exports, the services it may call, the building blocks it may use) and, at runtime, the dashboard's own running module, which a module reaches by the bare name `framework/module`. A module adds pages, Overview cards, tabs in the side rail, what an agent's page shows, sections of the Settings page and a stop line [7] on the usage bar, offers actions on the links [3] the dashboard's pages show, and may read through its own server part.
 
 ## Context
 
@@ -8,23 +8,26 @@
 
 ## Glossary
 
-[1] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command [2], or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
+[1] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections, the usage bar's stop line): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command [2], or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [2] command: one of a package's executables, as its `package.json` `bin` lists them, run the way an agent runs it with `npx`.
 [3] link: the name of some work and where it points, as a dashboard page shows it: a text, an optional target (a path inside the project's repository, or an absolute URL; absent for plain text that points nowhere) and an optional priority from 0 (only if capacity) to 10 (critical).
 [5] run slot: a place on an agent's page a module fills: the summary, a few words in the action bar, shown until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the bar. Each is told the agent, whether it is still working, and whether the bar is open.
 [6] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root.
 [4] link action: one verb a module offers on any link [3], done by the module package's own command [2]: a label, an optional label for once it is done, an optional icon, and the act itself, on a list of links in one project.
+[7] stop line: where a module's unattended work (agents its package starts on its own, with nobody at the keyboard) stops on the Overview's usage bar, as an offset from the quota boundary in percentage points of the week, negative before the boundary and positive past it. The quota boundary is the share of the account's quota week that may be spent by now.
 
 ## Business logic — TL;DR
 
-- **What a module exports** - by default, a definition: its pages (each a URL segment, a sidebar label, an optional icon, the page component), its cards for the Overview (each an id, an optional order, the card component), its link actions [4], its side-rail tabs (each an id, a label, a tooltip, an optional count, the tab component), its run slots [5] (a summary and details component), its Settings sections (each an id, an optional order, the section component), and an optional stylesheet beside its module.
+- **What a module exports** - by default, a definition: its pages (each a URL segment, a sidebar label, an optional icon, the page component), its cards for the Overview (each an id, an optional order, the card component), its link actions [4], its side-rail tabs (each an id, a label, a tooltip, an optional count, the tab component), its run slots [5] (a summary and details component), its Settings sections (each an id, an optional order, the section component), an optional stop line [7] for the usage bar (a read and a save), and an optional stylesheet beside its module.
+- **A project, as a module is given it** - its id, its name, and whether one of its packages provides a git host, since without one no pull request can be opened there.
+- **The usage bar's stop line** - a module that starts unattended work may put on the Overview's usage bar the line that work stops at: the bar asks the module to read the offset in force and to save the one a drag picked, each given the projects that have its package; the first module that declares one, in package order, has the line.
 - **What a Settings section is given** - the registered projects whose dependencies include the module's package; it is drawn after the Settings page's own sections, and not at all while no registered project has the package.
 - **What a side-rail tab is given** - the project on screen, the agent whose page it is (if any), and the Context's [6] files with a way to add or remove one; it is offered on every project and agent page of a project that has the module, and says itself when it has nothing.
 - **What a run slot is given** - the project, the agent, whether it is still working, and whether its action bar is open.
 - **A link action** - a verb the dashboard shows as a button beside any link [3] whose project has the module's package; the module acts on the links, in order, through its own command, and a batch stops at its first failure with the reason.
 - **What a page is given** - the registered projects whose dependencies include the module's package, and the URL segments after its own; a link into a project's files opens the page named by the link's first segment, with the project and the rest of the path as that page's segments.
 - **What a page may ask the dashboard** - run one of its own package's commands [2] in one project and get the JSON, or act with one so what it wrote shows at once; call one of its own server part's reads in one project; open an agent's page or a module's page; start a run with a prompt and land on it, or not land when the module says so, or open the launcher with the prompt drafted; and list a project's runs. None of it names a skill: what a module composes out of them is its own.
-- **What a module may draw with** - the dashboard's buttons, badge, card, skeleton, checkbox, input, popover, range slider, separator, scroll area, tooltip and dropdown menu, its markdown renderer, its split start button, its link-actions slot, its hover card, the dashboard's "+added −removed" pair, its class-name joiner, the Settings page's section, row and drop-down row, the list of coding agents with the models each lists, its date, age and duration formatting, its polling and loading hooks, and its action hook.
+- **What a module may draw with** - the dashboard's buttons, badge, card, skeleton, checkbox, input, popover, range slider, separator, scroll area, tooltip and dropdown menu, its markdown renderer, its split start button, its link-actions slot, its hover card, the dashboard's "+added −removed" pair, its class-name joiner, the Settings page's section, row and drop-down row, the list of coding agents with the models each lists, the reach of the usage bar's handle (50 points either side of the quota boundary), its date, age and duration formatting, its polling and loading hooks, and its action hook.
 
 ## Business logic
 
@@ -36,7 +39,7 @@ See `## Context`.
 
 #### Business logic
 
-The module's browser part's default export is its definition. `pages` lists the pages it adds; each has a `segment`, its URL `/<segment>`, which is a lowercase letter followed by lowercase letters and digits and so can never be a project's id (a project's id always carries a dash); a `label` for its sidebar row; an optional `icon` component for that row (a generic icon otherwise); and the `Page` component. `cards` lists the cards it adds to the Overview: each has an `id`, for the shell's key and its error line, never shown as a title; an optional `order`, its place among every installed package's cards, lower first, 50 when unsaid, ties by package name; and the `Card` component, given the registered projects that have the module's package, by id and name, and nothing else: a card has no URL and no sub-path. A project none of whose packages declares a card sees none. `settings` lists the sections it adds to the Settings page: each has an `id`, for the shell's key and its error line, never shown as a title (the section draws its own); an optional `order`, its place among every installed package's sections, lower first, 50 when unsaid, ties by package name; and the `Section` component. `linkActions` lists the link actions [4] it offers. `stylesheet` names a file relative to the module's browser part's own URL, loaded once with the module. `defineModule` only types the definition; it changes nothing.
+The module's browser part's default export is its definition. `pages` lists the pages it adds; each has a `segment`, its URL `/<segment>`, which is a lowercase letter followed by lowercase letters and digits and so can never be a project's id (a project's id always carries a dash); a `label` for its sidebar row; an optional `icon` component for that row (a generic icon otherwise); and the `Page` component. `cards` lists the cards it adds to the Overview: each has an `id`, for the shell's key and its error line, never shown as a title; an optional `order`, its place among every installed package's cards, lower first, 50 when unsaid, ties by package name; and the `Card` component, given the registered projects that have the module's package (see "A project, as a module is given it"), and nothing else: a card has no URL and no sub-path. A project none of whose packages declares a card sees none. `settings` lists the sections it adds to the Settings page: each has an `id`, for the shell's key and its error line, never shown as a title (the section draws its own); an optional `order`, its place among every installed package's sections, lower first, 50 when unsaid, ties by package name; and the `Section` component. `linkActions` lists the link actions [4] it offers. `usageLimit` is the stop line [7] it puts on the usage bar (see "The usage bar's stop line"). `stylesheet` names a file relative to the module's browser part's own URL, loaded once with the module. `defineModule` only types the definition; it changes nothing.
 
 ### What a side-rail tab and a run slot are given
 
@@ -50,6 +53,30 @@ The module's browser part's default export is its definition. `pages` lists the 
 
 `run` holds a module's run slots [5]: an optional `summary` and an optional `details` component. Each is rendered with the project, the agent (`agentId`), `working`, true while the agent's coding agent is still working (an agent that ended or stopped on a question is not), and `expanded`, true while the action bar is open.
 
+### A project, as a module is given it
+
+#### Context
+
+**User story**: a module's section offers "Open PR" only in a project where a pull request can be opened. A project with no git host package (a repository on a host no installed package speaks to) is offered what stops at the branch.
+
+**Problem**: whether a project has a git host is the dashboard's knowledge (which package provides it is read from the project's own `package.json`); a module that needed it would otherwise have to learn how providers are declared.
+
+#### Business logic
+
+Wherever a module's page, card or Settings section, or its stop line's read and save, is given projects, each is the project's id, its name, and `gitHost`: whether one of the project's packages provides a git host. The fact comes from the daemon's project list (`../../src/dashboard/projects.ts`), so it is as fresh as that list.
+
+### The usage bar's stop line
+
+#### Context
+
+**User story**: the scheduler package starts agents on its own while the account is under a line the user sets. The user sees that line on the Overview's usage bar and drags it, without the dashboard knowing the scheduler exists.
+
+**Problem**: the line is one package's setting, drawn on the dashboard's own bar. The dashboard reading that package's file and writing through a hook line would make the dashboard know the package.
+
+#### Business logic
+
+`usageLimit` holds a `read` and a `save`. `read`, given the dashboard's services for the module (the same a page gets from `useModuleHost()`) and the registered projects that have the module's package, answers the offset in force across them, or nothing when none says one: the bar then draws no line. `save`, given the same and the offset a drag picked, in percentage points and within 50 either side of the boundary (`MAX_SPEND_OFFSET`, which the module may import to bound its own controls), answers done, or stopped with the reason, which the bar shows. Both go through the module package's own command [2]. The first module that declares a stop line, in package order, has it (`lib/use-modules.ts`); how the bar draws it, when it reads and when it saves are the bar's (`components/Quota.tsx`).
+
 ### What a Settings section is given
 
 #### Context
@@ -60,7 +87,7 @@ The module's browser part's default export is its definition. `pages` lists the 
 
 #### Business logic
 
-A Settings section is rendered with `projects`: the registered projects whose dependencies include its package, each as its id and name, in the registry's order. The section reads and writes the package's own settings through its own package's command [2], as a page reads its data, and draws its own title and rows, usually with the building blocks below, so it looks like the page's own sections. Where the dashboard draws it is the dashboard's (`components/ModuleSettingsSections.tsx`).
+A Settings section is rendered with `projects`: the registered projects whose dependencies include its package (see "A project, as a module is given it"), in the registry's order. The section reads and writes the package's own settings through its own package's command [2], as a page reads its data, and draws its own title and rows, usually with the building blocks below, so it looks like the page's own sections. Where the dashboard draws it is the dashboard's (`components/ModuleSettingsSections.tsx`).
 
 ### A link action
 
@@ -82,7 +109,7 @@ A link action [4] has a `label`, the button's short verb phrase ("Add to queue")
 
 #### Business logic
 
-A page receives `projects`, the registered projects whose dependencies include its package, each as its id and name, in the registry's order; and `path`, the URL's segments after its own, decoded (`/logs/a` gives `['a']`).
+A page receives `projects`, the registered projects whose dependencies include its package (see "A project, as a module is given it"), in the registry's order; and `path`, the URL's segments after its own, decoded (`/logs/a` gives `['a']`).
 
 The link convention: a link [3] whose target is a path inside a project's repository, such as `tickets/2026-01-01_x.md`, is opened by the dashboard at `/<first segment>/<project id>/<rest…>`, the page named by the path's first segment getting `[projectId, ...rest]` as its `path`, when an installed module brings a page under that word; with none, the link is shown as text and opens nothing. So a page that shows one project's file under its own segment is where every such link in the dashboard lands, and the dashboard names no page (`lib/data-link.ts`).
 

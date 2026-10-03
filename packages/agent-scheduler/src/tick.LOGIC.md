@@ -50,7 +50,7 @@ The tick's time is the clock's now. The `agent-data` branch is pulled first; whe
 
 #### Context
 
-**User story**: the dashboard's Settings page lists one schedule switch [12] and one publish menu per scheduled command of every project, the menu naming what the command's line says beside this machine's publish pick [14]; the dashboard names no tool and does not read `agent-schedule.md`, so it lists what the scheduler's last tick recorded.
+**User story**: the Scheduler section this package brings to a dashboard's Settings page lists one schedule switch [12] and one publish menu per scheduled command of every project, the menu naming what the command's line says beside this machine's publish pick [14]; the section reads `agent-scheduler status`, not `agent-schedule.md`, so it lists what the scheduler's last tick recorded.
 
 #### Business logic
 

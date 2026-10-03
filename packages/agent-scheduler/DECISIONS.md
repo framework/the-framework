@@ -25,7 +25,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The scheduler depends on `agent-runner` for the runs, the records and the sweep, on
   `agent-driver` for the quota reading, on the branches package for the project root, on
   the logs package to count the records, and on `agent-data` for the branch. It never
-  depends on The Framework, and The Framework never depends on it.
+  depends on The Framework, and The Framework never depends on it. Its dashboard part is
+  the exception: it is drawn with the dashboard's module contract, and the tool itself runs
+  without it.
 - The tool names no skill and no command. What runs comes from the schedule file, and a
   command runs only when `.claude/skills/<command>` exists in the project; else the state
   says "no such command in this project". Picked over the tool linking a command's skill
@@ -46,7 +48,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A schedule line may say `publish <branch|pr|merge>`; a line that says nothing publishes
   nothing, as a person's run does. The line is the team's default, in the tracked schedule
   like the cap. A person may override it for one command on their machine, in the state file
-  like the on/off switch; Settings → Automation shows the level in force and changes it.
+  like the on/off switch; the scheduler's own Settings section shows the level in force and
+  changes it.
   Picked over the level being the file's alone, where changing it on one machine meant
   editing a tracked file.
 - A schedule line paces a command two ways, alone or together: `when` says there is work
@@ -107,3 +110,10 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   honours the user's keep-alive while a person's plain `stop` still stops. Picked over
   `stop` reading keep-alive always (a person's stop must stop) and over a separate `close`
   verb (one stop).
+
+## The dashboard part
+- The scheduler brings its own part of a dashboard: a Settings section (the spend cushion, a
+  switch and a publish pick per scheduled command) and an Overview card (on or off, the last
+  tick). Both read `status` and write through `offset`, `switch` and `publish`. Picked over a
+  hook line per setting that a dashboard runs, and over the dashboard reading the state file
+  by name.

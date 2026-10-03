@@ -4,7 +4,7 @@ import { collectQueue } from './queue.js'
 import type { ProjectSummary } from './projects.js'
 import type { QueueFor } from '../store/queue.js'
 
-const project = (id: string, path: string): ProjectSummary => ({ id, path, name: id, activated: true })
+const project = (id: string, path: string): ProjectSummary => ({ id, path, name: id, activated: true, gitHost: false })
 
 /** A queue reader off disk: a project's entries by path; a path with no list has no provider. */
 const queueFor =

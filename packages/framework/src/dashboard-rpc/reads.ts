@@ -4,7 +4,6 @@ import { listProjectWorktrees } from '../worktrees.js'
 import { projectGitHost, type GitHostHome } from '../store/git-host.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
-import { collectSchedulers, type ProjectScheduler } from '../dashboard/scheduler-state.js'
 import { buildOverview, buildRecentAgents, type Overview, type RecentAgent } from '../dashboard/overview.js'
 import { buildInterventions, type Intervention } from '../dashboard/interventions.js'
 import type { ProjectionRead } from '../dashboard/projects.js'
@@ -217,11 +216,6 @@ export async function onDocs(projectId: string): Promise<WorkspaceDoc[]> {
 /** The aggregated open TODO queue across every registered project (#438), most-open first. */
 export async function onQueue(): Promise<ProjectQueue[]> {
   return withProjects(collectQueue)
-}
-
-/** Every project's scheduler (#1774): a projection of each project's `.agent-scheduler/state.json`, one row per project. */
-export async function onSchedulers(): Promise<ProjectScheduler[]> {
-  return withProjects(collectSchedulers)
 }
 
 /** The cross-project Overview (#437): what is running now, the queue size, and recent projects. */

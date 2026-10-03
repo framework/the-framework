@@ -1,4 +1,4 @@
-Writes this tool's lines into a dashboard's hooks file, `.the-framework/hooks.yml` in the project, so the dashboard's check before a Start, the Start, and its answers to a run's question run through this tool. What `agent-runner init` runs. The writer takes any tool's lines, one-line keys and lists alike, so the scheduler's `init` writes its own lines (`open`, `close`, `offset`, `switch`) through it.
+Writes this tool's lines into a dashboard's hooks file, `.the-framework/hooks.yml` in the project, so the dashboard's check before a Start, the Start, and its answers to a run's question run through this tool. What `agent-runner init` runs. The writer takes any tool's lines, one-line keys and lists alike, so the scheduler's `init` writes its own lines (`open`, `close`) through it.
 
 ## Context
 

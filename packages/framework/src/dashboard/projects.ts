@@ -4,6 +4,7 @@ import { nodeFs } from '../node-fs.js'
 import { isActivated } from '../project.js'
 import { readAllAgents, type AgentMeta } from '../store/index.js'
 import type { ProjectError } from '../project-errors.js'
+import { projectGitHost, type GitHostFor } from '../store/git-host.js'
 
 /**
  * The multi-project read side (#392): projects the daemon serves come from the registry (#390),
@@ -22,6 +23,8 @@ export interface ProjectSummary {
   name: string
   /** True when the repo still has its `.the-framework/` marker. */
   activated: boolean
+  /** Whether one of the project's packages provides a git host; without one no pull request can be opened there. */
+  gitHost: boolean
   /** ISO timestamp of the project's newest activity: its most recent session. */
   lastActivityAt?: string
   /**
@@ -52,6 +55,8 @@ export interface SummarizeDeps {
   isActivated?: (path: string) => Promise<boolean>
   /** The project's runs (live + archived), newest-first. Defaults to {@link readAllAgents}. */
   readAgents?: (path: string) => Promise<AgentMeta[]>
+  /** The project's git host. Defaults to {@link projectGitHost}. */
+  gitHost?: GitHostFor
 }
 
 /** A project's runs, live prepended to the archived history. Forgiving: a failed read is `[]`. */
@@ -77,6 +82,7 @@ export async function summarizeProject(record: ProjectRecord, deps: SummarizeDep
     path: record.path,
     name: basename(record.path),
     activated,
+    gitHost: (await (deps.gitHost ?? projectGitHost)(record.path).catch(() => undefined)) !== undefined,
   }
   if (lastActivityAt) summary.lastActivityAt = lastActivityAt
   return summary

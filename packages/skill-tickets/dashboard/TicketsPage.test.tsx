@@ -31,7 +31,7 @@ const render = (mounted: MountedModules = modules()) => {
   const answers: Answers = {}
   for (const g of groups) answers[g.projectId] = { 'list --local': g.tickets, 'meta --local': {} }
   host = fakeHost(answers)
-  return renderWithHost(<TicketsPage projects={groups.map(g => ({ id: g.projectId, name: g.projectName }))} />, host, mounted)
+  return renderWithHost(<TicketsPage projects={groups.map(g => ({ id: g.projectId, name: g.projectName, gitHost: true }))} />, host, mounted)
 }
 /** The starts the host was asked for: `[projectId, prompt]` each. */
 const started = () => host.startRun.mock.calls.map(([projectId, prompt]) => [projectId, prompt])
@@ -123,7 +123,7 @@ describe('TicketsPage (#1144)', () => {
   test('a claim naming one of the project\'s runs reads as its session name and opens the run (#1748)', async () => {
     const run = { id: '2026-08-30T10-00-00-000Z', name: 'login-page', status: 'running' as const, startedAt: '2026-08-30T10:00:00.000Z' }
     host = fakeHost({ p1: { 'list --local': [ticket({ locked: true, lockedBy: run.id })], 'meta --local': {} } }, { p1: [run] })
-    renderWithHost(<TicketsPage projects={[{ id: 'p1', name: 'Alpha' }]} />, host, modules())
+    renderWithHost(<TicketsPage projects={[{ id: 'p1', name: 'Alpha', gitHost: true }]} />, host, modules())
     fireEvent.click(await screen.findByText('login-page'))
     expect(host.openAgent).toHaveBeenCalledWith('p1', run.id)
   })

@@ -21,15 +21,10 @@ const onModels = vi.hoisted(() =>
   })),
 )
 vi.mock('../rpc/models.js', () => ({ onModels }))
-const schedulers = vi.hoisted(() => vi.fn(async (): Promise<unknown[]> => []))
-const sendScheduleSwitch = vi.hoisted(() => vi.fn(async (): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true })))
-const sendSchedulePublish = vi.hoisted(() => vi.fn(async (): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true })))
 const onProjects = vi.hoisted(() => vi.fn(async (): Promise<unknown[]> => []))
 vi.mock('../rpc/projects.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../rpc/projects.js')>()),
   onProjects,
-  sendScheduleSwitch,
-  sendSchedulePublish,
 }))
 vi.mock('../rpc/reads.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../rpc/reads.js')>()),
@@ -39,10 +34,9 @@ vi.mock('../rpc/reads.js', async importOriginal => ({
   onDetectedEditors: vi.fn(async () => []),
   onDashboard: vi.fn(async () => null),
   onOnboardingSuggestion: vi.fn(async () => null),
-  onSchedulers: schedulers,
 }))
 
-import { SettingsPage, pace, publishChoices, publishes } from './SettingsPage.js'
+import { SettingsPage } from './SettingsPage.js'
 
 afterEach(() => {
   cleanup()
@@ -142,99 +136,6 @@ describe('SettingsPage Claude web (#1332)', () => {
     render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
     await screen.findByLabelText('Browser bridge')
     expect(screen.queryByText(/Which browser does the work/)).toBeNull()
-  })
-})
-
-describe('SettingsPage run on a schedule', () => {
-  const gemstack = {
-    projectId: 'p1',
-    projectName: 'gemstack',
-    gitHost: true,
-    present: true,
-    on: true,
-    keepAlive: false,
-    running: true,
-    commands: [
-      { command: 'work-queue', when: 'npx queue', on: true, publish: 'merge' as const },
-      { command: 'post-merge-cleanup', every: '1d', on: false },
-    ],
-  }
-
-  test("one switch per scheduled command, showing this machine's switch; flipping one runs the project's switch hook", async () => {
-    schedulers.mockResolvedValue([gemstack])
-    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
-    const cleanup = (await screen.findByLabelText('Run /post-merge-cleanup on a schedule')) as HTMLElement
-    const queue = screen.getByLabelText('Run /work-queue on a schedule') as HTMLElement
-    expect(cleanup.getAttribute('aria-checked')).toBe('false')
-    expect(queue.getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByText(/gemstack · every 1d · publishes nothing\./)).toBeTruthy()
-    expect(screen.getByText(/gemstack · when its check finds work · opens a pull request that merges on green\./)).toBeTruthy()
-    cleanup.click()
-    await waitFor(() => expect(sendScheduleSwitch).toHaveBeenCalledWith('p1', 'post-merge-cleanup', true))
-  })
-
-  test('a switch the hook refused says why', async () => {
-    schedulers.mockResolvedValue([gemstack])
-    sendScheduleSwitch.mockResolvedValueOnce({ ok: false, error: 'this project has no switch hook in .the-framework/hooks.yml' })
-    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
-    ;((await screen.findByLabelText('Run /work-queue on a schedule')) as HTMLElement).click()
-    expect((await screen.findByRole('alert')).textContent).toBe('The switch was not saved: /work-queue: this project has no switch hook in .the-framework/hooks.yml')
-  })
-
-  const options = (menu: HTMLSelectElement): string[] => [...menu.options].map(o => o.textContent ?? '')
-
-  test("each command's publish menu shows this machine's pick, else what the file says; picking saves through the project's publish hook, and \"As the file says\" takes the pick back", async () => {
-    const picked = { ...gemstack, commands: [gemstack.commands[0]!, { ...gemstack.commands[1]!, publishPick: 'branch' as const }] }
-    schedulers.mockResolvedValue([picked])
-    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
-    const queue = (await screen.findByLabelText('What /work-queue publishes')) as HTMLSelectElement
-    const cleanup = screen.getByLabelText('What /post-merge-cleanup publishes') as HTMLSelectElement
-    expect(options(queue)).toEqual(['As the file says (Merge on green)', 'Nothing', 'Publish branch', 'Open PR', 'Merge on green'])
-    expect(queue.value, 'nobody picked here: the file decides').toBe('')
-    expect(options(cleanup)[0]).toBe('As the file says (Nothing)')
-    expect(cleanup.value).toBe('branch')
-    // The description says the level in force: this machine's pick over the line's.
-    expect(screen.getByText(/gemstack · every 1d · publishes its branch\./)).toBeTruthy()
-
-    fireEvent.change(queue, { target: { value: 'nothing' } })
-    await waitFor(() => expect(sendSchedulePublish).toHaveBeenCalledWith('p1', 'work-queue', 'nothing'))
-    fireEvent.change(cleanup, { target: { value: '' } })
-    await waitFor(() => expect(sendSchedulePublish).toHaveBeenCalledWith('p1', 'post-merge-cleanup', null))
-  })
-
-  test('a project with no git host is offered Nothing and Publish branch only, beside what the file says', async () => {
-    schedulers.mockResolvedValue([{ ...gemstack, gitHost: false }])
-    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
-    const queue = (await screen.findByLabelText('What /work-queue publishes')) as HTMLSelectElement
-    expect(options(queue)).toEqual(['As the file says (Merge on green)', 'Nothing', 'Publish branch'])
-    expect(publishChoices(false, undefined)).toEqual(['nothing', 'branch'])
-    expect(publishChoices(true, 'pr')).toEqual(['nothing', 'branch', 'pr', 'merge'])
-    // A pick saved while the project had a git host is still listed, so the menu shows what is in force.
-    expect(publishChoices(false, 'pr')).toEqual(['nothing', 'branch', 'pr'])
-  })
-
-  test('a publish pick the hook refused says why', async () => {
-    schedulers.mockResolvedValue([gemstack])
-    sendSchedulePublish.mockResolvedValueOnce({ ok: false, error: 'this project has no publish hook in .the-framework/hooks.yml' })
-    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
-    fireEvent.change(await screen.findByLabelText('What /work-queue publishes'), { target: { value: 'pr' } })
-    expect((await screen.findByRole('alert')).textContent).toBe('The publish pick was not saved: /work-queue: this project has no publish hook in .the-framework/hooks.yml')
-  })
-
-  test('the pace in words: an interval, a check, or both', () => {
-    expect(pace({ command: 'a', every: '1d', on: true })).toBe('every 1d')
-    expect(pace({ command: 'a', when: 'npx queue', on: true })).toBe('when its check finds work')
-    expect(pace({ command: 'a', every: '6h', when: 'x', on: true })).toBe('every 6h at most, when its check finds work')
-  })
-
-  test('how far a scheduled command publishes, in words: what its line says, nothing when it says none', () => {
-    expect(publishes({ command: 'a', every: '1d', on: true })).toBe('publishes nothing')
-    expect(publishes({ command: 'a', every: '1d', on: true, publish: 'branch' })).toBe('publishes its branch')
-    expect(publishes({ command: 'a', every: '1d', on: true, publish: 'pr' })).toBe('opens a pull request')
-    expect(publishes({ command: 'a', every: '1d', on: true, publish: 'merge' })).toBe('opens a pull request that merges on green')
-    // This machine's pick stands in for the line's level.
-    expect(publishes({ command: 'a', every: '1d', on: true, publish: 'merge', publishPick: 'nothing' })).toBe('publishes nothing')
-    expect(publishes({ command: 'a', every: '1d', on: true, publishPick: 'pr' })).toBe('opens a pull request')
   })
 })
 

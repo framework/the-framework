@@ -20,6 +20,8 @@ export type { ModuleCommandResult, ModuleReadResult, AgentStatus }
 export interface ModuleProject {
   id: string
   name: string
+  /** Whether one of the project's packages provides a git host; without one no pull request can be opened there. */
+  gitHost: boolean
 }
 
 /**
@@ -131,6 +133,23 @@ export interface ModuleSettings {
   Section: ComponentType<ModuleSettingsProps>
 }
 
+/** How saving a usage limit went: done, or stopped, with the reason the module's command gave. */
+export type UsageLimitSaved = { ok: true } | { ok: false; error: string }
+
+/**
+ * The stop line a module puts on the Overview's usage bar: where its unattended work stops, as an
+ * offset from the quota boundary in percentage points, negative before it and positive past it.
+ * The bar draws the line and its handle, and asks the module to read the offset and to save the
+ * one a drag picked, through the module package's own command. The first module that declares one
+ * (in package order) has the line.
+ */
+export interface ModuleUsageLimit {
+  /** The offset in force across the projects, or undefined when none says one: the bar then draws no line. */
+  read(host: ModuleHost, projects: ModuleProject[]): Promise<number | undefined>
+  /** Save the offset the handle was dragged to, within ±{@link MAX_SPEND_OFFSET}. */
+  save(host: ModuleHost, projects: ModuleProject[], points: number): Promise<UsageLimitSaved>
+}
+
 /**
  * The Context as a side-rail tab sees it (#504): the files the next run is pointed at. A tab may
  * show which files are in it and add or remove one.
@@ -209,6 +228,8 @@ export interface ModuleDefinition {
   run?: ModuleRunSlots
   /** The sections the module adds to the Settings page. */
   settings?: ModuleSettings[]
+  /** The stop line the module puts on the usage bar. */
+  usageLimit?: ModuleUsageLimit
   /** A stylesheet to load with the module, relative to the module's browser part's own URL. */
   stylesheet?: string
 }
@@ -326,6 +347,7 @@ export { LinkActions, type ProjectLinks, type LinkTargets } from '../components/
 export { cn } from '../lib/utils.js'
 export { SettingsSection, SettingsRow, SettingsSelectRow, type SettingsOption } from '../components/SettingsRows.js'
 export { useCodingAgents, type CodingAgent } from '../lib/models.js'
+export { MAX_SPEND_OFFSET } from '../../src/preference-defaults.js'
 export { formatRelative, formatDateTime, formatDuration, formatAge } from '../lib/format-date.js'
 export { usePolled, useLoaded } from '../lib/use-async.js'
 export { useAction } from '../lib/use-action.js'

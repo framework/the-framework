@@ -9,8 +9,8 @@ import { configureFirst } from '../../framework/dashboard/test-utils.js'
 // command, and no other module mounted. A queued ticket is a link into a repository the card has
 // no page for, so it reads as text: the card names no tickets package.
 
-const alpha = { id: 'p1', name: 'alpha' }
-const beta = { id: 'p2', name: 'beta' }
+const alpha = { id: 'p1', name: 'alpha', gitHost: true }
+const beta = { id: 'p2', name: 'beta', gitHost: true }
 const LOGIN = '[Login page](tickets/2026-08-01_login-page.md)'
 const UPSTREAM = '[Upstream bug](https://github.com/x/y/issues/1)'
 

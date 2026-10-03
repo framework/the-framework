@@ -7,7 +7,7 @@ import type { ProjectSummary } from './projects.js'
 import type { LiveAgent, AgentMeta } from '../store/index.js'
 import type { FrameworkEvent } from '../events.js'
 
-const project = (id: string, path: string): ProjectSummary => ({ id, path, name: id, activated: true })
+const project = (id: string, path: string): ProjectSummary => ({ id, path, name: id, activated: true, gitHost: false })
 
 /** No paused run anywhere — keeps the PR-only tests hermetic (no disk read). */
 const noAgents = async (): Promise<LiveAgent[]> => []

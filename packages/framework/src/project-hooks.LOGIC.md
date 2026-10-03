@@ -1,28 +1,22 @@
-A project's hooks [1]: the shell lines the project's own `.the-framework/hooks.yml` names to run when the dashboard opens and when it closes, the two lines that start an agent [2] and continue an ended one, the line that says whether an agent can start here at all, the line that sets the project's spend offset [3], the line that sets one schedule switch [4], the line that sets one publish pick [5], and the runner that runs them in the project, bounded. The daemon names no tool: whatever the file says runs. Per user, since `.the-framework/` is ignored by git: a hook is this machine's, and a teammate's pull changes nothing.
+A project's hooks [1]: the shell lines the project's own `.the-framework/hooks.yml` names to run when the dashboard opens and when it closes, the two lines that start an agent [2] and continue an ended one, the line that says whether an agent can start here at all, and the runner that runs them in the project, bounded. The daemon names no tool: whatever the file says runs. Per user, since `.the-framework/` is ignored by git: a hook is this machine's, and a teammate's pull changes nothing.
 
 ## Context
 
-**User story**: the user writes `open: [npx agent-scheduler start]` and `close: [npx agent-scheduler stop --unless-keep-alive]` in the project's `.the-framework/hooks.yml`; the project's scheduler then starts whenever the dashboard does and stops when it closes, with nothing of the scheduler known to The Framework. A user with no such file sees nothing change. The user also writes `start: npx agent-runner run --detach "$PROMPT" --driver "$DRIVER"` and a `resume:` line; pressing Start in the dashboard then runs that line, and answering an ended agent's question runs the other, still with nothing of the tool known to The Framework. Likewise `offset: npx agent-scheduler offset -- "$POINTS"`: moving the usage panel's handle runs that line, and the project's scheduler then starts unattended work up to the new line (the `--` keeps a negative value from being read as an option). And `check: npx agent-runner check ${DRIVER:+--driver "$DRIVER"}`: the launcher runs that line and says under the prompt box, before the Start, what would stop the agent (a coding agent not installed or logged out) and what is only worth knowing. And `switch: npx agent-scheduler switch "$COMMAND" "$SWITCH"`: flipping a scheduled command's row in Settings runs that line, and the project's scheduler then runs that command on this machine, or stops starting it. And `publish: npx agent-scheduler publish "$COMMAND" "$PUBLISH"`: picking how far a scheduled command publishes on its row in Settings runs that line, and the project's scheduler then starts that command's runs on this machine at that level.
+**User story**: the user writes `open: [npx agent-scheduler start]` and `close: [npx agent-scheduler stop --unless-keep-alive]` in the project's `.the-framework/hooks.yml`; the project's scheduler then starts whenever the dashboard does and stops when it closes, with nothing of the scheduler known to The Framework. A user with no such file sees nothing change. The user also writes `start: npx agent-runner run --detach "$PROMPT" --driver "$DRIVER"` and a `resume:` line; pressing Start in the dashboard then runs that line, and answering an ended agent's question runs the other, still with nothing of the tool known to The Framework. And `check: npx agent-runner check ${DRIVER:+--driver "$DRIVER"}`: the launcher runs that line and says under the prompt box, before the Start, what would stop the agent (a coding agent not installed or logged out) and what is only worth knowing. A setting of a package (the scheduler's spend offset, say) is no hook: the package's own part of the dashboard reads and saves it through the package's own command.
 
 **Problem**: the tool that starts agents on a schedule should follow the dashboard's life, but The Framework must not depend on it or name it; and a line a person wrote can fail, hang or be missing without keeping the dashboard from coming up or from closing.
 
 ## Glossary
 
-[1] hooks: the shell lines a project's own `.the-framework/hooks.yml` names: the `open` and `close` lists, run in the project by the daemon when the dashboard opens and closes, and the `start`, `resume`, `check`, `offset`, `switch` and `publish` lines, one shell line each, run when the user starts an agent, continues an ended one, opens the launcher, sets the spend offset, flips a schedule switch, or sets a publish pick.
+[1] hooks: the shell lines a project's own `.the-framework/hooks.yml` names: the `open` and `close` lists, run in the project by the daemon when the dashboard opens and closes, and the `start`, `resume` and `check` lines, one shell line each, run when the user starts an agent, continues an ended one, or opens the launcher.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
-[3] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file.
-[4] schedule switch: a person's choice, on one machine, whether a scheduled command (a line of the project's `agent-schedule.md`) runs there; the project's scheduler keeps it in its state file, and the schedule line is the default where nobody switched the command.
-[5] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: nothing, the branch, a pull request, or a pull request set to merge on its own once its checks pass; the project's scheduler keeps it in its state file, where it stands in for the level the command's line in `agent-schedule.md` says until the person takes it back.
 
 ## Business logic — TL;DR
 
-- **The file** - `.the-framework/hooks.yml` at the project root: a YAML map with the keys `open` and `close`, each a list of shell lines, and `start`, `resume`, `check`, `offset`, `switch` and `publish`, each one shell line; no file means no hooks; a document that is not such a map, an unknown key, or a list that is not all non-empty strings is refused as a whole and reported with "ignoring" in front, and counts as no hooks.
+- **The file** - `.the-framework/hooks.yml` at the project root: a YAML map with the keys `open` and `close`, each a list of shell lines, and `start`, `resume` and `check`, each one shell line; no file means no hooks; a document that is not such a map, an unknown key (a scheduler setting's `offset`, `switch` or `publish` among them), or a list that is not all non-empty strings is refused as a whole and reported with "ignoring" in front, and counts as no hooks.
 - **Running the lines** - the lines of one kind run in order, each through `sh -c` with the project's root as working directory and the daemon's environment; one line failing or timing out does not stop the next; a line is killed after one minute; nothing ever throws to the caller.
 - **The start and resume lines** - one line each, run with the user's input in its environment; the line answers one JSON document on stdout whose `id` names the agent; no line, a failing line, a line that answers no id and a line that hangs are each an error in words.
 - **The check line** - one line, run with the picked coding agent in `DRIVER` when picked; it answers one JSON document on stdout with `problems` and `warnings`, each a list of lines; no line is an error marked as "no hook"; a broken file, a failing line, a line that answers no such lists and a line that hangs are each an error in words.
-- **The offset line** - one line, run with the points in `POINTS`; exit 0 is done; no line is an error marked as "no hook", so a caller can skip the project; a broken file, a failing line and a line that hangs are each an error in words.
-- **The switch line** - one line, run with the command in `COMMAND` and `on` or `off` in `SWITCH`; exit 0 is done; no line is an error marked as "no hook"; a broken file, a failing line and a line that hangs are each an error in words, like the offset line.
-- **The publish line** - one line, run with the command in `COMMAND` and the publish pick [5] in `PUBLISH`: `nothing`, `branch`, `pr` or `merge`, or `file` when the pick is taken back; exit 0 is done; no line is an error marked as "no hook"; a broken file, a failing line and a line that hangs are each an error in words, like the offset line.
 - **What is logged** - one line per hook line, "[framework] <open|close> hook (<project>): <line>: exit <code>", or "timed out after 60s", or "could not start: <why>", followed by whatever the line printed on stderr, indented; a refused file is logged once as the reason it was ignored; a missing file logs nothing.
 
 ## Business logic
@@ -35,7 +29,7 @@ See `## Context`.
 
 #### Business logic
 
-The hooks file is `.the-framework/hooks.yml` at the project's root. A missing file is no hooks. The file is a YAML map with eight keys: `open` and `close`, each a list of shell lines, and `start`, `resume`, `check`, `offset`, `switch` and `publish`, each one non-empty shell line; any may be absent or empty, and each line is trimmed. An empty document is no hooks. A document that is not a map (a list, a bare value) is refused with "hooks.yml must be a YAML map; the keys are open, close, start, resume, check, offset, switch and publish"; any other key is refused with "unknown key "<key>"; the keys are open, close, start, resume, check, offset, switch and publish", rather than ignored, because a misspelled `open` would otherwise be a hook that silently never runs; an `open` or `close` value that is not a list of non-empty strings is refused with ""<key>" must be a list of shell lines"; a `start`, `resume`, `check`, `offset`, `switch` or `publish` value that is not one non-empty string is refused with ""<key>" must be one shell line"; a document YAML cannot parse is refused with the parser's first line. A refusal discards the whole file, is reported to the caller's warning channel with "ignoring " in front, and counts as no hooks.
+The hooks file is `.the-framework/hooks.yml` at the project's root. A missing file is no hooks. The file is a YAML map with five keys: `open` and `close`, each a list of shell lines, and `start`, `resume` and `check`, each one non-empty shell line; any may be absent or empty, and each line is trimmed. An empty document is no hooks. A document that is not a map (a list, a bare value) is refused with "hooks.yml must be a YAML map; the keys are open, close, start, resume and check"; any other key is refused with "unknown key "<key>"; the keys are open, close, start, resume and check", rather than ignored, because a misspelled `open` would otherwise be a hook that silently never runs (so a file that still carries an `offset`, `switch` or `publish` line is refused whole until the line is removed); an `open` or `close` value that is not a list of non-empty strings is refused with ""<key>" must be a list of shell lines"; a `start`, `resume` or `check` value that is not one non-empty string is refused with ""<key>" must be one shell line"; a document YAML cannot parse is refused with the parser's first line. A refusal discards the whole file, is reported to the caller's warning channel with "ignoring " in front, and counts as no hooks.
 
 ### Running the lines
 
@@ -70,42 +64,6 @@ The `start` line runs like an `open` line (through `sh -c`, in the project's roo
 #### Business logic
 
 The `check` line runs like an `open` line (through `sh -c`, in the project's root, with the daemon's environment, killed after one minute) with one variable added when the user picked a coding agent: `DRIVER`, the pick, so the line's own default applies otherwise. Its stdout is read as one JSON document; when the line exits 0 and the document's `problems` and `warnings` are both lists of strings, those two lists are the answer. Otherwise the answer is an error in words: "this project has no check hook" when the file has no such line, marked as "no hook" so the caller can say nothing; the reason the file was ignored when it is broken (not marked as "no hook"); "the check hook: <the last non-empty line the line printed on stderr>" when the line failed; "the check hook: it answered no problems and warnings" when it exited 0 without both lists; "the check hook: timed out after 60s", "exit <code>" or "could not start: <why>" when it said nothing. Nothing is logged for this line: the outcome goes to the launcher.
-
-### The offset line
-
-#### Context
-
-**User story**: the user drags the usage panel's handle, or types a number in Settings → Automation → "Spend offset", and every project's scheduler takes the new spend offset [3] (`dashboard-rpc/quota.ts` runs the line in each project).
-
-**Problem**: the scheduler keeps the spend offset in its own state, and The Framework must not name the tool that does; the line is the project's, like the start line.
-
-#### Business logic
-
-The `offset` line runs like an `open` line (through `sh -c`, in the project's root, with the daemon's environment, killed after one minute) with one variable added: `POINTS`, the spend offset [3] in percentage points, as a decimal number that may be negative or fractional ("-12.5"). Exit 0 is done; the line's stdout is not read. Otherwise the answer is an error in words: "this project has no offset hook" when the file has no such line, marked as "no hook" so the caller can tell a project that opted out from one that failed; the reason the file was ignored when it is broken (not marked as "no hook"); "the offset hook: <the last non-empty line the line printed on stderr>" when the line failed; "the offset hook: timed out after 60s", "exit <code>" or "could not start: <why>" when it said nothing. Nothing is logged for this line: the outcome goes to the user who moved the handle.
-
-### The switch line
-
-#### Context
-
-**User story**: the user flips "Run /post-merge-cleanup on a schedule" in Settings → Automation, and that project's scheduler starts the command on this machine when it is due, or stops starting it (`dashboard-rpc/projects.ts` runs the line in that one project).
-
-**Problem**: the scheduler keeps the schedule switch [4] in its own state, and The Framework must not name the tool that does; the line is the project's, like the offset line.
-
-#### Business logic
-
-The `switch` line runs like the `offset` line (through `sh -c`, in the project's root, with the daemon's environment, killed after one minute) with two variables added: `COMMAND`, the scheduled command's name (`post-merge-cleanup`), and `SWITCH`, `on` or `off`. Exit 0 is done; the line's stdout is not read. Otherwise the answer is an error in words: "this project has no switch hook" when the file has no such line, marked as "no hook"; the reason the file was ignored when it is broken (not marked as "no hook"); "the switch hook: <the last non-empty line the line printed on stderr>" when the line failed (the scheduler's "agent-schedule.md has no line for <name>", say); "the switch hook: timed out after 60s", "exit <code>" or "could not start: <why>" when it said nothing. Nothing is logged for this line: the outcome goes to the user who flipped the row.
-
-### The publish line
-
-#### Context
-
-**User story**: the user picks "Open PR" in the menu on the row "Run /work-queue on a schedule" in Settings → Automation, and that project's scheduler starts the command's runs on this machine at that level, whatever the tracked `agent-schedule.md` says; picking "As the file says" follows the file again (`dashboard-rpc/projects.ts` runs the line in that one project).
-
-**Problem**: the scheduler keeps the publish pick [5] in its own state, and The Framework must not name the tool that does; the line is the project's, like the switch line.
-
-#### Business logic
-
-The `publish` line runs like the `offset` line (through `sh -c`, in the project's root, with the daemon's environment, killed after one minute) with two variables added: `COMMAND`, the scheduled command's name (`work-queue`), and `PUBLISH`, the publish pick: `nothing`, `branch`, `pr` or `merge`, or `file` when there is no pick, meaning what the project's schedule says. Exit 0 is done; the line's stdout is not read. Otherwise the answer is an error in words: "this project has no publish hook" when the file has no such line, marked as "no hook"; the reason the file was ignored when it is broken (not marked as "no hook"); "the publish hook: <the last non-empty line the line printed on stderr>" when the line failed; "the publish hook: timed out after 60s", "exit <code>" or "could not start: <why>" when it said nothing. Nothing is logged for this line: the outcome goes to the user who picked.
 
 ### What is logged
 

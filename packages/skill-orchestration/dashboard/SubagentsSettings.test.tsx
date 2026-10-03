@@ -13,8 +13,8 @@ vi.mock('../../framework/dashboard/rpc/models.js', () => ({
 }))
 
 const PROJECTS = [
-  { id: 'p1', name: 'gemstack' },
-  { id: 'p2', name: 'other' },
+  { id: 'p1', name: 'gemstack', gitHost: true },
+  { id: 'p2', name: 'other', gitHost: true },
 ]
 
 /** A host whose `orchestration settings` keeps what it was given per project, as the command does. */

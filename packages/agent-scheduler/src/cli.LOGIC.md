@@ -2,7 +2,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 
 ## Context
 
-**User story**: the user runs `init` once so the dashboard opens and closes the scheduler and reaches its spend cushion, schedule switches and publish picks, turns the scheduler on and off, reads its state, sets the model and the spend cushion for their machine, switches a scheduled command on or off for their machine, picks how far a scheduled command's runs publish on their machine, or ticks once by hand, all from any directory of the project, and a dashboard runs the same commands and parses the same JSON. Running, continuing and checking one run are `agent-runner`'s commands, not this tool's.
+**User story**: the user runs `init` once so the dashboard opens and closes the scheduler, turns the scheduler on and off, reads its state, sets the model and the spend cushion for their machine, switches a scheduled command on or off for their machine, picks how far a scheduled command's runs publish on their machine, or ticks once by hand, all from any directory of the project, and a dashboard runs the same commands and parses the same JSON: the package's own dashboard part (`../dashboard/`) reads with `status` and saves with `offset`, `switch` and `publish`. Running, continuing and checking one run are `agent-runner`'s commands, not this tool's.
 
 **Business logic story**: every command acts on the project the working directory belongs to, found by the `branches` package even from inside a checkout under `.branches/`. What each command does is `scheduler.ts`'s and `state.ts`'s; this file is the contract around them.
 
@@ -34,7 +34,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 
 #### Business logic
 
-A command that ran prints exactly one JSON document on stdout, an object with `ok`, and exits 0. A refusal, a rule saying no (the working directory is not inside a repository), prints `{"ok":false,"reason":…}` on stdout, one line on stderr, and exits 1. Anything else that fails (git, the file system, a driver) prints `{"ok":false,"reason":"failed","detail":<the error's message>}` on stdout, the detail on stderr, and exits 1. A command line that cannot be read is rejected before anything runs: no command or an unknown one (`agent-runner`'s `run` and `check` among them) prints the usage on stderr and exits 2; an unknown flag or the wrong number of arguments (`model` and `offset` take exactly one, `switch` exactly two, the others none) prints what was wrong (`expected 1 argument(s), got 0`) followed by the usage on stderr, nothing on stdout, and exits 2. The usage names the eight commands and the contract.
+A command that ran prints exactly one JSON document on stdout, an object with `ok`, and exits 0. A refusal, a rule saying no (the working directory is not inside a repository), prints `{"ok":false,"reason":…}` on stdout, one line on stderr, and exits 1. Anything else that fails (git, the file system, a driver) prints `{"ok":false,"reason":"failed","detail":<the error's message>}` on stdout, the detail on stderr, and exits 1. A command line that cannot be read is rejected before anything runs: no command or an unknown one (`agent-runner`'s `run` and `check` among them) prints the usage on stderr and exits 2; an unknown flag or the wrong number of arguments (`model` and `offset` take exactly one, `switch` exactly two, the others none) prints what was wrong (`expected 1 argument(s), got 0`) followed by the usage on stderr, nothing on stdout, and exits 2. The usage names the nine commands and the contract.
 
 ### The project
 
@@ -70,7 +70,7 @@ See `scheduler.ts`.
 
 #### Context
 
-**User story**: the user runs `npx agent-scheduler init` in a project the dashboard knows; from then on the dashboard starts the project's scheduler when it opens and stops it when it closes, and its usage panel's handle, its schedule switches and its publish picks reach the scheduler's state. The Start's lines are `agent-runner init`'s.
+**User story**: the user runs `npx agent-scheduler init` in a project the dashboard knows; from then on the dashboard starts the project's scheduler when it opens and stops it when it closes. The Start's lines are `agent-runner init`'s.
 
 #### Business logic
 
@@ -90,7 +90,7 @@ See `## Context`.
 
 #### Context
 
-**User story**: the user wants the daily clean-up after merges, listed `off` in the tracked `agent-schedule.md`, to run on their own machine; they flip its schedule switch [3] in the dashboard's Settings page, whose project `switch` hook runs `npx agent-scheduler switch "$COMMAND" "$SWITCH"`, or type `agent-scheduler switch post-merge-cleanup on`; the tracked file does not change, and no other machine runs it.
+**User story**: the user wants the daily clean-up after merges, listed `off` in the tracked `agent-schedule.md`, to run on their own machine; they flip its schedule switch [3] in the Scheduler section of the dashboard's Settings page, which runs this command in the project, or type `agent-scheduler switch post-merge-cleanup on`; the tracked file does not change, and no other machine runs it.
 
 #### Business logic
 
@@ -100,7 +100,7 @@ See `## Context`.
 
 #### Context
 
-**User story**: the tracked `agent-schedule.md` says `- work-queue: when \`npx queue\`, cap 1, publish merge`, the team's default; the user wants the queue's runs on their own machine to open a pull request and not merge it, so they pick "Open PR" on the command's row in the dashboard's Settings page, whose project `publish` hook runs `npx agent-scheduler publish "$COMMAND" "$PUBLISH"`, or type `agent-scheduler publish work-queue pr`; the tracked file does not change, and every other machine still merges. Picking "As the file says" there, or typing `agent-scheduler publish work-queue file`, takes the pick back.
+**User story**: the tracked `agent-schedule.md` says `- work-queue: when \`npx queue\`, cap 1, publish merge`, the team's default; the user wants the queue's runs on their own machine to open a pull request and not merge it, so they pick "Open PR" on the command's row in the Scheduler section of the dashboard's Settings page, which runs this command in the project, or type `agent-scheduler publish work-queue pr`; the tracked file does not change, and every other machine still merges. Picking "As the file says" there, or typing `agent-scheduler publish work-queue file`, takes the pick back.
 
 #### Business logic
 

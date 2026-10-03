@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parse } from 'yaml'
-import { HOOK_LINES, initHooks } from './init.js'
+import { initHooks } from './init.js'
 
 // `init` against real files: the scheduler's lines written into a fresh file. The merge into a
 // person's file is the writer's, tested in agent-runner.
@@ -14,8 +14,8 @@ test('a project the dashboard knows, with no hooks file, gets the scheduler\'s l
   await mkdir(join(repo, '.the-framework'))
   try {
     const outcome = await initHooks(repo)
-    assert.deepEqual(outcome, { ok: true, file: join(repo, '.the-framework', 'hooks.yml'), added: ['open', 'close', 'offset', 'switch', 'publish'], kept: [] })
-    assert.deepEqual(parse(await readFile(join(repo, '.the-framework', 'hooks.yml'), 'utf8')), HOOK_LINES)
+    assert.deepEqual(outcome, { ok: true, file: join(repo, '.the-framework', 'hooks.yml'), added: ['open', 'close'], kept: [] })
+    assert.deepEqual(parse(await readFile(join(repo, '.the-framework', 'hooks.yml'), 'utf8')), { open: ['npx agent-scheduler start'], close: ['npx agent-scheduler stop --unless-keep-alive'] })
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

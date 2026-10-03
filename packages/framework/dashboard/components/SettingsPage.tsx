@@ -1,15 +1,12 @@
-import { useState, type ReactNode } from 'react'
-import { DRIVERS, MAX_SPEND_OFFSET, PUBLISH_LABELS, isPublishPick, offeredPublishPicks, type PublishPick } from '../../src/client.js'
+import type { ReactNode } from 'react'
+import { DRIVERS } from '../../src/client.js'
 import { driverOptions, useModels } from '../lib/models.js'
 import { NO_MODEL_PINNED } from '../lib/agent-settings.js'
 import type { DriverOption } from './DriverModelMenu.js'
-import { useQuota } from '../lib/quota.js'
-import { useSpendOffset } from './Quota.js'
-import { onSchedulers } from '../rpc/reads.js'
-import { onProjects, sendSchedulePublish, sendScheduleSwitch } from '../rpc/projects.js'
+import { onProjects } from '../rpc/projects.js'
 import { ModuleSettingsSections } from './ModuleSettingsSections.js'
-import { useLoaded, usePolled } from '../lib/use-async.js'
-import type { ProjectScheduler, ProjectSummary, SchedulerCommand } from '../../src/index.js'
+import { useLoaded } from '../lib/use-async.js'
+import type { ProjectSummary } from '../../src/index.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
@@ -31,9 +28,7 @@ import { SettingsRow as Row, SettingsSection as Section, SettingsSelectRow as Se
 // points at, so the checklist lives here too and is not dismissible.
 //
 // Everything here writes your own settings, the same on every project: what is a project's own
-// (how a run is started) lives in that project's hooks file, not here. The Automation section's
-// schedule switches and publish picks are this machine's too, written through each project's
-// `switch` and `publish` hooks. After the page's own sections come the ones the installed packages
+// (how a run is started) lives in that project's hooks file, not here. After the page's own sections come the ones the installed packages
 // bring, each the package's own, read and written through its own command.
 
 export function SettingsPage({
@@ -149,8 +144,6 @@ export function SettingsPage({
             onChange={next => updatePreferences({ notifyNewActivity: next })}
           />
         </Section>
-
-        <SpendOffsetSection />
 
         <Section
           title="Claude web"
@@ -269,166 +262,4 @@ function modelOptions(driver: DriverOption | undefined, model: string): SelectOp
     ...(model && !listed.some(m => m.value === model) ? [{ value: model, label: model }] : []),
     ...(listed.length === 0 && driver?.modelsNote ? [{ value: driver.modelsNote, label: driver.modelsNote, disabled: true }] : []),
   ]
-}
-
-/**
- * The spend offset as a number (#960): the same value the usage panel's slider moves, read off the
- * projects' schedulers and written through their `offset` hooks. Bounded to the same
- * ±MAX_SPEND_OFFSET the slider uses; the value shown is the one in force, to one decimal.
- */
-function SpendOffsetSection() {
-  const view = useQuota()
-  const [offset, setOffset, error] = useSpendOffset(view?.boundary?.limit.offset)
-  return (
-    <Section title="Automation">
-      <NumberRow
-        label="Spend offset"
-        description={`How far each project's scheduler may start work past the quota boundary, in percentage points (max ${MAX_SPEND_OFFSET}). Negative holds it back; positive lets it borrow from the days ahead. Set through each project's offset hook.`}
-        value={Math.round(offset * 10) / 10}
-        min={-MAX_SPEND_OFFSET}
-        max={MAX_SPEND_OFFSET}
-        onChange={setOffset}
-      />
-      {error && (
-        <p role="alert" className="text-xs text-danger">
-          The offset was not saved: {error}
-        </p>
-      )}
-      <ScheduleSwitchRows />
-    </Section>
-  )
-}
-
-const NO_SCHEDULERS: ProjectScheduler[] = []
-
-/**
- * Run on a schedule: one row per command of each project's schedule (`agent-schedule.md`), as the
- * project's scheduler last read it, with a switch and a publish menu. On means the scheduler
- * starts the command on this machine when it is due; the menu says how far its runs publish on
- * this machine: what the schedule line says, or the person's pick in its place. Both are this
- * machine's, written through the project's `switch` and `publish` hooks, and what the schedule
- * line says is the default. A project whose scheduler has not ticked yet lists nothing.
- */
-function ScheduleSwitchRows() {
-  const { value: rows, reload } = usePolled(onSchedulers, NO_SCHEDULERS, 5000, [])
-  const [saving, setSaving] = useState<string | undefined>()
-  const [error, setError] = useState<string | undefined>()
-  const save = (projectId: string, command: string, what: string, send: Promise<{ ok: true } | { ok: false; error: string }>): void => {
-    const key = `${projectId}/${command}`
-    setSaving(key)
-    setError(undefined)
-    void send.then(result => {
-      setSaving(current => (current === key ? undefined : current))
-      if (!result.ok) setError(`The ${what} was not saved: /${command}: ${result.error}`)
-      reload()
-    })
-  }
-  return (
-    <>
-      {rows.flatMap(row =>
-        row.commands.map(command => {
-          const label = `Run /${command.command} on a schedule`
-          const busy = saving === `${row.projectId}/${command.command}`
-          return (
-            <Row
-              key={`${row.projectId}/${command.command}`}
-              label={label}
-              description={`${row.projectName} · ${pace(command)} · ${publishes(command)}. On this machine only; agent-schedule.md sets the defaults.`}
-              dimmed={busy}
-              control={
-                <div className="flex items-center gap-3">
-                  <select
-                    value={command.publishPick ?? ''}
-                    disabled={busy}
-                    onChange={e => {
-                      const pick = e.target.value
-                      if (pick === '' || isPublishPick(pick)) save(row.projectId, command.command, 'publish pick', sendSchedulePublish(row.projectId, command.command, pick === '' ? null : pick))
-                    }}
-                    aria-label={`What /${command.command} publishes`}
-                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-                  >
-                    <option value="">As the file says ({PUBLISH_LABELS[command.publish ?? 'nothing']})</option>
-                    {publishChoices(row.gitHost, command.publishPick).map(pick => (
-                      <option key={pick} value={pick}>
-                        {PUBLISH_LABELS[pick]}
-                      </option>
-                    ))}
-                  </select>
-                  <Checkbox
-                    checked={command.on}
-                    disabled={busy}
-                    onCheckedChange={next => save(row.projectId, command.command, 'switch', sendScheduleSwitch(row.projectId, command.command, next === true))}
-                    aria-label={label}
-                  />
-                </div>
-              }
-            />
-          )
-        }),
-      )}
-      {error && (
-        <p role="alert" className="text-xs text-danger">
-          {error}
-        </p>
-      )}
-    </>
-  )
-}
-
-/** The picks a scheduled command's publish menu lists after "As the file says": the ones its project is offered, and the pick already saved when the project is no longer offered it. */
-export function publishChoices(gitHost: boolean, saved: PublishPick | undefined): readonly PublishPick[] {
-  const offered = offeredPublishPicks(gitHost)
-  return saved !== undefined && !offered.includes(saved) ? [...offered, saved] : offered
-}
-
-/** How often a scheduled command runs, in words: its interval, its check, or both. */
-export function pace(command: SchedulerCommand): string {
-  if (command.every && command.when) return `every ${command.every} at most, when its check finds work`
-  if (command.every) return `every ${command.every}`
-  return 'when its check finds work'
-}
-
-/** How far a scheduled command's runs publish on this machine, in words: the person's pick here, else what its schedule line says, nothing when it says none. */
-export function publishes(command: SchedulerCommand): string {
-  const level = command.publishPick ?? command.publish
-  if (level === 'branch') return 'publishes its branch'
-  if (level === 'pr') return 'opens a pull request'
-  if (level === 'merge') return 'opens a pull request that merges on green'
-  return 'publishes nothing'
-}
-
-function NumberRow({
-  label,
-  description,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  label: string
-  description: string
-  value: number
-  min: number
-  max: number
-  onChange: (next: number) => void
-}) {
-  return (
-    <Row
-      label={label}
-      description={description}
-      control={
-        <input
-          type="number"
-          value={value}
-          min={min}
-          max={max}
-          // Clamped here as well as on the input: `min`/`max` only constrain the spinner, so a typed
-          // value still has to be held to the slider's range (#960).
-          onChange={e => onChange(Math.min(Math.max(Math.round(Number(e.target.value) || 0), min), max))}
-          aria-label={label}
-          className="w-24 rounded-md border border-border bg-background px-2 py-1 text-sm"
-        />
-      }
-    />
-  )
 }

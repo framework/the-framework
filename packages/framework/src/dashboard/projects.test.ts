@@ -10,6 +10,7 @@ function deps(over: SummarizeDeps): SummarizeDeps {
   return {
     isActivated: async () => true,
     readAgents: async () => [],
+    gitHost: async () => undefined,
     ...over,
   }
 }
@@ -26,6 +27,18 @@ test('summarizeProject derives name from the path basename', async () => {
   assert.equal(summary.name, 'app-a')
   assert.equal(summary.id, 'app-a-1')
   assert.equal(summary.path, '/repos/app-a')
+})
+
+test('gitHost says whether a package provides the project a git host; a lookup that fails reads as none', async () => {
+  assert.equal((await summarizeProject(RECORD, deps({}))).gitHost, false)
+  const source = {} as NonNullable<Awaited<ReturnType<NonNullable<SummarizeDeps['gitHost']>>>>
+  assert.equal((await summarizeProject(RECORD, deps({ gitHost: async () => source }))).gitHost, true)
+  const failing = deps({
+    gitHost: async () => {
+      throw new Error('package.json unreadable')
+    },
+  })
+  assert.equal((await summarizeProject(RECORD, failing)).gitHost, false)
 })
 
 test('lastActivityAt is the newest run (#645)', async () => {
@@ -71,7 +84,7 @@ function provider(present: string[]) {
   return defaultProjectsProvider({
     listRecords: async () => [RECORD, RECORD_B],
     isDirectory: async path => present.includes(path),
-    summarize: async record => ({ id: record.id, path: record.path, name: record.path.split('/').pop()!, activated: true }),
+    summarize: async record => ({ id: record.id, path: record.path, name: record.path.split('/').pop()!, activated: true, gitHost: false }),
   })
 }
 
@@ -102,7 +115,7 @@ test('a failing directory check reads as gone, never throws (#1140)', async () =
     isDirectory: async () => {
       throw new Error('EACCES')
     },
-    summarize: async record => ({ id: record.id, path: record.path, name: 'x', activated: true }),
+    summarize: async record => ({ id: record.id, path: record.path, name: 'x', activated: true, gitHost: false }),
   }).list()
   assert.deepEqual(listed, [])
 })

@@ -24,7 +24,7 @@ export { interventionKey, activityKey } from './dashboard/keys.js'
 // git host reach take an empty backlog for a real one. Pure, and its only import is a type.
 export { SeenTracker } from './dashboard/keyed-watcher.js'
 export type { ProjectionRead } from './dashboard/projects.js'
-export { NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, notifies, browserNotifyEnabled, notifyCategoryEnabled, type NotifyCategory } from './preference-defaults.js'
+export { NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, notifies, browserNotifyEnabled, notifyCategoryEnabled, type NotifyCategory } from './preference-defaults.js'
 // Whether an address is truly local (#1051). The daemon decides the token gate with it and the
 // dashboard labels the connection with it, so they must agree on what "local" means — the browser
 // kept its own looser copy, which answered `false` for every 127.0.0.0/8 address but the first.

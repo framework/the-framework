@@ -11,13 +11,12 @@ import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { Agents } from './Agents.js'
 import { ModuleCards } from './ModuleCards.js'
 import type { ProjectSummary } from '../../src/index.js'
-import { SchedulerCard } from './SchedulerCard.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 // The Overview landing page (#1139): a focused at-a-glance board — usage first, then what needs a
 // human (Human Queue) beside the agents working now stacked on the cards the installed packages
-// declare (#1818: the queue package's AI Queue, the tickets package's hot tickets) and each
-// project's scheduler. The framework's own cards are projections of the same .the-framework files
+// declare (#1818: the queue package's AI Queue, the tickets package's hot tickets, the scheduler
+// package's Scheduler). The framework's own cards are projections of the same .the-framework files
 // over the `onDashboard` RPC, polled so they stay live; selecting a row jumps into its project or
 // straight into a session. Shown by the shell when no project is picked.
 //
@@ -56,7 +55,7 @@ export function DashboardPage({
         )}
 
         {/* Usage first (#1139): the one figure that governs everything the agent may do next. */}
-        <Quota />
+        <Quota projects={projects} />
 
         {/* The two queues side by side (#1139), with the agents working now sitting to the Human
             Queue's right on top of the packages' cards: what needs you, who is on it, and what the
@@ -68,9 +67,6 @@ export function DashboardPage({
             {/* The cards the installed packages declare (#1818), under the agents at work: a package's own
                 summary of its data, only where a project has the package. */}
             <ModuleCards projects={projects} />
-            {/* What runs while nobody is at the keyboard (#1774): each project's scheduler, below
-                the queue it works. */}
-            <SchedulerCard onSelectAgent={onSelectAgent} />
           </div>
         </div>
       </div>

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { QuotaView } from '../../src/index.js'
+import type { ProjectSummary, QuotaView } from '../../src/index.js'
+import type { ModuleHost, ModuleProject } from '../module/index.js'
+import { ModulesContext, type MountedModules, type MountedUsageLimit } from '../lib/use-modules.js'
 
 /** Opens a Base UI tooltip in a test: hover alone leaves the popup unrendered until this settles. */
 async function openTooltip(trigger: HTMLElement) {
@@ -15,13 +17,32 @@ function mainFigureTrigger(): HTMLElement {
   return screen.getByText(/^resets /).closest('p')!.querySelector('.cursor-default')!
 }
 
-const sendSpendOffset = vi.hoisted(() => vi.fn(async (_points: number): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true })))
-vi.mock('../rpc/quota.js', () => ({ sendSpendOffset }))
+// The stop line a module puts on the bar: what its read answers, and its save, as the tests set them.
+const sendSpendOffset = vi.fn(async (_points: number): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true }))
+let savedOffset = 0
+const readOffset = vi.fn(async (_host: ModuleHost, _projects: ModuleProject[]): Promise<number | undefined> => savedOffset)
+const usageLimit: MountedUsageLimit = { package: 'agent-scheduler', projects: ['p1'], read: readOffset, save: (_host, _projects, points) => sendSpendOffset(points) }
+const NOTHING: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [], settings: [], loaded: true }
+const PROJECTS: ProjectSummary[] = [
+  { id: 'p1', path: '/p1', name: 'gemstack', activated: true, gitHost: true },
+  { id: 'p2', path: '/p2', name: 'other', activated: true, gitHost: false },
+]
 
 let view: QuotaView | undefined
 vi.mock('../lib/quota.js', () => ({ useQuota: () => view }))
 
 const { Quota } = await import('./Quota.js')
+
+/** The panel with a module's stop line on its bar, once the module's first read has put the handle there. */
+async function show() {
+  const shown = render(
+    <ModulesContext.Provider value={{ ...NOTHING, usageLimit }}>
+      <Quota projects={PROJECTS} />
+    </ModulesContext.Provider>,
+  )
+  if (view?.boundary) await screen.findByLabelText('Unattended work stops at')
+  return shown
+}
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 const STARTS_AT = new Date(2026, 6, 21, 19, 0, 0).getTime() // Tue evening, the mid-day-start case
@@ -34,47 +55,83 @@ function reading(percentUsed: number, limitOffset = 0): QuotaView {
 /** Same, with the boundary at an arbitrary day — for the offset's clamp, which needs room to test. */
 function readingAt(day: number, percentUsed: number, limitOffset = 0): QuotaView {
   const boundaryPercent = (day / 7) * 100
+  savedOffset = limitOffset
   return {
     windows: [
       { label: 'Current week (all models)', kind: 'week', percentUsed, resetsAtText: 'Jul 28 at 7pm' },
       { label: 'Current session', kind: 'session', percentUsed: 3 },
     ],
-    boundary: {
-      boundary: { startsAt: STARTS_AT, resetsAt: STARTS_AT + WEEK_MS, day, percent: boundaryPercent },
-      limit: { percent: Math.min(Math.max(boundaryPercent + limitOffset, 0), 100), offset: limitOffset },
-      windows: [{ label: 'Current week (all models)', percentUsed, reached: false }],
-      reached: null,
-    },
+    boundary: { startsAt: STARTS_AT, resetsAt: STARTS_AT + WEEK_MS, day, percent: boundaryPercent },
   }
 }
 
 beforeEach(() => {
   view = undefined
+  savedOffset = 0
+  readOffset.mockClear()
   sendSpendOffset.mockClear()
   sendSpendOffset.mockImplementation(async () => ({ ok: true }))
 })
 afterEach(cleanup)
 
+describe("Quota's stop line is a module's", () => {
+  test('with no module that declares one the bar shows the account only: no handle, no budget, no enabled or disabled', async () => {
+    view = reading(20)
+    const { container } = render(
+      <ModulesContext.Provider value={NOTHING}>
+        <Quota projects={PROJECTS} />
+      </ModulesContext.Provider>,
+    )
+    const bar = screen.getByRole('img')
+    expect(bar.getAttribute('aria-label')).toMatch(/20% of the week used, against a boundary of 57%/)
+    expect(screen.queryByLabelText('Unattended work stops at')).toBeNull()
+    expect(bar.querySelectorAll('.opacity-35')).toHaveLength(0)
+    expect(screen.queryByText('Budget for Autonomous AI')).toBeNull()
+    expect(container.querySelector('em')).toBeNull()
+    expect(screen.getByText('Quota boundary')).toBeTruthy()
+    expect(readOffset).not.toHaveBeenCalled()
+  })
+
+  test('the module is asked with only the projects that have its package, and its answer is where the handle rests', async () => {
+    view = reading(20, 15)
+    await show()
+    expect(readOffset.mock.calls[0]![1]).toEqual([{ id: 'p1', name: 'gemstack', gitHost: true }])
+    expect(Number((screen.getByLabelText('Unattended work stops at') as HTMLInputElement).value)).toBeCloseTo((4 / 7) * 100 + 15, 5)
+  })
+
+  test('a module that reads no offset leaves the bar without a handle', async () => {
+    view = reading(20)
+    readOffset.mockImplementationOnce(async () => undefined)
+    render(
+      <ModulesContext.Provider value={{ ...NOTHING, usageLimit }}>
+        <Quota projects={PROJECTS} />
+      </ModulesContext.Provider>,
+    )
+    await waitFor(() => expect(readOffset).toHaveBeenCalled())
+    expect(screen.queryByLabelText('Unattended work stops at')).toBeNull()
+  })
+})
+
 describe('Quota (#960)', () => {
-  test('says it is reading rather than drawing an empty week', () => {
-    render(<Quota />)
+  test('says it is reading rather than drawing an empty week', async () => {
+    await show()
     // An empty track would read as "nothing used", which is the opposite of "we do not know yet".
     expect(screen.getByText(/Reading your usage/)).toBeTruthy()
     expect(screen.queryByRole('img')).toBeNull()
   })
 
-  test('draws the week as one track, labelled with where consumption stands', () => {
+  test('draws the week as one track, labelled with where consumption stands', async () => {
     view = reading(20)
-    render(<Quota />)
+    await show()
     const bar = screen.getByRole('img')
     expect(bar.getAttribute('aria-label')).toMatch(/20% of the week used/)
     expect(bar.getAttribute('aria-label')).toMatch(/boundary of 57%/)
     expect(bar.getAttribute('aria-label')).toMatch(/day 4 of 7/)
   })
 
-  test('draws one day label per calendar day, and a separator between each (#960 Edit)', () => {
+  test('draws one day label per calendar day, and a separator between each (#960 Edit)', async () => {
     view = reading(20)
-    render(<Quota />)
+    await show()
     // STARTS_AT is a Tuesday evening: the fixture's mid-day-start case, so `TU` reads once, at
     // whichever end of the bar most of Tuesday actually falls (the end, here).
     const labels = screen.getAllByText(/^[A-Z]{2}$/).map(el => el.textContent)
@@ -86,16 +143,16 @@ describe('Quota (#960)', () => {
 
   test('the session window is reachable through the bar\'s "show all limits" tooltip, never as its own bar', async () => {
     view = reading(20)
-    render(<Quota />)
+    await show()
     // One bar, and it is the account's week.
     expect(screen.getAllByRole('img')).toHaveLength(1)
     await openTooltip(screen.getByText('show all limits'))
     expect(screen.getByText('Current session')).toBeTruthy()
   })
 
-  test('the handle is valued on the bar\'s own scale, but writes an offset from the boundary through the offset hooks (#960)', async () => {
+  test('the handle is valued on the bar\'s own scale, but writes an offset from the boundary through the module\'s save (#960)', async () => {
     view = reading(20)
-    render(<Quota />)
+    await show()
     const slider = screen.getByLabelText('Unattended work stops at') as HTMLInputElement
     const boundaryPercent = (4 / 7) * 100
     // At rest it sits exactly on the boundary tick beneath it, not at some offset-scale zero.
@@ -104,16 +161,16 @@ describe('Quota (#960)', () => {
     await waitFor(() => expect(sendSpendOffset).toHaveBeenCalledWith(15))
   })
 
-  test('an unreadable quota explains itself instead of showing a zeroed bar', () => {
+  test('an unreadable quota explains itself instead of showing a zeroed bar', async () => {
     view = { windows: [], unavailable: 'agent-not-found' }
-    render(<Quota />)
+    await show()
     expect(screen.getByText(/Claude Code was not found/)).toBeTruthy()
     expect(screen.queryByRole('img')).toBeNull()
     // And no slider: there is no line to move.
     expect(screen.queryByLabelText('Unattended work stops at')).toBeNull()
   })
 
-  test('a week with no reset time says so, rather than denying the week exists', () => {
+  test('a week with no reset time says so, rather than denying the week exists', async () => {
     // The third way to be unplaceable, and the one an untouched account hits: nothing consumed, so
     // Claude Code prints the window without its `· resets …` tail. `quotaBoundaryStatus` yields no
     // boundary without that text, and the panel used to borrow the "no week" wording — while the
@@ -125,7 +182,7 @@ describe('Quota (#960)', () => {
       ],
       readAt: Date.now(),
     }
-    render(<Quota />)
+    await show()
     const alert = screen.getByRole('alert').textContent ?? ''
     expect(alert).toMatch(/no reset time/)
     expect(alert).toMatch(/Current week \(all models\)/)
@@ -133,7 +190,7 @@ describe('Quota (#960)', () => {
     expect(screen.queryByRole('img')).toBeNull()
   })
 
-  test('a readout with no week at all names the missing line and what came instead (#1367 follow-up)', () => {
+  test('a readout with no week at all names the missing line and what came instead (#1367 follow-up)', async () => {
     // The readout is prose from another program, so when the week is simply absent the labels that
     // *did* arrive are the whole diagnosis — this used to say only "no week this version can
     // place", which nobody can act on or paste into an issue.
@@ -144,7 +201,7 @@ describe('Quota (#960)', () => {
       ],
       readAt: Date.now(),
     }
-    render(<Quota />)
+    await show()
     const alert = screen.getByRole('alert').textContent ?? ''
     expect(alert).toMatch(/Couldn't parse quota/)
     expect(alert).toMatch(/Current week \(all models\)/) // the line the parser wanted
@@ -152,7 +209,7 @@ describe('Quota (#960)', () => {
     expect(alert).toMatch(/“Current week \(Fable\)”/)
   })
 
-  test('a week it cannot place is an error, not a quietly plainer panel', () => {
+  test('a week it cannot place is an error, not a quietly plainer panel', async () => {
     // The failure this test exists for: Claude Code rephrased its reset times and the parser
     // missed, so the boundary vanished — and the panel just showed the week as a plain figure,
     // as if that were a design choice. No fallback: name the text that did not parse.
@@ -163,7 +220,7 @@ describe('Quota (#960)', () => {
       ],
       readAt: Date.now(),
     }
-    render(<Quota />)
+    await show()
     expect(screen.getByRole('alert').textContent).toMatch(/Couldn't parse quota/)
     expect(screen.getByRole('alert').textContent).toMatch(/Jul 28, 9pm \(Europe\/Berlin\)/)
     expect(screen.queryByRole('img')).toBeNull()
@@ -173,19 +230,19 @@ describe('Quota (#960)', () => {
     expect(screen.queryByLabelText('Unattended work stops at')).toBeNull()
   })
 
-  test('a readout it could not parse keeps the bar and dates it, rather than replacing it (#960)', () => {
+  test('a readout it could not parse keeps the bar and dates it, rather than replacing it (#960)', async () => {
     // The poller now survives an unrecognized answer, so the earlier reading is still on screen.
     // It has to say how old it is: an undated bar claims to be current.
     view = { ...reading(20), unavailable: 'unrecognized', readAt: Date.now() - 90 * 60 * 1000 }
-    render(<Quota />)
+    await show()
     expect(screen.getByRole('img')).toBeTruthy()
     expect(screen.getByText(/from the reading before it/)).toBeTruthy()
     expect(screen.getByText(/Last read/)).toBeTruthy()
   })
 
-  test('an unrecognized readout with nothing retained says it will try again (#960)', () => {
+  test('an unrecognized readout with nothing retained says it will try again (#960)', async () => {
     view = { windows: [], unavailable: 'unrecognized' }
-    render(<Quota />)
+    await show()
     // It used to read as terminal ("the boundary is off"), which is what made this look reverted.
     expect(screen.getByText(/Trying again shortly/)).toBeTruthy()
   })
@@ -195,7 +252,7 @@ describe('Quota (#960)', () => {
   // snapped back, so twenty presses of an arrow key moved the limit by one.
   test('successive moves accumulate instead of snapping back to the last poll, and one write goes out once the handle rests (#960)', async () => {
     view = reading(20, 0)
-    render(<Quota />)
+    await show()
     const slider = screen.getByLabelText('Unattended work stops at') as HTMLInputElement
     const boundaryPercent = (4 / 7) * 100
     fireEvent.change(slider, { target: { value: String(boundaryPercent + 5) } })
@@ -203,24 +260,24 @@ describe('Quota (#960)', () => {
     fireEvent.change(slider, { target: { value: String(boundaryPercent + 12) } })
     expect(Number(slider.value)).toBeCloseTo(boundaryPercent + 12, 5)
     await waitFor(() => expect(sendSpendOffset).toHaveBeenCalledWith(12))
-    // A drag is many changes; each write is a hook line per project, so only the resting value goes out.
+    // A drag is many changes; each save is a command per project, so only the resting value goes out.
     expect(sendSpendOffset).toHaveBeenCalledTimes(1)
   })
 
-  test('a write that fails says why, and the handle goes back to the value the schedulers hold (#960)', async () => {
-    sendSpendOffset.mockImplementation(async () => ({ ok: false, error: 'no project has an offset hook in .the-framework/hooks.yml' }))
+  test('a save that fails says why, and the handle goes back to the value the module reads (#960)', async () => {
+    sendSpendOffset.mockImplementation(async () => ({ ok: false, error: 'gemstack: not inside a git repository' }))
     view = reading(20, 0)
-    render(<Quota />)
+    await show()
     const slider = screen.getByLabelText('Unattended work stops at') as HTMLInputElement
     const boundaryPercent = (4 / 7) * 100
     fireEvent.change(slider, { target: { value: String(boundaryPercent + 10) } })
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/not saved: no project has an offset hook/))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/not saved: gemstack: not inside a git repository/))
     expect(Number(slider.value)).toBeCloseTo(boundaryPercent, 5)
   })
 
-  test('the drawn limit follows the handle, not the poll (#960)', () => {
+  test('the drawn limit follows the handle, not the poll (#960)', async () => {
     view = reading(20, 0)
-    render(<Quota />)
+    await show()
     const slider = screen.getByLabelText('Unattended work stops at') as HTMLInputElement
     const boundaryPercent = (4 / 7) * 100
     // At rest the handle sits exactly on the boundary tick — one mark, not two.
@@ -237,7 +294,7 @@ describe('Quota (#960)', () => {
   test('dragged to the far end of the bar, the stored offset still clamps to +50 (#960 Edit)', async () => {
     // A boundary early in the week, so the bar's far (right) end is more than 50 points away.
     view = readingAt(1, 20, 0)
-    render(<Quota />)
+    await show()
     fireEvent.change(screen.getByLabelText('Unattended work stops at'), { target: { value: '100' } })
     await waitFor(() => expect(sendSpendOffset).toHaveBeenLastCalledWith(50))
   })
@@ -245,14 +302,14 @@ describe('Quota (#960)', () => {
   test('dragged to the near end of the bar, the stored offset still clamps to -50 (#960 Edit)', async () => {
     // A boundary late in the week, so the bar's near (left) end is more than 50 points away.
     view = readingAt(6, 20, 0)
-    render(<Quota />)
+    await show()
     fireEvent.change(screen.getByLabelText('Unattended work stops at'), { target: { value: '0' } })
     await waitFor(() => expect(sendSpendOffset).toHaveBeenLastCalledWith(-50))
   })
 
-  test('the bar splits into used and projected segments, not a used amount plus a floating mark (#960 Edit)', () => {
+  test('the bar splits into used and projected segments, not a used amount plus a floating mark (#960 Edit)', async () => {
     view = reading(20, 15) // boundary 57%, offset 15 -> limit 72%
-    render(<Quota />)
+    await show()
     const bar = screen.getByRole('img')
     const [used, projected] = bar.querySelectorAll<HTMLElement>(':scope > div')
     expect(used!.style.width).toBe('20%')
@@ -265,60 +322,60 @@ describe('Quota (#960)', () => {
     expect(projected!.className).not.toMatch(/rounded/)
   })
 
-  test('nothing left to project once the limit has already been reached, so no dimmed segment is drawn', () => {
+  test('nothing left to project once the limit has already been reached, so no dimmed segment is drawn', async () => {
     view = reading(80, -50) // boundary 57% - 50 = limit 7%, already well below the 80% used
-    render(<Quota />)
+    await show()
     const bar = screen.getByRole('img')
     // Used, the day delimiters, and the boundary line — no dimmed segment, since there is no room.
     expect(bar.querySelectorAll('.opacity-35')).toHaveLength(0)
   })
 
-  test('names whether autonomous AI currently has room to spend (#960 Edit)', () => {
+  test('names whether autonomous AI currently has room to spend (#960 Edit)', async () => {
     view = reading(20, 15) // limit 72% > 20% used: room left
-    const { container } = render(<Quota />)
+    const { container } = await show()
     expect(container.querySelector('em')?.textContent).toBe('enabled')
     expect(screen.getByText(/move slider to the left to disable/)).toBeTruthy()
   })
 
-  test('names autonomous AI as disabled once the knob leaves no room (#960 Edit)', () => {
+  test('names autonomous AI as disabled once the knob leaves no room (#960 Edit)', async () => {
     view = reading(80, -50) // limit 7% < 80% used: no room
-    const { container } = render(<Quota />)
+    const { container } = await show()
     expect(container.querySelector('em')?.textContent).toBe('disabled')
     expect(screen.getByText(/move slider to the right to enable/)).toBeTruthy()
   })
 
   test('the enabled status has its own tooltip naming what enabled means (#960 Edit)', async () => {
     view = reading(20, 15) // room left: enabled
-    render(<Quota />)
+    await show()
     await openTooltip(screen.getByText('enabled', { selector: 'em' }).closest('span')!)
     expect(
       screen.getByText(
-        "Autonomous AI enabled means that each project's scheduler may start the commands its agent-schedule.md lists while the account is under the line.",
+        'Autonomous AI enabled means that unattended work may start on its own while the account is under the line.',
       ),
     ).toBeTruthy()
   })
 
   test('the disabled status has its own tooltip naming what disabled means (#960 Edit)', async () => {
     view = reading(80, -50) // no room: disabled
-    render(<Quota />)
+    await show()
     await openTooltip(screen.getByText('disabled', { selector: 'em' }).closest('span')!)
     expect(
       screen.getByText(
-        "Autonomous AI disabled means that no scheduler starts an agent on its own — every new agentic work is triggered by you manually."
+        'Autonomous AI disabled means that no agent starts on its own — every new agentic work is triggered by you manually.',
       ),
     ).toBeTruthy()
   })
 
-  test('no warning while the limit sits on, or only just past, the boundary (#960 Edit)', () => {
+  test('no warning while the limit sits on, or only just past, the boundary (#960 Edit)', async () => {
     view = reading(20, 0) // limit sits exactly on the boundary: not past it yet
-    render(<Quota />)
+    await show()
     expect(screen.queryByText(/Eager consumption/)).toBeNull()
   })
 
-  test('no warning for an overshoot smaller than a full day above the boundary (#960 Edit)', () => {
+  test('no warning for an overshoot smaller than a full day above the boundary (#960 Edit)', async () => {
     // Boundary at 57.14%, offset 10: 67.14%, short of the ~14.29-point (one day) threshold.
     view = reading(20, 10)
-    render(<Quota />)
+    await show()
     expect(screen.queryByText(/Eager consumption/)).toBeNull()
   })
 
@@ -326,7 +383,7 @@ describe('Quota (#960)', () => {
     // Boundary at 57.14%, offset 20: 77.14%, clearing the ~14.29-point (one day) threshold — a
     // 20-point offset over a 7-day week is 1.4 days, floored to "1 day".
     view = reading(20, 20)
-    render(<Quota />)
+    await show()
     const warning = screen.getByText('⚠️ Eager consumption')
     await openTooltip(warning)
     expect(screen.getByText("Autonomous AI will spend tokens 1 day faster than the week's pace allows")).toBeTruthy()
@@ -336,23 +393,23 @@ describe('Quota (#960)', () => {
     // Offset 40 over a 7-day week is 2.8 days, floored to "2 days" — distinct from the other test's
     // "1 day" at offset 20, proving the tooltip reads the real deviation rather than a hardcoded one.
     view = reading(20, 40)
-    render(<Quota />)
+    await show()
     await openTooltip(screen.getByText('⚠️ Eager consumption'))
     expect(screen.getByText("Autonomous AI will spend tokens 2 days faster than the week's pace allows")).toBeTruthy()
   })
 
-  test('the warning sits beside the enabled/disabled status, not stacked below it (#960 Edit)', () => {
+  test('the warning sits beside the enabled/disabled status, not stacked below it (#960 Edit)', async () => {
     view = reading(20, 20)
-    const { container } = render(<Quota />)
+    const { container } = await show()
     const em = container.querySelector('em')
     const row = em?.closest('div')
     expect(row?.textContent).toMatch(/enabled/)
     expect(row?.querySelectorAll('svg.lucide-circle-help').length).toBeGreaterThan(0)
   })
 
-  test('one bar, not two: the handle is drawn on the week track itself (#960 Edit)', () => {
+  test('one bar, not two: the handle is drawn on the week track itself (#960 Edit)', async () => {
     view = reading(20, 0)
-    const { container } = render(<Quota />)
+    const { container } = await show()
     // A single native range input, and it lives inside the same card section as the week track —
     // not as a full-width slider of its own underneath it.
     expect(container.querySelectorAll('input[type="range"]')).toHaveLength(1)
@@ -361,25 +418,25 @@ describe('Quota (#960)', () => {
     expect(bar.parentElement).toBe(slider.parentElement)
   })
 
-  test('names the reset as a weekday and a time, not a date the bar already implies (#960 Edit)', () => {
+  test('names the reset as a weekday and a time, not a date the bar already implies (#960 Edit)', async () => {
     view = reading(20)
-    render(<Quota />)
+    await show()
     expect(screen.getByText(/^resets /)).toBeTruthy()
     expect(screen.queryByText('Under the line, with room to spend.')).toBeNull()
   })
 
-  test('the main figure reads a pace deviation as a duration, not a percentage of the week (#960 Edit)', () => {
+  test('the main figure reads a pace deviation as a duration, not a percentage of the week (#960 Edit)', async () => {
     // 20% of the week used against a 57% (day 4/7) pace: 2.6 days behind, floored to 2d.
     view = reading(20)
-    render(<Quota />)
+    await show()
     expect(mainFigureTrigger().textContent).toBe('Under-consuming: 2d')
     expect(screen.queryByText('20% used')).toBeNull()
     expect(screen.queryByText(/^-?\d+% used$/)).toBeNull()
   })
 
-  test('the duration is bold and coloured to match the bar\'s own tone, the label plain (#960 Edit)', () => {
+  test('the duration is bold and coloured to match the bar\'s own tone, the label plain (#960 Edit)', async () => {
     view = reading(20) // under-consuming: the bar's tone (and so the duration) reads green
-    render(<Quota />)
+    await show()
     const trigger = mainFigureTrigger()
     expect(trigger.className).not.toMatch(/font-medium/)
     const duration = trigger.querySelector('span')!
@@ -388,60 +445,60 @@ describe('Quota (#960)', () => {
     expect(duration.className).toMatch(/text-success/)
   })
 
-  test('reads over-consuming (zero duration) exactly on the boundary\'s own pace', () => {
+  test('reads over-consuming (zero duration) exactly on the boundary\'s own pace', async () => {
     view = reading((4 / 7) * 100)
-    render(<Quota />)
+    await show()
     expect(mainFigureTrigger().textContent).toBe('Over-consuming: 0s')
   })
 
-  test('reads over-consuming with a duration when ahead of pace', () => {
+  test('reads over-consuming with a duration when ahead of pace', async () => {
     // Boundary at day 1 of 7 (~14.3%), 60% used: well over three sevenths of the week ahead.
     view = readingAt(1, 60, 0)
-    render(<Quota />)
+    await show()
     expect(mainFigureTrigger().textContent).toMatch(/^Over-consuming: \d+d$/)
   })
 
-  test('the footer also says what was spent, as quota time (#1367)', () => {
+  test('the footer also says what was spent, as quota time (#1367)', async () => {
     // Half the week used is half the week's allowance consumed — the same unit as the pace figure
     // beside it, rather than a percentage a reader has to convert.
     view = reading(50)
-    render(<Quota />)
+    await show()
     expect(screen.getByText(/^resets /).closest('p')!.textContent).toMatch(/3d spent/)
   })
 
-  test('the footer says consumption as a share of the pace, not of the week (#1367)', () => {
+  test('the footer says consumption as a share of the pace, not of the week (#1367)', async () => {
     // Boundary at day 4 of 7 (~57%), 60% used: a little over pace, so a little over 100%.
     view = reading(60)
-    render(<Quota />)
+    await show()
     expect(screen.getByText(/^resets /).closest('p')!.textContent).toMatch(/105% of pace/)
   })
 
-  test('the pace share is coloured to match the bar, since it is the same comparison (#1367)', () => {
+  test('the pace share is coloured to match the bar, since it is the same comparison (#1367)', async () => {
     view = reading(20) // well under pace: the bar reads green, and so does this
-    render(<Quota />)
+    await show()
     const share = [...screen.getByText(/^resets /).closest('p')!.querySelectorAll('span')].find(s =>
       /^\d+%$/.test(s.textContent ?? ''),
     )!
     expect(share.className).toMatch(/text-success/)
   })
 
-  test('no pace share at the very start of the week, rather than an infinite one (#1367)', () => {
+  test('no pace share at the very start of the week, rather than an infinite one (#1367)', async () => {
     // Day zero: nothing is allowed yet, so every amount is infinitely above the allowance.
     view = readingAt(0, 3, 0)
-    render(<Quota />)
+    await show()
     expect(screen.getByText(/^resets /).closest('p')!.textContent).not.toMatch(/of pace/)
   })
 
   test('the main figure has its own tooltip naming the deviation against the quota boundary (#960 Edit)', async () => {
     view = reading(20)
-    render(<Quota />)
+    await show()
     await openTooltip(mainFigureTrigger())
     expect(screen.getByText(/You are 2 days below the quota boundary\.\s*You're under-consuming: you spend slower/)).toBeTruthy()
   })
 
-  test('the legend names the projected segment and gives the quota boundary a tooltip (#960 Edit)', () => {
+  test('the legend names the projected segment and gives the quota boundary a tooltip (#960 Edit)', async () => {
     view = reading(20)
-    const { container } = render(<Quota />)
+    const { container } = await show()
     expect(screen.getByText('Budget for Autonomous AI')).toBeTruthy()
     expect(screen.getByText('Quota boundary')).toBeTruthy()
     expect(container.querySelector('svg.lucide-circle-help')).toBeTruthy()
@@ -449,7 +506,7 @@ describe('Quota (#960)', () => {
 
   test('the quota boundary tooltip explains itself in its own paragraph, and ends on a fun fact (#960 Edit)', async () => {
     view = reading(20)
-    render(<Quota />)
+    await show()
     await openTooltip(screen.getByText('Quota boundary'))
     expect(
       screen.getByText("If your usage matches the quota boundary, then you're spending exactly what the week's pace allows."),
@@ -459,9 +516,9 @@ describe('Quota (#960)', () => {
     ).toBeTruthy()
   })
 
-  test('the reset tooltip trigger carries no underline (#960 Edit)', () => {
+  test('the reset tooltip trigger carries no underline (#960 Edit)', async () => {
     view = reading(20)
-    render(<Quota />)
+    await show()
     const trigger = screen.getByText(/^resets /)
     expect(trigger.className).not.toMatch(/underline/)
   })
@@ -469,7 +526,7 @@ describe('Quota (#960)', () => {
   test('every window Claude Code reports gets its own line, reachable through "show all limits" (#960 Edit)', async () => {
     view = reading(20)
     view.windows.push({ label: 'Current week (Fable)', kind: 'week-model', percentUsed: 12, resetsAtText: 'Jul 28 at 7pm' })
-    render(<Quota />)
+    await show()
     await openTooltip(screen.getByText('show all limits'))
     const rows = screen.getAllByText(/Current (session|week)/).map(el => el.textContent)
     expect(rows).toEqual(['Current week (all models)', 'Current session', 'Current week (Fable)'])
@@ -478,7 +535,7 @@ describe('Quota (#960)', () => {
   test('"show all limits" renders as a real table, not flex rows that drift out of alignment (#960 Edit)', async () => {
     view = reading(20)
     view.windows.push({ label: 'Current week (Fable)', kind: 'week-model', percentUsed: 12, resetsAtText: 'Jul 28 at 7pm' })
-    render(<Quota />)
+    await show()
     await openTooltip(screen.getByText('show all limits'))
     const tooltip = screen.getByRole('tooltip')
     const table = tooltip.querySelector('table')!
@@ -487,9 +544,9 @@ describe('Quota (#960)', () => {
     for (const row of table.querySelectorAll('tr')) expect(row.querySelectorAll('td')).toHaveLength(2)
   })
 
-  test('the legend and the enabled/disabled status share one row, the warning between them (#960 Edit)', () => {
+  test('the legend and the enabled/disabled status share one row, the warning between them (#960 Edit)', async () => {
     view = reading(20, 20) // limit a full day past the boundary, so the warning shows too
-    render(<Quota />)
+    await show()
     const em = screen.getByText('enabled', { selector: 'em' })
     const legend = screen.getByText('Used')
     // Same row: the legend and the status line share the same immediate row container.
@@ -503,15 +560,15 @@ describe('Quota (#960)', () => {
     expect(warning.compareDocumentPosition(em.closest('span')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  test('"show all limits" is absent when there is nothing else to show', () => {
+  test('"show all limits" is absent when there is nothing else to show', async () => {
     view = { ...reading(20), windows: reading(20).windows.filter(w => w.kind === 'week') }
-    render(<Quota />)
+    await show()
     expect(screen.queryByText('show all limits')).toBeNull()
   })
 
-  test('the roadmap-spend toggle is gone from this panel (#960 Edit)', () => {
+  test('the roadmap-spend toggle is gone from this panel (#960 Edit)', async () => {
     view = reading(20)
-    render(<Quota />)
+    await show()
     expect(screen.queryByText(/Spend what's left on the roadmap/)).toBeNull()
   })
 })

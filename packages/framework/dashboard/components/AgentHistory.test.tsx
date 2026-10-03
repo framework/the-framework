@@ -324,7 +324,7 @@ describe('subagents on the rail', () => {
   })
 })
 
-const proj = (id: string, name: string): ProjectSummary => ({ id, path: `/${id}`, name, activated: true })
+const proj = (id: string, name: string): ProjectSummary => ({ id, path: `/${id}`, name, activated: true, gitHost: false })
 
 describe('AgentHistory New button (#new-button)', () => {
   test('with one project, New starts a session in it', () => {
@@ -494,6 +494,7 @@ describe('project errors in the Projects list (#1500)', () => {
     path: '/repos/p1',
     name: 'p1',
     activated: true,
+    gitHost: false,
     errors: [{ code: 'data-sync', message: 'the data branch could not be pushed: Permission denied (publickey)', since: '2026-08-20T10:00:00.000Z' }],
   }
 

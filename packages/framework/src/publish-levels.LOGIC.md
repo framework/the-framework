@@ -48,11 +48,11 @@ The options of the publish menu [3] are exactly `nothing`, `branch`, `pr` and `m
 
 #### Context
 
-**Problem**: the saved option travels through a file the user can edit (the registry's preferences), and the scheduler's state file, which the dashboard reads a scheduled command's publish level from, is written by another tool. An arbitrary string must not be taken for a level or an option.
+**Problem**: the saved option travels through a file the user can edit (the registry's preferences). An arbitrary string must not be taken for a level or an option.
 
 #### Business logic
 
-A value names a publish level [2] only when it is one of the three words above, and names an option only when it is one of the four; anything else, an absent value included, names neither. What happens to a value that names neither is the caller's: the registry drops a saved `publish` that is no option (`registry.ts`), and the scheduler card's read leaves out a scheduled command's `publish` that is no level (`dashboard/scheduler-state.ts`).
+A value names a publish level [2] only when it is one of the three words above, and names an option only when it is one of the four; anything else, an absent value included, names neither. What happens to a value that names neither is the caller's: the registry drops a saved `publish` that is no option (`registry.ts`).
 
 ### What a project is offered
 

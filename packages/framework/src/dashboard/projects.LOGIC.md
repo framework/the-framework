@@ -1,4 +1,4 @@
-The read side of the registered projects: one summary per project for the sidebar and the launcher [1] (its name, whether it is still activated, and when it was last active), the list itself, which serves only projects whose directory is on disk while keeping every registration, the lookup from a project id to its path, and the shape every cross-project projection is read in, which tells "nothing found" from "could not read".
+The read side of the registered projects: one summary per project for the sidebar and the launcher [1] (its name, whether it is still activated, whether it has a git host, and when it was last active), the list itself, which serves only projects whose directory is on disk while keeping every registration, the lookup from a project id to its path, and the shape every cross-project projection is read in, which tells "nothing found" from "could not read".
 
 ## Context
 
@@ -16,7 +16,7 @@ The read side of the registered projects: one summary per project for the sideba
 
 ## Business logic — TL;DR
 
-- **A project's summary** - its registry id, its path, the directory's name as its display name, whether the `.the-framework/` marker is present and the newest activity among its agents, each read forgivingly.
+- **A project's summary** - its registry id, its path, the directory's name as its display name, whether the `.the-framework/` marker is present, whether one of its packages provides a git host, and the newest activity among its agents, each read forgivingly.
 - **Only projects whose directory is on disk are served** - a renamed or deleted directory leaves the list and comes back on the next read once it is there again; the registration is never pruned.
 - **A project id resolves to its path** - only for a project currently on disk; anything else is unknown.
 - **A projection read says which projects it saw whole** - every cross-project read returns its items together with the ids of the projects every source answered for, so a caller that announces new items can tell an empty project from an unreadable one.
@@ -31,7 +31,7 @@ See `## Context`.
 
 #### Business logic
 
-A summary is derived from a registry [4] record: the record's id, which is stable and safe in a URL; the absolute path; the display name, which is the last segment of the path; whether the project is activated, meaning its `.the-framework/` marker is present; and its last activity. The last activity is the newest among the project's agents [3], those with a checkout and the recorded ones [5] alike, taking each agent's last-update time or, failing that, its start time; a project with no agents has no last activity.  Every read is forgiving: a failed marker check reads as not activated, failed agents read as no activity, and neither of them fails the summary. What the daemon's sweeps [6] currently find wrong with a project is not part of the summary; the dashboard's project list attaches it from the daemon's error state (`../project-errors.ts`).
+A summary is derived from a registry [4] record: the record's id, which is stable and safe in a URL; the absolute path; the display name, which is the last segment of the path; whether the project is activated, meaning its `.the-framework/` marker is present; whether it has a git host, meaning one of its packages provides one (`../store/git-host.ts`), which is what lets a pull request be opened there, and which a module's piece is told about each of its projects; and its last activity. The last activity is the newest among the project's agents [3], those with a checkout and the recorded ones [5] alike, taking each agent's last-update time or, failing that, its start time; a project with no agents has no last activity.  Every read is forgiving: a failed marker check reads as not activated, a failed git host lookup reads as no git host, failed agents read as no activity, and neither of them fails the summary. What the daemon's sweeps [6] currently find wrong with a project is not part of the summary; the dashboard's project list attaches it from the daemon's error state (`../project-errors.ts`).
 
 ### Only projects whose directory is on disk are served
 

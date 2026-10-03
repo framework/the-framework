@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runCheckHook, runOffsetHook, runProjectHooks, runResumeHook, runPublishHook, runStartHook, runSwitchHook } from './project-hooks.js'
+import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runCheckHook, runProjectHooks, runResumeHook, runStartHook } from './project-hooks.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 // The hooks file and the runner (#1774), for real: `sh -c` in a throwaway project, the lines
@@ -24,18 +24,15 @@ test('the file: open and close lists of shell lines; missing means none; the wro
   })
   assert.deepEqual(parseProjectHooks('open:\n  - echo one\n  - echo two\n'), { open: ['echo one', 'echo two'], close: [] })
   assert.deepEqual(parseProjectHooks('open:\nclose:\n'), { open: [], close: [] })
-  assert.throws(() => parseProjectHooks('- echo hi\n'), /hooks\.yml must be a YAML map; the keys are open, close, start, resume, check, offset, switch and publish/)
-  assert.throws(() => parseProjectHooks('opne:\n  - echo hi\n'), /unknown key "opne"; the keys are open, close, start, resume, check, offset, switch and publish/)
+  assert.throws(() => parseProjectHooks('- echo hi\n'), /hooks\.yml must be a YAML map; the keys are open, close, start, resume and check$/)
+  assert.throws(() => parseProjectHooks('opne:\n  - echo hi\n'), /unknown key "opne"; the keys are open, close, start, resume and check$/)
   assert.throws(() => parseProjectHooks('open: echo hi\n'), /"open" must be a list of shell lines/)
   assert.throws(() => parseProjectHooks('close:\n  - 3\n'), /"close" must be a list of shell lines/)
   assert.deepEqual(parseProjectHooks('start: npx agent-runner run --detach "$PROMPT"\nresume:\n'), { open: [], close: [], start: 'npx agent-runner run --detach "$PROMPT"' })
   assert.throws(() => parseProjectHooks('start:\n  - echo hi\n'), /"start" must be one shell line/)
   assert.throws(() => parseProjectHooks('resume: 3\n'), /"resume" must be one shell line/)
-  assert.deepEqual(parseProjectHooks('offset: npx agent-scheduler offset "$POINTS"\n'), { open: [], close: [], offset: 'npx agent-scheduler offset "$POINTS"' })
-  assert.throws(() => parseProjectHooks('offset:\n  - echo hi\n'), /"offset" must be one shell line/)
-  assert.deepEqual(parseProjectHooks('switch: npx agent-scheduler switch "$COMMAND" "$SWITCH"\n'), { open: [], close: [], switch: 'npx agent-scheduler switch "$COMMAND" "$SWITCH"' })
-  assert.deepEqual(parseProjectHooks('publish: npx agent-scheduler publish "$COMMAND" "$PUBLISH"\n'), { open: [], close: [], publish: 'npx agent-scheduler publish "$COMMAND" "$PUBLISH"' })
-  assert.throws(() => parseProjectHooks('publish:\n  - echo hi\n'), /"publish" must be one shell line/)
+  // A scheduler setting is no hook of the dashboard's: its line is an unknown key like any other.
+  for (const key of ['offset', 'switch', 'publish']) assert.throws(() => parseProjectHooks(`${key}: echo hi\n`), new RegExp(`unknown key "${key}"`))
 
   const none = await project()
   const broken = await project('open: [\n')
@@ -140,57 +137,6 @@ test('no start line, a broken file, a failing line, a line that answers no id, a
     assert.deepEqual(await runStartHook(hanging, { prompt: 'x' }, { timeoutMs: 300 }), { ok: false, error: 'the start hook: timed out after 0s' })
   } finally {
     for (const dir of [none, broken, failing, mute, hanging]) await rm(dir, { recursive: true, force: true })
-  }
-})
-
-test('the offset line gets the points; no line, a failing line and a broken file are each an answer in words', async () => {
-  const cwd = await project(`offset: 'printf "%s" "$POINTS" > offset.txt'\n`)
-  const none = await project('open:\n  - echo hi\n')
-  const failing = await project('offset: echo "not a number of percentage points" >&2; exit 1\n')
-  const broken = await project('offset: [\n')
-  try {
-    assert.deepEqual(await runOffsetHook(cwd, -12.5), { ok: true })
-    assert.equal(await readFile(join(cwd, 'offset.txt'), 'utf8'), '-12.5')
-    assert.deepEqual(await runOffsetHook(none, 3), { ok: false, error: 'this project has no offset hook', noHook: true })
-    assert.deepEqual(await runOffsetHook(failing, 3), { ok: false, error: 'the offset hook: not a number of percentage points' })
-    const said = await runOffsetHook(broken, 3)
-    assert.ok(!said.ok && !('noHook' in said) && /^ignoring .*hooks\.yml/.test(said.error), JSON.stringify(said))
-  } finally {
-    for (const dir of [cwd, none, failing, broken]) await rm(dir, { recursive: true, force: true })
-  }
-})
-
-test('the switch line gets the command and on or off; no line and a failing line are each an answer in words', async () => {
-  const cwd = await project(`switch: 'printf "%s %s" "$COMMAND" "$SWITCH" > switch.txt'\n`)
-  const none = await project('open:\n  - echo hi\n')
-  const failing = await project('switch: echo "agent-schedule.md has no line for nope" >&2; exit 1\n')
-  try {
-    assert.deepEqual(await runSwitchHook(cwd, 'post-merge-cleanup', true), { ok: true })
-    assert.equal(await readFile(join(cwd, 'switch.txt'), 'utf8'), 'post-merge-cleanup on')
-    assert.deepEqual(await runSwitchHook(cwd, 'work-queue', false), { ok: true })
-    assert.equal(await readFile(join(cwd, 'switch.txt'), 'utf8'), 'work-queue off')
-    assert.deepEqual(await runSwitchHook(none, 'work-queue', true), { ok: false, error: 'this project has no switch hook', noHook: true })
-    assert.deepEqual(await runSwitchHook(failing, 'nope', true), { ok: false, error: 'the switch hook: agent-schedule.md has no line for nope' })
-  } finally {
-    for (const dir of [cwd, none, failing]) await rm(dir, { recursive: true, force: true })
-  }
-})
-
-test('the publish line gets the command and the pick, `file` when there is none; no line and a failing line are each an answer in words', async () => {
-  const cwd = await project(`publish: 'printf "%s %s" "$COMMAND" "$PUBLISH" > publish.txt'\n`)
-  const none = await project('switch: echo hi\n')
-  const failing = await project('publish: echo "agent-schedule.md has no line for nope" >&2; exit 1\n')
-  try {
-    assert.deepEqual(await runPublishHook(cwd, 'work-queue', 'nothing'), { ok: true })
-    assert.equal(await readFile(join(cwd, 'publish.txt'), 'utf8'), 'work-queue nothing')
-    assert.deepEqual(await runPublishHook(cwd, 'triage quick', 'merge'), { ok: true })
-    assert.equal(await readFile(join(cwd, 'publish.txt'), 'utf8'), 'triage quick merge')
-    assert.deepEqual(await runPublishHook(cwd, 'work-queue', undefined), { ok: true })
-    assert.equal(await readFile(join(cwd, 'publish.txt'), 'utf8'), 'work-queue file')
-    assert.deepEqual(await runPublishHook(none, 'work-queue', 'pr'), { ok: false, error: 'this project has no publish hook', noHook: true })
-    assert.deepEqual(await runPublishHook(failing, 'nope', 'pr'), { ok: false, error: 'the publish hook: agent-schedule.md has no line for nope' })
-  } finally {
-    for (const dir of [cwd, none, failing]) await rm(dir, { recursive: true, force: true })
   }
 })
 

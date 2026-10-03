@@ -44,15 +44,16 @@ project's own `.the-framework/hooks.yml`:
 start: npx agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"} ${PUBLISH:+--publish "$PUBLISH"}
 resume: npx agent-runner run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}
 check: npx agent-runner check ${DRIVER:+--driver "$DRIVER"}
-offset: npx agent-scheduler offset -- "$POINTS"
 ```
 
 The line is given the prompt and the user's picks in its environment, and answers one JSON
 document whose `id` names the agent it began. From there the agent belongs to whatever that
 line started. A project with no `start` line cannot start an agent from the dashboard, and the
 dashboard says so. `npx agent-runner init`, run in the project, writes the `start`, `resume`
-and `check` lines into the file, and `npx agent-scheduler init` the scheduler's `open`, `close`,
-`offset`, `switch` and `publish` lines, each keeping any line already there.
+and `check` lines into the file, and `npx agent-scheduler init` the scheduler's `open` and `close`
+lines (they start it when the dashboard opens and stop it when it closes), each keeping any line
+already there. The file's keys are `open`, `close`, `start`, `resume` and `check`; any other key
+is refused and the whole file ignored.
 
 The launcher's **Post-merge cleanup** box, shown where the project has the
 `post-merge-cleanup` command, puts `/post-merge-cleanup` in `THEN`: once the agent ends done
@@ -65,11 +66,11 @@ The `check` line is what the launcher runs before a Start, with the picked codin
 out: said in red) and `warnings` (said in amber), each line naming its own fix. A project
 with no `check` line shows nothing there.
 
-The `offset` line is how the usage panel's slider (and Settings → Automation → Spend offset)
-reaches the scheduler: it runs in every project that has it, with the percentage points in
-`POINTS` — how far past the quota boundary the project's scheduler may start unattended work.
-The panel reads the value back from the schedulers' own state. The `--` keeps a negative value
-from being read as an option.
+A package's own settings are no hook. The scheduler's (how far past the quota boundary it may
+start unattended work, a switch and a publish pick per scheduled command) are the scheduler
+package's own Settings section and Overview card, and the handle on the usage bar is its stop
+line: its part of the dashboard reads them with `agent-scheduler status` and saves them with
+`agent-scheduler offset`, `switch` and `publish`.
 
 The dashboard is a **projection of the agent's own files**. The agent's tool keeps the
 agent's card (`<id>.json`) and diary (`<id>.jsonl`) under `.the-framework/` in the agent's

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { onProjectFiles, onAgentWorktree, onSchedulers, markCloudWaiting, markOtherHost, markSaving } from './reads.js'
+import { onProjectFiles, onAgentWorktree, markCloudWaiting, markOtherHost, markSaving } from './reads.js'
 import { bridgeQuestions, resetBridgeQuestions } from '../dashboard/bridge-store.js'
 import type { AgentMeta } from '../store/index.js'
 import { provideTestContext } from './test-context.js'
@@ -16,11 +16,6 @@ test('onProjectFiles for an unknown project returns an empty list', async () => 
 test('onAgentWorktree for an unknown project returns null', async () => {
   provideTestContext()
   assert.equal(await onAgentWorktree('project-that-does-not-exist', '2026-07-19T10-00-00-000Z'), null)
-})
-
-test('onSchedulers with no registered project answers an empty list (#1774)', async () => {
-  provideTestContext()
-  assert.deepEqual(await onSchedulers(), [])
 })
 
 test('onAgentWorktree refuses a run id that could escape the worktrees dir', async () => {

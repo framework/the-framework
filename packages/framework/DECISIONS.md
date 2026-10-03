@@ -67,6 +67,16 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   sections, where a project has its package. It reads and writes through the package's own
   command. Picked over the framework's own sections knowing a package's file and a hook line
   per setting, which made every package's settings a change to the framework.
+- The scheduler is a package's: its Settings section and its Overview card are the scheduler
+  package's own module, read and written through its command. The Framework reads no
+  scheduler file and has no hook line for a scheduler setting. Picked over the framework's
+  own Automation section and scheduler card, which read the scheduler's state file by name
+  and needed a hook line per setting.
+- A module may put a stop line on the usage bar: where its unattended work stops, as an
+  offset from the quota boundary. The bar draws it and its handle, and the module reads and
+  saves the offset through its own command. With no such module the bar shows the account
+  only. Picked over the framework reading the scheduler's state file and writing through an
+  `offset` hook line, and over dropping the handle, which lost dragging on the bar.
 - A module may bring a server part (`./server`) that the daemon calls in its own process,
   given the project's folder and the facts about a run, never a verdict about them. Picked
   over reading only through the package's command, a new process for every read of a tree

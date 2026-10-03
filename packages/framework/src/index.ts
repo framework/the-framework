@@ -15,7 +15,7 @@
 
 export type { AgentError, SessionInfo } from './agent-view.js'
 export type { ChoiceRequest, FrameworkEvent } from './events.js'
-export type { QuotaBoundaryStatus } from './quota-boundary.js'
+export type { QuotaBoundary } from './quota-boundary.js'
 export type { CustomPreset, Preferences } from './registry.js'
 export type { PublishLevel, PublishPick } from './publish-levels.js'
 export type { DriverQuotaWindow } from 'agent-driver'
@@ -35,7 +35,6 @@ export type { ActiveAgent, Overview, RecentAgent } from './dashboard/overview.js
 export type { ProjectSummary, ProjectionRead } from './dashboard/projects.js'
 export type { ProjectError, ProjectErrorCode } from './project-errors.js'
 export type { ProjectQueue } from './dashboard/queue.js'
-export type { ProjectScheduler, SchedulerCommand, SchedulerDecision, SchedulerState, SchedulerTick } from './dashboard/scheduler-state.js'
 export type { QuotaView } from './dashboard/quota.js'
 export type { Ticket } from './store/tickets.js'
 export type { AgentWorktree, OnboardingSuggestion } from './dashboard/types.js'

@@ -5,7 +5,7 @@ import { fakeHost, renderWithHost } from './test-host.js'
 
 // The page rendered from nothing but this package: a host answering `queue --local --full`.
 
-const alpha = { id: 'p1', name: 'alpha' }
+const alpha = { id: 'p1', name: 'alpha', gitHost: true }
 
 afterEach(cleanup)
 

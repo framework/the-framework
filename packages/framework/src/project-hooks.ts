@@ -4,14 +4,11 @@ import { basename, join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { errorMessage } from './error-message.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
-import type { PublishPick } from './publish-levels.js'
 
 /**
  * A project's hooks (#1774): the shell lines a project's own `.the-framework/hooks.yml` names to
  * run when the dashboard opens and when it closes, the two lines that start a run and continue
- * one, the line that says whether a run can start here at all, and the line that sets how far past
- * the quota boundary unattended work may go, the line that switches a scheduled command on or
- * off on this machine, and the line that says how far that command's runs publish on this machine. The daemon names no tool: it runs whatever the file says, in the project. Per
+ * one, and the line that says whether a run can start here at all. The daemon names no tool: it runs whatever the file says, in the project. Per
  * user, since `.the-framework/` is ignored: a hook is this machine's, and a teammate's pull
  * changes nothing.
  *
@@ -36,14 +33,8 @@ export type HookKind = 'open' | 'close'
  */
 export type RunHookKind = 'start' | 'resume'
 
-/**
- * The one-shell-line hooks: the two run lines; `check`, which the launcher runs to say before a
- * Start what would stop the run; `offset`, which sets how far past the quota boundary the
- * project's unattended work may go; `switch`, which switches one scheduled command on or off
- * on this machine; and `publish`, which sets how far one scheduled command's runs publish on this
- * machine.
- */
-type OneLineHookKind = RunHookKind | 'check' | 'offset' | 'switch' | 'publish'
+/** The one-shell-line hooks: the two run lines, and `check`, which the launcher runs to say before a Start what would stop the run. */
+type OneLineHookKind = RunHookKind | 'check'
 
 export interface ProjectHooks {
   open: string[]
@@ -51,13 +42,10 @@ export interface ProjectHooks {
   start?: string
   resume?: string
   check?: string
-  offset?: string
-  switch?: string
-  publish?: string
 }
 
 const HOOK_KINDS: readonly HookKind[] = ['open', 'close']
-const ONE_LINE_HOOK_KINDS: readonly OneLineHookKind[] = ['start', 'resume', 'check', 'offset', 'switch', 'publish']
+const ONE_LINE_HOOK_KINDS: readonly OneLineHookKind[] = ['start', 'resume', 'check']
 
 /**
  * Read a project's hooks. A missing file is no hooks. A file that cannot be parsed or has the
@@ -80,7 +68,7 @@ export async function readProjectHooks(cwd: string, onWarn?: (message: string) =
 
 /**
  * Parse the hooks file: a YAML map whose keys are `open` and `close`, each a list of shell lines,
- * and `start`, `resume`, `check`, `offset`, `switch` and `publish`, each one shell line. An empty document is no hooks. Anything else throws, so the reader can warn: a wrong key is
+ * and `start`, `resume` and `check`, each one shell line. An empty document is no hooks. Anything else throws, so the reader can warn: a wrong key is
  * refused rather than ignored, because a misspelled `open` would otherwise be a hook that
  * silently never runs.
  */
@@ -94,10 +82,10 @@ export function parseProjectHooks(raw: string, source = PROJECT_HOOKS_FILE): Pro
   }
   const hooks: ProjectHooks = { open: [], close: [] }
   if (data == null) return hooks
-  if (typeof data !== 'object' || Array.isArray(data)) throw new Error(`${source} must be a YAML map; the keys are open, close, start, resume, check, offset, switch and publish`)
+  if (typeof data !== 'object' || Array.isArray(data)) throw new Error(`${source} must be a YAML map; the keys are open, close, start, resume and check`)
   for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
     const isOneLine = (ONE_LINE_HOOK_KINDS as readonly string[]).includes(key)
-    if (!isOneLine && !(HOOK_KINDS as readonly string[]).includes(key)) throw new Error(`${source}: unknown key "${key}"; the keys are open, close, start, resume, check, offset, switch and publish`)
+    if (!isOneLine && !(HOOK_KINDS as readonly string[]).includes(key)) throw new Error(`${source}: unknown key "${key}"; the keys are open, close, start, resume and check`)
     if (value == null) continue
     if (isOneLine) {
       if (typeof value !== 'string' || value.trim() === '') throw new Error(`${source}: "${key}" must be one shell line`)
@@ -233,47 +221,6 @@ export async function runCheckHook(cwd: string, input: { driver?: string }, opts
   if (outcome.summary === 'exit 0' && problems && warnings) return { ok: true, problems, warnings }
   const lastSaid = outcome.stderr.split('\n').map(s => s.trim()).filter(Boolean).at(-1)
   return { ok: false, error: `the check hook: ${lastSaid ?? (outcome.summary === 'exit 0' ? 'it answered no problems and warnings' : outcome.summary)}` }
-}
-
-/** How a setting line (`offset`, `switch`, `publish`) went; `noHook` when the project's file names no such line. */
-export type SettingHookResult = { ok: true } | { ok: false; error: string; noHook?: true }
-
-/**
- * Run the project's `offset` line: the percentage points in `POINTS`, how far past the quota
- * boundary the project's unattended work may go. Exit 0 is done; the line answers nothing else.
- */
-export function runOffsetHook(cwd: string, points: number, opts: Omit<RunHooksOptions, 'log'> = {}): Promise<SettingHookResult> {
-  return runSettingHook(cwd, 'offset', { POINTS: String(points) }, opts)
-}
-
-/**
- * Run the project's `switch` line: the scheduled command in `COMMAND`, and `on` or `off` in
- * `SWITCH`, whether it runs on this machine. Exit 0 is done; the line answers nothing else.
- */
-export function runSwitchHook(cwd: string, command: string, on: boolean, opts: Omit<RunHooksOptions, 'log'> = {}): Promise<SettingHookResult> {
-  return runSettingHook(cwd, 'switch', { COMMAND: command, SWITCH: on ? 'on' : 'off' }, opts)
-}
-
-/**
- * Run the project's `publish` line: the scheduled command in `COMMAND`, and in `PUBLISH` how far
- * its runs publish on this machine: `nothing`, `branch`, `pr` or `merge`, or `file` for what the
- * project's schedule says. Exit 0 is done; the line answers nothing else.
- */
-export function runPublishHook(cwd: string, command: string, pick: PublishPick | undefined, opts: Omit<RunHooksOptions, 'log'> = {}): Promise<SettingHookResult> {
-  return runSettingHook(cwd, 'publish', { COMMAND: command, PUBLISH: pick ?? 'file' }, opts)
-}
-
-async function runSettingHook(cwd: string, kind: 'offset' | 'switch' | 'publish', vars: Record<string, string>, opts: Omit<RunHooksOptions, 'log'>): Promise<SettingHookResult> {
-  let broken: string | undefined
-  const hooks = await readProjectHooks(cwd, message => {
-    broken = message
-  })
-  const line = hooks[kind]
-  if (line === undefined) return broken ? { ok: false, error: broken } : { ok: false, error: `this project has no ${kind} hook`, noHook: true }
-  const outcome = await runLine(cwd, line, opts.timeoutMs ?? HOOK_TIMEOUT_MS, { ...(opts.env ?? process.env), ...vars })
-  if (outcome.summary === 'exit 0') return { ok: true }
-  const lastSaid = outcome.stderr.split('\n').map(s => s.trim()).filter(Boolean).at(-1)
-  return { ok: false, error: `the ${kind} hook: ${lastSaid ?? outcome.summary}` }
 }
 
 /** One line through the shell: how it ended, in words, what it said on stderr, and its stdout when asked for. */

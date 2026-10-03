@@ -4,7 +4,7 @@ import { buildOpenQuestions } from './open-questions.js'
 import type { FrameworkEvent } from '../events.js'
 import type { LiveAgent } from '../store/index.js'
 
-const PROJECTS = [{ id: 'p1', path: '/one', name: 'one', activated: true }]
+const PROJECTS = [{ id: 'p1', path: '/one', name: 'one', activated: true, gitHost: false }]
 
 /** A run that ended on its question: `waiting`, its checkout kept. */
 function liveAgent(overrides: Partial<LiveAgent> = {}): LiveAgent {
@@ -80,7 +80,7 @@ test('longest-waiting first: the run blocked longest is the one to unblock first
 
 test('an unreadable project or log contributes nothing rather than failing the read', async () => {
   const questions = await buildOpenQuestions(
-    [...PROJECTS, { id: 'p2', path: '/two', name: 'two', activated: true }],
+    [...PROJECTS, { id: 'p2', path: '/two', name: 'two', activated: true, gitHost: false }],
     {
       liveAgents: async cwd => {
         if (cwd === '/two') throw new Error('unreadable')
@@ -139,7 +139,7 @@ test('a web agent\'s question arrives from the bridge and is answerable by label
 test('two checkouts of one repository yield one card for a bridged question, not two (#1554)', async () => {
   // They share a agents-data archive, so the same web run is in both projects' agent lists.
   const agents = async () => [{ status: 'done' as const, id: 'run-web', startedAt: '', updatedAt: '', target: 'web' as const, sessionId: 'session_01Web' }]
-  const questions = await buildOpenQuestions([PROJECTS[0]!, { id: 'p2', path: '/two', name: 'two', activated: true }], {
+  const questions = await buildOpenQuestions([PROJECTS[0]!, { id: 'p2', path: '/two', name: 'two', activated: true, gitHost: false }], {
     liveAgents: async () => [],
     events: async () => [],
     bridged: () => [{ sessionId: 'session_01Web', title: 'Where?', options: [{ label: 'Here' }], receivedAt: '' }],

@@ -1,4 +1,4 @@
-Works out everything the quota [1] bar draws and says: where each calendar day of the quota week falls across the bar, which color the week's consumption deserves, where the line that stops unattended [4] work sits, how far ahead of or behind pace the account is, and how much of the week is left to project into. Where the quota boundary [2] actually sits, and what it gates, is decided in `src/quota-boundary.ts`; this never re-derives it.
+Works out everything the quota [1] bar draws and says: where each calendar day of the quota week falls across the bar, which color the week's consumption deserves, where the line that stops unattended [4] work sits, how far ahead of or behind pace the account is, and how much of the week is left to project into. Where the quota boundary [2] actually sits is decided in `src/quota-boundary.ts`; this never re-derives it. Whether there is a stop line at all is a module's: the panel (`components/Quota.tsx`) passes the offset an installed package's module read, and without one draws no line.
 
 ## Context
 
@@ -9,9 +9,9 @@ Works out everything the quota [1] bar draws and says: where each calendar day o
 ## Glossary
 
 [1] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
-[2] quota boundary: the share of the quota week that may be spent by now, rising with the clock; unattended work stands down past it, work a human asked for never does.
-[3] spend offset: the user's adjustment of the quota boundary, in percentage points of the week: how far past it unattended work may start. Each project's scheduler holds its own, as `spendOffset` in its state file.
-[4] unattended: said of an agent nobody is watching: one the scheduler started rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
+[2] quota boundary: the share of the quota week that may be spent by now, rising with the clock. The dashboard only draws it; whether work stops at it is the business of whatever starts unattended work.
+[3] spend offset: the offset of a module's stop line from the quota boundary, in percentage points of the week: how far past the boundary that module's unattended work may start. The module's package holds it; the bar is handed it.
+[4] unattended: said of an agent nobody is watching: one a package started on its own rather than a person. It is not answered any faster: a question it ends on waits for a human like any other.
 
 ## Business logic — TL;DR
 
@@ -76,11 +76,11 @@ The week's consumption is in one of four states:
 
 **User story**: the user drags the dim segment's right edge, labeled "Unattended work stops at", and the bar follows the finger.
 
-**Problem**: the daemon works out the same line from the spend offset the schedulers hold, but the dashboard only learns it on the next reading, and the schedulers only hold a new offset once the control's write has gone through. A line drawn only from the daemon's answer would trail the control by up to half a minute, which reads as a broken control.
+**Problem**: the module's package holds the spend offset, and the bar only learns a saved one on the module's next read, after the control's save has gone through. A line drawn only from what the module read would trail the control, which reads as a broken control.
 
 #### Business logic
 
-The line is the quota boundary [2] plus the user's spend offset [3], and it is clamped to the week: never below zero, never above one hundred. Computing it in the browser is what lets the bar redraw the moment the control moves; what decides whether unattended [4] work may start is each project's scheduler, against the spend offset it holds.
+The line is the quota boundary [2] plus the user's spend offset [3], and it is clamped to the week: never below zero, never above one hundred. Computing it in the browser is what lets the bar redraw the moment the control moves; what decides whether unattended [4] work may start is the module's own package, against the spend offset it holds.
 
 ### A day's worth of pace
 

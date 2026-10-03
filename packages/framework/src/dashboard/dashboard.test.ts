@@ -10,6 +10,7 @@ const project = (id: string, path: string, lastActivityAt?: string): ProjectSumm
   path,
   name: id,
   activated: true,
+  gitHost: false,
   ...(lastActivityAt ? { lastActivityAt } : {}),
 })
 

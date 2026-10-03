@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { DEFAULT_AT_ONCE, DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET, isDriverName, type SubagentRunner, type SubagentSettings, PUBLISH_LABELS, isPublishPick, offeredPublishPicks, type PublishPick } from '../../src/client.js'
 import { driverOptions, useModels } from '../lib/models.js'
 import { NO_MODEL_PINNED } from '../lib/agent-settings.js'
@@ -425,15 +425,28 @@ export function subagentRunnerOf(value: string): SubagentRunner | undefined {
  */
 function SubagentsSection({ drivers }: { drivers: DriverOption[] }) {
   const { value: view, reload } = usePolled(onSubagentSettings, NO_SUBAGENT_SETTINGS, 10000, [])
+  // What was last picked, shown until a read made after every save brings the settings back: the
+  // menus build each save on it, so a second pick made before the first is read back keeps the first.
+  const [picked, setPicked] = useState<SubagentSettings | undefined>()
+  const inFlight = useRef(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
-  const { settings } = view
+  useEffect(() => {
+    if (inFlight.current === 0) setPicked(undefined)
+  }, [view])
+  const settings = picked ?? view.settings
   const save = (next: SubagentSettings): void => {
+    inFlight.current++
+    setPicked(next)
     setSaving(true)
     setError(undefined)
     void sendSubagentSettings(next).then(result => {
-      setSaving(false)
+      inFlight.current--
       if (!result.ok) setError(result.error)
+      if (inFlight.current > 0) return
+      setSaving(false)
+      // A refused save shows what is saved again; a saved one stays shown until the read has it.
+      if (!result.ok) setPicked(undefined)
       reload()
     })
   }

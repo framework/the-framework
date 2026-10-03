@@ -253,9 +253,21 @@ describe('Subagents (#1902)', () => {
     fireEvent.change(simple, { target: { value: 'codex' } })
     await waitFor(() => expect(sendSubagentSettings).toHaveBeenLastCalledWith({ hard: { driver: 'claude-code', model: 'opus' }, atOnce: 3, simple: { driver: 'codex' } }))
     fireEvent.change(screen.getByLabelText('Hard tasks'), { target: { value: '' } })
-    await waitFor(() => expect(sendSubagentSettings).toHaveBeenLastCalledWith({ atOnce: 3 }))
+    await waitFor(() => expect(sendSubagentSettings).toHaveBeenLastCalledWith({ atOnce: 3, simple: { driver: 'codex' } }))
     fireEvent.change(screen.getByLabelText('At once'), { target: { value: '6' } })
-    await waitFor(() => expect(sendSubagentSettings).toHaveBeenLastCalledWith({ hard: { driver: 'claude-code', model: 'opus' }, atOnce: 6 }))
+    await waitFor(() => expect(sendSubagentSettings).toHaveBeenLastCalledWith({ simple: { driver: 'codex' }, atOnce: 6 }))
+  })
+
+  test('a second pick made before the first is saved keeps the first', async () => {
+    subagentSettings.mockResolvedValue({ settings: {}, hooked: 1 })
+    let finish: (value: { ok: true }) => void = () => {}
+    sendSubagentSettings.mockImplementationOnce(() => new Promise(resolve => (finish = resolve)))
+    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
+    fireEvent.change(await screen.findByLabelText('Simple tasks'), { target: { value: 'codex' } })
+    expect((screen.getByLabelText('Simple tasks') as HTMLSelectElement).value).toBe('codex')
+    fireEvent.change(screen.getByLabelText('Hard tasks'), { target: { value: 'claude-code opus' } })
+    await waitFor(() => expect(sendSubagentSettings).toHaveBeenLastCalledWith({ simple: { driver: 'codex' }, hard: { driver: 'claude-code', model: 'opus' } }))
+    finish({ ok: true })
   })
 
   test('nothing set reads as the main agent\'s own and 4 at once; no project with the line says how to add it; a refused save says why', async () => {

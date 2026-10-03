@@ -6,7 +6,6 @@
   "intent": "ask me what color i perfer with choices",
   "driver": "codex",
   "model": "gpt-5.6-luna",
-  "branch": "agent-2026-10-03T16-54-41-507Z",
   "caller": {
     "runner": {
       "host": "Suleimans-MacBook-Pro.local",

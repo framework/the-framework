@@ -63,6 +63,10 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The modules every project wants are built in: the framework depends on them and loads them
   for every project through the same contract as any other module, and a project's own copy
   wins. Picked over each project installing Files itself.
+- A module may bring a section of the Settings page, shown after the framework's own
+  sections, where a project has its package. It reads and writes through the package's own
+  command. Picked over the framework's own sections knowing a package's file and a hook line
+  per setting, which made every package's settings a change to the framework.
 - A module may bring a server part (`./server`) that the daemon calls in its own process,
   given the project's folder and the facts about a run, never a verdict about them. Picked
   over reading only through the package's command, a new process for every read of a tree
@@ -82,9 +86,6 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   agent. A project with no git host package is offered Nothing and Publish branch only.
   Picked over handing over every option the launcher once had, which is how the options
   became the thing to maintain.
-- Settings has one Subagents section, the same on every project: a coding agent and model
-  for simple tasks and for hard tasks, and how many run at once. Settings sends it to each
-  project's `subagents` line, as it does the spend offset. Picked over a setting per project.
 - A project with no `start` line cannot start a run from the dashboard, and the launcher
   says so. Picked over a built-in fallback, which would be The Framework running agents
   again.

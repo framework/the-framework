@@ -232,20 +232,6 @@ test('settings: saved whole on this machine, hidden from git, read back; setting
   }
 })
 
-test('init: the subagents line in the dashboard\'s hooks file, a line already there kept; no dashboard directory is a refusal', async () => {
-  const repo = await testRepo()
-  try {
-    assert.deepEqual((await run(repo, undefined, ['init'])).out.reason, 'no-dashboard')
-    await mkdir(join(repo, '.the-framework'))
-    assert.deepEqual((await run(repo, undefined, ['init'])).out.added, ['subagents'])
-    assert.match(await readFile(join(repo, '.the-framework', 'hooks.yml'), 'utf8'), /^subagents: npx orchestration settings "\$SUBAGENTS"$/m)
-    await writeFile(join(repo, '.the-framework', 'hooks.yml'), 'subagents: my own line\n')
-    assert.deepEqual((await run(repo, undefined, ['init'])).out, { ok: true, file: join(repo, '.the-framework', 'hooks.yml'), added: [], kept: ['subagents'] })
-  } finally {
-    await removeRepo(repo)
-  }
-})
-
 test('list: the caller\'s subagents only, newest first, the task without the added lines, nothing of the runner\'s', async () => {
   const repo = await testRepo()
   try {
@@ -515,7 +501,7 @@ test('a command line that cannot be read exits 2 with the usage and starts nothi
   const elsewhere = await mkdtemp(join(tmpdir(), 'not-a-repo-'))
   try {
     await mainAgent(repo)
-    for (const argv of [[], ['nope'], ['start'], ['start', ' '], ['start', 'a', 'b'], ['start', 'a', '--driver', 'pi'], ['list', 'extra'], ['read'], ['stop'], ['stop', FIRST, '--force'], ['plan', 'a', 'b'], ['plan', '--nope'], ['land'], ['land', FIRST, SECOND], ['start', '--level', 'simple', 'a', '--model', 'opus'], ['start', '--level', 'simple', 'a', '--driver', 'codex'], ['start', '--level'], ['settings', '{}', '{}'], ['init', 'x']]) {
+    for (const argv of [[], ['nope'], ['start'], ['start', ' '], ['start', 'a', 'b'], ['start', 'a', '--driver', 'pi'], ['list', 'extra'], ['read'], ['stop'], ['stop', FIRST, '--force'], ['plan', 'a', 'b'], ['plan', '--nope'], ['land'], ['land', FIRST, SECOND], ['start', '--level', 'simple', 'a', '--model', 'opus'], ['start', '--level', 'simple', 'a', '--driver', 'codex'], ['start', '--level'], ['settings', '{}', '{}']]) {
       const bad = await run(repo, MAIN, argv)
       assert.deepEqual([bad.code, bad.out, bad.started, bad.stopped], [2, undefined, [], []], argv.join(' '))
       assert.match(bad.err, /usage: orchestration/)

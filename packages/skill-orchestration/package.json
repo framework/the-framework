@@ -1,7 +1,7 @@
 {
   "name": "@gemstack/skill-orchestration",
   "version": "0.0.1",
-  "description": "Orchestration as a skill: a main agent plans its task, starts subagents on the parts once the person approved the plan, each a run of its own on a branch started from the main agent's, and lists them, reads their results, stops them and lands their work with the orchestration command.",
+  "description": "Orchestration as a skill: a main agent plans its task, starts subagents on the parts once the person approved the plan, each a run of its own on a branch started from the main agent's, and lists them, reads their results, stops them and lands their work with the orchestration command, and brings the Subagents section of the dashboard's Settings page.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,13 +28,14 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./SKILL.md": "./SKILL.md"
+    "./SKILL.md": "./SKILL.md",
+    "./dashboard": "./dist/dashboard/dashboard.js"
   },
   "scripts": {
-    "build": "pnpm -C ../agent-runner build && tsc -p tsconfig.build.json",
+    "build": "pnpm -C ../agent-runner build && tsc -p tsconfig.build.json && vite build -c dashboard/vite.config.ts",
     "prepack": "node -e \"if(!process.env.npm_config_user_agent?.startsWith('pnpm/')){console.error('Pack and publish with pnpm: it replaces workspace:* with the real version, npm does not');process.exit(1)}\"",
-    "typecheck": "pnpm -C ../agent-runner build && tsc --noEmit",
-    "test": "pnpm build && tsc -p tsconfig.test.json && node --test --test-timeout=60000 'dist-test/**/*.test.js'",
+    "typecheck": "pnpm -C ../agent-runner build && tsc --noEmit && tsc --noEmit -p dashboard/tsconfig.json",
+    "test": "pnpm build && tsc -p tsconfig.test.json && node --test --test-timeout=60000 'dist-test/**/*.test.js' && cd dashboard && vitest run",
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
@@ -45,7 +46,18 @@
     "agent-runner": "workspace:*"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20.0.0",
-    "typescript": "^7.0.2"
+    "@types/react": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.3",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.10"
   }
 }

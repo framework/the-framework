@@ -5,7 +5,6 @@ import { parseArgs } from 'node:util'
 import { nodeGitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
 import { isPidAlive, readyToRun, spawnRun, withdrawMarker, writeMarker } from 'agent-runner'
-import { initHooks } from './init.js'
 import { isLevel, LEVELS, parseSettings, readSettings, writeSettings } from './settings.js'
 import { Refused, landSubagent, listSubagents, readSubagent, savePlan, showPlan, startSubagent, stopSubagent, type SubagentDeps } from './subagents.js'
 
@@ -25,7 +24,6 @@ export const USAGE = `usage: orchestration <command>
                     approved your saved plan, and while as many of your subagents run as the person allows
   settings          the person's settings for subagents on this machine
   settings <json>   save them whole: {"simple": {"driver", "model"}, "hard": {...}, "atOnce": <n>}, each optional
-  init              this tool's line in the dashboard's .the-framework/hooks.yml; a line already there is kept
   list              your subagents, newest first
   read <id>         one subagent: how it stands, its branch, and its last reply as \`result\`
   stop <id>         stop a subagent that is running
@@ -123,13 +121,6 @@ const COMMANDS: Record<string, Command> = {
     if (!read.ok) throw new Usage(read.error)
     await writeSettings(repo, read.settings, deps.git)
     return { ok: true, ...read.settings }
-  },
-
-  async init(args, io, deps) {
-    parse(args, {}, 0)
-    const outcome = await initHooks(await project(io.cwd, deps))
-    if (!outcome.ok) throw new Refused(outcome, outcome.reason === 'no-dashboard' ? `${outcome.file} has no dashboard directory: add the project to the dashboard first` : `${outcome.file} cannot be read: ${outcome.detail ?? ''}`)
-    return outcome
   },
 
   async list(args, io, deps) {

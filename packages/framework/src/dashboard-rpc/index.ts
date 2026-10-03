@@ -18,7 +18,6 @@ export {
 } from './preferences.js'
 export { type EditorInfo } from '../dashboard/open-in-app.js'
 export { onQuota } from './quota.js'
-export { onSubagentSettings, sendSubagentSettings } from './subagents.js'
 export { onModels } from './models.js'
 export { checkDevices, type DeviceCheck } from './devices.js'
 export { onModules, runModuleCommand, readModule, type DashboardModule, type ModuleCommandResult, type ModuleReadResult } from './modules.js'
@@ -28,7 +27,6 @@ import * as control from './control.js'
 import * as projects from './projects.js'
 import * as preferences from './preferences.js'
 import * as quota from './quota.js'
-import * as subagents from './subagents.js'
 import * as models from './models.js'
 import * as devices from './devices.js'
 import * as modules from './modules.js'
@@ -52,7 +50,7 @@ export type RpcHandler = (...args: never[]) => unknown
 export const RPC_HANDLERS: Record<string, RpcHandler> = Object.assign(
   Object.create(null) as Record<string, RpcHandler>,
   Object.fromEntries(
-    [reads, control, projects, preferences, quota, subagents, models, devices, modules]
+    [reads, control, projects, preferences, quota, models, devices, modules]
       .flatMap(module => Object.entries(module))
       .filter((entry): entry is [string, RpcHandler] => typeof entry[1] === 'function'),
   ),

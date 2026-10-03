@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { DEFAULT_AT_ONCE, DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET, isDriverName, type SubagentRunner, type SubagentSettings, PUBLISH_LABELS, isPublishPick, offeredPublishPicks, type PublishPick } from '../../src/client.js'
+import { useState, type ReactNode } from 'react'
+import { DRIVERS, MAX_SPEND_OFFSET, PUBLISH_LABELS, isPublishPick, offeredPublishPicks, type PublishPick } from '../../src/client.js'
 import { driverOptions, useModels } from '../lib/models.js'
 import { NO_MODEL_PINNED } from '../lib/agent-settings.js'
 import type { DriverOption } from './DriverModelMenu.js'
 import { useQuota } from '../lib/quota.js'
 import { useSpendOffset } from './Quota.js'
 import { onSchedulers } from '../rpc/reads.js'
-import { sendSchedulePublish, sendScheduleSwitch } from '../rpc/projects.js'
-import { onSubagentSettings, sendSubagentSettings, type SubagentSettingsView } from '../rpc/subagents.js'
-import { usePolled } from '../lib/use-async.js'
-import type { ProjectScheduler, SchedulerCommand } from '../../src/index.js'
+import { onProjects, sendSchedulePublish, sendScheduleSwitch } from '../rpc/projects.js'
+import { ModuleSettingsSections } from './ModuleSettingsSections.js'
+import { useLoaded, usePolled } from '../lib/use-async.js'
+import type { ProjectScheduler, ProjectSummary, SchedulerCommand } from '../../src/index.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Checkbox } from './ui/checkbox.js'
 import { ScrollArea } from './ui/scroll-area.js'
 import { cn } from '../lib/utils.js'
+import { SettingsRow as Row, SettingsSection as Section, SettingsSelectRow as SelectRow, type SettingsOption as SelectOption } from './SettingsRows.js'
 
 // The settings page (#958): every setting in one place, and the Onboarding checklist.
 //
@@ -32,7 +33,8 @@ import { cn } from '../lib/utils.js'
 // Everything here writes your own settings, the same on every project: what is a project's own
 // (how a run is started) lives in that project's hooks file, not here. The Automation section's
 // schedule switches and publish picks are this machine's too, written through each project's
-// `switch` and `publish` hooks.
+// `switch` and `publish` hooks. After the page's own sections come the ones the installed packages
+// bring, each the package's own, read and written through its own command.
 
 export function SettingsPage({
   onAgentStarted,
@@ -45,6 +47,7 @@ export function SettingsPage({
   onDone?: () => void
 }) {
   const preferences = usePreferences()
+  const projects = useLoaded<ProjectSummary[]>(onProjects, [], [])
   const editors = useDetectedEditors()
   const theme = themePreference(preferences)
   // The start menu's own list (#1874), so Settings offers exactly the picks the menu does.
@@ -118,8 +121,6 @@ export function SettingsPage({
           />
         </Section>
 
-        <SubagentsSection drivers={drivers} />
-
         {/* A saved device is the other place a session can run on. */}
         <DevicesSettings />
 
@@ -171,45 +172,11 @@ export function SettingsPage({
             />
           )}
         </Section>
+
+        {/* What the installed packages bring: each its own section, after the page's own. */}
+        <ModuleSettingsSections projects={projects} />
       </div>
     </ScrollArea>
-  )
-}
-
-function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
-      </CardHeader>
-      <CardContent>
-        <div className="divide-y divide-border">{children}</div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function Row({
-  label,
-  description,
-  control,
-  dimmed = false,
-}: {
-  label: string
-  description: string
-  control: ReactNode
-  /** A row the rules turned off: greyed, but still shown with its reason. */
-  dimmed?: boolean
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
-      <div className="min-w-0">
-        <p className={cn('text-sm', dimmed && 'text-muted-foreground')}>{label}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </div>
-      <div className="shrink-0">{control}</div>
-    </div>
   )
 }
 
@@ -304,58 +271,6 @@ function modelOptions(driver: DriverOption | undefined, model: string): SelectOp
   ]
 }
 
-interface SelectOption {
-  value: string
-  label: string
-  /** A line in the list that says something rather than being a choice. */
-  disabled?: boolean
-}
-
-/**
- * One setting picked from a list.
- *
- * A row with nothing to pick renders nothing at all (#1172). An empty `<select>` is a control that
- * cannot be operated — it reads as broken rather than as "no choices here", which is exactly the
- * paper cut this guard exists for. Every list on this page has a fixed first entry today ("Auto-detect",
- * the agent's own default), so nothing hits it; it is here because the next list will be added
- * without thinking about the empty case.
- */
-function SelectRow({
-  label,
-  description,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  description: string
-  value: string
-  options: SelectOption[]
-  onChange: (next: string) => void
-}) {
-  if (options.length === 0) return null
-  return (
-    <Row
-      label={label}
-      description={description}
-      control={
-        <select
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          aria-label={label}
-          className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-        >
-          {options.map(o => (
-            <option key={o.value} value={o.value} disabled={o.disabled}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      }
-    />
-  )
-}
-
 /**
  * The spend offset as a number (#960): the same value the usage panel's slider moves, read off the
  * projects' schedulers and written through their `offset` hooks. Bounded to the same
@@ -380,104 +295,6 @@ function SpendOffsetSection() {
         </p>
       )}
       <ScheduleSwitchRows />
-    </Section>
-  )
-}
-
-const NO_SUBAGENT_SETTINGS: SubagentSettingsView = { settings: {}, hooked: 0 }
-
-/** The choice that leaves a level unset: the main agent's own coding agent and model. */
-const SAME_AS_MAIN = ''
-
-/**
- * A level's choices (#1902): the main agent's own first, then every coding agent, by its own default
- * and by each model it lists. A choice is one coding agent and one model, `<driver>` or
- * `<driver> <model>`, since a model is always one agent's own. A saved model the list does not
- * hold is kept, by its id.
- */
-export function subagentRunnerChoices(drivers: readonly DriverOption[], saved: SubagentRunner | undefined): SelectOption[] {
-  const options: SelectOption[] = [{ value: SAME_AS_MAIN, label: 'Same as the main agent' }]
-  for (const driver of drivers) {
-    options.push({ value: driver.value, label: `${driver.label} · ${NO_MODEL_PINNED}` })
-    for (const model of driver.models) options.push({ value: `${driver.value} ${model.value}`, label: `${driver.label} · ${model.label}` })
-  }
-  const value = subagentRunnerValue(saved)
-  if (!options.some(o => o.value === value) && saved) options.push({ value, label: `${DRIVER_LABELS[saved.driver]} · ${saved.model ?? NO_MODEL_PINNED}` })
-  return options
-}
-
-export function subagentRunnerValue(runner: SubagentRunner | undefined): string {
-  if (!runner) return SAME_AS_MAIN
-  return runner.model !== undefined ? `${runner.driver} ${runner.model}` : runner.driver
-}
-
-export function subagentRunnerOf(value: string): SubagentRunner | undefined {
-  const [driver, ...model] = value.split(' ')
-  if (!driver || !isDriverName(driver)) return undefined
-  return model.length > 0 ? { driver, model: model.join(' ') } : { driver }
-}
-
-/**
- * Subagents (#1902): which coding agent and model a main agent's subagents run on, by how hard the
- * main agent says their task is, and how many of one main agent's subagents run at once. The same
- * on every project: read off the projects' orchestration settings, written through each project's
- * `subagents` hook, whole.
- */
-function SubagentsSection({ drivers }: { drivers: DriverOption[] }) {
-  const { value: view, reload } = usePolled(onSubagentSettings, NO_SUBAGENT_SETTINGS, 10000, [])
-  // What was last picked, shown until a read made after every save brings the settings back: the
-  // menus build each save on it, so a second pick made before the first is read back keeps the first.
-  const [picked, setPicked] = useState<SubagentSettings | undefined>()
-  const inFlight = useRef(0)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | undefined>()
-  useEffect(() => {
-    if (inFlight.current === 0) setPicked(undefined)
-  }, [view])
-  const settings = picked ?? view.settings
-  const save = (next: SubagentSettings): void => {
-    inFlight.current++
-    setPicked(next)
-    setSaving(true)
-    setError(undefined)
-    void sendSubagentSettings(next).then(result => {
-      inFlight.current--
-      if (!result.ok) setError(result.error)
-      if (inFlight.current > 0) return
-      setSaving(false)
-      // A refused save shows what is saved again; a saved one stays shown until the read has it.
-      if (!result.ok) setPicked(undefined)
-      reload()
-    })
-  }
-  const level = (key: 'simple' | 'hard') => (value: string) => {
-    const { [key]: _old, ...rest } = settings
-    const runner = subagentRunnerOf(value)
-    save(runner ? { ...rest, [key]: runner } : rest)
-  }
-  const atOnce = settings.atOnce ?? DEFAULT_AT_ONCE
-  return (
-    <Section title="Subagents" description="The models a main agent's subagents run on, by how hard the main agent says each task is. The same on every project, on this machine.">
-      {view.hooked === 0 && (
-        <p className="text-xs text-muted-foreground">
-          No project has a subagents line in .the-framework/hooks.yml yet: run <code>npx orchestration init</code> in a project.
-        </p>
-      )}
-      <SelectRow label="Simple tasks" description="A task the main agent marks simple." value={subagentRunnerValue(settings.simple)} options={subagentRunnerChoices(drivers, settings.simple)} onChange={level('simple')} />
-      <SelectRow label="Hard tasks" description="A task the main agent marks hard." value={subagentRunnerValue(settings.hard)} options={subagentRunnerChoices(drivers, settings.hard)} onChange={level('hard')} />
-      <SelectRow
-        label="At once"
-        description="How many of one main agent's subagents run at the same time. It starts the next when one ends."
-        value={String(atOnce)}
-        options={Array.from({ length: Math.max(8, atOnce) }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
-        onChange={value => save({ ...settings, atOnce: Number(value) })}
-      />
-      {saving && <p className="text-xs text-muted-foreground">Saving…</p>}
-      {error && (
-        <p role="alert" className="text-xs text-danger">
-          The subagent settings were not saved: {error}
-        </p>
-      )}
     </Section>
   )
 }

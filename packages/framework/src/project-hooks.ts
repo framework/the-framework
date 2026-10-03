@@ -5,7 +5,6 @@ import { parse as parseYaml } from 'yaml'
 import { errorMessage } from './error-message.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { PublishPick } from './publish-levels.js'
-import type { SubagentSettings } from './subagent-settings.js'
 
 /**
  * A project's hooks (#1774): the shell lines a project's own `.the-framework/hooks.yml` names to
@@ -41,11 +40,10 @@ export type RunHookKind = 'start' | 'resume'
  * The one-shell-line hooks: the two run lines; `check`, which the launcher runs to say before a
  * Start what would stop the run; `offset`, which sets how far past the quota boundary the
  * project's unattended work may go; `switch`, which switches one scheduled command on or off
- * on this machine; `publish`, which sets how far one scheduled command's runs publish on this
- * machine; and `subagents`, which sets the coding agent and model of a main agent's subagents by
- * how hard their task is, and how many run at once.
+ * on this machine; and `publish`, which sets how far one scheduled command's runs publish on this
+ * machine.
  */
-type OneLineHookKind = RunHookKind | 'check' | 'offset' | 'switch' | 'publish' | 'subagents'
+type OneLineHookKind = RunHookKind | 'check' | 'offset' | 'switch' | 'publish'
 
 export interface ProjectHooks {
   open: string[]
@@ -56,11 +54,10 @@ export interface ProjectHooks {
   offset?: string
   switch?: string
   publish?: string
-  subagents?: string
 }
 
 const HOOK_KINDS: readonly HookKind[] = ['open', 'close']
-const ONE_LINE_HOOK_KINDS: readonly OneLineHookKind[] = ['start', 'resume', 'check', 'offset', 'switch', 'publish', 'subagents']
+const ONE_LINE_HOOK_KINDS: readonly OneLineHookKind[] = ['start', 'resume', 'check', 'offset', 'switch', 'publish']
 
 /**
  * Read a project's hooks. A missing file is no hooks. A file that cannot be parsed or has the
@@ -83,7 +80,7 @@ export async function readProjectHooks(cwd: string, onWarn?: (message: string) =
 
 /**
  * Parse the hooks file: a YAML map whose keys are `open` and `close`, each a list of shell lines,
- * and `start`, `resume`, `check`, `offset`, `switch`, `publish` and `subagents`, each one shell line. An empty document is no hooks. Anything else throws, so the reader can warn: a wrong key is
+ * and `start`, `resume`, `check`, `offset`, `switch` and `publish`, each one shell line. An empty document is no hooks. Anything else throws, so the reader can warn: a wrong key is
  * refused rather than ignored, because a misspelled `open` would otherwise be a hook that
  * silently never runs.
  */
@@ -97,10 +94,10 @@ export function parseProjectHooks(raw: string, source = PROJECT_HOOKS_FILE): Pro
   }
   const hooks: ProjectHooks = { open: [], close: [] }
   if (data == null) return hooks
-  if (typeof data !== 'object' || Array.isArray(data)) throw new Error(`${source} must be a YAML map; the keys are open, close, start, resume, check, offset, switch, publish and subagents`)
+  if (typeof data !== 'object' || Array.isArray(data)) throw new Error(`${source} must be a YAML map; the keys are open, close, start, resume, check, offset, switch and publish`)
   for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
     const isOneLine = (ONE_LINE_HOOK_KINDS as readonly string[]).includes(key)
-    if (!isOneLine && !(HOOK_KINDS as readonly string[]).includes(key)) throw new Error(`${source}: unknown key "${key}"; the keys are open, close, start, resume, check, offset, switch, publish and subagents`)
+    if (!isOneLine && !(HOOK_KINDS as readonly string[]).includes(key)) throw new Error(`${source}: unknown key "${key}"; the keys are open, close, start, resume, check, offset, switch and publish`)
     if (value == null) continue
     if (isOneLine) {
       if (typeof value !== 'string' || value.trim() === '') throw new Error(`${source}: "${key}" must be one shell line`)
@@ -238,7 +235,7 @@ export async function runCheckHook(cwd: string, input: { driver?: string }, opts
   return { ok: false, error: `the check hook: ${lastSaid ?? (outcome.summary === 'exit 0' ? 'it answered no problems and warnings' : outcome.summary)}` }
 }
 
-/** How a setting line (`offset`, `switch`, `publish`, `subagents`) went; `noHook` when the project's file names no such line. */
+/** How a setting line (`offset`, `switch`, `publish`) went; `noHook` when the project's file names no such line. */
 export type SettingHookResult = { ok: true } | { ok: false; error: string; noHook?: true }
 
 /**
@@ -266,15 +263,7 @@ export function runPublishHook(cwd: string, command: string, pick: PublishPick |
   return runSettingHook(cwd, 'publish', { COMMAND: command, PUBLISH: pick ?? 'file' }, opts)
 }
 
-/**
- * Run the project's `subagents` line: the person's subagent settings as one JSON value in
- * `SUBAGENTS`, saved whole. Exit 0 is done; the line answers nothing else.
- */
-export function runSubagentsHook(cwd: string, settings: SubagentSettings, opts: Omit<RunHooksOptions, 'log'> = {}): Promise<SettingHookResult> {
-  return runSettingHook(cwd, 'subagents', { SUBAGENTS: JSON.stringify(settings) }, opts)
-}
-
-async function runSettingHook(cwd: string, kind: 'offset' | 'switch' | 'publish' | 'subagents', vars: Record<string, string>, opts: Omit<RunHooksOptions, 'log'>): Promise<SettingHookResult> {
+async function runSettingHook(cwd: string, kind: 'offset' | 'switch' | 'publish', vars: Record<string, string>, opts: Omit<RunHooksOptions, 'log'>): Promise<SettingHookResult> {
   let broken: string | undefined
   const hooks = await readProjectHooks(cwd, message => {
     broken = message

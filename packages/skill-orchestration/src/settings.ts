@@ -1,13 +1,16 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
-import { isDriverName, type DriverName } from 'agent-runner'
+import { isDriverName } from 'agent-runner'
+import { LEVELS, isLevel, type Level, type Runner, type Settings } from './levels.js'
+
+export { DEFAULT_AT_ONCE, LEVELS, isLevel, type Level, type Runner, type Settings } from './levels.js'
 
 /**
  * The person's settings for subagents, on this machine: which coding agent and model a simple
  * task runs on, which a hard one runs on, and how many of one main agent's subagents run at once.
- * One JSON file under `.orchestration/` at the project's root, written by `settings` (a dashboard's
- * `subagents` line) and read by `start`. Never tracked: the directory is hidden through the
+ * One JSON file under `.orchestration/` at the project's root, written by `settings` (the package's
+ * Settings section in the dashboard runs it) and read by `start`. Never tracked: the directory is hidden through the
  * repository's exclude file, as the scheduler's state is, since the models are one person's.
  *
  * A level nobody set runs on the main agent's own coding agent and model.
@@ -15,29 +18,6 @@ import { isDriverName, type DriverName } from 'agent-runner'
 
 export const SETTINGS_DIR = '.orchestration'
 export const SETTINGS_FILE = 'settings.json'
-
-/** How hard the main agent says a task is. */
-export const LEVELS = ['simple', 'hard'] as const
-export type Level = (typeof LEVELS)[number]
-
-export function isLevel(value: unknown): value is Level {
-  return typeof value === 'string' && (LEVELS as readonly string[]).includes(value)
-}
-
-/** How many of one main agent's subagents run at once when nobody said. */
-export const DEFAULT_AT_ONCE = 4
-
-/** A coding agent and, when one is named, its model; no model is that coding agent's own default. */
-export interface Runner {
-  driver: DriverName
-  model?: string
-}
-
-export interface Settings {
-  simple?: Runner
-  hard?: Runner
-  atOnce?: number
-}
 
 export function settingsPath(repo: string): string {
   return join(repo, SETTINGS_DIR, SETTINGS_FILE)

@@ -39,7 +39,7 @@ export function fakeHost(answers: Answers = {}): FakeHost {
 }
 
 /** No other module is installed: the card is rendered with nothing but its own package. */
-export const NO_MODULES: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [], loaded: true }
+export const NO_MODULES: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [], settings: [], loaded: true }
 
 /** Render the card inside the fake host, with no other module mounted. */
 export function renderWithHost(ui: ReactElement, host: ModuleHost): RenderResult {

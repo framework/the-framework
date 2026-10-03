@@ -52,8 +52,7 @@ document whose `id` names the agent it began. From there the agent belongs to wh
 line started. A project with no `start` line cannot start an agent from the dashboard, and the
 dashboard says so. `npx agent-runner init`, run in the project, writes the `start`, `resume`
 and `check` lines into the file, and `npx agent-scheduler init` the scheduler's `open`, `close`,
-`offset`, `switch` and `publish` lines, and `npx orchestration init` the `subagents` line that
-Settings → Subagents writes through, each keeping any line already there.
+`offset`, `switch` and `publish` lines, each keeping any line already there.
 
 The launcher's **Post-merge cleanup** box, shown where the project has the
 `post-merge-cleanup` command, puts `/post-merge-cleanup` in `THEN`: once the agent ends done

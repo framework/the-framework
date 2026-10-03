@@ -1,0 +1,129 @@
+import { afterEach, describe, expect, test, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { ModuleHostContext, type ModuleCommandResult, type ModuleHost } from 'framework/module'
+import { SubagentsSettings } from './SubagentsSettings.js'
+import { runnerChoices, runnerOf, runnerValue } from './choices.js'
+
+// The coding agents' own lists, as the dashboard asked them: Claude Code answered, Codex listed one.
+vi.mock('../../framework/dashboard/rpc/models.js', () => ({
+  onModels: vi.fn(async () => ({
+    'claude-code': { models: [{ id: 'opus', name: 'Opus 5.5' }] },
+    codex: { models: [{ id: 'gpt-5.6-luna', name: 'GPT-5.6-Luna' }] },
+  })),
+}))
+
+const PROJECTS = [
+  { id: 'p1', name: 'gemstack' },
+  { id: 'p2', name: 'other' },
+]
+
+/** A host whose `orchestration settings` keeps what it was given per project, as the command does. */
+function fakeHost(saved: Record<string, unknown> = {}, refuse?: (projectId: string) => string | undefined) {
+  const files: Record<string, unknown> = { p1: saved, p2: saved }
+  const runCommand = vi.fn(async (projectId: string, args: string[]): Promise<ModuleCommandResult> => {
+    const refused = refuse?.(projectId)
+    if (refused !== undefined) return { ok: false, error: refused }
+    if (args.length === 2) files[projectId] = JSON.parse(args[1]!)
+    return { ok: true, output: { ok: true, ...(files[projectId] as object) } }
+  })
+  const host: ModuleHost = {
+    package: '@gemstack/skill-orchestration',
+    runCommand,
+    act: runCommand,
+    read: vi.fn(async () => ({ ok: false as const, error: 'no server part' })),
+    openAgent: vi.fn(),
+    openPage: vi.fn(),
+    startRun: vi.fn(async () => ({ ok: false as const, error: 'not here' })),
+    configureRun: vi.fn(),
+    agents: vi.fn(async () => []),
+  }
+  return { host, runCommand, files }
+}
+
+function show(host: ModuleHost, projects = PROJECTS) {
+  return render(
+    <ModuleHostContext.Provider value={host}>
+      <SubagentsSettings projects={projects} />
+    </ModuleHostContext.Provider>,
+  )
+}
+
+const options = (menu: HTMLSelectElement): string[] => [...menu.options].map(o => o.textContent ?? '')
+
+afterEach(cleanup)
+
+describe('Subagents settings', () => {
+  test('each level offers the main agent\'s own, then every coding agent by its default and its models; a pick is saved whole in every project', async () => {
+    const { host, runCommand, files } = fakeHost({ hard: { driver: 'claude-code', model: 'opus' }, atOnce: 3 })
+    show(host)
+    await waitFor(() => expect((screen.getByLabelText('Hard tasks') as HTMLSelectElement).value).toBe('claude-code opus'))
+    const simple = screen.getByLabelText('Simple tasks') as HTMLSelectElement
+    await waitFor(() => expect(options(simple)).toEqual(['Same as the main agent', 'Claude Code · its own default', 'Claude Code · Opus 5.5', 'Codex · its own default', 'Codex · GPT-5.6-Luna']))
+    expect(simple.value).toBe('')
+    expect((screen.getByLabelText('At once') as HTMLSelectElement).value).toBe('3')
+
+    fireEvent.change(simple, { target: { value: 'codex gpt-5.6-luna' } })
+    const whole = { hard: { driver: 'claude-code', model: 'opus' }, atOnce: 3, simple: { driver: 'codex', model: 'gpt-5.6-luna' } }
+    await waitFor(() => expect(files).toEqual({ p1: whole, p2: whole }))
+    expect(runCommand).toHaveBeenCalledWith('p2', ['settings', JSON.stringify(whole)])
+    fireEvent.change(screen.getByLabelText('Hard tasks'), { target: { value: '' } })
+    await waitFor(() => expect(files['p1']).toEqual({ atOnce: 3, simple: { driver: 'codex', model: 'gpt-5.6-luna' } }))
+    fireEvent.change(screen.getByLabelText('At once'), { target: { value: '6' } })
+    await waitFor(() => expect(files['p1']).toEqual({ atOnce: 6, simple: { driver: 'codex', model: 'gpt-5.6-luna' } }))
+  })
+
+  test('nothing saved reads as the main agent\'s own and 4 at once; the first project that answers is the one shown', async () => {
+    const { host } = fakeHost({}, projectId => (projectId === 'p1' ? 'orchestration: command not found' : undefined))
+    show(host)
+    await waitFor(() => expect((screen.getByLabelText('At once') as HTMLSelectElement).value).toBe('4'))
+    expect((screen.getByLabelText('Simple tasks') as HTMLSelectElement).value).toBe('')
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  test('a second pick made before the first is saved keeps the first', async () => {
+    const { host, runCommand } = fakeHost()
+    show(host)
+    await screen.findByLabelText('Simple tasks')
+    let finish: (value: ModuleCommandResult) => void = () => {}
+    runCommand.mockImplementationOnce(() => new Promise(resolve => (finish = resolve)))
+    fireEvent.change(screen.getByLabelText('Simple tasks'), { target: { value: 'codex' } })
+    expect((screen.getByLabelText('Simple tasks') as HTMLSelectElement).value).toBe('codex')
+    fireEvent.change(screen.getByLabelText('Hard tasks'), { target: { value: 'claude-code opus' } })
+    await waitFor(() => expect(runCommand).toHaveBeenLastCalledWith('p2', ['settings', JSON.stringify({ simple: { driver: 'codex' }, hard: { driver: 'claude-code', model: 'opus' } })]))
+    finish({ ok: true, output: { ok: true } })
+  })
+
+  test('a save a project refused says which and why, and the menu shows what is saved again; nothing read says why', async () => {
+    const { host } = fakeHost()
+    show(host)
+    await screen.findByLabelText('Simple tasks')
+    ;(host.runCommand as ReturnType<typeof vi.fn>).mockImplementation(async (projectId: string, args: string[]) =>
+      args.length === 2 && projectId === 'p2' ? { ok: false, error: 'atOnce is not a whole number' } : { ok: true, output: { ok: true } },
+    )
+    fireEvent.change(screen.getByLabelText('Simple tasks'), { target: { value: 'codex' } })
+    expect((await screen.findByRole('alert')).textContent).toBe('The subagent settings were not saved: other: atOnce is not a whole number')
+    await waitFor(() => expect((screen.getByLabelText('Simple tasks') as HTMLSelectElement).value).toBe(''))
+    cleanup()
+
+    const { host: broken } = fakeHost({}, () => 'orchestration: command not found')
+    show(broken)
+    expect((await screen.findByRole('alert')).textContent).toBe('The subagent settings could not be read: gemstack: orchestration: command not found')
+  })
+
+  test('no project with the package: no section', () => {
+    const { host } = fakeHost()
+    const { container } = show(host, [])
+    expect(container.textContent).toBe('')
+  })
+
+  test('a choice is one coding agent and one model, and a saved model the agent does not list is kept', () => {
+    expect(runnerValue(undefined)).toBe('')
+    expect(runnerValue({ driver: 'codex' })).toBe('codex')
+    expect(runnerValue({ driver: 'codex', model: 'gpt-5.5' })).toBe('codex gpt-5.5')
+    expect(runnerOf('codex gpt-5.5')).toEqual({ driver: 'codex', model: 'gpt-5.5' })
+    expect(runnerOf('claude-code')).toEqual({ driver: 'claude-code' })
+    expect(runnerOf('')).toBeUndefined()
+    const kept = runnerChoices([{ value: 'codex', label: 'Codex', models: [] }], { driver: 'codex', model: 'gpt-5.5' })
+    expect(kept.map(o => [o.value, o.label])).toEqual([['', 'Same as the main agent'], ['codex', 'Codex · its own default'], ['codex gpt-5.5', 'Codex · gpt-5.5']])
+  })
+})

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { refreshPreferences } from '../lib/preferences.js'
+import { ModulesContext, byMountOrder, type MountedModules } from '../lib/use-modules.js'
 
 // The reads this page makes, answered as an empty machine: no devices, no editors detected, no
 // stored preferences. The rest of the module is kept, since the onboarding checklist inside the
@@ -23,14 +24,13 @@ vi.mock('../rpc/models.js', () => ({ onModels }))
 const schedulers = vi.hoisted(() => vi.fn(async (): Promise<unknown[]> => []))
 const sendScheduleSwitch = vi.hoisted(() => vi.fn(async (): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true })))
 const sendSchedulePublish = vi.hoisted(() => vi.fn(async (): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true })))
+const onProjects = vi.hoisted(() => vi.fn(async (): Promise<unknown[]> => []))
 vi.mock('../rpc/projects.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../rpc/projects.js')>()),
+  onProjects,
   sendScheduleSwitch,
   sendSchedulePublish,
 }))
-const subagentSettings = vi.hoisted(() => vi.fn(async (): Promise<{ settings: Record<string, unknown>; hooked: number }> => ({ settings: {}, hooked: 1 })))
-const sendSubagentSettings = vi.hoisted(() => vi.fn(async (): Promise<{ ok: true } | { ok: false; error: string }> => ({ ok: true })))
-vi.mock('../rpc/subagents.js', () => ({ onSubagentSettings: subagentSettings, sendSubagentSettings }))
 vi.mock('../rpc/reads.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../rpc/reads.js')>()),
   onBridgeToken: vi.fn(async () => null),
@@ -42,7 +42,7 @@ vi.mock('../rpc/reads.js', async importOriginal => ({
   onSchedulers: schedulers,
 }))
 
-import { SettingsPage, pace, publishChoices, publishes, subagentRunnerChoices, subagentRunnerOf, subagentRunnerValue } from './SettingsPage.js'
+import { SettingsPage, pace, publishChoices, publishes } from './SettingsPage.js'
 
 afterEach(() => {
   cleanup()
@@ -238,59 +238,45 @@ describe('SettingsPage run on a schedule', () => {
   })
 })
 
-describe('Subagents (#1902)', () => {
-  const options = (menu: HTMLSelectElement): string[] => [...menu.options].map(o => o.textContent ?? '')
+describe('Settings sections a module brings (#1902)', () => {
+  const mounted = (settings: MountedModules['settings']): MountedModules => ({ pages: [], cards: [], linkActions: [], panels: [], runSlots: [], settings, loaded: true })
 
-  test('each level offers the main agent\'s own, then every coding agent by its default and its models; a pick saves the settings whole', async () => {
-    subagentSettings.mockResolvedValue({ settings: { hard: { driver: 'claude-code', model: 'opus' }, atOnce: 3 }, hooked: 1 })
-    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
-    const simple = (await screen.findByLabelText('Simple tasks')) as HTMLSelectElement
-    await waitFor(() => expect((screen.getByLabelText('Hard tasks') as HTMLSelectElement).value).toBe('claude-code opus'))
-    expect(options(simple)).toEqual(['Same as the main agent', "Claude Code · the CLI's own default", 'Claude Code · Opus 5.5', 'Claude Code · Fable 5.1', "Codex · the CLI's own default"])
-    expect(simple.value).toBe('')
-    expect((screen.getByLabelText('At once') as HTMLSelectElement).value).toBe('3')
-
-    fireEvent.change(simple, { target: { value: 'codex' } })
-    await waitFor(() => expect(sendSubagentSettings).toHaveBeenLastCalledWith({ hard: { driver: 'claude-code', model: 'opus' }, atOnce: 3, simple: { driver: 'codex' } }))
-    fireEvent.change(screen.getByLabelText('Hard tasks'), { target: { value: '' } })
-    await waitFor(() => expect(sendSubagentSettings).toHaveBeenLastCalledWith({ atOnce: 3, simple: { driver: 'codex' } }))
-    fireEvent.change(screen.getByLabelText('At once'), { target: { value: '6' } })
-    await waitFor(() => expect(sendSubagentSettings).toHaveBeenLastCalledWith({ simple: { driver: 'codex' }, atOnce: 6 }))
+  test('each is drawn after the page\'s own sections, in the order mounted, given only the projects that have its package; one that throws breaks only itself', async () => {
+    onProjects.mockResolvedValue([
+      { id: 'p1', name: 'gemstack', path: '/p1' },
+      { id: 'p2', name: 'other', path: '/p2' },
+    ])
+    const seen: string[][] = []
+    const Subagents = ({ projects }: { projects: { id: string; name: string }[] }) => {
+      seen.push(projects.map(p => p.name))
+      return <section aria-label="Subagents section">Subagents</section>
+    }
+    const Broken = () => {
+      throw new Error('boom')
+    }
+    render(
+      <ModulesContext.Provider
+        value={mounted([
+          { id: 'subagents', Section: Subagents, package: '@gemstack/skill-orchestration', projects: ['p1', 'gone'] },
+          { id: 'broken', Section: Broken, package: '@gemstack/skill-broken', projects: ['p2'] },
+        ])}
+      >
+        <SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />
+      </ModulesContext.Provider>,
+    )
+    const section = await screen.findByLabelText('Subagents section')
+    await waitFor(() => expect(seen.at(-1)).toEqual(['gemstack']))
+    expect(screen.getByText('The broken settings failed: boom')).toBeTruthy()
+    // After the page's last own section.
+    const own = screen.getByText('Claude web')
+    expect(own.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  test('a second pick made before the first is saved keeps the first', async () => {
-    subagentSettings.mockResolvedValue({ settings: {}, hooked: 1 })
-    let finish: (value: { ok: true }) => void = () => {}
-    sendSubagentSettings.mockImplementationOnce(() => new Promise(resolve => (finish = resolve)))
-    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
-    fireEvent.change(await screen.findByLabelText('Simple tasks'), { target: { value: 'codex' } })
-    expect((screen.getByLabelText('Simple tasks') as HTMLSelectElement).value).toBe('codex')
-    fireEvent.change(screen.getByLabelText('Hard tasks'), { target: { value: 'claude-code opus' } })
-    await waitFor(() => expect(sendSubagentSettings).toHaveBeenLastCalledWith({ simple: { driver: 'codex' }, hard: { driver: 'claude-code', model: 'opus' } }))
-    finish({ ok: true })
-  })
-
-  test('nothing set reads as the main agent\'s own and 4 at once; no project with the line says how to add it; a refused save says why', async () => {
-    subagentSettings.mockResolvedValue({ settings: {}, hooked: 0 })
-    sendSubagentSettings.mockResolvedValueOnce({ ok: false, error: 'no project has a subagents hook in .the-framework/hooks.yml' })
-    render(<SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />)
-    expect(((await screen.findByLabelText('At once')) as HTMLSelectElement).value).toBe('4')
-    expect(await screen.findByText(/npx orchestration init/)).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Simple tasks'), { target: { value: 'claude-code opus' } })
-    expect((await screen.findByRole('alert')).textContent).toBe('The subagent settings were not saved: no project has a subagents hook in .the-framework/hooks.yml')
-    // The menu shows what is saved again, not the pick that was refused.
-    expect((screen.getByLabelText('Simple tasks') as HTMLSelectElement).value).toBe('')
-  })
-
-  test('a choice is one coding agent and one model, and a saved model the agent does not list is kept', () => {
-    expect(subagentRunnerValue(undefined)).toBe('')
-    expect(subagentRunnerValue({ driver: 'codex' })).toBe('codex')
-    expect(subagentRunnerValue({ driver: 'codex', model: 'gpt-5.5' })).toBe('codex gpt-5.5')
-    expect(subagentRunnerOf('codex gpt-5.5')).toEqual({ driver: 'codex', model: 'gpt-5.5' })
-    expect(subagentRunnerOf('claude-code')).toEqual({ driver: 'claude-code' })
-    expect(subagentRunnerOf('')).toBeUndefined()
-    expect(subagentRunnerOf('pi x')).toBeUndefined()
-    const kept = subagentRunnerChoices([{ value: 'codex', label: 'Codex', models: [] }], { driver: 'codex', model: 'gpt-5.5' })
-    expect(kept.map(o => [o.value, o.label])).toEqual([['', 'Same as the main agent'], ['codex', "Codex · the CLI's own default"], ['codex gpt-5.5', 'Codex · gpt-5.5']])
+  test('sections are ordered by their order, 50 when unsaid, then by package name', () => {
+    const a = { package: 'b-pkg', order: 10 }
+    const b = { package: 'a-pkg' }
+    const c = { package: 'c-pkg' }
+    const d = { package: 'z-pkg', order: 60 }
+    expect([d, c, b, a].sort(byMountOrder)).toEqual([a, b, c, d])
   })
 })

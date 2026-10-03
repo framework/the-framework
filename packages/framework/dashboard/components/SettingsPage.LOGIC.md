@@ -1,10 +1,10 @@
-The Settings page: every preference [1] the user can set, on one page, each change applied the moment it is made and saved to the daemon in the background, with the Onboarding checklist kept at the top, plus the subagent settings [25], the spend offset [19], the schedule switches [21] and the publish picks [23], which are not preferences. Everything else written here goes to the user's own preferences, so a value on this page always means "my default, everywhere"; the subagent settings go to every project's orchestration settings file, and the spend offset to every project's scheduler, the one place each is kept, and a schedule switch or a publish pick goes to its own project's scheduler, for this machine only.
+The Settings page: every preference [1] the user can set, on one page, each change applied the moment it is made and saved to the daemon in the background, with the Onboarding checklist kept at the top, plus the spend offset [19], the schedule switches [21] and the publish picks [23], which are not preferences. Everything else written here goes to the user's own preferences, so a value on this page always means "my default, everywhere"; the spend offset goes to every project's scheduler, the one place it is kept, and a schedule switch or a publish pick goes to its own project's scheduler, for this machine only.
 
 ## Context
 
 **User story**: the user opens Settings (the address `/settings`) to look up or change a setting without hunting through the header's menus, and follows the Overview's [2] hint that the onboarding can be resumed on the settings page. The heading is "Settings" and the line under it reads "Your defaults, everywhere."
 
-**Business logic story**: the same preferences feed the launcher on a project home [3], the notifications bell and the daemon's sweeps [4]. This page is the one surface that lists all of them, so what it shows must match what those surfaces act on. The spend offset [19] is the usage panel's handle as a number, read and written exactly as the handle does. The schedule switches [21] and the publish picks [23] follow the same path: the dashboard names no tool, writes through a project's hook line and reads the scheduler's state file. The subagent settings [25] too: written through each project's subagents hook [26], read off the orchestration command's settings file.
+**Business logic story**: the same preferences feed the launcher on a project home [3], the notifications bell and the daemon's sweeps [4]. This page is the one surface that lists all of them, so what it shows must match what those surfaces act on. The spend offset [19] is the usage panel's handle as a number, read and written exactly as the handle does. The schedule switches [21] and the publish picks [23] follow the same path: the dashboard names no tool, writes through a project's hook line and reads the scheduler's state file.
 
 ## Glossary
 
@@ -27,17 +27,14 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 [22] switch hook: the one shell line under `switch` in a project's `.the-framework/hooks.yml`, given the command's name in `COMMAND` and `on` or `off` in `SWITCH`; for example `npx agent-scheduler switch "$COMMAND" "$SWITCH"`.
 [23] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: nothing, the branch, a pull request, or a pull request set to merge on its own once its checks pass; the project's scheduler keeps it in its state file, where it stands in for the level the command's line in `agent-schedule.md` says until the person takes it back.
 [24] publish hook: the one shell line under `publish` in a project's `.the-framework/hooks.yml`, given the command's name in `COMMAND` and the publish pick in `PUBLISH` (`nothing`, `branch`, `pr` or `merge`, or `file` when the pick is taken back); for example `npx agent-scheduler publish "$COMMAND" "$PUBLISH"`.
-[25] subagent settings: a person's choice, on one machine, of the coding agent and model a main agent's subagents (the agents a main agent starts on parts of its task, with the `orchestration` command) run on, one for a task the main agent calls simple and one for a task it calls hard, and how many of one main agent's subagents run at once; the `orchestration` command keeps them in `.orchestration/settings.json` at each project's root, hidden from git. A level nobody set runs on the main agent's own coding agent and model; with no number set, 4 run at once.
-[26] subagents hook: the one shell line under `subagents` in a project's `.the-framework/hooks.yml`, given the subagent settings as one JSON value in `SUBAGENTS`, to be saved whole; `npx orchestration settings "$SUBAGENTS"`, which `npx orchestration init` writes.
 
 ## Business logic — TL;DR
 
-- **One page, one destination** - every control but the subagent settings, the spend offset, the schedule switches and the publish picks reads and writes the user's own preferences, applied at once and saved in the background.
+- **One page, one destination** - every control but the spend offset, the schedule switches and the publish picks reads and writes the user's own preferences, applied at once and saved in the background.
 - **The Onboarding checklist stays on this page** - it sits above every section, cannot be dismissed here, and its two navigating steps lead to an agent's page or a project's launcher.
 - **Appearance: theme and editor** - "Theme" follows the system by default; "Editor" offers "Auto-detect" plus the editors found on the daemon's machine.
 - **Agent: which coding agent, which model, and post-merge cleanup** - "Agent" (Claude Code by default) and "Model", picked from the models that coding agent lists, the same list the launcher's select offers, or the coding agent's own default (the default); both handed to a project's start hook [8] with every start; picking another coding agent leaves no model picked; "Post-merge cleanup" (off by default), the default of the launcher's box of that name.
-- **Subagents: which coding agent and model, by how hard the task is, and how many at once** - "Simple tasks" and "Hard tasks", each "Same as the main agent" (the default) or one coding agent with its own default or one of the models it lists, and "At once", 1 to 8, 4 by default; the same on every project, read off the projects' orchestration settings files and saved whole through every project's subagents hook [26]; a pick shows at once and the next pick builds on it, even before the first is saved; a write that fails says why; with no project having the hook, the section says how to add it.
-- **Devices, after "Agent" and "Subagents"** - the saved devices follow, because a device is the other place an agent can run.
+- **Devices, after "Agent"** - the saved devices follow directly, because a device is the other place an agent can run.
 - **Notifications: how they reach you, and what about** - a delivery row ("Browser") showing both the preference and whether the browser lets it deliver, and two category rows ("Human Queue", "New activity").
 - **Automation: the spend offset** - "Spend offset" is the number the usage panel's handle moves, from −50 to 50 percentage points, read off the projects' schedulers and written through every project's offset hook [20]; a write that fails says why.
 - **Automation: run on a schedule** - after the spend offset, one row per scheduled command of every project, "Run /<command> on a schedule", with a checkbox, checked when the command runs on this machine, and a menu of how far the command's runs publish on this machine: "As the file says (<level>)", Nothing, Publish branch, Open PR, Merge on green, the last two only in a project with a git host; flipping the checkbox writes the schedule switch [21] through that project's switch hook [22], and picking in the menu writes the publish pick [23] through that project's publish hook [24], "As the file says" taking the pick back; a write that fails says why.
@@ -54,7 +51,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 
 #### Business logic
 
-Every control on the page but the subagent settings, the spend offset, the schedule switches and the publish picks reads and writes the user's own preferences [1], which the daemon keeps in the registry file `~/.the-framework.json`. The exceptions are the subagent settings [25], which are kept in each project's orchestration settings file (see "Subagents: which coding agent and model, by how hard the task is, and how many at once"), the spend offset [19], which is kept by each project's scheduler and nowhere else (see "Automation: the spend offset"), and the schedule switches [21] and publish picks [23], each kept by its own project's scheduler for this machine (see "Automation: run on a schedule"). The page belongs to no project. A change takes effect on the page the instant it is made and is saved to the daemon in the background; a failed save is not reported, and a value another tab changed is adopted when the daemon answers (the write rules are in `lib/preferences.ts`).
+Every control on the page but the spend offset, the schedule switches and the publish picks reads and writes the user's own preferences [1], which the daemon keeps in the registry file `~/.the-framework.json`. The exceptions are the spend offset [19], which is kept by each project's scheduler and nowhere else (see "Automation: the spend offset"), and the schedule switches [21] and publish picks [23], each kept by its own project's scheduler for this machine (see "Automation: run on a schedule"). The page belongs to no project. A change takes effect on the page the instant it is made and is saved to the daemon in the background; a failed save is not reported, and a value another tab changed is adopted when the daemon answers (the write rules are in `lib/preferences.ts`).
 
 ### The Onboarding checklist stays on this page
 
@@ -97,24 +94,7 @@ The "Agent" section has three rows:
 
 Where an agent runs is not a setting: it is picked per start in the launcher's "Run on" (`RunOnMenu.tsx`).
 
-### Subagents: which coding agent and model, by how hard the task is, and how many at once
-
-#### Context
-
-**User story**: an agent splitting its task across subagents says, for each task, whether it is simple or hard. The user wants simple tasks on a cheaper model and hard ones on the strongest, and no more than three subagents of one agent working at a time; they pick that here once, and every project's subagents follow it on this machine.
-
-**Problem**: a main agent that chose each subagent's model would spend the user's money on its own guess; a setting per project would have to be made again in each one. The settings are the `orchestration` command's, which The Framework must not name, so the page reads them off the file by its name and writes them through each project's subagents hook [26], as the spend offset goes through the offset hook.
-
-#### Business logic
-
-The "Subagents" section follows the "Agent" section, with the description "The models a main agent's subagents run on, by how hard the main agent says each task is. The same on every project, on this machine." It has three rows:
-
-- "Simple tasks" ("A task the main agent marks simple.") and "Hard tasks" ("A task the main agent marks hard."): each a drop-down whose first entry, "Same as the main agent", sets nothing for that level, so its subagents run on the main agent's own coding agent and model; it is what the row shows when nothing is set. Then, for each coding agent in the order the "Agent" row lists them, "<coding agent> · the CLI's own default" (that coding agent with no model, so it uses its own default), followed by "<coding agent> · <model>" for each model it lists, by the names it gives them: the same lists, from the same place, as the "Model" row (`lib/models.ts`). One entry is always one coding agent and one model, since a model belongs to one coding agent. A saved model the list does not hold is kept at the end, "<coding agent> · <model id>", and stays picked.
-- "At once" ("How many of one main agent's subagents run at the same time. It starts the next when one ends."): 1 to 8 (up to the saved number when it is larger); with nothing set it shows 4, the orchestration command's own default.
-
-The settings shown are the subagent settings [25] the daemon reads off the registered projects (`../../src/dashboard/subagent-settings.ts`), asked again every ten seconds. Every pick saves all three rows together, whole: a level set back to "Same as the main agent" is left out of what is saved, so it is unset again. The daemon runs every registered project's subagents hook [26] with them (`../../src/dashboard-rpc/subagents.ts`). A pick shows at once and stays shown until a read made after every pending save has finished brings the settings back, and each pick is built on the last one shown, so a second pick made before the first is saved keeps the first. While a save is pending, "Saving…" shows under the rows. A save that fails shows, under the rows, as an alert: "The subagent settings were not saved: <why>" (for example "no project has a subagents hook in .the-framework/hooks.yml"), and the rows go back to the settings read; the next pick clears it. While no registered project has the subagents hook, the section says so above the rows: "No project has a subagents line in .the-framework/hooks.yml yet: run `npx orchestration init` in a project."
-
-### Devices, after "Agent" and "Subagents"
+### Devices, after "Agent"
 
 #### Context
 
@@ -122,7 +102,7 @@ The settings shown are the subagent settings [25] the daemon reads off the regis
 
 #### Business logic
 
-The "Devices" section follows the "Subagents" section, which follows the "Agent" section, because a saved device [10] is the other place an agent [5] can run. Its rows and rules live in `DevicesSettings.tsx`.
+The "Devices" section follows the "Agent" section directly, because a saved device [10] is the other place an agent [5] can run. Its rows and rules live in `DevicesSettings.tsx`.
 
 ### Notifications: how they reach you, and what about
 

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { AgentHandoff } from '../../src/index.js'
-import { ChevronDown, GitMerge, GitPullRequest, Upload } from 'lucide-react'
-import { sendMerge, sendMergeBranch, sendOpenPullRequest, sendPush } from '../rpc/control.js'
+import { ChevronDown, GitCommitHorizontal, GitMerge, GitPullRequest, Upload } from 'lucide-react'
+import { sendMerge, sendMergeBranch, sendMessage, sendOpenPullRequest, sendPush } from '../rpc/control.js'
 import type { AgentHandoffState } from '../lib/use-agent-handoff.js'
 import { cn } from '../lib/utils.js'
 import { DiffStat } from './DiffStat.js'
@@ -78,6 +78,9 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
  * of the bar where it is always in view. What it left uncommitted is still named, since nothing
  * lands that.
  */
+/** What the Commit button says to the agent: it commits its own work, in its own words. */
+export const COMMIT_MESSAGE = 'Commit your work.'
+
 /** The project's main branch by name, when the handoff was measured from it; a run measured from a commit only knows it as "the main branch". */
 function mainBranchName(base: string | undefined): string {
   return base !== undefined && !/^[0-9a-f]{40}$/.test(base) ? base.replace(/^origin\//, '') : 'the main branch'
@@ -128,9 +131,22 @@ export function HandoffActions({
   if (!handoff.exists) return handoff.unchanged ? null : <Reason>Branch gone — nothing to open a PR from.</Reason>
   // A branch with no diff never gets the button (#1173): there is nothing the git host would accept a PR
   // for, and offering one that fails with "No commits between main and <branch>" is the dead end
-  // this bar exists to prevent. When the tree holds uncommitted work, that work is named — the
-  // reader's next step is to have the session commit it (the composer is right below).
-  if (handoff.empty) return <Uncommitted paths={handoff.pendingFiles ?? []} />
+  // this bar exists to prevent. When the tree holds uncommitted work, that work is named, and the
+  // next step is offered: the agent is asked to commit it. The agent commits, not the dashboard:
+  // it knows what it changed and writes the message, and nothing is committed on its behalf.
+  if (handoff.empty) {
+    const paths = handoff.pendingFiles ?? []
+    if (paths.length === 0) return null
+    return (
+      <>
+        <Uncommitted paths={paths} />
+        <Button size="xs" disabled={busy} onClick={() => act('commit', () => sendMessage(projectId, COMMIT_MESSAGE, agentId), 'Could not ask the agent to commit.')}>
+          <GitCommitHorizontal className="h-3.5 w-3.5" />
+          {pending === 'commit' ? 'Asking…' : 'Commit'}
+        </Button>
+      </>
+    )
+  }
   // No remote: nothing to push to and no pull request to open, so the work reaches the project's
   // own folder by a merge on this machine, and that is the one step offered.
   if (!handoff.hasRemote) {
@@ -144,7 +160,7 @@ export function HandoffActions({
           onClick={() => act('merge-branch', () => sendMergeBranch(projectId, agentId), 'Could not merge the branch.')}
         >
           <GitMerge className="h-3.5 w-3.5" />
-          {pending === 'merge-branch' ? 'Merging…' : `Merge into ${mainBranchName(handoff.base)}`}
+          {pending === 'merge-branch' ? 'Merging…' : 'Merge'}
         </Button>
       </>
     )

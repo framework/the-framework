@@ -32,8 +32,13 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   has no pull requests, and a finished run's last step is Push. Picked over the branches
   package opening the request, which put the git host inside the git skill, and over a git host
   adapter inside it, which made another git host a change to that package.
-- A project with no remote is offered one step on a finished agent's page: "Merge into
-  main", which merges the agent's branch into the project's default branch on this machine,
+- An agent that ended with its work uncommitted gets a "Commit" button on its page, beside
+  the files it left. The button asks the agent to commit: it sends it "Commit your work."
+  The dashboard commits nothing itself, since the agent knows what it changed and writes the
+  message. Picked over a message that only names the files and leaves the person to type
+  the ask.
+- A project with no remote is offered one step on a finished agent's page: "Merge",
+  which merges the agent's branch into the project's default branch on this machine,
   through the branches provider. A conflict changes nothing and is said. The merged branch
   is deleted, and the run's record keeps its last commit and where its work began, so the
   page still shows what the agent changed. Picked over "No remote to push to", which left

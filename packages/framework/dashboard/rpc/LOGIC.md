@@ -25,6 +25,7 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 [15] schedule switch: a person's choice, on one machine, whether a scheduled command (a line of the project's `agent-schedule.md`) runs there; the project's scheduler keeps it in its state file. The switch hook, under `switch:` in `.the-framework/hooks.yml`, sets it.
 [16] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [17] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: nothing, the branch, a pull request, or a pull request set to merge on its own once its checks pass; the project's scheduler keeps it in its state file, where it stands in for the level the command's line in `agent-schedule.md` says until the person takes it back. The publish hook, under `publish:` in `.the-framework/hooks.yml`, sets it.
+[18] subagent settings: a person's choice, on one machine, of the coding agent and model a main agent's subagents (the agents it starts on parts of its task) run on, one for a task the main agent calls simple and one for a task it calls hard, and how many of one main agent's subagents run at once; the project's `orchestration` command keeps them. The subagents hook, under `subagents:` in `.the-framework/hooks.yml`, saves them.
 
 ## Business logic — TL;DR
 
@@ -36,6 +37,7 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 - **Preferences** (`preferences.ts`) - reading, replacing or patching the preferences [10], a project's shared saved prompts, and the installed editors.
 - **Models** (`models.ts`) - which models each coding agent offers, as the daemon asked them, or why one could not say.
 - **Quota** (`quota.ts`) - the quota [11] reading against the quota boundary [12], and setting the spend offset [14] through every project's offset hook.
+- **Subagents** (`subagents.ts`) - the subagent settings [18] in force and how many projects have the subagents hook, and saving them whole through every project's subagents hook.
 - **Devices** (`devices.ts`) - whether each saved device [13] answers, checked by the daemon with the token the browser holds and never keeps.
 - **Modules** (`modules.ts`) - which modules [16] the registered projects have, a module running one of its own package's commands in one project, and a module calling one of its own server part's reads.
 

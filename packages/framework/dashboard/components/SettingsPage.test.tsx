@@ -278,6 +278,8 @@ describe('Subagents (#1902)', () => {
     expect(await screen.findByText(/npx orchestration init/)).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Simple tasks'), { target: { value: 'claude-code opus' } })
     expect((await screen.findByRole('alert')).textContent).toBe('The subagent settings were not saved: no project has a subagents hook in .the-framework/hooks.yml')
+    // The menu shows what is saved again, not the pick that was refused.
+    expect((screen.getByLabelText('Simple tasks') as HTMLSelectElement).value).toBe('')
   })
 
   test('a choice is one coding agent and one model, and a saved model the agent does not list is kept', () => {

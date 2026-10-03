@@ -2,6 +2,7 @@ import { contextAddProject, contextProjectErrors, contextProjects, resolveProjec
 import { readProjectCommands, type ProjectCommand } from '../project-commands.js'
 import { readProjectHooks, runCheckHook, type StartReadiness } from '../project-hooks.js'
 import { isPublishPick, publishPickIn, type PublishPick } from '../publish-levels.js'
+import { hasRemote } from '../has-remote.js'
 import { pickDirectory, type PickDirectoryResult } from '../pick-directory.js'
 import { projectGitHost } from '../store/git-host.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
@@ -66,6 +67,8 @@ export interface ProjectLauncher {
   startHook: boolean
   /** Whether one of the project's packages provides a git host; without one no pull request can be opened, so the publish menu stops at the branch. */
   gitHost: boolean
+  /** Whether the project's repository has an `origin` remote; without one nothing can be published, so the publish menu is not offered. */
+  remote: boolean
 }
 
 /**
@@ -75,8 +78,8 @@ export interface ProjectLauncher {
 export async function onCommands(projectId: string): Promise<ProjectLauncher | null> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return null
-  const [commands, hooks, gitHost] = await Promise.all([readProjectCommands(cwd), readProjectHooks(cwd), projectGitHost(cwd).catch(() => undefined)])
-  return { commands, startHook: hooks.start !== undefined, gitHost: gitHost !== undefined }
+  const [commands, hooks, gitHost, remote] = await Promise.all([readProjectCommands(cwd), readProjectHooks(cwd), projectGitHost(cwd).catch(() => undefined), hasRemote(cwd)])
+  return { commands, startHook: hooks.start !== undefined, gitHost: gitHost !== undefined, remote }
 }
 
 /**

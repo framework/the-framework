@@ -23,7 +23,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 - **Adding a project** - a path is registered only after it has been installed as a project; an empty path is refused outright.
 - **The folder dialog is the daemon's** - the machine's own choose-a-folder dialog is opened by the daemon, because a browser cannot learn an absolute path; dismissing it is an ordinary answer, not a failure.
 - **The onboarding's first suggestion** - the directory the daemon was started in is offered as the first project, together with whether it is already registered.
-- **What the launcher offers** - the project's commands [3], read off its skills folders, whether its hooks file has a start hook [7], and whether one of its packages provides a git host; an unknown project answers nothing.
+- **What the launcher offers** - the project's commands [3], read off its skills folders, whether its hooks file has a start hook [7], whether one of its packages provides a git host, and whether its repository has an `origin` remote (`../has-remote.ts`), without which the launcher shows no publish menu; an unknown project answers nothing.
 - **What would stop an agent** - the project's check hook [8], run with the coding agent the user picked: its problems and its warnings; a check hook that fails is one warning; no check hook, or an unknown project, answers nothing.
 
 ## Business logic

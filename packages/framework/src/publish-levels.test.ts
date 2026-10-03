@@ -22,3 +22,13 @@ test('Nothing hands the start hook no level; every other pick is its own level',
   assert.equal(publishLevelOf('pr'), 'pr')
   assert.equal(publishLevelOf('merge'), 'merge')
 })
+
+test('a project with no remote is offered Nothing alone, and any saved pick is Nothing there', () => {
+  assert.deepEqual(offeredPublishPicks(true, false), ['nothing'])
+  assert.deepEqual(offeredPublishPicks(false, false), ['nothing'])
+  assert.equal(publishPickIn('merge', true, false), 'nothing')
+  assert.equal(publishPickIn('branch', false, false), 'nothing')
+  assert.equal(publishPickIn(undefined, true, false), 'nothing')
+  // With a remote, as before: a pick the project is not offered falls back to the branch.
+  assert.equal(publishPickIn('merge', false, true), 'branch')
+})

@@ -21,3 +21,4 @@ What the tests cover, for the launcher on a project home [1]:
 [5] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [6] check hook: the one shell line under `check:` in the project's `.the-framework/hooks.yml`, which answers what would stop an agent (problems) and what is only worth knowing (warnings).
 [7] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root.
+- **No remote** - a project with no remote shows no publish menu, and a saved pick starts its agent with no publish level.

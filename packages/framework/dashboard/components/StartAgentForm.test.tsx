@@ -125,6 +125,16 @@ describe('StartAgentForm (#1774)', () => {
     await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', { publish: 'branch' }))
   })
 
+  test('a project with no remote is offered no publish menu, and a saved pick starts it publishing nothing', async () => {
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: false, remote: false })
+    prefs.current = { publish: 'merge' }
+    start.mockResolvedValue({ agentId: 'r1' })
+    render(<StartAgentForm {...props} />)
+    await waitFor(() => expect(screen.queryByRole('combobox', { name: 'Publish' })).toBeNull())
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
+  })
+
   test('a project with the post-merge-cleanup command shows the box; ticked, the start carries the command as the follow-up', async () => {
     onCommands.mockResolvedValue({ commands: [...COMMANDS, { name: 'post-merge-cleanup' }], startHook: true, gitHost: true })
     prefs.current = { postMergeCleanup: true }

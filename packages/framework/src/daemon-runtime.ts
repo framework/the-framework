@@ -12,6 +12,7 @@ import { writeHookLines } from './built-in.js'
 import { installProject } from './install.js'
 import { runProjectHooks, runStartHook } from './project-hooks.js'
 import { publishLevelOf, publishPickIn } from './publish-levels.js'
+import { hasRemote } from './has-remote.js'
 import { projectGitHost } from './store/git-host.js'
 
 /**
@@ -104,8 +105,9 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
     }
     const projectCwd = await resolveProject(targetProjectId)
     if (!projectCwd) return { ok: false, error: `unknown project: ${targetProjectId}` }
-    // A project with no git host package can open no pull request: the furthest its run publishes is the branch.
-    const publish = options.publish !== undefined ? publishLevelOf(publishPickIn(options.publish, (await projectGitHost(projectCwd).catch(() => undefined)) !== undefined)) : undefined
+    // A project with no git host package can open no pull request: the furthest its run publishes is
+    // the branch. One with no remote can publish nothing, whatever pick the start carries.
+    const publish = options.publish !== undefined ? publishLevelOf(publishPickIn(options.publish, (await projectGitHost(projectCwd).catch(() => undefined)) !== undefined, await hasRemote(projectCwd))) : undefined
     const started = await runStartHook(projectCwd, {
       prompt,
       ...(options.driver !== undefined ? { driver: options.driver } : {}),

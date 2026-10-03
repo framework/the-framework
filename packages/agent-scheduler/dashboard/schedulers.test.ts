@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { STATUS, hostAnswering } from './fixtures.js'
-import { loosestSpendOffset, pace, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, typedOffset } from './schedulers.js'
+import { loosestSpendOffset, offsetsThatDiffer, pace, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, typedOffset } from './schedulers.js'
 
 const GEMSTACK = { id: 'p1', name: 'gemstack', gitHost: true }
 const OTHER = { id: 'p2', name: 'other', gitHost: false }
@@ -46,6 +46,13 @@ describe('reading and saving through the command', () => {
     expect(loosestSpendOffset([row(-5), row(12), row()])).toBe(12)
     expect(loosestSpendOffset([row(), row()])).toBeUndefined()
     expect(loosestSpendOffset([])).toBeUndefined()
+  })
+
+  test('the projects whose offset is not the one in force are named with their own; none when they agree or did not answer', () => {
+    const row = (name: string, spendOffset?: number) => ({ ...schedulerRow({ id: name, name, gitHost: true }, {}), ...(spendOffset !== undefined ? { spendOffset } : {}) })
+    expect(offsetsThatDiffer([row('a', 12), row('b', -5.04), row('c'), row('d', 12)])).toEqual([{ name: 'b', offset: -5 }])
+    expect(offsetsThatDiffer([row('a', 4), row('b', 4)])).toEqual([])
+    expect(offsetsThatDiffer([row('a')])).toEqual([])
   })
 
   test('a typed offset is a whole number held to the reach of the bar; text that is no number yet is none', () => {

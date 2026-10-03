@@ -19,6 +19,7 @@ What the module knows of a project's scheduler and how it changes it: one row pe
 - **A project's row** - on, keep-alive, running, the model, the spend cushion [3], the last tick [5] with its decisions and its note, and the schedule's commands, each with this machine's schedule switch [2] and publish pick [4] folded in; anything that is not what the command promises reads as absent.
 - **Reading every project** - `agent-scheduler status` in each project, at once; a project whose command fails is a row that says why and holds nothing else.
 - **The spend cushion in force** - the loosest one any project holds; none when no project answered one.
+- **Projects holding another cushion** - each project whose spend cushion is not the one in force, with its own, to one decimal; none when they agree.
 - **A typed spend cushion** - the text of the Settings box as a whole number of points held to −50..50; none while the text is empty or no number yet (a minus sign alone).
 - **Saving the spend cushion** - `agent-scheduler offset -- <points>` in every project; each failing project is named.
 - **In words** - a row's leading status, a command's pace, how far a command publishes, the labels of the publish picks, and which picks a project is offered.

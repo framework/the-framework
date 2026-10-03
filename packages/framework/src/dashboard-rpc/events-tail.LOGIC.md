@@ -45,7 +45,7 @@ The boundary is reported once the first read has delivered everything already lo
 The tail of one agent's diary [2] withholds it until lines could be delivered. A reconnecting browser replaces what it shows with the replay at the boundary, and an agent being continued has, for a second or more, no diary to read: its record says it is running while its checkout [3] is on its way back, or its checkout exists a moment before the diary is written into it. A boundary reported then said "the replay is empty", and the browser emptied a full transcript until the lines came. So:
 
 - a diary that is nowhere yet is asked for again once a second, and the boundary is reported once its home's lines are delivered: after the first read of its file, or after the finished agent's lines;
-- a diary whose file does not exist when it is first read has its boundary reported after the first read that finds the file, or, when the file never comes and the agent turns up finished, after the finished agent's lines;
+- a diary whose file does not exist when it is first read, or exists and still holds nothing (a writer creates the file a moment before it writes the first lines), has its boundary reported after the first read that finds the file written, or, when the file never comes and the agent turns up finished, after the finished agent's lines;
 - a file that is there, and an agent already finished, report it after their lines, as before.
 
 Either tail reports it exactly once: when nothing can be tailed at all (no file could be resolved) it is still reported and the tail stays silent, and a relocation of the file is not a new replay.

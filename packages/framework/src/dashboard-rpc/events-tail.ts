@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { logLiveFile } from 'agent-driver'
@@ -59,6 +59,15 @@ export function partialReader(send: (text: string) => void): (diary: string) => 
 
 /** Where a relocating tail reads now: a file it follows, a finished run's lines, whole, or nowhere yet (`pending`: ask again shortly). */
 export type TailTarget<T> = { file: string } | { finished: T[] } | { pending: true }
+
+/** Whether the file at `path` holds at least one byte; a file that cannot be read holds nothing. */
+function holdsSomething(path: string): boolean {
+  try {
+    return statSync(path).size > 0
+  } catch {
+    return false
+  }
+}
 
 /**
  * Tail a run's diary across its relocations: the same read-then-follow as {@link tailEvents},
@@ -142,10 +151,15 @@ export function tailAgentEvents<T = unknown>(
   const pullOrRelocate = async (): Promise<void> => {
     if (stopped || !tailer || path === undefined) return
     if (existsSync(path)) {
+      // A file that is there and still holds nothing is a diary about to be written: the owed
+      // boundary waits for the pull that had lines to deliver, or it would say an empty replay.
+      const written = owed !== undefined && holdsSomething(path)
       await tailer.pull()
-      const boundary = owed
-      owed = undefined
-      boundary?.()
+      if (written) {
+        const boundary = owed
+        owed = undefined
+        boundary?.()
+      }
       await afterPull?.(path)
       return
     }
@@ -179,10 +193,13 @@ export function tailAgentEvents<T = unknown>(
       },
     )
     // The boundary is reported once the file has been read. A checkout is there a moment before
-    // the diary is written into it: reported then, the boundary would say an empty replay.
+    // the diary is written into it, and the diary is there a moment before its first lines:
+    // reported then, the boundary would say an empty replay. So it is reported only when the
+    // file held something before the read, and owed until a later read finds it written.
+    const written = holdsSomething(file)
     const replayed = (): void => {
       if (stopped) return
-      if (existsSync(file)) onReplayedOnce()
+      if (written) onReplayedOnce()
       else owed = onReplayedOnce
       follow()
     }

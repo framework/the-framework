@@ -1,4 +1,4 @@
-One "⋮" menu at the end of an agent's [1] action bar, holding everything the user can do to the agent other than its next step [2]: open the project on its git host, open the agent's folder, open it in an editor, open its driver session [3], copy the command that resumes that driver session in a terminal, stop [4] the agent, remove its kept checkout [5], and delete it after a confirmation. Each item is offered only when it can honestly do what it says.
+One "⋮" menu at the end of an agent's [1] action bar, holding everything the user can do to the agent other than its next step [2]: open the project on its git host, open the agent's folder, open it in an editor, open its driver session [3], copy the command that resumes that driver session in a terminal, stop [4] the agent, remove its kept checkout [5], and delete it after a confirmation. Each item is offered only when it can honestly do what it says. The project home's action bar shows the same menu for no agent: the items that open the project itself.
 
 ## Context
 
@@ -19,6 +19,7 @@ One "⋮" menu at the end of an agent's [1] action bar, holding everything the u
 
 - **Opening the agent somewhere** - "Open on <git host name>" when the project's git host names a page; a folder item named for what it will open; an "Open in editor" submenu with the preferred-editor picker; "Open session (<id>)" when the driver session has a real link.
 - **Copying the resume command** - when the driver session id is known, one item copies the terminal command that reopens the conversation, or just the id when the directory it ran in is unknown, and confirms with "Copied".
+- **The menu for no agent** - on the project home the same menu, named "Project actions", holds only the items that open the project.
 - **Stop, while the agent works** - "Stop agent", which reads "Stopping…" until the agent's end arrives. There is no merge here: an agent that is working is still writing its branch.
 - **Remove and delete, once the agent has ended** - "Remove worktree" only while the agent's checkout is kept; "Delete session" only for a finished agent, behind a confirmation that says the history is gone for good while the branch and pull request stay in git.
 - **Failures are said in the menu** - a failed action's reason is shown at the bottom of the menu instead of nothing happening.
@@ -33,7 +34,7 @@ See `## Context`.
 
 #### Business logic
 
-The menu opens from an icon button whose hover reads "Session actions". Its first items, in order:
+The menu opens from an icon button whose hover reads "Session actions", or "Project actions" when the menu serves no particular agent, as on the project home. Its first items, in order:
 
 - "Open on <git host name>" ("Open on GitHub" for a GitHub project), opening the project's repository page in a new tab. Offered only when the project's git host provider names a page; the last known page stays while another project's loads, so the item does not flicker.
 - The folder item, which asks the daemon to open the agent's [1] folder in the OS file manager. It is named for what it will open: "Open session's folder" when the agent still has a checkout [5] of its own, which is the case while it runs and, once finished, while its checkout was kept; "Open project folder" when the agent's checkout is gone, since the open then resolves to the project root, with the hover "This session no longer has its own checkout"; and "Open folder" when the menu serves no particular agent.
@@ -51,6 +52,16 @@ Opening the folder or the editor is disabled while another action is in flight; 
 #### Business logic
 
 Offered only when the agent's [1] events carry a driver session id. The item shows the first 8 characters of the session id at its end and the full command on hover. It reads "Copy resume command" when the directory the agent ran in is known, and copies `mkdir -p '<directory>' && cd '<directory>' && claude --resume <session id>` (built by the rule in `lib/resume-command.ts`, which sets no permission mode on purpose); otherwise it reads "Copy session id" and copies the id alone. The menu stays open on the click, and the item reads "Copied" for a moment so a click that only fills the clipboard shows something for itself.
+
+### The menu for no agent
+
+#### Context
+
+**User story**: on the project home the user opens the project on its git host, in the file manager or in an editor from the same "⋮" menu, in the same corner, as on an agent's page.
+
+#### Business logic
+
+Given no agent, the menu is named "Project actions" and holds only the items that open something: "Open on <git host name>", "Open folder" and "Open in editor" with "Open in your editor" and the preferred-editor picker. Each acts on the project's own checkout. Nothing is offered to stop, remove or delete, and no rule is drawn under the last item: the rule that separates the opening items from the rest is drawn only when one of those follows.
 
 ### Stop, while the agent works
 

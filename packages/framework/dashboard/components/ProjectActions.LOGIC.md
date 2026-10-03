@@ -1,4 +1,4 @@
-The action bar at the top of the project home [1]: the project's name first, since with all projects showing in the sidebar nothing else on the page says which project an agent will start in, then the project's git status on the left (`GitStatusBar.tsx`) and the workspace actions on the right (`WorkspaceActions.tsx`). Both halves are the same ones an agent's [2] page shows; here they are given no agent, so they report on and act on the project's own checkout rather than an agent's.
+The action bar at the top of the project home [1]: the project's name first, since with all projects showing in the sidebar nothing else on the page says which project an agent will start in, then the project's git status on the left (`GitStatusBar.tsx`) and the "⋮" menu of actions on the right (`AgentActionsMenu.tsx`): open the project on its git host, its folder, or in an editor. Both halves are the same ones an agent's [2] page shows; here they are given no agent, so they report on and act on the project's own checkout rather than an agent's.
 
 ## Glossary
 

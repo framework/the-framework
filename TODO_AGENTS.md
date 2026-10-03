@@ -8,6 +8,7 @@
 
 
 ## Priority 5
+- Create tickets/2026-10-03_pretty-dashboard-url.plan.md
 
 
 ## Priority 4

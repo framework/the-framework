@@ -30,9 +30,9 @@ import {
 } from './ui/dropdown-menu.js'
 
 // One ⋮ overflow menu for everything you can DO to a session (#toolbar-menu), instead of a row of
-// five-plus icon buttons that came and went with the agent's state. It folds in what used to be
-// WorkspaceActions (git host / folder / editor / Serve), the Stop button, Remove worktree, Open
-// session, and Delete. The handoff's Push / Open PR stay visible in the bar — they move the work
+// five-plus icon buttons that came and went with the agent's state: git host / folder / editor,
+// the Stop button, Remove worktree, Open session, and Delete. The project home's bar shows the
+// same menu with no session: the items that open the project itself, under "Project actions". The handoff's Push / Open PR stay visible in the bar — they move the work
 // forward, not just open it somewhere. Serve keeps its state (Serve → Open/Stop, or a picker
 // submenu in a multi-app repo); the editor keeps its preferred-editor submenu; Delete opens its
 // confirm dialog (a menu item cannot also be the dialog's trigger, so the dialog is controlled).
@@ -107,6 +107,10 @@ export function AgentActionsMenu({
   }
 
   const name = label?.trim() || agentId
+  // What the button is called: the menu acts on one session, or, with none, on the project.
+  const title = agentId ? 'Session actions' : 'Project actions'
+  const removable = retainedWorktree && !active && !!agentId
+  const deletable = !!onDeleted && !active && !!agentId
 
   return (
     <>
@@ -116,14 +120,14 @@ export function AgentActionsMenu({
             render={
               <DropdownMenuTrigger
                 type="button"
-                aria-label="Session actions"
+                aria-label={title}
                 className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
               />
             }
           >
             <MoreVertical className="h-3.5 w-3.5" />
           </TooltipTrigger>
-          <TooltipContent>Session actions</TooltipContent>
+          <TooltipContent>{title}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent align="end" className="min-w-[14rem]">
           {home && (
@@ -179,7 +183,8 @@ export function AgentActionsMenu({
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuSeparator />
+          {/* A rule only above something: a menu with nothing to stop, remove or delete ends on its last item. */}
+          {(active || removable || deletable) && <DropdownMenuSeparator />}
 
           {active && (
             <DropdownMenuItem disabled={stopping} onClick={() => void stopSession()}>
@@ -187,13 +192,12 @@ export function AgentActionsMenu({
             </DropdownMenuItem>
           )}
 
-          {((retainedWorktree && !active) || (onDeleted && !active)) && agentId && <DropdownMenuSeparator />}
-          {retainedWorktree && !active && agentId && (
+          {removable && (
             <DropdownMenuItem disabled={busy} onClick={() => removeWorktree()}>
               <FolderX className="h-3.5 w-3.5 shrink-0" /> Remove worktree
             </DropdownMenuItem>
           )}
-          {onDeleted && !active && agentId && (
+          {deletable && (
             <DropdownMenuItem onClick={() => setConfirmDelete(true)} className="text-danger">
               <Trash2 className="h-3.5 w-3.5 shrink-0" /> Delete session
             </DropdownMenuItem>

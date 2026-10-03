@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-// The ⋮ menu subsumes the old WorkspaceActions / Stop / Remove / Delete row, so it pulls the same
-// RPC + editor reads; stub them the way WorkspaceActions.test did.
+// The ⋮ menu holds the git host / folder / editor / Stop / Remove / Delete actions, so it pulls
+// their RPC + editor reads; stub them.
 const onGitHostHome = vi.fn(async () => ({ url: 'https://github.com/o/r', name: 'GitHub' }))
 const sendOpenInApp = vi.fn(async () => ({ ok: true as const }))
 const sendStop = vi.fn(async () => {})
@@ -15,8 +15,13 @@ vi.mock('../rpc/control.js', () => ({
   sendRemoveWorktree,
   sendDeleteAgent,
 }))
-vi.mock('../lib/preferences.js', () => ({ usePreferences: () => ({}), updatePreferences: vi.fn() }))
-vi.mock('../lib/editors.js', () => ({ useDetectedEditors: () => [] }))
+// The editor picker (#727) lives in the menu's editor submenu; stub the preference store and the
+// detected-editors read so the tests drive a fixed set.
+const updatePreferences = vi.hoisted(() => vi.fn())
+let prefs: { editor?: string } = {}
+let detectedEditors: { bin: string; label: string }[] = []
+vi.mock('../lib/preferences.js', () => ({ usePreferences: () => prefs, updatePreferences }))
+vi.mock('../lib/editors.js', () => ({ useDetectedEditors: () => detectedEditors }))
 
 const { AgentActionsMenu } = await import('./AgentActionsMenu.js')
 
@@ -25,6 +30,9 @@ const openMenu = () => fireEvent.click(screen.getByRole('button', { name: /sessi
 beforeEach(() => {
   sendOpenInApp.mockClear()
   sendDeleteAgent.mockClear()
+  updatePreferences.mockClear()
+  prefs = {}
+  detectedEditors = []
 })
 afterEach(cleanup)
 
@@ -119,5 +127,78 @@ describe('the live-session action: Stop', () => {
     openMenu()
     await waitFor(() => expect(screen.getByText('Open in editor')).toBeTruthy())
     expect(screen.queryByText('Stop agent')).toBeNull()
+  })
+})
+
+describe('the menu with no session: the project home (#809)', () => {
+  const openProjectMenu = () => fireEvent.click(screen.getByRole('button', { name: 'Project actions' }))
+
+  test('it is named "Project actions" and opens the project folder', async () => {
+    render(<AgentActionsMenu projectId="p1" events={[]} />)
+    expect(screen.queryByRole('button', { name: /session actions/i })).toBeNull()
+    openProjectMenu()
+    expect(await screen.findByText('Open on GitHub')).toBeTruthy()
+    fireEvent.click(screen.getByText('Open folder'))
+    await waitFor(() => expect(sendOpenInApp).toHaveBeenCalledWith('p1', 'files', undefined))
+  })
+
+  test('its editor item opens the project in the editor', async () => {
+    render(<AgentActionsMenu projectId="p1" events={[]} />)
+    openProjectMenu()
+    fireEvent.click(await screen.findByText('Open in editor'))
+    fireEvent.click(await screen.findByText('Open in your editor'))
+    await waitFor(() => expect(sendOpenInApp).toHaveBeenCalledWith('p1', 'editor', undefined))
+  })
+
+  test('it offers nothing to stop, remove or delete, and ends on its last item with no rule under it', async () => {
+    render(<AgentActionsMenu projectId="p1" events={[]} retainedWorktree onDeleted={vi.fn()} />)
+    openProjectMenu()
+    const menu = await screen.findByRole('menu')
+    expect(screen.queryByText('Stop agent')).toBeNull()
+    expect(screen.queryByText('Remove worktree')).toBeNull()
+    expect(screen.queryByText('Delete session')).toBeNull()
+    expect(menu.querySelector('[role="separator"]')).toBeNull()
+  })
+
+  test('a finished session with something to delete has one rule above it', async () => {
+    render(<AgentActionsMenu projectId="p1" agentId="run-1" events={[]} onDeleted={vi.fn()} />)
+    openMenu()
+    const menu = await screen.findByRole('menu')
+    expect(menu.querySelectorAll('[role="separator"]')).toHaveLength(1)
+  })
+})
+
+describe('the editor picker in the menu (#727)', () => {
+  const openEditorMenu = async () => {
+    openMenu()
+    fireEvent.click(await screen.findByText('Open in editor'))
+  }
+
+  test('picking a detected editor stores its CLI bin', async () => {
+    detectedEditors = [
+      { bin: 'code', label: 'VS Code' },
+      { bin: 'cursor', label: 'Cursor' },
+    ]
+    render(<AgentActionsMenu projectId="p1" agentId="run-1" events={[]} />)
+    await openEditorMenu()
+    fireEvent.click(await screen.findByText('Cursor'))
+    expect(updatePreferences).toHaveBeenCalledWith({ editor: 'cursor' })
+  })
+
+  test('picking Default clears the editor', async () => {
+    prefs = { editor: 'cursor' }
+    detectedEditors = [{ bin: 'cursor', label: 'Cursor' }]
+    render(<AgentActionsMenu projectId="p1" agentId="run-1" events={[]} />)
+    await openEditorMenu()
+    fireEvent.click(await screen.findByText('Default'))
+    expect(updatePreferences).toHaveBeenCalledWith({ editor: '' })
+  })
+
+  test('shows a stored editor that was not auto-detected as a custom row', async () => {
+    prefs = { editor: 'mate' }
+    detectedEditors = [{ bin: 'code', label: 'VS Code' }]
+    render(<AgentActionsMenu projectId="p1" agentId="run-1" events={[]} />)
+    await openEditorMenu()
+    await waitFor(() => expect(screen.getAllByText('mate').length).toBeGreaterThan(0))
   })
 })

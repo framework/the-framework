@@ -7,7 +7,7 @@ import { OptionLabel } from './ui/option-label.js'
 import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel } from './ui/dropdown-menu.js'
 
 // The "Preferred editor" picker (#727), as one group both menus that offer it render: the project
-// home's action bar (WorkspaceActions) and a session's ⋮ menu (AgentActionsMenu). They showed the
+// home's and a session's ⋮ menu (AgentActionsMenu). They showed the
 // same rows from the same two reads, written out twice — so a row added to one silently did not
 // appear in the other.
 

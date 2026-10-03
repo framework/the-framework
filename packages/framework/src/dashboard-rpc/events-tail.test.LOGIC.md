@@ -15,3 +15,4 @@ What the tests cover, against real files on disk and finished agents' lines hand
 - **An agent already finished** - every line, then the boundary, and nothing follows.
 - **A finished agent that is resumed** - after the finished lines, the tail keeps asking from cached reads; the resumed agent's file, starting with the lines already delivered, delivers only the new ones and its appends; ended again, the extra finished lines arrive.
 - **A diary rewritten in place** - an agent's diary written again whole with the same lines delivers nothing again; a line appended after that is delivered once; written again and grown in one step, it delivers only the new line.
+- **A diary that is there and still empty** - no boundary is reported while the file holds nothing; once its first lines are written they are delivered, then the boundary.

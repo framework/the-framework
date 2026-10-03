@@ -426,6 +426,25 @@ test('tailAgentEvents on a diary that is nowhere yet and turns up finished: its 
   }
 })
 
+test('tailAgentEvents on a diary that is there and still empty: the replay marker waits for its first lines', async () => {
+  const cwd = await tmpWorkspace()
+  const diary = join(cwd, 'r1.jsonl')
+  const order: string[] = []
+  // The file exists before anything is in it: what a writer leaves between creating it and writing.
+  await writeFile(diary, '')
+  const stop = tailAgentEvents<FrameworkEvent>(async () => ({ file: diary }), e => void (e.kind === 'log' && order.push(e.message)), () => order.push('boundary'))
+  try {
+    await sleep(1400)
+    assert.deepEqual(order, [], 'no boundary over a file that holds nothing: it would say an empty replay')
+    await appendFile(diary, line('one') + line('two'))
+    await sleep(1400)
+    assert.deepEqual(order, ['one', 'two', 'boundary'])
+  } finally {
+    stop()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
 test('tailAgentEvents on a checkout whose diary is not written yet: the replay marker waits for the file', async () => {
   const cwd = await tmpWorkspace()
   const diary = join(cwd, 'r1.jsonl')

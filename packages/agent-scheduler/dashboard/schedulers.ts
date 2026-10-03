@@ -126,6 +126,12 @@ export function loosestSpendOffset(rows: readonly SchedulerRow[]): number | unde
   return offsets.length ? Math.max(...offsets) : undefined
 }
 
+/** The projects whose spend offset is not the one in force (the loosest), each with its own, to one decimal: what a save would bring into line. */
+export function offsetsThatDiffer(rows: readonly SchedulerRow[]): { name: string; offset: number }[] {
+  const loosest = loosestSpendOffset(rows)
+  return rows.flatMap(row => (row.spendOffset !== undefined && row.spendOffset !== loosest ? [{ name: row.project.name, offset: Math.round(row.spendOffset * 10) / 10 }] : []))
+}
+
 /** The spend offset a typed text means: a whole number of points held to the reach of the usage bar's handle; `undefined` while the text is no number yet (empty, a minus sign alone). */
 export function typedOffset(raw: string): number | undefined {
   if (raw.trim() === '' || !Number.isFinite(Number(raw))) return undefined

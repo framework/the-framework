@@ -58,7 +58,7 @@ A person's run, one given neither `--resume` nor `--id` (with or without `--deta
 
 #### Context
 
-**User story**: the dashboard's launcher runs a project's check hook, `npx agent-runner check --driver "$DRIVER"`, when the user picks a coding agent, and says what would stop the run under the prompt box before the Start.
+**User story**: the dashboard's launcher runs a project's check hook, `agent-runner check --driver "$DRIVER"`, when the user picks a coding agent, and says what would stop the run under the prompt box before the Start.
 
 #### Business logic
 
@@ -68,7 +68,7 @@ A person's run, one given neither `--resume` nor `--id` (with or without `--deta
 
 #### Context
 
-**User story**: the user adds a project in the dashboard and its launcher says the project has no start hook; the user runs `npx agent-runner init` in the project, and Start works.
+**User story**: the user deleted the project's `start` line and its launcher says the project has no start hook; the user runs `agent-runner init` in the project, and Start works. (Adding a project in the dashboard writes the same lines with no command run.)
 
 #### Business logic
 

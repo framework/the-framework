@@ -52,7 +52,7 @@ async function project(deps: Record<string, Record<string, unknown>>): Promise<s
 const calls = async (root: string, pkg: string): Promise<string[]> =>
   (await readFile(join(root, 'node_modules', pkg, 'calls.log'), 'utf8').catch(() => '')).split('\n').filter(Boolean)
 
-test('the runs provider is the dependency that declares it, naming one of its own commands; none declares it, none provides', async () => {
+test('the runs provider is the dependency that declares it, naming one of its own commands; none declares it, the built-in one provides', async () => {
   const root = await project({
     plain: { bin: { plain: 'provider.cjs' } },
     'wrong-bin': { bin: { a: 'provider.cjs' }, framework: { runs: 'b' } },
@@ -65,8 +65,8 @@ test('the runs provider is the dependency that declares it, naming one of its ow
     assert.equal(await readProvidedCommand(root, 'tickets'), undefined, 'another kind: nobody declares it')
     const none = await project({ plain: { bin: { plain: 'provider.cjs' } } })
     try {
-      assert.equal(await readProvidedCommand(none, 'runs'), undefined)
-      assert.equal(await providedRuns()(none), undefined, 'no provider: no finished runs at all')
+      assert.equal(await readProvidedCommand(none, 'runs'), undefined, 'none of the project\'s own packages')
+      assert.ok(await providedRuns()(none), 'no package of its own: the built-in logs package reads its runs')
     } finally {
       await rm(none, { recursive: true, force: true })
     }

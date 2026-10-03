@@ -1,4 +1,5 @@
-import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
+import { runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
+import { providedCommand } from '../built-in.js'
 
 /**
  * The project's git host, as the framework reads and acts on it (#1820): the pull requests of the
@@ -153,7 +154,7 @@ export function providedGitHost(now: () => number = Date.now): GitHostReader {
   const reader: GitHostFor = async root => {
     let known = sources.get(root)
     if (!known || now() - known.at >= CACHE_MS) {
-      const command = await readProvidedCommand(root, 'git-host').catch(() => undefined)
+      const command = await providedCommand(root, 'git-host').catch(() => undefined)
       const same = known?.command && command && known.command.bin === command.bin
       known = { at: now(), ...(command ? { command, source: same ? known!.source! : commandGitHost(root, command) } : {}) }
       sources.set(root, known)

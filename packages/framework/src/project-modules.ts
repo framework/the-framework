@@ -1,7 +1,7 @@
 import { realpath, stat } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { dirname, join, normalize, sep } from 'node:path'
 import { packageBins, projectPackages, readManifest, runPackageCommand, type PackageCommandResult, type ProjectPackage } from '@gemstack/agent-data'
+import { builtInPackages } from './built-in.js'
 
 /**
  * A package that adds to the dashboard (#1774): its browser part, named by its
@@ -23,12 +23,6 @@ export interface ProjectModule {
   /** The module's server part, an absolute path inside the package, when it has one. */
   server?: string
 }
-
-/**
- * The modules the framework ships and loads for every project, by package name: dependencies of
- * the framework itself, resolved from its own install, so a project installs nothing for them.
- */
-export const BUILT_IN_MODULES: readonly string[] = ['@gemstack/files']
 
 /** The file an `exports[key]` entry names: a plain path, or the first of `conditions` it has. */
 function exportedFile(exports: unknown, key: string, conditions: readonly string[]): string | undefined {
@@ -56,27 +50,9 @@ async function fileInside(pkgDir: string, target: string | undefined): Promise<s
   return file
 }
 
-/** The framework's built-in modules' packages, resolved from its own install; one that is not installed is skipped. */
-async function builtInPackages(): Promise<ProjectPackage[]> {
-  const require = createRequire(import.meta.url)
-  const packages: ProjectPackage[] = []
-  for (const name of BUILT_IN_MODULES) {
-    let manifestPath: string
-    try {
-      manifestPath = require.resolve(`${name}/package.json`)
-    } catch {
-      continue
-    }
-    const dir = await realpath(dirname(manifestPath)).catch(() => undefined)
-    const manifest = dir ? await readManifest(join(dir, 'package.json')) : undefined
-    if (dir && manifest) packages.push({ name, dir, manifest })
-  }
-  return packages
-}
-
 /**
  * The modules a project has: each of its dependencies whose package.json exports `./dashboard` to
- * a file that exists inside the package, plus the framework's built-in modules. A project that
+ * a file that exists inside the package, plus the modules among the framework's built-in packages (`built-in.ts`). A project that
  * depends on a built-in module's package itself gets its own copy. Sorted by name.
  */
 export async function readProjectModules(root: string): Promise<ProjectModule[]> {

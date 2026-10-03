@@ -1,4 +1,4 @@
-import { lookupProvidedCommand } from '@gemstack/agent-data'
+import { lookupProvided } from '../built-in.js'
 import { projectBranches } from './branches.js'
 import { projectGitHost } from './git-host.js'
 import { projectQueue } from './queue.js'
@@ -31,7 +31,7 @@ export const PROVIDED_KINDS = ['tickets', 'queue', 'runs', 'branches', 'git-host
 export async function providerProblems(root: string): Promise<string[]> {
   const problems: string[] = []
   for (const kind of PROVIDED_KINDS) {
-    const { problem } = await lookupProvidedCommand(root, kind).catch((): { problem?: string } => ({}))
+    const { problem } = await lookupProvided(root, kind).catch((): { problem?: string } => ({}))
     if (problem) problems.push(problem)
   }
   return problems

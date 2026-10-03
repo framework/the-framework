@@ -398,7 +398,7 @@ test('the eager pull converges a machine on what others pushed, and names a repo
   const solo = await initRepo('file-branch-pull-solo-')
   try {
     const result = await pullFileBranch(solo, BRANCH)
-    assert.ok(!result.ok && /no remote/.test(result.error))
+    assert.ok(!result.ok && result.noRemote === true && /no remote/.test(result.error))
   } finally {
     await rm(solo, RETRIED_RM)
   }

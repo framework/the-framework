@@ -36,23 +36,26 @@ the command cannot start one at all.
 
 ## How it works
 
-The Framework runs no coding agent, makes no model call, and names no tool. Starting an
-agent is running **one shell line the project itself names** — its `start` hook, in the
-project's own `.the-framework/hooks.yml`:
+The Framework runs no coding agent and makes no model call. Starting an agent is running
+**one shell line the project itself names** — its `start` hook, in the project's own
+`.the-framework/hooks.yml`:
 
 ```yaml
-start: npx agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"} ${PUBLISH:+--publish "$PUBLISH"}
-resume: npx agent-runner run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}
-check: npx agent-runner check ${DRIVER:+--driver "$DRIVER"}
+start: agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"} ${PUBLISH:+--publish "$PUBLISH"}
+resume: agent-runner run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}
+check: agent-runner check ${DRIVER:+--driver "$DRIVER"}
 ```
 
 The line is given the prompt and the user's picks in its environment, and answers one JSON
 document whose `id` names the agent it began. From there the agent belongs to whatever that
-line started. A project with no `start` line cannot start an agent from the dashboard, and the
-dashboard says so. `npx agent-runner init`, run in the project, writes the `start`, `resume`
-and `check` lines into the file, and `npx agent-scheduler init` the scheduler's `open` and `close`
-lines (they start it when the dashboard opens and stop it when it closes), each keeping any line
-already there. The file's keys are `open`, `close`, `start`, `resume` and `check`; any other key
+line started. Adding a project writes these three lines into the file, so a new project, an
+empty folder included, starts an agent with nothing typed by hand. They are a default: a line
+already there is kept, and any of them can be changed or deleted. A line finds its tools in the
+project's installed packages first, then in the dashboard's built-in ones, which bring `agent-runner`;
+nothing is downloaded to run a line. A project with no `start` line cannot start an agent from
+the dashboard, and the dashboard says so. `npx agent-scheduler init`, run in the project, writes
+the scheduler's `open` and `close` lines (they start it when the dashboard opens and stop it
+when it closes), keeping any line already there. The file's keys are `open`, `close`, `start`, `resume` and `check`; any other key
 is refused and the whole file ignored.
 
 The launcher's **Post-merge cleanup** box, shown where the project has the

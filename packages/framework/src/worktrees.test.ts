@@ -139,11 +139,11 @@ test("a run started from another run's branch: the commit on its card is named t
   }
 })
 
-test('a project none of whose packages provides its checkouts has nothing to remove (#1774)', async () => {
+test('a project none of whose own packages provides its checkouts is asked through the built-in one (#1774)', async () => {
   const { repo, path } = await repoWithDirtyWorktree()
   try {
     await rm(join(repo, 'node_modules'), { recursive: true, force: true })
-    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: false, error: 'no package of this project provides its checkouts' })
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: false, error: `${agentBranchName(RUN_ID)} has uncommitted work; the checkout was kept` })
     assert.equal((await stat(path)).isDirectory(), true, 'the checkout is untouched')
   } finally {
     await rm(repo, { recursive: true, force: true })

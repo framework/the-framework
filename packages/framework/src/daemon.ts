@@ -187,7 +187,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
       if (written.bridgeBrowser === true) void bridgeBrowser.start()
       if (written.bridgeBrowser === false) void bridgeBrowser.stop()
     }),
-    projectErrors: projectErrors.list,
+    projectErrors: projectErrors.read,
     bridgeBrowser,
     ...(token ? { token } : {}),
     ...(clientBundleDir ? { clientBundleDir } : {}),

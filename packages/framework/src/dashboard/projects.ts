@@ -33,6 +33,11 @@ export interface ProjectSummary {
    * list attaches it from the daemon's error state.
    */
   errors?: ProjectError[]
+  /**
+   * The project's repository has no remote, as the daemon's last data sync found it: nothing is
+   * wrong, it lives on this machine only. Absent otherwise; attached like `errors`.
+   */
+  localOnly?: true
 }
 
 /**

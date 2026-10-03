@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { BUILT_IN_MODULES, readProjectModules, runModuleCommand, moduleFile, findProjectModule } from './project-modules.js'
+import { BUILT_IN_PACKAGES } from './built-in.js'
+import { readProjectModules, runModuleCommand, moduleFile, findProjectModule } from './project-modules.js'
 
 async function tempDir(prefix: string): Promise<string> {
   return realpath(await mkdtemp(join(tmpdir(), prefix)))
@@ -38,7 +39,7 @@ test('a project\'s modules are the dependencies whose package exports ./dashboar
     await symlink(elsewhere, join(nodeModules, 'linked'))
     await pkg(join(nodeModules, 'conditional'), { name: 'conditional', exports: { './dashboard': { types: './d.ts', import: './esm/w.js' } } }, { 'esm/w.js': 'export default {}' })
 
-    const modules = (await readProjectModules(root)).filter(module => !BUILT_IN_MODULES.includes(module.package))
+    const modules = (await readProjectModules(root)).filter(module => !BUILT_IN_PACKAGES.includes(module.package))
     assert.deepEqual(
       modules.map(w => ({ package: w.package, entry: w.entry, bins: Object.keys(w.bins) })),
       [
@@ -51,8 +52,8 @@ test('a project\'s modules are the dependencies whose package exports ./dashboar
     assert.equal(modules[0]!.dir, join(nodeModules, '@acme/logs', 'dist'))
     assert.equal(modules[2]!.dir, join(elsewhere, 'w'), 'the link is followed to the package itself')
 
-    // A project with no package.json brings none of its own: it has the built-in ones only.
-    assert.deepEqual((await readProjectModules(join(root, 'node_modules'))).map(module => module.package), [...BUILT_IN_MODULES].sort())
+    // A project with no package.json brings none of its own: it has the built-in packages that are modules, only.
+    assert.deepEqual((await readProjectModules(join(root, 'node_modules'))).map(module => module.package), ['@gemstack/files', '@gemstack/skill-logs'])
   } finally {
     await rm(root, { recursive: true, force: true })
     await rm(elsewhere, { recursive: true, force: true })

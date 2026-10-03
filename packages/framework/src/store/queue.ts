@@ -1,4 +1,5 @@
-import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
+import { runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
+import { providedCommand } from '../built-in.js'
 
 /**
  * The agent queue, as the framework reads it (#1774). The framework keeps no queue and imports no
@@ -78,7 +79,7 @@ export function providedQueue(now: () => number = Date.now): QueueReader {
   const reader: QueueFor = async root => {
     let known = sources.get(root)
     if (!known || now() - known.at >= CACHE_MS) {
-      const command = await readProvidedCommand(root, 'queue').catch(() => undefined)
+      const command = await providedCommand(root, 'queue').catch(() => undefined)
       const same = known?.command && command && known.command.bin === command.bin
       known = { at: now(), ...(command ? { command, source: same ? known!.source! : commandQueue(root, command, now) } : {}) }
       sources.set(root, known)

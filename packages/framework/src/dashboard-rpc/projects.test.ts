@@ -31,7 +31,7 @@ test('onProjects carries each project’s recorded errors, and nothing when ther
   const { dir, restore } = await registered()
   try {
     const errors = projectErrorStore(() => new Date('2026-08-20T10:00:00.000Z'))
-    provideTestContext({ projectErrors: errors.list })
+    provideTestContext({ projectErrors: errors.read })
 
     const clean = await onProjects()
     assert.equal(clean.length, 1)
@@ -42,6 +42,12 @@ test('onProjects carries each project’s recorded errors, and nothing when ther
     assert.deepEqual(stranded?.errors, [
       { code: 'data-sync', message: 'the data branch could not be pushed: permission denied', since: '2026-08-20T10:00:00.000Z' },
     ])
+
+    assert.equal('localOnly' in stranded!, false, 'a project whose repository has a remote carries no note')
+    errors.setLocalOnly(dir, true)
+    assert.equal((await onProjects())[0]?.localOnly, true)
+    errors.setLocalOnly(dir, false)
+    assert.equal('localOnly' in (await onProjects())[0]!, false)
   } finally {
     await restore()
   }

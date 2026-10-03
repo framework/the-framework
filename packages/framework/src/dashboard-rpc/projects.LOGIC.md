@@ -40,7 +40,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 
 The list answers with every registered project [1]: its id, its absolute path, its display name, whether it still carries its installation marker, whether one of its packages provides a git host, and when it was last active.
 
-To each project the daemon attaches whatever its background sweeps [6] currently find wrong with it — a `agent-data` branch [5] that cannot reach its remote, for instance — oldest first. A project with nothing wrong carries no faults at all, rather than an empty list.
+To each project the daemon attaches whatever its background sweeps [6] currently find wrong with it — a `agent-data` branch [5] that cannot reach its remote, for instance — oldest first. A project with nothing wrong carries no faults at all, rather than an empty list. A project whose repository has no remote, as the daemon's last data sync found it, also carries the local only note (`../project-errors.ts`): not a fault, and absent otherwise.
 
 ### Adding a project
 

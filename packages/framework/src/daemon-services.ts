@@ -54,12 +54,15 @@ export interface BackgroundServiceDeps {
  * which carries the tickets, the queue and the `logs` skill's runs — with
  * origin through the shared branch library, one pull, and set or clear the project's `data-sync`
  * error by the outcome. The clear is unconditional on success, so the error lives exactly as long
- * as the condition — the next tick after the user fixes the remote, it is gone. The daemon knows
+ * as the condition — the next tick after the user fixes the remote, it is gone. A repository with
+ * no remote is no error: the project is marked local only, for as long as it has none. The daemon knows
  * nothing of what is on the branch (#1774): a skill's own setup makes its files.
  */
 export async function syncProjectData(path: string, errors: ProjectErrors, log: (message: string) => void): Promise<void> {
   const result = await pullFileBranch(path, DATA_BRANCH, { log })
-  if (result.ok) errors.clear(path, 'data-sync')
+  const localOnly = !result.ok && result.noRemote === true
+  errors.setLocalOnly(path, localOnly)
+  if (result.ok || localOnly) errors.clear(path, 'data-sync')
   else {
     log(`[framework] data sync: ${result.error}`)
     errors.set(path, 'data-sync', result.error)

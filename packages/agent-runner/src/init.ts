@@ -6,9 +6,13 @@ import { DASHBOARD_DIR, DASHBOARD_HOOKS } from './names.js'
 /**
  * `init`: this tool's lines written into a dashboard's hooks file, so a project added to the
  * dashboard can check, start and resume a run with nothing typed by hand. The tool writes its own
- * lines: the dashboard names no tool, and a project that wants another tool writes that tool's
- * lines. The writer takes any tool's lines, so another tool's `init` (a scheduler's) writes its
- * own through it.
+ * lines: the dashboard runs `init` when a project is added (the package declares it under
+ * `framework.hooks` in its package.json) and holds no copy of them, and a project that wants
+ * another tool writes that tool's lines. The writer takes any tool's lines, so
+ * another tool's `init` (a scheduler's) writes its own through it.
+ *
+ * The lines name the tool bare, with no `npx`: the dashboard runs a line with the project's
+ * installed tools and then its built-in packages' on the PATH, so nothing is fetched from npm to run one.
  *
  * A person's file is never overwritten. A one-line key already there keeps its line, whatever
  * it says; a list (`open`, `close`) gains a line only when it lacks it; comments and
@@ -17,9 +21,9 @@ import { DASHBOARD_DIR, DASHBOARD_HOOKS } from './names.js'
 
 /** The lines, in the order a new file lists them: one line each. */
 export const HOOK_LINES: Readonly<Record<string, string | readonly string[]>> = {
-  start: 'npx agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"} ${PUBLISH:+--publish "$PUBLISH"}',
-  resume: 'npx agent-runner run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}',
-  check: 'npx agent-runner check ${DRIVER:+--driver "$DRIVER"}',
+  start: 'agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"} ${PUBLISH:+--publish "$PUBLISH"}',
+  resume: 'agent-runner run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}',
+  check: 'agent-runner check ${DRIVER:+--driver "$DRIVER"}',
 }
 
 export type InitOutcome =

@@ -37,7 +37,7 @@ See `## Context`.
 The menu is as wide as the button and lists, top to bottom:
 
 - "All projects".
-- One entry per registered project, by name, with the same dot as the button. Under the name of a project in error, one red line per error names what is wrong, the error's title from `ProjectErrorBanner.tsx` (for a data-branch sync failure, "Not syncing with the remote"), and hovering that line shows the daemon's own message. Under the name of a project that is not activated and has no error: "Not activated".
+- One entry per registered project, by name, with the same dot as the button. Under the name of a project in error, one red line per error names what is wrong, the error's title from `ProjectErrorBanner.tsx` (for a data-branch sync failure, "Not syncing with the remote"), and hovering that line shows the daemon's own message. Under the name of a project that is not activated and has no error: "Not activated". Under the name of an activated project with no error whose repository has no remote: "Local only, no remote", in grey; its dot stays that of a project with nothing wrong.
 - "Add project", which opens the add-project panel (`AddProjectPanel.tsx`); once a project is added, the caller refreshes its list.
 
 A tick marks the entry that is the current pick: the picked project, or "All projects".

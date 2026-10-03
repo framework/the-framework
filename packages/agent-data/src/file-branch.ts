@@ -349,8 +349,8 @@ async function cycle(
   }
 }
 
-/** How a pull went: converged with origin, or why it could not. */
-export type FileBranchSync = { ok: true } | { ok: false; error: string }
+/** How a pull went: converged with origin, or why it could not; `noRemote` when the reason is that there is no origin at all. */
+export type FileBranchSync = { ok: true } | { ok: false; error: string; noRemote?: true }
 
 /**
  * The eager pull: sync the persistent checkout with origin so this machine reads what other
@@ -360,8 +360,9 @@ export type FileBranchSync = { ok: true } | { ok: false; error: string }
  *
  * Reports why it could not converge: a push origin rejects, or no origin to converge with at
  * all. The writer treats a remote-less repo as fine — the commit is safe locally — but a sync's
- * whole job is to meet the other machines, and a repo nothing can reach is an error state the
- * caller has to surface, not a mode this supports.
+ * whole job is to meet the other machines, so a repo nothing can reach did not converge. That
+ * outcome is marked `noRemote`, since a caller may tell a repository that was never shared from a
+ * sync that broke.
  */
 export async function pullFileBranch(repo: string, branch: string, deps: FileBranchDeps = {}): Promise<FileBranchSync> {
   const r = resolveDeps(deps)
@@ -370,7 +371,7 @@ export async function pullFileBranch(repo: string, branch: string, deps: FileBra
     ? { ok: false, error: result.error }
     : (await hasRemote(repo, r.git))
       ? { ok: true }
-      : { ok: false, error: `the repository has no remote, so the ${branch} branch cannot be shared with other machines` }
+      : { ok: false, noRemote: true, error: `the repository has no remote, so the ${branch} branch cannot be shared with other machines` }
   if (!outcome.ok) r.log(`[branches] ${branch}: ${outcome.error}`)
   return outcome
 }

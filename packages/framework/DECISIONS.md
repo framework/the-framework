@@ -60,9 +60,14 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   Settings sections) is a module; a skill that brings pages is a module that is also a skill.
   The Files tab is the first module that is no skill. Picked over keeping Files a folder inside the framework,
   which gave it a boundary but taught the module contract nothing, and named module over widget.
-- The modules every project wants are built in: the framework depends on them and loads them
-  for every project through the same contract as any other module, and a project's own copy
-  wins. Picked over each project installing Files itself.
+- The packages every project wants are built in: the framework depends on them and uses them
+  for every project through the same contract as a project's own package (a module by its
+  `./dashboard` export, a provider of a kind of data and the writer of its hook lines by its
+  `framework` key), and a project's own copy wins. They are Files, the runner, and the
+  packages that read a project's runs and checkouts, so an empty folder starts an agent and
+  shows it. One list names them, and nothing else in the framework names a package. Picked
+  over each project installing them itself, which left a project with nothing installed
+  unable to start an agent or to see one.
 - A module may bring a section of the Settings page, shown after the framework's own
   sections, where a project has its package. It reads and writes through the package's own
   command. Picked over the framework's own sections knowing a package's file and a hook line
@@ -87,9 +92,18 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## Starting a run
 - A Start runs the project's own `start` line, in the project's hooks file, and the line
-  answers the new run's id. The dashboard names no tool. Picked over the dashboard calling
-  the tool by name: the person picks what starts their runs, and a project that starts its
-  runs some other way is not a special case.
+  answers the new run's id. The daemon runs what the line says and calls no tool by name.
+  Picked over the daemon calling the tool itself: the person picks what starts their runs,
+  and a project that starts its runs some other way is not a special case.
+- Adding a project has every package that writes hook lines write its own into the project's
+  hooks file: the project's packages, then the built-in ones, the runner's `start`, `resume`
+  and `check` among them. So a new project starts an agent with nothing typed by hand. The
+  lines are a default: a line already there is kept, and the person can change or delete any
+  of them. Picked over the launcher telling the person which command to run, which left an
+  empty folder unable to start.
+- A hook line finds its tools in the project's installed packages first, then in the
+  built-in packages. Nothing is downloaded to run a line. Picked over `npx` in the lines, which
+  downloads whatever package holds the name on npm when the project has not installed it.
 - The line gets the prompt, and the coding agent, the model and how far to publish when the
   person picked them; anything else is the line's own business. The publish pick is one menu
   beside Start: Nothing, Publish branch, Open PR, Merge on green. It is saved like the coding
@@ -97,8 +111,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   Picked over handing over every option the launcher once had, which is how the options
   became the thing to maintain.
 - A project with no `start` line cannot start a run from the dashboard, and the launcher
-  says so. Picked over a built-in fallback, which would be The Framework running agents
-  again.
+  says so and names the file. Picked over a built-in fallback: the hooks file is the one
+  place that says what starts a run.
 - No cap on a person's runs: the click is the brake. Picked over the one-run-per-checkout
   guard, which existed because runs shared a working tree and they no longer do.
 

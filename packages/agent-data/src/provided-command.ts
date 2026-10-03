@@ -104,15 +104,14 @@ function frameworkKey(manifest: PackageManifest, kind: string): unknown {
  * the package does not have is no declaration. Two or more declare it: the one the project's own
  * package.json names under `"framework": { "<kind>": "<package name>" }`, else none, with the
  * reason. The project naming a package that does not declare the kind is the same: none, said.
+ *
+ * `shipped` are packages the caller brings for every project (a dashboard's built-in ones): they
+ * are asked only when none of the project's own packages declares the kind, so a project's own
+ * copy wins and a project with nothing installed still has a provider.
  */
-export async function lookupProvidedCommand(root: string, kind: string): Promise<ProvidedCommandLookup> {
-  const providers: ProvidedCommand[] = []
-  for (const { name, dir, manifest } of await projectPackages(root)) {
-    const declared = frameworkKey(manifest, kind)
-    if (typeof declared !== 'string') continue
-    const bin = packageBins(name, manifest.bin, dir)[declared]
-    if (bin !== undefined) providers.push({ package: name, name: declared, bin })
-  }
+export async function lookupProvidedCommand(root: string, kind: string, shipped: readonly ProjectPackage[] = []): Promise<ProvidedCommandLookup> {
+  let providers = declaring(await projectPackages(root), kind)
+  if (providers.length === 0) providers = declaring(shipped, kind)
   const project = await readManifest(join(root, 'package.json'))
   const named = project ? frameworkKey(project, kind) : undefined
   const names = providers.map(p => p.package).join(', ')
@@ -126,9 +125,21 @@ export async function lookupProvidedCommand(root: string, kind: string): Promise
   return { problem: `${providers.length} packages provide ${kind}: ${names}; name one under "framework" in package.json` }
 }
 
+/** The commands among `packages` that declare `kind`, each naming one of its package's own commands. */
+export function declaring(packages: readonly ProjectPackage[], kind: string): ProvidedCommand[] {
+  const providers: ProvidedCommand[] = []
+  for (const { name, dir, manifest } of packages) {
+    const declared = frameworkKey(manifest, kind)
+    if (typeof declared !== 'string') continue
+    const bin = packageBins(name, manifest.bin, dir)[declared]
+    if (bin !== undefined) providers.push({ package: name, name: declared, bin })
+  }
+  return providers
+}
+
 /** {@link lookupProvidedCommand}'s command, for a caller that only needs to run it. */
-export async function readProvidedCommand(root: string, kind: string): Promise<ProvidedCommand | undefined> {
-  return (await lookupProvidedCommand(root, kind)).command
+export async function readProvidedCommand(root: string, kind: string, shipped: readonly ProjectPackage[] = []): Promise<ProvidedCommand | undefined> {
+  return (await lookupProvidedCommand(root, kind, shipped)).command
 }
 
 /** What a package's command answered: its JSON output, or why there is none. */

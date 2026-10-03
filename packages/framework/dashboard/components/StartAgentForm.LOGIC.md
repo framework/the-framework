@@ -30,7 +30,7 @@ The launcher on a project home [1]: the box where the user says what an agent [3
 - **The "Post-merge cleanup" box** - on the control row, after the publish menu, only when the project has the `post-merge-cleanup` command [2] and no device is picked; ticked from the user's saved setting, and a click writes that setting.
 - **The publish menu** - a menu labelled "Publish" on the control row, after the Context menu: "Nothing", "Publish branch", "Open PR", "Merge on green"; it shows the user's saved setting, "Nothing" when none is saved, and a change writes that setting; a project with no git host provider [14] is offered "Nothing" and "Publish branch" only, and a saved pull request option is shown and started there as "Publish branch".
 - **What a Start sends** - the text with the Context on one `Context:` line at its end, the coding agent [5] and the model when the user picked them, the publish level [13] when the publish menu's option is one, `/post-merge-cleanup` as the follow-up [12] when the box is offered and ticked, and the picked device's address and token; nothing else.
-- **A project with no start hook** - Start is off and the form says to run `npx agent-runner init` in the project, or which line to add to which file; a picked device lifts the block, since the device runs its own hook.
+- **A project with no start hook** - Start is off and the form says which line to add to which file; a picked device lifts the block, since the device runs its own hook.
 - **Before the Start: what would stop the agent** - the check hook's [10] problems in red and its warnings in amber, under the editor, for the coding agent picked; read again when the pick changes; not asked for a picked device; neither turns Start off.
 - **Feedback about the start itself** - "Starting…", the refusal in the start hook's own words, the note a loaded command or saved prompt [8] leaves, and an error that clears as soon as the user edits.
 - **The moment an agent starts** - the agent is shown and selected immediately under the typed prompt, marked with the device it runs on, and the editor and the Context are emptied.
@@ -120,7 +120,7 @@ Whether the text is a command, a saved prompt [8] or the user's own words makes 
 
 #### Business logic
 
-Once the project is read and it has no start hook [4], and no device [6] is picked, the submit stays disabled — by click and by keyboard — and the form shows, as an alert: "This project has no start hook. Run `npx agent-runner init` in the project, or add a `start:` line to `.the-framework/hooks.yml`."
+Once the project is read and it has no start hook [4], and no device [6] is picked, the submit stays disabled — by click and by keyboard — and the form shows, as an alert: "This project has no start hook. Add a `start:` line to `.the-framework/hooks.yml`." It names no command to run: a project gets its lines when it is added, and a command typed with `npx` in a project with nothing installed would download whatever package holds that name.
 
 A picked device lifts the block: the device runs its own project's start hook, so this project's lack of one says nothing about that start. Before the project is read nothing is shown and the submit is on, so the message never flashes on a project that does have the line.
 

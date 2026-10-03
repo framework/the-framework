@@ -23,7 +23,7 @@ What the daemon does for a project: starting an agent [1] through the project's 
 - **Which project a request is for** - no project id, or the home project's [7], is the daemon's own directory; any other id is looked up in the registry.
 - **Starting an agent** - the project's start hook [2] is run with the prompt, the user's picks and the follow-up when there is one, a `pr` or `merge` publish level [8] handed over as `branch` in a project with no git host provider [9]; the id it answers is the Start's answer; a refusal is its words; the project's checkouts are read again on the next look, so the new agent's checkout is found at once.
 - **Starting an agent on a device** - the start is forwarded to the device, which runs its own project's hook; a memory-only row stands for the agent here.
-- **Adding a project** - the directory is checked, installed and registered, and its `open` hooks [6] run.
+- **Adding a project** - the directory is checked and installed, every package that writes hook lines writes its own into its hooks file where missing (the built-in runner's `start`, `resume` and `check` among them), it is registered, and its `open` hooks [6] run.
 - **Relaying a device's agent** - the events of an agent relayed from a device stream from memory; an agent a device relayed here is tailed off its diary [5]; one whitelisted read or write is run against the home project for the relaying daemon.
 
 ## Business logic
@@ -68,7 +68,7 @@ When the Start names a device [4], the prompt and the picks are forwarded to tha
 
 #### Business logic
 
-The path is resolved against the daemon's directory. A path that does not exist or is not a directory is refused with "path does not exist or is not a directory: <path>". The repository is installed (`install.ts`; an already installed one is a success), then registered with the current time; a registration that fails does not fail the add. Then the project's `open` hooks [6] run, as they would have at boot, their outcome logged. The answer says whether the repository was already installed.
+The path is resolved against the daemon's directory. A path that does not exist or is not a directory is refused with "path does not exist or is not a directory: <path>". The repository is installed (`install.ts`; an already installed one is a success). Then every package that writes hook lines writes its own into the project's `.the-framework/hooks.yml` (`built-in.ts`): the project's own packages, then the built-in ones, the runner's `start`, `resume` and `check` among them. So the new project, an empty folder included, starts an agent with nothing typed by hand; a line already in the file is kept, so adding a project a second time only fills what is missing, and a writer that fails is logged and does not fail the add. Then the project is registered with the current time; a registration that fails does not fail the add. Then the project's `open` hooks [6] run, as they would have at boot, their outcome logged. The answer says whether the repository was already installed.
 
 ### Relaying a device's agent
 

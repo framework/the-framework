@@ -34,6 +34,7 @@ export {
   projectPackages,
   packageBins,
   readManifest,
+  declaring,
   lookupProvidedCommand,
   readProvidedCommand,
   runPackageCommand,

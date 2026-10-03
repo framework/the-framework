@@ -1,14 +1,17 @@
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { basename, delimiter, join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
+import { builtInBinDirs } from './built-in.js'
 import { errorMessage } from './error-message.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /**
  * A project's hooks (#1774): the shell lines a project's own `.the-framework/hooks.yml` names to
  * run when the dashboard opens and when it closes, the two lines that start a run and continue
- * one, and the line that says whether a run can start here at all. The daemon names no tool: it runs whatever the file says, in the project. Per
+ * one, and the line that says whether a run can start here at all. The daemon calls no tool by
+ * name: it runs whatever the file says, in the project, with the project's installed tools and
+ * then the built-in packages' on the PATH, so a line reaches its tool with nothing fetched from npm. Per
  * user, since `.the-framework/` is ignored: a hook is this machine's, and a teammate's pull
  * changes nothing.
  *
@@ -223,8 +226,18 @@ export async function runCheckHook(cwd: string, input: { driver?: string }, opts
   return { ok: false, error: `the check hook: ${lastSaid ?? (outcome.summary === 'exit 0' ? 'it answered no problems and warnings' : outcome.summary)}` }
 }
 
+/**
+ * The environment a line runs with: the PATH led by the project's installed tools, then the
+ * built-in packages' own commands, so a tool named in a line is the project's copy when it
+ * installed one and the dashboard's otherwise, and never a package fetched by name.
+ */
+export async function hookEnv(cwd: string, env: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv> {
+  return { ...env, PATH: [join(cwd, 'node_modules', '.bin'), ...(await builtInBinDirs()), env['PATH']].filter(Boolean).join(delimiter) }
+}
+
 /** One line through the shell: how it ended, in words, what it said on stderr, and its stdout when asked for. */
-function runLine(cwd: string, line: string, timeoutMs: number, env: NodeJS.ProcessEnv, readStdout = false): Promise<{ summary: string; stderr: string; stdout: string }> {
+async function runLine(cwd: string, line: string, timeoutMs: number, baseEnv: NodeJS.ProcessEnv, readStdout = false): Promise<{ summary: string; stderr: string; stdout: string }> {
+  const env = await hookEnv(cwd, baseEnv)
   return new Promise(resolve => {
     let stderr = ''
     let stdout = ''

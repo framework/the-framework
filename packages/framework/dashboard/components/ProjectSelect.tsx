@@ -64,6 +64,8 @@ export function ProjectSelect({
                   </span>
                 ))}
                 {!p.errors?.length && !p.activated && <span className="block text-xs text-muted-foreground">Not activated</span>}
+                {/* Nothing wrong: the repository was never shared, so its data stays on this machine. */}
+                {!p.errors?.length && p.activated && p.localOnly && <span className="block text-xs text-muted-foreground">Local only, no remote</span>}
               </span>
               {p.id === scope && <Check className="h-3.5 w-3.5 shrink-0" aria-label="selected" />}
             </DropdownMenuItem>

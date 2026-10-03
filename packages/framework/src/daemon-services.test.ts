@@ -26,18 +26,23 @@ test('a project whose data branch cannot reach a remote carries a data-sync erro
     const errors = projectErrorStore()
     const logs: string[] = []
 
-    // No remote: the branch is born locally, but nothing else can ever read it — an error, not a mode.
+    // No remote: the branch is born locally and the project is local only — a note, not an error.
     await syncProjectData(project, errors, m => logs.push(m))
-    const [noRemote] = errors.list(project)
-    assert.equal(noRemote?.code, 'data-sync')
-    assert.match(noRemote?.message ?? '', /no remote/)
-    assert.ok(logs.some(m => m.includes('data sync') && m.includes('no remote')), 'still said on the daemon log too')
+    assert.deepEqual(errors.read(project), { errors: [], localOnly: true })
+    assert.ok(!logs.some(m => m.includes('data sync')), 'nothing failed, so the daemon log names no failed sync')
 
-    // The user fixes it: the next turn converges and the error is gone, not merely re-worded.
+    // The user adds a remote: the next turn converges and the note is gone.
     await git('git', ['init', '-q', '--bare'], { cwd: remote })
     await git('git', ['remote', 'add', 'origin', remote], { cwd: project })
     await syncProjectData(project, errors, () => {})
-    assert.deepEqual(errors.list(project), [])
+    assert.deepEqual(errors.read(project), { errors: [], localOnly: false })
+
+    // A remote that cannot be reached is the error it always was.
+    await git('git', ['remote', 'set-url', 'origin', join(remote, 'gone')], { cwd: project })
+    await git('git', ['commit', '-q', '--allow-empty', '-m', 'local'], { cwd: join(project, '.branches', 'agent-data') })
+    await syncProjectData(project, errors, m => logs.push(m))
+    assert.equal(errors.read(project).errors[0]?.code, 'data-sync')
+    assert.equal(errors.read(project).localOnly, false)
   } finally {
     await rm(project, { recursive: true, force: true })
     await rm(remote, { recursive: true, force: true })

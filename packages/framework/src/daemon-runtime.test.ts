@@ -55,3 +55,33 @@ test('onStart refuses in words: an unknown project, a project with no start line
     await rm(home, { recursive: true, force: true })
   }
 })
+
+test('adding a project writes the runner\'s start, resume and check lines, an empty folder included, and keeps a line already there', async () => {
+  const folder = await realpath(await mkdtemp(join(tmpdir(), 'framework-add-')))
+  const cfg = await realpath(await mkdtemp(join(tmpdir(), 'framework-add-cfg-')))
+  // The add registers through the process's own environment, and its commit needs an author.
+  const env = { XDG_CONFIG_HOME: cfg, GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' }
+  const before = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]))
+  Object.assign(process.env, env)
+  const runtime = createProjectRuntime({ cwd: folder, env })
+  try {
+    assert.deepEqual(await runtime.onAddProject(folder), { ok: true, alreadyActivated: false })
+    const written = await readFile(join(folder, PROJECT_HOOKS_FILE), 'utf8')
+    for (const key of ['start', 'resume', 'check']) assert.match(written, new RegExp(`^${key}: agent-runner `, 'm'))
+
+    // The person's own line stays; adding the project again fills only what is missing.
+    await writeFile(join(folder, PROJECT_HOOKS_FILE), 'start: my-own-tool "$PROMPT"\n')
+    assert.deepEqual(await runtime.onAddProject(folder), { ok: true, alreadyActivated: true })
+    const again = await readFile(join(folder, PROJECT_HOOKS_FILE), 'utf8')
+    assert.match(again, /^start: my-own-tool "\$PROMPT"$/m)
+    assert.match(again, /^resume: agent-runner /m)
+  } finally {
+    await runtime.dispose()
+    for (const [key, value] of Object.entries(before)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    await rm(folder, { recursive: true, force: true })
+    await rm(cfg, { recursive: true, force: true })
+  }
+})

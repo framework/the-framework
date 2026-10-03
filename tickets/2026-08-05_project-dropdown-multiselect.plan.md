@@ -1,5 +1,6 @@
 Effort: 4
 Uncertainty: 5
+Outdated: yes
 
 # [Plan] Project dropdown
 
@@ -56,3 +57,4 @@ Order: decisions first — steps 1 and 4 encode Problems 1 and 2 and need the hu
 4. **Filtering**: in `App.tsx`, derive the active id set (empty ⇒ all) and filter the rows of `onDashboard`/`onQueue`/`onHotTickets`/`onOpenQuestions`/`onInterventions`/`onActivity`/`onRecentAgents` before passing down; scope `interventionCount`; in `TicketsPage.tsx`, scope `onAllTickets`/`onQueue` reads and remove the project facet + codec + predicate (pending the Problem-2 decision; else scope facet counts within the filter).
 5. **Specs & features**: rewrite the `App.tsx:46-59` doctrine block and `App.SPEC.md`; update `AgentHistory.SPEC.md`, `dashboard/SPEC.md`, `FEATURES-SPEC.md` (needs the human sign-off).
 6. **Tests**: `ProjectFilter.test.tsx` under `SidebarProvider` per `AgentHistory.test.tsx` conventions (`:1-39`) — checkbox toggle vs row-click vs All, selected-first computed on open, tooltips via `hoverTooltip`, add-project row; shell-level test that queue/recents/badge scope together; adjust `TicketsPage`/`TicketFilterBar` tests. `pnpm test` + `pnpm typecheck`.
+

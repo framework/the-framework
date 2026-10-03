@@ -56,7 +56,8 @@ export function SubagentsSettings({ projects }: ModuleSettingsProps) {
     sending.current = true
     const answers = await Promise.all(projects.map(async project => ({ project, answer: await host.runCommand(project.id, ['settings', JSON.stringify(next)]) })))
     const failed = answers.flatMap(({ project, answer }) => (answer.ok ? [] : [`${project.name}: ${answer.error}`]))
-    if (failed.length > 0) setError(failed.join('; '))
+    // The line says how the latest save went: a refused one before it was overtaken by this one.
+    setError(failed.length > 0 ? failed.join('; ') : undefined)
     const after = waiting.current
     waiting.current = undefined
     if (after !== undefined) return send(after)

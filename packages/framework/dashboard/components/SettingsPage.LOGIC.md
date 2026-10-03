@@ -1,4 +1,4 @@
-The Settings page: every preference [1] the user can set, on one page, each change applied the moment it is made and saved to the daemon in the background, with the Onboarding checklist kept at the top, plus the spend offset [19], the schedule switches [21] and the publish picks [23], which are not preferences. Everything else written here goes to the user's own preferences, so a value on this page always means "my default, everywhere"; the spend offset goes to every project's scheduler, the one place it is kept, and a schedule switch or a publish pick goes to its own project's scheduler, for this machine only.
+The Settings page: every preference [1] the user can set, on one page, each change applied the moment it is made and saved to the daemon in the background, with the Onboarding checklist kept at the top, plus the spend offset [19], the schedule switches [21] and the publish picks [23], which are not preferences. Everything else written here goes to the user's own preferences, so a value on this page always means "my default, everywhere"; the spend offset goes to every project's scheduler, the one place it is kept, and a schedule switch or a publish pick goes to its own project's scheduler, for this machine only. After the page's own sections come the sections the installed modules [25] bring, each the package's own, read and written through its package's own command, never through the preferences.
 
 ## Context
 
@@ -27,6 +27,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 [22] switch hook: the one shell line under `switch` in a project's `.the-framework/hooks.yml`, given the command's name in `COMMAND` and `on` or `off` in `SWITCH`; for example `npx agent-scheduler switch "$COMMAND" "$SWITCH"`.
 [23] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: nothing, the branch, a pull request, or a pull request set to merge on its own once its checks pass; the project's scheduler keeps it in its state file, where it stands in for the level the command's line in `agent-schedule.md` says until the person takes it back.
 [24] publish hook: the one shell line under `publish` in a project's `.the-framework/hooks.yml`, given the command's name in `COMMAND` and the publish pick in `PUBLISH` (`nothing`, `branch`, `pr` or `merge`, or `file` when the pick is taken back); for example `npx agent-scheduler publish "$COMMAND" "$PUBLISH"`.
+[25] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 
 ## Business logic — TL;DR
 
@@ -39,6 +40,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 - **Automation: the spend offset** - "Spend offset" is the number the usage panel's handle moves, from −50 to 50 percentage points, read off the projects' schedulers and written through every project's offset hook [20]; a write that fails says why.
 - **Automation: run on a schedule** - after the spend offset, one row per scheduled command of every project, "Run /<command> on a schedule", with a checkbox, checked when the command runs on this machine, and a menu of how far the command's runs publish on this machine: "As the file says (<level>)", Nothing, Publish branch, Open PR, Merge on green, the last two only in a project with a git host; flipping the checkbox writes the schedule switch [21] through that project's switch hook [22], and picking in the menu writes the publish pick [23] through that project's publish hook [24], "As the file says" taking the pick back; a write that fails says why.
 - **Claude web: the bridge, and which browser does its work** - "Browser bridge" is off by default; while on, one exclusive choice decides whether the daemon runs the bridge browser or the user's own Chrome does the work, each option carrying its own setup.
+- **After "Claude web": the sections the installed packages bring** - each module's [25] Settings section, in the order the dashboard mounted them, given only the projects that have its package; a section that fails shows why in its place and the rest of the page keeps working; none when no package brings one.
 - **A list with nothing to pick is not shown** - a drop-down row with no choices is left out rather than rendered empty.
 
 ## Business logic
@@ -165,6 +167,18 @@ The "Claude web" section ("A Claude web agent hands off and ends, so the questio
   - With nothing stored, "Your own Chrome" is selected. The user's own Chrome with the extension can serve whether or not the daemon's browser runs; the page presents the decision as one choice because a person makes one.
 - With the bridge off, no browser choice is shown at all.
 
+### After "Claude web": the sections the installed packages bring
+
+#### Context
+
+**User story**: a project depends on the orchestration package; the user scrolls past "Claude web" and finds that package's Subagents section, where they pick the models a main agent's subagents run on. A dashboard where no project has the package shows no such section.
+
+**Problem**: a package's settings that this page drew itself would make the dashboard know each package's file and command, so every package's settings would be a change to the dashboard. The page names no package: what comes after its own sections is the installed modules' own.
+
+#### Business logic
+
+After the "Claude web" section, the page draws every Settings section the installed modules [25] declare (`ModuleSettingsSections.tsx`), in the order the dashboard mounted them: by each section's order, 50 when unsaid, then by package name (`lib/use-modules.ts`). Each is given the registered projects that have its package, as the daemon lists them, and draws its own title and rows with the same building blocks as the page's own sections (`SettingsRows.tsx`), so it looks like them. What a section holds, where it keeps it and how it saves is its package's; the page writes nothing of it to the preferences [1]. A section that throws while rendering shows "The <id> settings failed: <reason>" in its place, and the rest of the page keeps working. With no package bringing a section, nothing follows "Claude web".
+
 ### A list with nothing to pick is not shown
 
 #### Context
@@ -173,4 +187,4 @@ The "Claude web" section ("A Claude web agent hands off and ends, so the questio
 
 #### Business logic
 
-A row whose list of choices is empty is left out of the page entirely rather than shown as an empty drop-down. Every list on the page today has at least one entry ("Auto-detect" guarantees the editor list one, "the CLI's own default" the model list), so the rule guards the next list assembled at run time.
+A row whose list of choices is empty is left out of the page entirely rather than shown as an empty drop-down (`SettingsRows.tsx`, the same row a module's section draws with). Every list of the page's own today has at least one entry ("Auto-detect" guarantees the editor list one, "the CLI's own default" the model list), so the rule guards the next list assembled at run time.

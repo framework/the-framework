@@ -105,13 +105,31 @@ describe('Subagents settings', () => {
     expect(saves()).toHaveLength(4)
   })
 
+  test('a refused save overtaken by a later one that is saved says nothing', async () => {
+    const { host, runCommand } = fakeHost()
+    show(host)
+    await screen.findByLabelText('Simple tasks')
+    const finish: Array<(value: ModuleCommandResult) => void> = []
+    runCommand.mockImplementation((_projectId: string, args: string[]) => (args.length === 2 ? new Promise(resolve => finish.push(resolve)) : Promise.resolve({ ok: true, output: { ok: true } })))
+    fireEvent.change(screen.getByLabelText('Simple tasks'), { target: { value: 'codex' } })
+    fireEvent.change(screen.getByLabelText('Hard tasks'), { target: { value: 'claude-code opus' } })
+    for (const done of finish.splice(0)) done({ ok: false, error: 'busy' })
+    await waitFor(() => expect(finish).toHaveLength(2))
+    for (const done of finish.splice(0)) done({ ok: true, output: { ok: true } })
+    await waitFor(() => expect(screen.queryByText('Saving…')).toBeNull())
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   test('a save a project refused says which and why, and the menu shows what is saved again; nothing read says why', async () => {
     const { host } = fakeHost()
     show(host)
     await screen.findByLabelText('Simple tasks')
-    ;(host.runCommand as ReturnType<typeof vi.fn>).mockImplementation(async (projectId: string, args: string[]) =>
-      args.length === 2 && projectId === 'p2' ? { ok: false, error: 'atOnce is not a whole number' } : { ok: true, output: { ok: true } },
-    )
+    // The save is refused in one project, and the read after it does not come back: the menu
+    // still goes back to what was read last, not the refused pick.
+    ;(host.runCommand as ReturnType<typeof vi.fn>).mockImplementation(async (projectId: string, args: string[]) => {
+      if (args.length === 1) throw new Error('the dashboard is not answering')
+      return projectId === 'p2' ? { ok: false, error: 'atOnce is not a whole number' } : { ok: true, output: { ok: true } }
+    })
     fireEvent.change(screen.getByLabelText('Simple tasks'), { target: { value: 'codex' } })
     expect((await screen.findByRole('alert')).textContent).toBe('The subagent settings were not saved: other: atOnce is not a whole number')
     await waitFor(() => expect((screen.getByLabelText('Simple tasks') as HTMLSelectElement).value).toBe(''))

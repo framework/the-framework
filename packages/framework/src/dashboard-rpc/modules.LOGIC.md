@@ -6,7 +6,7 @@ The dashboard's three calls about modules [1]: which modules the registered proj
 
 ## Glossary
 
-[1] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command [2], or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
+[1] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command [2], or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [2] command: one of a package's executables, as its `package.json` `bin` lists them, run the way an agent runs it with `npx`.
 [3] provider: the command a project's package declares as answering for one kind of the framework's data (the agent queue, the finished agents), which the framework reads and keeps for five seconds (`../store/queue.ts`, `../store/runs.ts`).
 [4] act: a module's command run as an action on the project (a link action's, `dashboard/components/LinkActions.tsx`) rather than as a page's read; the call says so with its last argument.

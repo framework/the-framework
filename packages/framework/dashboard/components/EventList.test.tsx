@@ -11,7 +11,7 @@ vi.mock('../lib/preferences.js', () => ({
   updatePreferences: vi.fn(),
 }))
 
-const { EventList, askedReplies, passedEnds } = await import('./EventList.js')
+const { EventList, askedReplies, passedEnds, withoutQuestionBlock } = await import('./EventList.js')
 
 beforeEach(() => {
   sendChoice.mockReset().mockResolvedValue(undefined)
@@ -568,6 +568,39 @@ describe('EventList replies a question follows', () => {
     render(<EventList events={events} stick={false} />)
     expect(screen.getAllByRole('button', { name: 'Expand message' })).toHaveLength(2)
     expect(screen.getAllByRole('button', { name: 'Collapse message' })).toHaveLength(1)
+  })
+})
+
+describe('EventList hides the block a question is written in', () => {
+  const prompt: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'ask me' } }
+  const reply = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'text', text } })
+  const choice = { kind: 'choice', id: 'await-choices', title: 'Which color?', options: [{ id: 'a', label: 'Blue' }] } as FrameworkEvent
+  const block = '```await-choices\n{ "title": "Which color?", "options": [{ "label": "Blue" }] }\n```'
+
+  test('the reply a question follows shows its words and not the block', () => {
+    render(<EventList events={[prompt, reply(`Pick one, please.\n\n${block}\n`), choice]} stick={false} />)
+    expect(screen.getByText('Pick one, please.')).toBeTruthy()
+    expect(screen.queryByText(/"title"/)).toBeNull()
+  })
+
+  test('a reply that is only the block is no row', () => {
+    render(<EventList events={[prompt, reply(block), choice]} stick={false} />)
+    expect(screen.queryByText(/"title"/)).toBeNull()
+    expect(screen.queryByText('agent')).toBeNull()
+  })
+
+  test('a block no question came of stays as written: it is how the reader sees it did not parse', () => {
+    render(<EventList events={[prompt, reply(`Pick one.\n\n${block}`)]} stick={false} />)
+    expect(screen.getByText(/"title"/)).toBeTruthy()
+  })
+
+  test('the message being written never shows the block, closed or not, and the words before it stay', () => {
+    const { rerender } = render(<EventList events={[prompt]} writing={'Pick one.\n\n```await-choices\n{ "title": "Whi'} working stick={false} />)
+    expect(screen.getByText('Pick one.')).toBeTruthy()
+    expect(screen.queryByText(/"title"/)).toBeNull()
+    rerender(<EventList events={[prompt]} writing={'```await-choices\n{ "title": "Whi'} working stick={false} />)
+    expect(screen.queryByText(/"title"/)).toBeNull()
+    expect(withoutQuestionBlock(`a\n${block}\nb`)).toBe('a\n\nb')
   })
 })
 

@@ -266,6 +266,15 @@ export function askedReplies(events: readonly FrameworkEvent[]): Set<FrameworkEv
   return asked
 }
 
+/**
+ * A reply without the block its question is written in (the fenced `await-choices` block, JSON):
+ * the question's card, the row under the reply, shows the question. A block still being written
+ * has no closing fence yet and goes too, so the JSON never scrolls by while the agent types it.
+ */
+export function withoutQuestionBlock(text: string): string {
+  return text.replace(/```await-choices\b[\s\S]*?(```|$)/g, '').trim()
+}
+
 // A conversation message (a prompt or a reply), rendered as compact Markdown. A short one renders
 // as-is. A long one clamps to its first line with a chevron beside it and expands in place on click —
 // the chevron stays on that first line (never a lone chevron on its own row), and the same rendered
@@ -394,7 +403,14 @@ export function EventList({
   const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
   // Every row and every passed end, in order, a message just sent last; `shown` is the rows alone.
   const kept: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
-  const shown = kept.filter(e => !passed.has(e))
+  // The text of a row's message: the reply a question follows, without the question's block.
+  const textOf = (e: FrameworkEvent): string | null => {
+    const text = messageText(e)
+    return text !== null && asked.has(e) ? withoutQuestionBlock(text) : text
+  }
+  // A reply that was only its question's block is no row: the card under it is the question.
+  const shown = kept.filter(e => !passed.has(e) && textOf(e) !== '')
+  const written = withoutQuestionBlock(writing)
   // The prompts that told this run one of its subagents ended: SUBAGENT rows, not the reader's own.
   const ends = new Map<FrameworkEvent, SubagentEnd>()
   for (const e of shown) {
@@ -447,7 +463,7 @@ export function EventList({
         <MessageScrollerViewport aria-label="Agent output">
           <MessageScrollerContent className="gap-1 p-4 font-mono text-xs">
             {shown.map((e, i, rows) => {
-              const message = messageText(e)
+              const message = textOf(e)
               const choiceRow = choiceRows?.rows.get(e)
               const prev = i > 0 ? rows[i - 1] : undefined
               const end = ends.get(e)
@@ -521,7 +537,7 @@ export function EventList({
             })}
             {passedLast.map(placeOf)}
             {startedRows(shown.length)}
-            {writing && (
+            {written && (
               <MessageScrollerItem messageId="writing" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
                 <span className="w-28 shrink-0">
                   {shown.length === 0 || started.has(shown.length) || groupOf(shown[shown.length - 1]!) !== 'agent' ? (
@@ -529,11 +545,11 @@ export function EventList({
                   ) : null}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <Markdown text={writing} compact />
+                  <Markdown text={written} compact />
                 </div>
               </MessageScrollerItem>
             )}
-            {working && !writing && (
+            {working && !written && (
               <MessageScrollerItem messageId="working" className="-mx-1.5 flex items-center gap-2 rounded-sm px-1.5 text-muted-foreground">
                 <span className="w-28 shrink-0" />
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />

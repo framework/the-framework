@@ -4,7 +4,9 @@ import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { nodeGitRunner } from '@gemstack/agent-data'
 import { projectRoot } from '@gemstack/skill-branches'
-import { DRIVER_NAMES, isDriverName, isPidAlive, readyToRun, spawnRun, withdrawMarker, writeMarker } from 'agent-runner'
+import { isPidAlive, readyToRun, spawnRun, withdrawMarker, writeMarker } from 'agent-runner'
+import { initHooks } from './init.js'
+import { isLevel, LEVELS, parseSettings, readSettings, writeSettings } from './settings.js'
 import { Refused, landSubagent, listSubagents, readSubagent, savePlan, showPlan, startSubagent, stopSubagent, type SubagentDeps } from './subagents.js'
 
 /**
@@ -17,9 +19,13 @@ export const USAGE = `usage: orchestration <command>
 
   plan <file>       save the file as your plan; answers the \`question\` to ask the person
   plan              your saved plan, its question, and whether the person approved it
-  start <task> [--model <id>] [--driver <${DRIVER_NAMES.join('|')}>]
-                    start a subagent on the task, on a branch started from yours; answers its id at once;
-                    refused until the person approved your saved plan
+  start --level <simple|hard> <task>
+                    start a subagent on the task, on a branch started from yours, on the coding agent and
+                    model the person set for the level; answers its id at once; refused until the person
+                    approved your saved plan, and while as many of your subagents run as the person allows
+  settings          the person's settings for subagents on this machine
+  settings <json>   save them whole: {"simple": {"driver", "model"}, "hard": {...}, "atOnce": <n>}, each optional
+  init              this tool's line in the dashboard's .the-framework/hooks.yml; a line already there is kept
   list              your subagents, newest first
   read <id>         one subagent: how it stands, its branch, and its last reply as \`result\`
   stop <id>         stop a subagent that is running
@@ -86,14 +92,44 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async start(args, io, deps) {
-    const { positionals, values } = parse(args, { model: { type: 'string' }, driver: { type: 'string' } }, 1)
+    const { positionals, values } = parse(args, { level: { type: 'string' } }, 1)
     const task = positionals[0]!
     if (!task.trim()) throw new Usage('the task is empty')
-    const driver = values.driver
-    if (driver !== undefined && !isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
-    const started = await startSubagent(await project(io.cwd, deps), io.env, { task, ...(values.model !== undefined ? { model: values.model } : {}), ...(driver !== undefined ? { driver } : {}) }, deps)
+    if (values.level === undefined) throw new Refused({ ok: false, reason: 'no-level' }, `say how hard the task is with --level ${LEVELS.join(' or ')}: the person's settings pick the model for it`)
+    if (!isLevel(values.level)) throw new Usage(`unknown level "${values.level}"; the levels are ${LEVELS.join(' and ')}`)
+    const started = await startSubagent(await project(io.cwd, deps), io.env, { task, level: values.level }, deps)
     if (started.uncommitted) io.stderr('your checkout has uncommitted changes: the subagent does not have them')
     return { ok: true, ...started }
+  },
+
+  async settings(args, io, deps) {
+    let parsed
+    try {
+      parsed = parseArgs({ args, options: {}, allowPositionals: true, strict: true })
+    } catch (err) {
+      throw new Usage(err instanceof Error ? err.message : String(err))
+    }
+    const [given, ...more] = parsed.positionals
+    if (more.length > 0) throw new Usage(`expected at most 1 argument, got ${parsed.positionals.length}`)
+    const repo = await project(io.cwd, deps)
+    if (given === undefined) return { ok: true, ...(await readSettings(repo)) }
+    let json: unknown
+    try {
+      json = JSON.parse(given)
+    } catch {
+      throw new Usage('the settings are not JSON')
+    }
+    const read = parseSettings(json)
+    if (!read.ok) throw new Usage(read.error)
+    await writeSettings(repo, read.settings, deps.git)
+    return { ok: true, ...read.settings }
+  },
+
+  async init(args, io, deps) {
+    parse(args, {}, 0)
+    const outcome = await initHooks(await project(io.cwd, deps))
+    if (!outcome.ok) throw new Refused(outcome, outcome.reason === 'no-dashboard' ? `${outcome.file} has no dashboard directory: add the project to the dashboard first` : `${outcome.file} cannot be read: ${outcome.detail ?? ''}`)
+    return outcome
   },
 
   async list(args, io, deps) {

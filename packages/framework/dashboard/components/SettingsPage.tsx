@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { DRIVERS, MAX_SPEND_OFFSET, PUBLISH_LABELS, isPublishPick, offeredPublishPicks, type PublishPick } from '../../src/client.js'
+import { DEFAULT_AT_ONCE, DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET, isDriverName, type SubagentRunner, type SubagentSettings, PUBLISH_LABELS, isPublishPick, offeredPublishPicks, type PublishPick } from '../../src/client.js'
 import { driverOptions, useModels } from '../lib/models.js'
 import { NO_MODEL_PINNED } from '../lib/agent-settings.js'
 import type { DriverOption } from './DriverModelMenu.js'
@@ -7,6 +7,7 @@ import { useQuota } from '../lib/quota.js'
 import { useSpendOffset } from './Quota.js'
 import { onSchedulers } from '../rpc/reads.js'
 import { sendSchedulePublish, sendScheduleSwitch } from '../rpc/projects.js'
+import { onSubagentSettings, sendSubagentSettings, type SubagentSettingsView } from '../rpc/subagents.js'
 import { usePolled } from '../lib/use-async.js'
 import type { ProjectScheduler, SchedulerCommand } from '../../src/index.js'
 import { useDetectedEditors } from '../lib/editors.js'
@@ -116,6 +117,8 @@ export function SettingsPage({
             onChange={next => updatePreferences({ postMergeCleanup: next })}
           />
         </Section>
+
+        <SubagentsSection drivers={drivers} />
 
         {/* A saved device is the other place a session can run on. */}
         <DevicesSettings />
@@ -377,6 +380,91 @@ function SpendOffsetSection() {
         </p>
       )}
       <ScheduleSwitchRows />
+    </Section>
+  )
+}
+
+const NO_SUBAGENT_SETTINGS: SubagentSettingsView = { settings: {}, hooked: 0 }
+
+/** The choice that leaves a level unset: the main agent's own coding agent and model. */
+const SAME_AS_MAIN = ''
+
+/**
+ * A level's choices (#1902): the main agent's own first, then every coding agent, by its own default
+ * and by each model it lists. A choice is one coding agent and one model, `<driver>` or
+ * `<driver> <model>`, since a model is always one agent's own. A saved model the list does not
+ * hold is kept, by its id.
+ */
+export function subagentRunnerChoices(drivers: readonly DriverOption[], saved: SubagentRunner | undefined): SelectOption[] {
+  const options: SelectOption[] = [{ value: SAME_AS_MAIN, label: 'Same as the main agent' }]
+  for (const driver of drivers) {
+    options.push({ value: driver.value, label: `${driver.label} · ${NO_MODEL_PINNED}` })
+    for (const model of driver.models) options.push({ value: `${driver.value} ${model.value}`, label: `${driver.label} · ${model.label}` })
+  }
+  const value = subagentRunnerValue(saved)
+  if (!options.some(o => o.value === value) && saved) options.push({ value, label: `${DRIVER_LABELS[saved.driver]} · ${saved.model ?? NO_MODEL_PINNED}` })
+  return options
+}
+
+export function subagentRunnerValue(runner: SubagentRunner | undefined): string {
+  if (!runner) return SAME_AS_MAIN
+  return runner.model !== undefined ? `${runner.driver} ${runner.model}` : runner.driver
+}
+
+export function subagentRunnerOf(value: string): SubagentRunner | undefined {
+  const [driver, ...model] = value.split(' ')
+  if (!driver || !isDriverName(driver)) return undefined
+  return model.length > 0 ? { driver, model: model.join(' ') } : { driver }
+}
+
+/**
+ * Subagents (#1902): which coding agent and model a main agent's subagents run on, by how hard the
+ * main agent says their task is, and how many of one main agent's subagents run at once. The same
+ * on every project: read off the projects' orchestration settings, written through each project's
+ * `subagents` hook, whole.
+ */
+function SubagentsSection({ drivers }: { drivers: DriverOption[] }) {
+  const { value: view, reload } = usePolled(onSubagentSettings, NO_SUBAGENT_SETTINGS, 10000, [])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | undefined>()
+  const { settings } = view
+  const save = (next: SubagentSettings): void => {
+    setSaving(true)
+    setError(undefined)
+    void sendSubagentSettings(next).then(result => {
+      setSaving(false)
+      if (!result.ok) setError(result.error)
+      reload()
+    })
+  }
+  const level = (key: 'simple' | 'hard') => (value: string) => {
+    const { [key]: _old, ...rest } = settings
+    const runner = subagentRunnerOf(value)
+    save(runner ? { ...rest, [key]: runner } : rest)
+  }
+  const atOnce = settings.atOnce ?? DEFAULT_AT_ONCE
+  return (
+    <Section title="Subagents" description="The models a main agent's subagents run on, by how hard the main agent says each task is. The same on every project, on this machine.">
+      {view.hooked === 0 && (
+        <p className="text-xs text-muted-foreground">
+          No project has a subagents line in .the-framework/hooks.yml yet: run <code>npx orchestration init</code> in a project.
+        </p>
+      )}
+      <SelectRow label="Simple tasks" description="A task the main agent marks simple." value={subagentRunnerValue(settings.simple)} options={subagentRunnerChoices(drivers, settings.simple)} onChange={level('simple')} />
+      <SelectRow label="Hard tasks" description="A task the main agent marks hard." value={subagentRunnerValue(settings.hard)} options={subagentRunnerChoices(drivers, settings.hard)} onChange={level('hard')} />
+      <SelectRow
+        label="At once"
+        description="How many of one main agent's subagents run at the same time. It starts the next when one ends."
+        value={String(atOnce)}
+        options={Array.from({ length: Math.max(8, atOnce) }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
+        onChange={value => save({ ...settings, atOnce: Number(value) })}
+      />
+      {saving && <p className="text-xs text-muted-foreground">Saving…</p>}
+      {error && (
+        <p role="alert" className="text-xs text-danger">
+          The subagent settings were not saved: {error}
+        </p>
+      )}
     </Section>
   )
 }

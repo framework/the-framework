@@ -4,6 +4,7 @@ import { isAgentBranch, removeWorktree, worktreeBranch, worktreeClean, worktreeP
 import { agentLines, findRun, listRuns, publicCard, readDiary, type RunCard } from '@gemstack/skill-logs'
 import { AGENT_ID_ENV, isDriverName, markerCard, readLiveCard, recordRun, runIdFrom, runnerMark, type DriverName, type readyToRun, type spawnRun } from 'agent-runner'
 import { APPROVE, planApproved, planQuestion, readPlan, writePlan } from './plan.js'
+import { DEFAULT_AT_ONCE, readSettings, runnerFor, type Level } from './settings.js'
 
 /**
  * A main agent and its subagents. The main agent is the run whose agent calls the command: its id
@@ -91,22 +92,26 @@ async function subagentOf(repo: string, main: RunCard, id: string): Promise<RunC
 
 /**
  * Start a subagent on a task: a run with the caller as its parent, its branch started from the
- * branch the caller's checkout is on, on the caller's coding agent unless one is named. A
- * subagent starts none of its own. Its record is written before its process is spawned, as a
- * scheduler's run is, so the id answered is one `list`, `read` and `stop` already know.
+ * branch the caller's checkout is on. The caller says how hard the task is, and the person's
+ * setting for that level names the coding agent and model; a level nobody set runs on the
+ * caller's own. A subagent starts none of its own, and no more of the caller's run at once than
+ * the setting allows. Its record is written before its process is spawned, as a scheduler's run
+ * is, so the id answered is one `list`, `read` and `stop` already know.
  */
 export async function startSubagent(
   repo: string,
   env: NodeJS.ProcessEnv,
-  opts: { task: string; model?: string; driver?: DriverName },
+  opts: { task: string; level: Level },
   deps: SubagentDeps,
-): Promise<{ id: string; driver: DriverName; model?: string; base: string; uncommitted?: true }> {
+): Promise<{ id: string; level: Level; driver: DriverName; model?: string; base: string; uncommitted?: true }> {
   const main = await mainAgent(repo, env)
   if (runnerMark(main)?.parent !== undefined) throw new Refused({ ok: false, reason: 'subagent' }, 'a subagent starts no subagents: do the task yourself')
   const checkout = worktreePath(repo, main.id)
   const base = await worktreeBranch(checkout, deps.git)
   if (base === undefined) throw new Refused({ ok: false, reason: 'no-branch' }, `the checkout of ${main.id} is on no branch: a subagent starts from a branch`)
-  const driver = opts.driver ?? (main.driver !== undefined && isDriverName(main.driver) ? main.driver : 'claude-code')
+  const settings = await readSettings(repo)
+  const own = { driver: main.driver !== undefined && isDriverName(main.driver) ? main.driver : 'claude-code', ...(main.model !== undefined ? { model: main.model } : {}) } as const
+  const { driver, model } = runnerFor(settings, opts.level, own)
   const ready = await deps.ready(repo, driver)
   if (ready.problems.length > 0) throw new Refused({ ok: false, reason: 'not-ready', ...ready }, ready.problems.join(' '))
   // No subagent before the person said yes to the plan as it is saved now.
@@ -116,21 +121,24 @@ export async function startSubagent(
     const question = planQuestion(plan)
     throw new Refused({ ok: false, reason: 'not-approved', question }, `the person has not approved the saved plan: ask them "${question}" with the option "${APPROVE}", end your reply there, and start once they chose it`)
   }
+  const atOnce = settings.atOnce ?? DEFAULT_AT_ONCE
+  const running = (await listRuns(repo)).filter(card => runnerMark(card)?.parent === main.id && card.status === 'running').length
+  if (running >= atOnce) throw new Refused({ ok: false, reason: 'limit', running, atOnce }, `${running} of your subagents are running, the most the person allows at once: end your reply, and start this one when you are told one ended`)
   // The subagent's branch starts from the caller's last commit: what is not committed is not in it.
   const uncommitted = !(await worktreeClean(checkout, deps.git).catch(() => true))
   const startedAt = deps.now().toISOString()
   const id = runIdFrom(startedAt)
   const prompt = subagentPrompt(opts.task)
-  const model = opts.model !== undefined ? { model: opts.model } : {}
-  const marked = await deps.mark(repo, markerCard({ id, startedAt, prompt, driver, ...model, mark: { host: deps.host, parent: main.id, base } }))
+  const named = model !== undefined ? { model } : {}
+  const marked = await deps.mark(repo, markerCard({ id, startedAt, prompt, driver, ...named, mark: { host: deps.host, parent: main.id, base } }))
   if (!marked.ok && !marked.committed) throw new Error(`the subagent's record could not be written: ${marked.error}`)
   try {
-    await deps.spawn(repo, { id, prompt, driver, ...model, parent: main.id, base })
+    await deps.spawn(repo, { id, prompt, driver, ...named, parent: main.id, base })
   } catch (err) {
     await deps.unmark(repo, id)
     throw err
   }
-  return { id, driver, ...model, base, ...(uncommitted ? { uncommitted: true } : {}) }
+  return { id, level: opts.level, driver, ...named, base, ...(uncommitted ? { uncommitted: true } : {}) }
 }
 
 /** The caller's subagents, newest first. */

@@ -46,8 +46,8 @@ async function run(cwd: string, agent: string | undefined, argv: string[], given
 }
 
 /** A run's record on the data branch. */
-async function record(repo: string, id: string, opts: { status?: RunStatus; prompt?: string; driver?: string; mark?: Partial<RunnerMark>; diary?: AnyDiaryLine[]; branch?: string } = {}): Promise<RunCard> {
-  const marker = markerCard({ id, startedAt: '2026-10-01T10:00:00.000Z', prompt: opts.prompt ?? 'Do the work', driver: opts.driver ?? 'claude-code', mark: { host: HOST, ...opts.mark } })
+async function record(repo: string, id: string, opts: { status?: RunStatus; prompt?: string; driver?: string; model?: string; mark?: Partial<RunnerMark>; diary?: AnyDiaryLine[]; branch?: string } = {}): Promise<RunCard> {
+  const marker = markerCard({ id, startedAt: '2026-10-01T10:00:00.000Z', prompt: opts.prompt ?? 'Do the work', driver: opts.driver ?? 'claude-code', ...(opts.model !== undefined ? { model: opts.model } : {}), mark: { host: HOST, ...opts.mark } })
   const card: RunCard = { ...marker, status: opts.status ?? 'running', ...(opts.branch !== undefined ? { branch: opts.branch } : {}) }
   const written = await recordRun(repo, card, opts.diary ?? [])
   assert.ok(written.ok || written.committed, 'the record is written')
@@ -55,7 +55,7 @@ async function record(repo: string, id: string, opts: { status?: RunStatus; prom
 }
 
 /** The main agent: its record, and its checkout on its own branch. */
-async function mainAgent(repo: string, opts: { driver?: string; mark?: Partial<RunnerMark> } = {}): Promise<string> {
+async function mainAgent(repo: string, opts: { driver?: string; model?: string; mark?: Partial<RunnerMark> } = {}): Promise<string> {
   await record(repo, MAIN, opts)
   return (await addWorktree(repo, { agentId: MAIN, branch: agentBranchName(MAIN) }, git)).path
 }
@@ -91,40 +91,49 @@ async function approvedPlan(repo: string, cwd: string, agent: string = MAIN): Pr
   await prompted(repo, agent, continuationPrompt(await savePlan(repo, cwd, agent, PLAN), 'Approve'))
 }
 
-test('start: a run for the caller, from the caller\'s branch, on the caller\'s coding agent, told it is a subagent', async () => {
+test('start: a run for the caller, from the caller\'s branch, on the coding agent and model set for its level, else the caller\'s own, told it is a subagent', async () => {
   const repo = await testRepo()
   try {
-    const checkout = await mainAgent(repo, { driver: 'codex' })
+    const checkout = await mainAgent(repo, { driver: 'codex', model: 'gpt-5.5' })
     await approvedPlan(repo, checkout)
-    const plain = await run(checkout, MAIN, ['start', 'Add the tests'])
-    assert.deepEqual([plain.code, plain.out, plain.err], [0, { ok: true, id: FIRST, driver: 'codex', base: agentBranchName(MAIN) }, ''])
-    assert.deepEqual(plain.started, [{ id: FIRST, prompt: `Add the tests\n\n${SUBAGENT_LINES}`, parent: MAIN, base: agentBranchName(MAIN), driver: 'codex' }])
+    // Nothing set: the caller's own coding agent and model.
+    const plain = await run(checkout, MAIN, ['start', '--level', 'simple', 'Add the tests'])
+    assert.deepEqual([plain.code, plain.out, plain.err], [0, { ok: true, id: FIRST, level: 'simple', driver: 'codex', model: 'gpt-5.5', base: agentBranchName(MAIN) }, ''])
+    assert.deepEqual(plain.started, [{ id: FIRST, prompt: `Add the tests\n\n${SUBAGENT_LINES}`, parent: MAIN, base: agentBranchName(MAIN), driver: 'codex', model: 'gpt-5.5' }])
     // Its record is there before its process is: the id answered is one the other commands know.
-    assert.deepEqual((await run(checkout, MAIN, ['list'])).out, [{ id: FIRST, startedAt: '2026-10-01T10:01:00.000Z', status: 'running', intent: 'Add the tests', driver: 'codex' }])
+    assert.deepEqual((await run(checkout, MAIN, ['list'])).out, [{ id: FIRST, startedAt: '2026-10-01T10:01:00.000Z', status: 'running', intent: 'Add the tests', driver: 'codex', model: 'gpt-5.5' }])
     assert.equal((await run(checkout, MAIN, ['stop', FIRST])).out.reason, 'no-process')
 
-    // The coding agent and the model named win; the branch is the one the checkout is on now.
+    // The setting for the level wins; a setting with no model is that coding agent's own default;
+    // the branch is the one the checkout is on now.
+    assert.equal((await run(repo, undefined, ['settings', JSON.stringify({ hard: { driver: 'claude-code', model: 'opus' }, simple: { driver: 'claude-code' }, atOnce: 10 })])).code, 0)
     await git(['branch', '-m', 'split-the-work'], checkout)
-    const named = await run(checkout, MAIN, ['start', 'Add the docs', '--driver', 'claude-code', '--model', 'haiku'], { now: () => new Date('2026-10-01T10:02:00.000Z') })
-    assert.deepEqual(named.out, { ok: true, id: SECOND, driver: 'claude-code', model: 'haiku', base: 'split-the-work' })
-    assert.deepEqual(named.started, [{ id: SECOND, prompt: `Add the docs\n\n${SUBAGENT_LINES}`, parent: MAIN, base: 'split-the-work', driver: 'claude-code', model: 'haiku' }])
-    assert.deepEqual((await run(checkout, MAIN, ['read', SECOND])).out.model, 'haiku')
+    const hard = await run(checkout, MAIN, ['start', '--level', 'hard', 'Add the docs'], { now: () => new Date('2026-10-01T10:02:00.000Z') })
+    assert.deepEqual(hard.out, { ok: true, id: SECOND, level: 'hard', driver: 'claude-code', model: 'opus', base: 'split-the-work' })
+    assert.deepEqual(hard.started, [{ id: SECOND, prompt: `Add the docs\n\n${SUBAGENT_LINES}`, parent: MAIN, base: 'split-the-work', driver: 'claude-code', model: 'opus' }])
+    assert.deepEqual((await run(checkout, MAIN, ['read', SECOND])).out.model, 'opus')
+    const simple = await run(checkout, MAIN, ['start', '--level', 'simple', 'Fix the typo'], { now: () => new Date('2026-10-01T10:02:30.000Z') })
+    assert.deepEqual(simple.started.map(s => [s.driver, s.model]), [['claude-code', undefined]])
+    // The readiness check is the level's coding agent's.
+    const checked: string[] = []
+    await run(checkout, MAIN, ['start', '--level', 'hard', 'Check it'], { now: () => new Date('2026-10-01T10:02:40.000Z'), ready: async (_repo, driver) => (checked.push(driver), { problems: ['not logged in'], warnings: [] }) })
+    assert.deepEqual(checked, ['claude-code'])
 
     // Uncommitted work is not on the branch the subagent starts from: said, and the subagent still starts.
     await writeFile(join(checkout, 'draft.md'), 'not committed\n')
-    const dirty = await run(checkout, MAIN, ['start', 'Read the draft'], { now: () => new Date('2026-10-01T10:03:00.000Z') })
+    const dirty = await run(checkout, MAIN, ['start', '--level', 'simple', 'Read the draft'], { now: () => new Date('2026-10-01T10:03:00.000Z') })
     assert.deepEqual([dirty.code, dirty.out.uncommitted, dirty.started.length], [0, true, 1])
     assert.match(dirty.err, /uncommitted changes: the subagent does not have them/)
 
     // A process that cannot be spawned leaves no record saying a subagent runs.
-    const unspawned = await run(checkout, MAIN, ['start', 'Never starts'], {
+    const unspawned = await run(checkout, MAIN, ['start', '--level', 'simple', 'Never starts'], {
       now: () => new Date('2026-10-01T10:04:00.000Z'),
       spawn: async () => {
         throw new Error('spawn ENOENT')
       },
     })
     assert.deepEqual([unspawned.code, unspawned.out], [1, { ok: false, reason: 'failed', detail: 'spawn ENOENT' }])
-    assert.deepEqual((await run(checkout, MAIN, ['list'])).out.map((card: { id: string }) => card.id), [OTHERS, SECOND, FIRST])
+    assert.deepEqual((await run(checkout, MAIN, ['list'])).out.map((card: { id: string }) => card.id), [OTHERS, '2026-10-01T10-02-30-000Z', SECOND, FIRST])
   } finally {
     await removeRepo(repo)
   }
@@ -133,10 +142,10 @@ test('start: a run for the caller, from the caller\'s branch, on the caller\'s c
 test('start is refused for a caller that is no run, for a subagent, and when the coding agent cannot start', async () => {
   const repo = await testRepo()
   try {
-    const none = await run(repo, undefined, ['start', 'Add the tests'])
+    const none = await run(repo, undefined, ['start', '--level', 'simple', 'Add the tests'])
     assert.deepEqual([none.code, none.out, none.started], [1, { ok: false, reason: 'not-a-run' }, []])
     assert.match(none.err, /AGENT_ID is not set/)
-    const unknown = await run(repo, MAIN, ['start', 'Add the tests'])
+    const unknown = await run(repo, MAIN, ['start', '--level', 'simple', 'Add the tests'])
     assert.deepEqual([unknown.code, unknown.out, unknown.started], [1, { ok: false, reason: 'not-a-run', id: MAIN }, []])
     assert.match(unknown.err, /do the task yourself/)
 
@@ -145,29 +154,93 @@ test('start is refused for a caller that is no run, for a subagent, and when the
     const early = (await addWorktree(repo, { agentId: OTHERS, branch: agentBranchName(OTHERS) }, git)).path
     await liveCard(repo, { ...markerCard({ id: OTHERS, startedAt: '2026-10-01T10:03:00.000Z', prompt: 'Split it', driver: 'pi', mark: { host: HOST, pid: 1 } }) })
     await approvedPlan(repo, early, OTHERS)
-    const fromLive = await run(early, OTHERS, ['start', 'Add the tests'])
+    const fromLive = await run(early, OTHERS, ['start', '--level', 'simple', 'Add the tests'])
     assert.deepEqual([fromLive.code, fromLive.started.map(s => [s.parent, s.driver])], [0, [[OTHERS, 'claude-code']]])
 
     const checkout = await mainAgent(repo)
-    const notReady = await run(checkout, MAIN, ['start', 'Add the tests'], { ready: async () => ({ problems: ['claude is not logged in.'], warnings: [] }) })
+    const notReady = await run(checkout, MAIN, ['start', '--level', 'simple', 'Add the tests'], { ready: async () => ({ problems: ['claude is not logged in.'], warnings: [] }) })
     assert.deepEqual([notReady.code, notReady.out, notReady.started], [1, { ok: false, reason: 'not-ready', problems: ['claude is not logged in.'], warnings: [] }, []])
     assert.equal(notReady.err, 'claude is not logged in.')
 
     await git(['checkout', '-q', '--detach'], checkout)
-    const detached = await run(checkout, MAIN, ['start', 'Add the tests'])
+    const detached = await run(checkout, MAIN, ['start', '--level', 'simple', 'Add the tests'])
     assert.deepEqual([detached.code, detached.out.reason, detached.started], [1, 'no-branch', []])
 
     // A run whose directory is no checkout of its own never borrows the project's branch.
     await record(repo, SECOND)
     await mkdir(liveDir(worktreePath(repo, SECOND)), { recursive: true })
-    const noCheckout = await run(repo, SECOND, ['start', 'Add the tests'])
+    const noCheckout = await run(repo, SECOND, ['start', '--level', 'simple', 'Add the tests'])
     assert.deepEqual([noCheckout.out.reason, noCheckout.started], ['no-branch', []])
 
     // A run started for another run starts none of its own.
     await record(repo, FIRST, { mark: { parent: MAIN } })
     await addWorktree(repo, { agentId: FIRST, branch: agentBranchName(FIRST) }, git)
-    const nested = await run(checkout, FIRST, ['start', 'Add the tests'])
+    const nested = await run(checkout, FIRST, ['start', '--level', 'simple', 'Add the tests'])
     assert.deepEqual([nested.code, nested.out, nested.started], [1, { ok: false, reason: 'subagent' }, []])
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('start: refused without a level, and while as many of the caller\'s subagents run as the setting allows, 4 when unset', async () => {
+  const repo = await testRepo()
+  try {
+    const checkout = await mainAgent(repo)
+    await approvedPlan(repo, checkout)
+    const unsaid = await run(checkout, MAIN, ['start', 'Add the tests'])
+    assert.deepEqual([unsaid.code, unsaid.out, unsaid.started], [1, { ok: false, reason: 'no-level' }, []])
+    assert.equal((await run(checkout, MAIN, ['start', '--level', 'medium', 'Add the tests'])).code, 2)
+
+    // Another main agent's subagent and an ended one of the caller's take no place.
+    await record(repo, '2026-10-01T09-00-00-000Z', { mark: { parent: OTHERS } })
+    await record(repo, '2026-10-01T09-00-01-000Z', { status: 'done', mark: { parent: MAIN } })
+    const at = (n: number) => ({ now: () => new Date(Date.parse('2026-10-01T10:10:00.000Z') + n * 1000) })
+    for (let n = 0; n < 4; n++) assert.equal((await run(checkout, MAIN, ['start', '--level', 'simple', `Task ${n}`], at(n))).code, 0, `start ${n}`)
+    const fifth = await run(checkout, MAIN, ['start', '--level', 'hard', 'Task 4'], at(4))
+    assert.deepEqual([fifth.code, fifth.out, fifth.started], [1, { ok: false, reason: 'limit', running: 4, atOnce: 4 }, []])
+    assert.match(fifth.err, /end your reply/)
+
+    // The person's setting moves the limit both ways.
+    assert.equal((await run(repo, undefined, ['settings', JSON.stringify({ atOnce: 5 })])).code, 0)
+    assert.equal((await run(checkout, MAIN, ['start', '--level', 'hard', 'Task 4'], at(5))).code, 0)
+    assert.equal((await run(checkout, MAIN, ['start', '--level', 'hard', 'Task 5'], at(6))).out.reason, 'limit')
+    assert.equal((await run(repo, undefined, ['settings', JSON.stringify({ atOnce: 1 })])).code, 0)
+    assert.deepEqual((await run(checkout, MAIN, ['start', '--level', 'hard', 'Task 5'], at(7))).out, { ok: false, reason: 'limit', running: 5, atOnce: 1 })
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('settings: saved whole on this machine, hidden from git, read back; settings that are not settings are refused and change nothing', async () => {
+  const repo = await testRepo()
+  try {
+    assert.deepEqual((await run(repo, undefined, ['settings'])).out, { ok: true })
+    const given = { simple: { driver: 'codex', model: 'gpt-5.5' }, hard: { driver: 'claude-code', model: 'opus' }, atOnce: 3 }
+    assert.deepEqual((await run(repo, undefined, ['settings', JSON.stringify(given)])).out, { ok: true, ...given })
+    assert.deepEqual((await run(repo, undefined, ['settings'])).out, { ok: true, ...given })
+    assert.deepEqual(JSON.parse(await readFile(join(repo, '.orchestration', 'settings.json'), 'utf8')), given)
+    assert.equal((await git(['status', '--porcelain'], repo)).trim(), '')
+    // Whole: what is left out is unset again; null is unset too.
+    assert.deepEqual((await run(repo, undefined, ['settings', JSON.stringify({ hard: { driver: 'codex' }, simple: null })])).out, { ok: true, hard: { driver: 'codex' } })
+    for (const bad of ['nope', '[]', '{"medium": {"driver": "codex"}}', '{"hard": {"driver": "pi"}}', '{"hard": "opus"}', '{"hard": {"driver": "codex", "model": " "}}', '{"atOnce": 0}', '{"atOnce": 2.5}', '{"atOnce": "4"}']) {
+      const refused = await run(repo, undefined, ['settings', bad])
+      assert.equal(refused.code, 2, bad)
+    }
+    assert.deepEqual((await run(repo, undefined, ['settings'])).out, { ok: true, hard: { driver: 'codex' } })
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('init: the subagents line in the dashboard\'s hooks file, a line already there kept; no dashboard directory is a refusal', async () => {
+  const repo = await testRepo()
+  try {
+    assert.deepEqual((await run(repo, undefined, ['init'])).out.reason, 'no-dashboard')
+    await mkdir(join(repo, '.the-framework'))
+    assert.deepEqual((await run(repo, undefined, ['init'])).out.added, ['subagents'])
+    assert.match(await readFile(join(repo, '.the-framework', 'hooks.yml'), 'utf8'), /^subagents: npx orchestration settings "\$SUBAGENTS"$/m)
+    await writeFile(join(repo, '.the-framework', 'hooks.yml'), 'subagents: my own line\n')
+    assert.deepEqual((await run(repo, undefined, ['init'])).out, { ok: true, file: join(repo, '.the-framework', 'hooks.yml'), added: [], kept: ['subagents'] })
   } finally {
     await removeRepo(repo)
   }
@@ -258,7 +331,7 @@ test('plan: saved beside the run\'s record, read back, and no subagent starts un
   const repo = await testRepo()
   try {
     const checkout = await mainAgent(repo)
-    const unplanned = await run(checkout, MAIN, ['start', 'Add the tests'])
+    const unplanned = await run(checkout, MAIN, ['start', '--level', 'simple', 'Add the tests'])
     assert.deepEqual([unplanned.code, unplanned.out, unplanned.started], [1, { ok: false, reason: 'no-plan' }, []])
     assert.match(unplanned.err, /orchestration plan <file>/)
     assert.deepEqual((await run(checkout, MAIN, ['plan'])).out, { ok: false, reason: 'no-plan' })
@@ -268,7 +341,7 @@ test('plan: saved beside the run\'s record, read back, and no subagent starts un
     assert.equal(await git(['show', `${DATA_BRANCH}:agents/tester@example.com/${MAIN}.plan.md`], join(dirname(repo), 'origin.git')), PLAN, 'on origin, beside the run\'s card')
     assert.deepEqual((await run(checkout, MAIN, ['plan'])).out, { ok: true, plan: PLAN, question, approved: false })
 
-    const unasked = await run(checkout, MAIN, ['start', 'Add the tests'])
+    const unasked = await run(checkout, MAIN, ['start', '--level', 'simple', 'Add the tests'])
     assert.deepEqual([unasked.code, unasked.out, unasked.started], [1, { ok: false, reason: 'not-approved', question }, []])
     assert.ok(unasked.err.includes(question) && unasked.err.includes('"Approve"'), 'the refusal says what to ask')
 
@@ -280,17 +353,17 @@ test('plan: saved beside the run\'s record, read back, and no subagent starts un
     await prompted(repo, MAIN, `The run ${FIRST}, started for this run, ended done. Its last reply: ${approval}`)
     await prompted(repo, MAIN, continuationPrompt('Start the subagents on plan 00000000?', 'Approve'))
     await prompted(repo, MAIN, approval, 'action')
-    assert.equal((await run(checkout, MAIN, ['start', 'Add the tests'])).out.reason, 'not-approved')
+    assert.equal((await run(checkout, MAIN, ['start', '--level', 'simple', 'Add the tests'])).out.reason, 'not-approved')
 
     await prompted(repo, MAIN, `${approval}\n\nOpen the pull request but do not arm its merge.`)
     assert.equal((await run(checkout, MAIN, ['plan'])).out.approved, true)
-    const started = await run(checkout, MAIN, ['start', 'Add the tests'])
+    const started = await run(checkout, MAIN, ['start', '--level', 'simple', 'Add the tests'])
     assert.deepEqual([started.code, started.started.length], [0, 1])
 
     // A plan changed after the yes is a plan not approved; the same text saved again still is.
     const changed = await savePlan(repo, checkout, MAIN, `${PLAN}\n## 3. Add a changelog\n`)
     assert.notEqual(changed, question)
-    assert.deepEqual((await run(checkout, MAIN, ['start', 'Add the docs'])).out, { ok: false, reason: 'not-approved', question: changed })
+    assert.deepEqual((await run(checkout, MAIN, ['start', '--level', 'simple', 'Add the docs'])).out, { ok: false, reason: 'not-approved', question: changed })
     assert.equal(await savePlan(repo, checkout, MAIN, PLAN), question)
     assert.equal((await run(checkout, MAIN, ['plan'])).out.approved, true)
 
@@ -442,7 +515,7 @@ test('a command line that cannot be read exits 2 with the usage and starts nothi
   const elsewhere = await mkdtemp(join(tmpdir(), 'not-a-repo-'))
   try {
     await mainAgent(repo)
-    for (const argv of [[], ['nope'], ['start'], ['start', ' '], ['start', 'a', 'b'], ['start', 'a', '--driver', 'pi'], ['list', 'extra'], ['read'], ['stop'], ['stop', FIRST, '--force'], ['plan', 'a', 'b'], ['plan', '--nope'], ['land'], ['land', FIRST, SECOND]]) {
+    for (const argv of [[], ['nope'], ['start'], ['start', ' '], ['start', 'a', 'b'], ['start', 'a', '--driver', 'pi'], ['list', 'extra'], ['read'], ['stop'], ['stop', FIRST, '--force'], ['plan', 'a', 'b'], ['plan', '--nope'], ['land'], ['land', FIRST, SECOND], ['start', '--level', 'simple', 'a', '--model', 'opus'], ['start', '--level', 'simple', 'a', '--driver', 'codex'], ['start', '--level'], ['settings', '{}', '{}'], ['init', 'x']]) {
       const bad = await run(repo, MAIN, argv)
       assert.deepEqual([bad.code, bad.out, bad.started, bad.stopped], [2, undefined, [], []], argv.join(' '))
       assert.match(bad.err, /usage: orchestration/)

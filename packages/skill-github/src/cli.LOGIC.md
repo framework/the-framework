@@ -19,3 +19,4 @@ Gives an agent [1] in a shell, the user, the dashboard's server and `agent-runne
 - **`merge <number>`** - lands the request as `merge.ts` does, answering `{ number, outcome }`; `not-open` with the request's state and `merge-failed` with the detail are refusals.
 - **`watch <number>`** - runs the merge watcher in this process, its progress on stderr, the outcome on stdout, `ok` only when it merged.
 - **`home`** - the project's page on GitHub and the git host's name; `no-remote` when `origin` is missing or on another host.
+- **`create`** - for a project with no `origin`: a private repository `<account>/<folder>`, set as `origin` and pushed (`create.ts`); `--check` only names it; `has-remote`, `not-logged-in` and `create-failed` are refusals, each with its line.

@@ -20,7 +20,7 @@ export function providedDataChanged(root: string): void {
 }
 
 /** The kinds of the framework's data a project's package may provide, one reader each (`git-host` is `git-host.ts`). */
-export const PROVIDED_KINDS = ['tickets', 'queue', 'runs', 'branches', 'git-host'] as const
+export const PROVIDED_KINDS = ['tickets', 'queue', 'runs', 'branches', 'git-host', 'repository'] as const
 
 /**
  * Why a kind of the project's data has no provider although packages declare it (#1820): two or

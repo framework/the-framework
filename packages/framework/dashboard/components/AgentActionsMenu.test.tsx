@@ -3,17 +3,20 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 // The ⋮ menu holds the git host / folder / editor / Stop / Remove / Delete actions, so it pulls
 // their RPC + editor reads; stub them.
-const onGitHostHome = vi.fn(async () => ({ url: 'https://github.com/o/r', name: 'GitHub' }))
+const onGitHostHome = vi.fn(async () => ({ url: 'https://github.com/o/r', name: 'GitHub' }) as { url: string; name: string } | null)
+const onRepositoryOffer = vi.fn(async () => null as { repository: string; name: string } | null)
+const sendCreateRepository = vi.fn(async () => ({ ok: true, url: 'https://github.com/me/shop' }) as unknown)
 const sendOpenInApp = vi.fn(async () => ({ ok: true as const }))
 const sendStop = vi.fn(async () => {})
 const sendRemoveWorktree = vi.fn(async () => ({ ok: true as const }))
 const sendDeleteAgent = vi.fn(async () => ({ ok: true as const }))
-vi.mock('../rpc/reads.js', () => ({ onGitHostHome }))
+vi.mock('../rpc/reads.js', () => ({ onGitHostHome, onRepositoryOffer }))
 vi.mock('../rpc/control.js', () => ({
   sendOpenInApp,
   sendStop,
   sendRemoveWorktree,
   sendDeleteAgent,
+  sendCreateRepository,
 }))
 // The editor picker (#727) lives in the menu's editor submenu; stub the preference store and the
 // detected-editors read so the tests drive a fixed set.
@@ -30,6 +33,10 @@ const openMenu = () => fireEvent.click(screen.getByRole('button', { name: /sessi
 beforeEach(() => {
   sendOpenInApp.mockClear()
   sendDeleteAgent.mockClear()
+  sendCreateRepository.mockClear()
+  sendCreateRepository.mockResolvedValue({ ok: true, url: 'https://github.com/me/shop' })
+  onRepositoryOffer.mockClear()
+  onRepositoryOffer.mockResolvedValue(null)
   updatePreferences.mockClear()
   prefs = {}
   detectedEditors = []
@@ -200,5 +207,49 @@ describe('the editor picker in the menu (#727)', () => {
     render(<AgentActionsMenu projectId="p1" agentId="run-1" events={[]} />)
     await openEditorMenu()
     await waitFor(() => expect(screen.getAllByText('mate').length).toBeGreaterThan(0))
+  })
+})
+
+describe('Create a repository, for a project that lives on this machine only', () => {
+  const openProjectMenu = () => fireEvent.click(screen.getByRole('button', { name: 'Project actions' }))
+
+  test('the project menu offers it only when the project is offered a repository, and asks before creating', async () => {
+    onRepositoryOffer.mockResolvedValue({ repository: 'me/shop', name: 'GitHub' })
+    render(<AgentActionsMenu projectId="p1" events={[]} />)
+    openProjectMenu()
+    fireEvent.click(await screen.findByText('Create a repository on GitHub…'))
+    await waitFor(() => expect(screen.getByText('Create a private repository on GitHub?')).toBeTruthy())
+    expect(screen.getByText('me/shop')).toBeTruthy()
+    expect(sendCreateRepository).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Create and push' }))
+    await waitFor(() => expect(sendCreateRepository).toHaveBeenCalledWith('p1'))
+    // The project is asked again: it has a page on its git host now, and nothing left to create.
+    await waitFor(() => expect(onRepositoryOffer.mock.calls.length).toBeGreaterThan(1))
+  })
+
+  test('a refusal stays in the dialog in the provider\'s words; no offer, no item; a session\'s menu never offers it', async () => {
+    onRepositoryOffer.mockResolvedValue({ repository: 'me/shop', name: 'GitHub' })
+    sendCreateRepository.mockResolvedValue({ ok: false, error: 'the repository could not be created: Name already exists on this account' })
+    render(<AgentActionsMenu projectId="p1" events={[]} />)
+    openProjectMenu()
+    fireEvent.click(await screen.findByText('Create a repository on GitHub…'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Create and push' }))
+    await waitFor(() => expect(screen.getByText(/Name already exists on this account/)).toBeTruthy())
+    cleanup()
+
+    onRepositoryOffer.mockResolvedValue(null)
+    render(<AgentActionsMenu projectId="p1" events={[]} />)
+    openProjectMenu()
+    await waitFor(() => expect(screen.getByText('Open folder')).toBeTruthy())
+    expect(screen.queryByText(/Create a repository/)).toBeNull()
+    cleanup()
+
+    onRepositoryOffer.mockClear()
+    onRepositoryOffer.mockResolvedValue({ repository: 'me/shop', name: 'GitHub' })
+    render(<AgentActionsMenu projectId="p1" agentId="run-1" events={[]} />)
+    fireEvent.click(screen.getByRole('button', { name: /session actions/i }))
+    await waitFor(() => expect(screen.getByText('Open project folder')).toBeTruthy())
+    expect(screen.queryByText(/Create a repository/)).toBeNull()
+    expect(onRepositoryOffer).not.toHaveBeenCalled()
   })
 })

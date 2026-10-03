@@ -38,6 +38,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   is deleted, and the run's record keeps its last commit and where its work began, so the
   page still shows what the agent changed. Picked over "No remote to push to", which left
   the work on a branch the person could only reach from a terminal.
+- A project with no remote is offered "Create a repository on <host>…" in its project menu,
+  when a package can create one: private, under the person's account, named after the folder,
+  pushed. It asks once before it does it, naming the repository, since the project's code
+  leaves the machine. Which host is the package's business. Picked over a field to paste a
+  repository address into, which leaves creating the repository to the person.
 - A subagent's page offers no pull request, no merge and no push. It says landed or not
   landed. Picked over saying nothing in their place.
 - Which package provides a kind of data when several installed packages declare it: the
@@ -69,9 +74,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The packages every project wants are built in: the framework depends on them and uses them
   for every project through the same contract as a project's own package (a module by its
   `./dashboard` export, a provider of a kind of data and the writer of its hook lines by its
-  `framework` key), and a project's own copy wins. They are Files, the runner, and the
-  packages that read a project's runs and checkouts, so an empty folder starts an agent and
-  shows it. One list names them, and nothing else in the framework names a package. Picked
+  `framework` key), and a project's own copy wins. They are Files, the runner, the
+  packages that read a project's runs and checkouts, and the GitHub package, so an empty
+  folder starts an agent, shows it, and can be put on GitHub. A built-in git host is a
+  project's only when the project's remote is on that host: it was not chosen by the
+  project, so it does not answer for a project on another host. One list names them, and nothing else in the framework names a package. Picked
   over each project installing them itself, which left a project with nothing installed
   unable to start an agent or to see one.
 - A module may bring a section of the Settings page, shown after the framework's own

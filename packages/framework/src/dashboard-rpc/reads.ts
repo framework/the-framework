@@ -2,6 +2,7 @@ import type { BridgeBrowserStatus } from '../bridge-browser.js'
 import { findAgent, findCheckout, readLiveMetas, readAllAgents, readDoing, loadAgentEvents, startedAtFromAgentId, isPidAlive, type AgentMeta, type AgentStatus, isRunId, projectBranches } from '../store/index.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { projectGitHost, type GitHostHome } from '../store/git-host.js'
+import { repositoryOffer, type RepositoryOffer } from '../store/repository.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
 import { buildOverview, buildRecentAgents, type Overview, type RecentAgent } from '../dashboard/overview.js'
@@ -278,6 +279,13 @@ export async function onGitHostHome(projectId: string): Promise<GitHostHome | nu
   if (!cwd) return null
   const gitHost = await projectGitHost(cwd).catch(() => undefined)
   return (await gitHost?.home()) ?? null
+}
+
+/** The repository the project's provider offers to create for it (a project with no remote), or null: no provider, a remote already there, the host out of reach, or the relay. */
+export async function onRepositoryOffer(projectId: string): Promise<RepositoryOffer | null> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return null
+  return (await repositoryOffer(cwd)) ?? null
 }
 
 /**

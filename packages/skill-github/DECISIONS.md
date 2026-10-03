@@ -48,3 +48,9 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   stderr, exit 2. The same contract as the other skills' commands, but for `watch`: it
   logs one line per read on stderr and exits 0 whatever its outcome, `ok` only when it
   merged.
+- `create` makes the project's repository on GitHub, for a project with no `origin`: private,
+  named `<account>/<folder>`, set as `origin` and pushed, in one `gh` step. `--check` only
+  names it. The package declares it under `"framework": { "repository": "github" }`, so a
+  dashboard offers it without naming GitHub. Always private: making code public is never this
+  command's choice. Picked over a name the person types, which is one more thing to ask, and
+  over moving a project that already has a remote.

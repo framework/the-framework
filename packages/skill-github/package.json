@@ -24,9 +24,11 @@
     "github": "bin/github"
   },
   "framework": {
-    "git-host": "github"
+    "git-host": "github",
+    "repository": "github"
   },
   "exports": {
+    "./package.json": "./package.json",
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"

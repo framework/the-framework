@@ -22,6 +22,10 @@ export function testBranches(byProject: Record<string, Checkout[]> = {}, states:
       writes.push(`push ${branch}`)
       return { ok: true, pushed: true }
     },
+    async merge(branch) {
+      writes.push(`merge ${branch}`)
+      return { ok: true, into: 'main', commit: 'c'.repeat(40), from: 'b'.repeat(40), deleted: true }
+    },
     async remove(id, opts = {}) {
       writes.push(`remove ${id}${opts.discard ? ' --discard' : ''}`)
       const rows = checkouts.get(root) ?? []

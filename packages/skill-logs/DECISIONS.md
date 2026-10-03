@@ -67,9 +67,10 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   throws refuses with `git-failed`.
 
 ## Flow: what the writer records
-- A run is recorded once, when it is over, as one commit carrying both files. Two late
-  facts, the branch the work landed on and the pull request, are patched onto the card
-  afterwards, one commit per patch, either or both. A run is deleted as one commit, both
+- A run is recorded once, when it is over, as one commit carrying both files. Late
+  facts are patched onto the card afterwards, one commit per patch: the branch the work is
+  on, the pull request, and that the work landed, which drops the branch and keeps its last
+  commit and the commit the work began at under the writer's key. A run is deleted as one commit, both
   files. A run a dead writer left marked running is recorded again by the next writer that
   notices, ended, where it already sits. Nothing else on a card changes after it lands.
 - The writer's persistent checkout is `.branches/agent-data`, and its writes go through

@@ -19,6 +19,7 @@ const answer = name => process.stdout.write(readFileSync(join(__dirname, name), 
 if (args[0] === 'list') answer('list.json')
 else if (args[0] === 'show') answer('show.json')
 else if (args[0] === 'push') process.stdout.write(args[2] === 'remote-only' ? '{"ok":true,"branch":"remote-only","pushed":false}' : args[2] === 'dirty' ? (process.stderr.write('agent-dirty has uncommitted work; commit or delete it, then push\\n'), process.exit(1)) : '{"ok":true,"branch":"agent-run-1","pushed":true}')
+else if (args[0] === 'merge') { if (args[1] === 'clash') { process.stderr.write('agent-clash does not merge cleanly into main: it conflicts in a.ts; nothing was changed\\n'); process.exit(1) } process.stdout.write('{"ok":true,"branch":"' + args[1] + '","into":"main","commit":"c1","from":"b1","deleted":true}') }
 else if (args[0] === 'remove') { if (args[1] === 'kept') { process.stderr.write('agent-kept has uncommitted work; the checkout was kept\\n'); process.exit(1) } process.stdout.write(args[1] === 'run-1' && !args.includes('--discard') ? '{"ok":true,"branchesDeleted":["agent-run-1"]}' : '{"ok":true}') }
 `
 
@@ -57,6 +58,8 @@ test('a project with no branches provider of its own is read by the built-in one
     assert.deepEqual(await branches.show(['agent-run-1', 'agent-run-2']), [STATE])
     assert.deepEqual(await branches.show([]), [], 'nothing asked is nothing run')
     assert.deepEqual(await branches.show(['agent-run-1'], 'abc123'), [STATE], 'measured from the commit the branch started at')
+    assert.deepEqual(await branches.merge('agent-run-1'), { ok: true, into: 'main', commit: 'c1', from: 'b1', deleted: true })
+    assert.deepEqual(await branches.merge('clash'), { ok: false, error: 'agent-clash does not merge cleanly into main: it conflicts in a.ts; nothing was changed' }, "a conflict is the provider's own line")
     assert.deepEqual(await branches.push('agent-run-1'), { ok: true, pushed: true })
     assert.deepEqual(await branches.push('remote-only'), { ok: true, pushed: false }, 'a branch only the remote has: nothing to push, and nothing missing')
     assert.deepEqual(await branches.push('dirty'), { ok: false, error: 'agent-dirty has uncommitted work; commit or delete it, then push' }, "a refusal is the provider's own line")
@@ -70,6 +73,8 @@ test('a project with no branches provider of its own is read by the built-in one
       'list --sizes',
       'show agent-run-1 agent-run-2',
       'show --from abc123 agent-run-1',
+      'merge agent-run-1',
+      'merge clash',
       'push --branch agent-run-1',
       'push --branch remote-only',
       'push --branch dirty',

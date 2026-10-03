@@ -4,6 +4,7 @@ import type { Cached } from './cache.js'
 import type { AgentMeta } from '../store/index.js'
 import { projectBranches, type BranchesFor } from '../store/branches.js'
 import { projectGitHost, type GitHostFor } from '../store/git-host.js'
+import { projectRuns, type RunsFor } from '../store/runs.js'
 // What a finished session produced, and what is left to do with it (#799).
 //
 // Everything up to "the agent is done" was covered; the handoff back to the human was not. A
@@ -55,8 +56,9 @@ export interface AgentHandoff {
   /** The branch is gone because the run changed nothing ({@link leftNothing}), not because work went. */
   unchanged?: boolean
   /**
-   * The run's main agent landed its work: merged into the main agent's branch. The run's own branch
-   * went with that, and what is read here is what it held, by the last commit its record kept.
+   * The run's work was landed: merged into its main agent's branch by that agent, or into the
+   * project's default branch by the person, on this machine. The run's own branch went with that,
+   * and what is read here is what it held, by the last commit its record kept.
    */
   landed?: boolean
   /** What the branch is measured against: the commit the run's own work begins at, else the repo's default branch, when one was found. */
@@ -334,6 +336,27 @@ export async function pushAgentBranch(cwd: string, agent: Pick<AgentMeta, 'id' |
   if (!source) return { ok: false, error: 'this project has no branches provider to push with' }
   const pushed = await source.push(branch)
   return pushed.ok ? { ok: true } : { ok: false, error: pushed.error }
+}
+
+/**
+ * Merge a finished session's branch into the project's default branch, on this machine: how the
+ * work reaches the project's own folder where there is no remote to push to. The branches provider
+ * merges and deletes the branch; the session's record then keeps the branch's last commit and the
+ * commit its work began at, so what it changed is still read once the branch is gone.
+ */
+export async function mergeAgentBranch(cwd: string, agent: Pick<AgentMeta, 'id' | 'branch'>, deps: { branches?: BranchesFor; runs?: RunsFor } = {}): Promise<HandoffResult> {
+  const branch = agentBranchFor(agent)
+  if (branch === undefined) return { ok: false, error: 'this session recorded no branch to merge' }
+  const source = await (deps.branches ?? projectBranches)(cwd).catch(() => undefined)
+  if (!source) return { ok: false, error: 'this project has no branches provider to merge with' }
+  const merged = await source.merge(branch)
+  if (!merged.ok) return { ok: false, error: merged.error }
+  if (!merged.deleted) return { ok: true }
+  const runs = await (deps.runs ?? projectRuns)(cwd).catch(() => undefined)
+  const recorded = await runs?.patch(agent.id, { landed: { commit: merged.commit, from: merged.from } })
+  // The merge is in whatever the record says; a record that could not be written is said, since the page reads the record.
+  if (recorded && !recorded.ok) return { ok: false, error: `merged into ${merged.into}, but the record was not updated: ${recorded.error}` }
+  return { ok: true }
 }
 
 /**

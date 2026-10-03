@@ -20,6 +20,7 @@ import { createCheckout, attachCheckout } from './checkout.js'
 import { reconcileBranchLinks } from './branch-links.js'
 import { discardWorktree, reclaimWorktree, type ReclaimOutcome, type ReclaimRefusal } from './reclaim.js'
 import { pushBranchByName, pushCheckout, type PushOutcome } from './push.js'
+import { mergeBranch, type MergeOutcome } from './merge.js'
 import { readBranchStates } from './branch-state.js'
 
 /**
@@ -53,6 +54,7 @@ export const USAGE = `usage: branches <command>
                                what each branch holds and where it stands: its commits and files beyond the base, whether it is pushed, merged, and what its checkout left uncommitted;
                                measured from <commit>, the one the branches started from, in place of the default branch; a full commit id in place of a branch is read as a branch that ends there
   push [--branch <b>]          push this checkout's branch, or branch <b>, to origin; a dirty checkout is refused
+  merge <branch>               merge branch <branch> into the default branch, in the project's folder, then delete it; a conflict changes nothing and names the files
   list [--sizes]               every agent checkout under .branches/
   remove <id> [--from <commit>] reclaim agent <id>'s checkout, once its branch holds everything in it; the branch stays, nothing is pushed;
                                <commit> is the one its branch started from, in place of the default branch
@@ -168,6 +170,16 @@ const COMMANDS: Record<string, Command> = {
     return outcome
   },
 
+  async merge(args, cwd, git) {
+    const { positionals } = parse(args, {}, 1)
+    const repo = await project(cwd, git)
+    const outcome = await mergeBranch(repo, positionals[0]!, git)
+    if (!outcome.ok) throw new Refused(outcome, mergeRefusalLine(outcome))
+    // A link named after a branch that just went is stale from this moment.
+    if (outcome.deleted) await reconcileBranchLinks(repo, { git })
+    return outcome
+  },
+
   async list(args, cwd, git) {
     const { values } = parse(args, { sizes: { type: 'boolean' } }, 0)
     const repo = await project(cwd, git)
@@ -250,6 +262,23 @@ function refusalLine(agentId: string, outcome: (ReclaimOutcome & { ok: false }) 
 const branchOf = (outcome: object): string => String((outcome as { branch?: string }).branch)
 
 /** Why a branch was not pushed, as one line for a person. */
+function mergeRefusalLine(outcome: MergeOutcome & { ok: false }): string {
+  switch (outcome.reason) {
+    case 'no-branch':
+      return `no branch ${outcome.branch} on this machine`
+    case 'no-default-branch':
+      return 'the project has no main branch to merge into'
+    case 'not-on-default':
+      return `the project's folder is on ${outcome.current ?? 'no branch'}, not on ${outcome.into}; switch it to ${outcome.into}, then merge`
+    case 'dirty':
+      return `${outcome.branch} has uncommitted work; commit or delete it, then merge`
+    case 'conflict':
+      return `${outcome.branch} does not merge cleanly into ${outcome.into}: it conflicts in ${outcome.files.join(', ')}; nothing was changed`
+    case 'merge-failed':
+      return `${outcome.branch} could not be merged into ${outcome.into}: ${outcome.detail}`
+  }
+}
+
 function pushRefusalLine(subject: string, outcome: PushOutcome & { ok: false }): string {
   switch (outcome.reason) {
     case 'not-a-worktree':

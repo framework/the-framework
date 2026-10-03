@@ -35,6 +35,7 @@ export { reclaimWorktree, discardWorktree, type ReclaimOptions, type ReclaimOutc
 export { projectRoot, nameBranch, isSessionName, type NameBranchOutcome, type NameBranchRefusal } from './worktree.js'
 export { createCheckout, attachCheckout, type CheckoutSkills } from './checkout.js'
 export { pushCheckout, pushBranchByName, type PushOutcome, type PushRefusal } from './push.js'
+export { mergeBranch, type MergeOutcome, type MergeRefusal } from './merge.js'
 export { readBranchStates, parseCommits, parseNumstat, parsePorcelain, type BranchState, type BranchCommit, type BranchFile } from './branch-state.js'
 export { runCli, USAGE, type CliIo, type CliRefusal } from './cli.js'
 export { CLI_BIN_DIR } from './bin-dir.js'

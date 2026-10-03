@@ -28,7 +28,7 @@ The `logs` command line: the reads an agent [1] (or a person) makes in a shell, 
 - **The bare command lists the runs** - newest first, the newest 20 unless `--limit` says otherwise, narrowed by `--branch <name>`, the skill's fields only.
 - **`show <id>` prints one run** - its card and the agent's four kinds of diary line, never the recording program's; an id no run has is the refusal `no-run`.
 - **For a dashboard: `--local` and `--full`** - with either read, `--local` reads the checkout kept at `.branches/agent-data` instead of fetching; `--full` prints the whole card, `caller` included, and for `show` every diary line.
-- **For a dashboard: `delete <id>` and `patch <id>`** - remove a run, or set its branch and pull request, as one commit through the kept checkout, pushed; an id no run has is `no-run`, a write that did not land is `write-failed`.
+- **For a dashboard: `delete <id>` and `patch <id>`** - remove a run, or set its branch and pull request, or that its work landed (`--landed <commit> --from <commit>`, two full commit ids, never with `--branch`), as one commit through the kept checkout, pushed; an id no run has is `no-run`, a write that did not land is `write-failed`.
 - **A command line that cannot be read is rejected first** - an unknown command, a stray or missing argument, an unknown flag, a `--limit` that is not a whole number above 0, an id that is not one: the usage on stderr, exit 2.
 - **Anything else that fails is `git-failed`** - reported with git's own reason on stderr and in the JSON, exit 1.
 

@@ -42,7 +42,7 @@ export const USAGE = `usage: logs [command]
   --full                             with either read: the whole card (with the writer's caller key)
                                      and, for show, every diary line
   delete <id>                        remove a run, card and diary, as one commit
-  patch <id> [--branch <name>] [--pr <number> --pr-url <url>]
+  patch <id> [--branch <name>] [--pr <number> --pr-url <url>] [--landed <commit> --from <commit>]
                                      set the branch the work landed on, and its pull request
 
 JSON on stdout. Exit code 1 for a refusal or a git failure (the reason on stderr), 2 for a usage error.`
@@ -159,15 +159,19 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async patch(args, io, git) {
-    const { values, positionals } = parse(args, { branch: { type: 'string' }, pr: { type: 'string' }, 'pr-url': { type: 'string' } }, 1)
+    const { values, positionals } = parse(args, { branch: { type: 'string' }, pr: { type: 'string' }, 'pr-url': { type: 'string' }, landed: { type: 'string' }, from: { type: 'string' } }, 1)
     const id = runIdArg(positionals[0]!)
     if ((values.pr === undefined) !== (values['pr-url'] === undefined)) throw new Usage('--pr and --pr-url go together')
     if (values.pr !== undefined && !/^\d+$/.test(values.pr)) throw new Usage(`--pr takes the pull request's number, got ${values.pr}`)
+    if ((values.landed === undefined) !== (values.from === undefined)) throw new Usage('--landed and --from go together')
+    for (const commit of [values.landed, values.from]) if (commit !== undefined && !/^[0-9a-f]{40}$/.test(commit)) throw new Usage(`--landed and --from take full commit ids, got ${commit}`)
+    if (values.landed !== undefined && values.branch !== undefined) throw new Usage('--landed removes the branch: it does not go with --branch')
     const patch: RunPatch = {
       ...(values.branch !== undefined ? { branch: values.branch } : {}),
       ...(values.pr !== undefined ? { pr: { number: Number(values.pr), url: values['pr-url']! } } : {}),
+      ...(values.landed !== undefined ? { landed: { commit: values.landed, from: values.from! } } : {}),
     }
-    if (Object.keys(patch).length === 0) throw new Usage('patch needs --branch or --pr')
+    if (Object.keys(patch).length === 0) throw new Usage('patch needs --branch, --pr or --landed')
     const root = await inRepo(() => checkoutRoot(io.cwd, git))
     if (await patchRun(root, id, patch, { git })) return { ok: true, id }
     // Not patched: the cycle synced the checkout first, so a run it does not hold is no run at all.

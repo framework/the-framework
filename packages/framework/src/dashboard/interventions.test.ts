@@ -183,6 +183,7 @@ const showing = (state: (branch: string, from?: string) => BranchState | undefin
       })
     },
     push: unused,
+    merge: unused,
     remove: unused,
   })
 }
@@ -255,6 +256,7 @@ test('an unreadable branch state is skipped rather than throwing, and the projec
       throw new Error('not a repo')
     },
     push: async () => ({ ok: false, error: 'no' }),
+    merge: async () => ({ ok: false, error: 'no' }),
     remove: async () => ({ ok: false, error: 'no' }),
   })
   const { items, whole } = await buildInterventions([project('a', '/a')], onlyUnpushed([doneMeta()], failing))

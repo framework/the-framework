@@ -5,8 +5,9 @@ const onAgentHandoff = vi.fn(async () => null as unknown)
 const sendOpenPullRequest = vi.fn(async () => ({ ok: true }) as unknown)
 const sendMerge = vi.fn(async () => ({ ok: true }) as unknown)
 const sendPush = vi.fn(async () => ({ ok: true }) as unknown)
+const sendMergeBranch = vi.fn(async () => ({ ok: true }) as unknown)
 vi.mock('../rpc/reads.js', () => ({ onAgentHandoff }))
-vi.mock('../rpc/control.js', () => ({ sendOpenPullRequest, sendMerge, sendPush }))
+vi.mock('../rpc/control.js', () => ({ sendOpenPullRequest, sendMerge, sendPush, sendMergeBranch }))
 
 const { HandoffActions, HandoffSummary, AgentHandoffDetails, handoffExpandable } = await import('./AgentHandoff.js')
 const { useAgentHandoff } = await import('../lib/use-agent-handoff.js')
@@ -49,6 +50,8 @@ beforeEach(() => {
   sendMerge.mockResolvedValue({ ok: true })
   sendPush.mockClear()
   sendPush.mockResolvedValue({ ok: true })
+  sendMergeBranch.mockClear()
+  sendMergeBranch.mockResolvedValue({ ok: true })
 })
 afterEach(cleanup)
 
@@ -225,11 +228,36 @@ describe('run handoff (#799)', () => {
     expect(screen.queryByText('Publish branch')).toBeNull()
   })
 
-  test('a repo with no remote says why instead of offering a dead button', async () => {
-    onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false })
+  test('a repo with no remote offers the one step it has: merge the work into the main branch, on this machine', async () => {
+    onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false, base: 'main' })
     render(<Harness />)
-    await waitFor(() => expect(screen.getByText(/No remote to push to/)).toBeTruthy())
-    expect(screen.queryByRole('button')).toBeNull()
+    await waitFor(() => expect(screen.getByText('Not in main yet.')).toBeTruthy())
+    expect(screen.queryByText(/Open PR|Publish branch/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Merge into main' }))
+    await waitFor(() => expect(sendMergeBranch).toHaveBeenCalledWith('p1', 'run-1'))
+    expect(sendPush).not.toHaveBeenCalled()
+  })
+
+  test('a merge that does not go in shows the reason; merged work says so and offers nothing more', async () => {
+    onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false, base: 'main' })
+    sendMergeBranch.mockResolvedValue({ ok: false, error: 'agent-x does not merge cleanly into main: it conflicts in a.ts; nothing was changed' })
+    render(<Harness />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Merge into main' }))
+    await waitFor(() => expect(screen.getByText(/does not merge cleanly into main/)).toBeTruthy())
+    cleanup()
+
+    // Its branch went with the merge: the record says landed.
+    onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false, landed: true, merged: true })
+    render(<Harness />)
+    await waitFor(() => expect(screen.getByText('Merged into the main branch.')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: /Merge/ })).toBeNull()
+    cleanup()
+
+    // A branch that was kept and is in the main branch already.
+    onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false, base: 'main', merged: true })
+    render(<Harness />)
+    await waitFor(() => expect(screen.getByText('Merged into main.')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: /Merge/ })).toBeNull()
   })
 
   test('work still only on this machine says not published beside its button; once pushed it says pushed; with no remote it says neither', async () => {

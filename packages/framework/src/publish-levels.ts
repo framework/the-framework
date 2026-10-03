@@ -33,15 +33,24 @@ export function isPublishPick(value: unknown): value is PublishPick {
   return (PUBLISH_PICKS as readonly unknown[]).includes(value)
 }
 
-/** The picks a project is offered: all four, or Nothing and Publish branch where no package provides a git host, so no pull request can be opened. */
-export function offeredPublishPicks(gitHost: boolean): readonly PublishPick[] {
+/**
+ * The picks a project is offered: every one where it has a git host; without a git host no pull
+ * request can be opened, so the picks stop at the branch; without a remote nothing can be
+ * published at all, so the only pick is Nothing.
+ */
+export function offeredPublishPicks(gitHost: boolean, remote = true): readonly PublishPick[] {
+  if (!remote) return ['nothing']
   return gitHost ? PUBLISH_PICKS : ['nothing', 'branch']
 }
 
-/** The pick in force in a project: the saved one, Nothing when none is saved; a pull request pick in a project with no git host is Publish branch, the furthest that project goes. */
-export function publishPickIn(saved: PublishPick | undefined, gitHost: boolean): PublishPick {
+/**
+ * The saved pick as this project can hold it: a pick it is not offered falls back to the furthest
+ * it can publish, the branch, or Nothing where it has no remote. No saved pick is Nothing.
+ */
+export function publishPickIn(saved: PublishPick | undefined, gitHost: boolean, remote = true): PublishPick {
   const pick = saved ?? 'nothing'
-  return offeredPublishPicks(gitHost).includes(pick) ? pick : 'branch'
+  if (offeredPublishPicks(gitHost, remote).includes(pick)) return pick
+  return remote ? 'branch' : 'nothing'
 }
 
 /** The level a pick hands the start hook; none for Nothing. */

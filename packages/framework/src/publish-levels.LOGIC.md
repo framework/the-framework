@@ -18,7 +18,7 @@ Fixes how far a run [1] publishes its work when its agent finishes: the three pu
 - **Three publish levels, in one order** - `branch`, then `pr`, then `merge`, each going further than the one before.
 - **Four options, in one order** - `nothing`, then the three levels, labelled "Nothing", "Publish branch", "Open PR" and "Merge on green"; the publish menu [3] lists them in that order.
 - **Only a known word counts** - a value is a publish level [2] only when it is one of the three words, and an option only when it is one of the four.
-- **What a project is offered** - all four options; "Nothing" and "Publish branch" only for a project with no git host provider [4].
+- **What a project is offered** - all four options; "Nothing" and "Publish branch" only for a project with no git host provider [4]; "Nothing" alone for a project whose repository has no remote, since nothing can be published from it.
 - **The option in force** - the saved option, "Nothing" when none is saved; an option the project is not offered is "Publish branch".
 - **The level an option hands over** - none for "Nothing"; for any other option, the publish level of the same word.
 
@@ -62,7 +62,7 @@ A value names a publish level [2] only when it is one of the three words above, 
 
 #### Business logic
 
-A project with a git host provider [4] is offered all four options. A project with none is offered "Nothing" and "Publish branch" only.
+A project with a git host provider [4] is offered all four options. A project with none is offered "Nothing" and "Publish branch" only. A project whose repository has no `origin` remote is offered "Nothing" alone, whatever its git host provider: there is nowhere to push a branch to. A saved option such a project is not offered counts as "Nothing" there, not as the branch.
 
 ### The option in force
 

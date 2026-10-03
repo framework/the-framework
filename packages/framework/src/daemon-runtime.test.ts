@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
+import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -50,6 +51,25 @@ test('onStart refuses in words: an unknown project, a project with no start line
     assert.deepEqual(await runtime.onStart('x'), { ok: false, error: 'this project has no start hook' })
     await writeFile(join(home, PROJECT_HOOKS_FILE), 'start: echo "codex is not installed" >&2; exit 1\n')
     assert.deepEqual(await runtime.onStart('x'), { ok: false, error: 'the start hook: codex is not installed' })
+  } finally {
+    await runtime.dispose()
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
+test('a Start publishes no further than the project can: nothing with no remote, the branch with a remote and no git host', async () => {
+  const PUBLISH = `start: 'printf "%s" "\${PUBLISH-unset}" > started.txt; echo "{\\"id\\":\\"run-8\\"}"'\n`
+  const home = await project(PUBLISH)
+  const env = { XDG_CONFIG_HOME: join(home, 'cfg') }
+  await mkdir(env.XDG_CONFIG_HOME, { recursive: true })
+  const runtime = createProjectRuntime({ cwd: home, env })
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: home })
+    assert.deepEqual(await runtime.onStart('Fix it', { publish: 'merge' }), { ok: true, agentId: 'run-8' })
+    assert.equal(await readFile(join(home, 'started.txt'), 'utf8'), 'unset', 'no remote: the line is given no publish level')
+    execFileSync('git', ['remote', 'add', 'origin', 'https://example.com/x.git'], { cwd: home })
+    assert.deepEqual(await runtime.onStart('Fix it', { publish: 'merge' }), { ok: true, agentId: 'run-8' })
+    assert.equal(await readFile(join(home, 'started.txt'), 'utf8'), 'branch', 'a remote and no git host: the branch')
   } finally {
     await runtime.dispose()
     await rm(home, { recursive: true, force: true })

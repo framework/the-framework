@@ -107,7 +107,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The line gets the prompt, and the coding agent, the model and how far to publish when the
   person picked them; anything else is the line's own business. The publish pick is one menu
   beside Start: Nothing, Publish branch, Open PR, Merge on green. It is saved like the coding
-  agent. A project with no git host package is offered Nothing and Publish branch only.
+  agent. A project with no git host package is offered Nothing and Publish branch only. A project
+  with no remote can publish nothing, so it is offered no menu, and a saved pick starts its
+  run publishing nothing.
   Picked over handing over every option the launcher once had, which is how the options
   became the thing to maintain.
 - A project with no `start` line cannot start a run from the dashboard, and the launcher

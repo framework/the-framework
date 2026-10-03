@@ -73,7 +73,9 @@ export function StartAgentForm({
   // own project is not read at all, so both are offered every pick; the daemon that starts the run
   // holds a pull request pick to the branch where its project has no git host.
   const gitHost = remoteDevice ? true : (launcher?.gitHost ?? true)
-  const publishPick = publishPickIn(preferences.publish, gitHost)
+  // A project with no remote can publish nothing: the menu would hold one pick, so it is not shown.
+  const remote = remoteDevice ? true : (launcher?.remote ?? true)
+  const publishPick = publishPickIn(preferences.publish, gitHost, remote)
 
   // Re-read when the pick changes: `claude` being logged in says nothing about `codex`. A device
   // runs on its own machine, so this one's CLIs say nothing about it.
@@ -136,30 +138,32 @@ export function StartAgentForm({
               busy={busy}
               onToggle={toggleContext}
             />
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <select
-                    value={publishPick}
-                    disabled={busy}
-                    onChange={e => {
-                      if (isPublishPick(e.target.value)) updatePreferences({ publish: e.target.value })
-                    }}
-                    aria-label="Publish"
-                    className="rounded-md border border-border bg-background px-1.5 py-0.5 text-xs text-muted-foreground"
-                  >
-                    {offeredPublishPicks(gitHost).map(pick => (
-                      <option key={pick} value={pick}>
-                        {PUBLISH_LABELS[pick]}
-                      </option>
-                    ))}
-                  </select>
-                }
-              />
-              <TooltipContent>
-                What the agent publishes when it finishes: nothing, its branch, its pull request, or its pull request set to merge once its checks pass.
-              </TooltipContent>
-            </Tooltip>
+            {remote && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <select
+                      value={publishPick}
+                      disabled={busy}
+                      onChange={e => {
+                        if (isPublishPick(e.target.value)) updatePreferences({ publish: e.target.value })
+                      }}
+                      aria-label="Publish"
+                      className="rounded-md border border-border bg-background px-1.5 py-0.5 text-xs text-muted-foreground"
+                    >
+                      {offeredPublishPicks(gitHost, remote).map(pick => (
+                        <option key={pick} value={pick}>
+                          {PUBLISH_LABELS[pick]}
+                        </option>
+                      ))}
+                    </select>
+                  }
+                />
+                <TooltipContent>
+                  What the agent publishes when it finishes: nothing, its branch, its pull request, or its pull request set to merge once its checks pass.
+                </TooltipContent>
+              </Tooltip>
+            )}
             {offersCleanup && (
               <Tooltip>
                 <TooltipTrigger

@@ -34,7 +34,15 @@ export interface RunCard {
 }
 
 /** The two late facts a writer patches onto a card once the run's process is gone. */
-export type RunPatch = Partial<Pick<RunCard, 'branch' | 'pr'>>
+export type RunPatch = Partial<Pick<RunCard, 'branch' | 'pr'>> & {
+  /**
+   * The run's work was merged and its branch deleted: `commit` is the branch's last commit and
+   * `from` the commit its work began at. The card loses its branch and keeps the two commits under
+   * the writer's key, as `landed` and `baseCommit` (one already there stays), which is where the
+   * writer's own tools keep them.
+   */
+  landed?: { commit: string; from: string }
+}
 
 /**
  * A diary line the package knows. A writer may put more fields on any of them, and any other

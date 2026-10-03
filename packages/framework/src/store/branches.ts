@@ -17,6 +17,7 @@ import { isRunId } from './runs.js'
  *   `<command> show [--from <commit>] <branch>...`      what each branch holds and where it stands, as an array of {@link BranchState}, in the order asked;
  *                                                       measured from `<commit>`, where the branches started, in place of the default branch;
  *                                                       a full commit id in place of a branch is read as a branch that ends there
+ *   `<command> merge <b>`                               merge the branch into the default branch, on this machine, then delete it
  *   `<command> push --branch <b>`                       push the branch to the remote; a branch only the remote has is answered as it is
  *   `<command> remove <id> [--from <commit>] [--discard]`  reclaim a run's checkout once its branch holds everything, pushing nothing, its branch measured from the commit it started from; `--discard` drops uncommitted work
  * `list` and `show` read this machine, no network: the framework polls. `show` answers the branch's
@@ -85,6 +86,13 @@ export interface BranchState {
 /** What pushing a branch did: `pushed` is false when only the remote had it, so there was nothing here to push. */
 export type PushOutcome = { ok: true; pushed: boolean } | { ok: false; error: string }
 
+/**
+ * What merging a branch into the project's default branch did: `into` names that branch, `commit`
+ * is the merged branch's last commit and `from` the commit its work began at, and `deleted` says
+ * the branch went once its work was in.
+ */
+export type MergeOutcome = { ok: true; into: string; commit: string; from: string; deleted: boolean } | { ok: false; error: string }
+
 /** What reclaiming a checkout did: done, with the branches that went with it when any did, or the provider's reason it stayed. */
 export type RemoveOutcome = { ok: true; branchesDeleted?: string[] } | { ok: false; error: string }
 
@@ -106,6 +114,8 @@ export interface BranchesSource {
   show(branches: readonly string[], from?: string): Promise<BranchState[]>
   /** Push a branch to the remote: the checkout on it under its clean rule, else the branch itself. */
   push(branch: string): Promise<PushOutcome>
+  /** Merge a branch into the project's default branch, on this machine, then delete it; a merge that conflicts changes nothing. */
+  merge(branch: string): Promise<MergeOutcome>
   /**
    * Reclaim a run's checkout, or why it stayed. `from` is the commit the run's branch started
    * from, when that is not the default branch: what tells a branch with nothing of its own.
@@ -243,6 +253,15 @@ function commandBranches(root: string, command: ProvidedCommand, now: () => numb
       if (!result.ok) return { ok: false, error: result.error }
       const pushed = result.output && typeof result.output === 'object' ? (result.output as Record<string, unknown>)['pushed'] : undefined
       return { ok: true, pushed: pushed !== false }
+    },
+    async merge(branch) {
+      const result = await runPackageCommand(root, command, ['merge', branch])
+      drop()
+      if (!result.ok) return { ok: false, error: result.error }
+      const out = (result.output && typeof result.output === 'object' ? result.output : {}) as Record<string, unknown>
+      const { into, commit, from } = out
+      if (typeof into !== 'string' || typeof commit !== 'string' || typeof from !== 'string') return { ok: false, error: 'the branches provider answered no merge' }
+      return { ok: true, into, commit, from, deleted: out['deleted'] === true }
     },
     async remove(id, opts = {}) {
       if (!isRunId(id)) return { ok: false, error: `not a run id: ${id}` }

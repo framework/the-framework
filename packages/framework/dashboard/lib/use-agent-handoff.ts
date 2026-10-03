@@ -12,8 +12,8 @@ export type AgentHandoffState = {
   busy: boolean
   error: string | null
   /** Which button is in flight, so it can say "Opening PR…" rather than silently greying (#948). */
-  pending: 'pr' | 'merge' | 'push' | null
-  act: (which: 'pr' | 'merge' | 'push', fn: () => Promise<unknown>, fallback: string) => void
+  pending: 'pr' | 'merge' | 'push' | 'merge-branch' | null
+  act: (which: 'pr' | 'merge' | 'push' | 'merge-branch', fn: () => Promise<unknown>, fallback: string) => void
 }
 
 // The handoff read lifted out of its panel: the same answer now feeds two places — the summary and
@@ -48,9 +48,9 @@ export function useAgentHandoff(projectId: string, agentId: string | null | unde
   )
   useEffect(() => setEveryMs(handoff?.prPending ? PR_PENDING_MS : 15_000), [handoff?.prPending])
   const { busy, error, run } = useAction()
-  const [pending, setPending] = useState<'pr' | 'merge' | 'push' | null>(null)
+  const [pending, setPending] = useState<'pr' | 'merge' | 'push' | 'merge-branch' | null>(null)
 
-  const act = (which: 'pr' | 'merge' | 'push', fn: () => Promise<unknown>, fallback: string): void => {
+  const act = (which: 'pr' | 'merge' | 'push' | 'merge-branch', fn: () => Promise<unknown>, fallback: string): void => {
     setPending(which)
     void run(fn, fallback).then(outcome => {
       setPending(null)

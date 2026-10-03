@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import { hostname } from 'node:os'
 import assert from 'node:assert/strict'
-import { readAgentHandoff, readRunHandoff, leftNothing, resolveAgentPr, mergeAgentPr, agentBranchFor, openAgentPullRequest, openRemoteBranchPullRequest, pushAgentBranch, type HandoffAgent } from './agent-handoff.js'
+import { readAgentHandoff, readRunHandoff, leftNothing, resolveAgentPr, mergeAgentPr, agentBranchFor, openAgentPullRequest, openRemoteBranchPullRequest, pushAgentBranch, mergeAgentBranch, type HandoffAgent } from './agent-handoff.js'
 import { pickAgentPr, type LinkedPr } from './pull-requests.js'
 import type { BranchState, BranchesFor, BranchesSource } from '../store/branches.js'
 import type { GitHostFor, GitHostSource } from '../store/git-host.js'
@@ -34,7 +34,7 @@ const state = (over: Partial<BranchState> = {}): BranchState => ({
 /** The two fake providers over one call log: the branches provider's `show` answers from `states` (a branch missing there is not answered) and its `push` as told; the git host's `open` and `merge` answer as told. */
 function fakeBranches(
   states: Record<string, BranchState | undefined>,
-  answers: { push?: Awaited<ReturnType<BranchesSource['push']>>; open?: Awaited<ReturnType<GitHostSource['open']>>; merge?: Awaited<ReturnType<GitHostSource['merge']>> } = {},
+  answers: { push?: Awaited<ReturnType<BranchesSource['push']>>; mergeBranch?: Awaited<ReturnType<BranchesSource['merge']>>; open?: Awaited<ReturnType<GitHostSource['open']>>; merge?: Awaited<ReturnType<GitHostSource['merge']>> } = {},
 ): { branches: BranchesFor; gitHost: GitHostFor; calls: unknown[][] } {
   const calls: unknown[][] = []
   const branches: BranchesFor = async () => ({
@@ -49,6 +49,10 @@ function fakeBranches(
     push: async branch => {
       calls.push(['push', branch])
       return answers.push ?? { ok: true, pushed: true }
+    },
+    merge: async branch => {
+      calls.push(['merge-branch', branch])
+      return answers.mergeBranch ?? { ok: true, into: 'main', commit: 'c'.repeat(40), from: 'b'.repeat(40), deleted: true }
     },
     remove: async () => ({ ok: true }),
   })
@@ -385,4 +389,28 @@ test('a run changed nothing when its own tool ended it here, done or failed, wit
   assert.equal(leftNothing({ status: 'done' }, 'here'), false, 'a record that names no machine')
   assert.equal(leftNothing({ status: 'done', host: 'here', pr: { number: 7 } }, 'here'), false, 'its work is on a pull request')
   assert.equal(leftNothing({ status: 'done', host: 'here', landed: 'c'.repeat(40) }, 'here'), false, 'its work was landed on its main agent’s branch')
+})
+
+test('"Merge into main" merges a finished session\'s branch through the branches provider and records the two commits on its run; a refusal is the provider\'s own line', async () => {
+  const { branches, calls } = fakeBranches({})
+  const patches: unknown[][] = []
+  const runs = async () => ({ list: async () => [], show: async () => undefined, remove: async () => ({ ok: true as const }), patch: async (id: string, patch: unknown) => (patches.push([id, patch]), { ok: true as const }) })
+  assert.deepEqual(await mergeAgentBranch('/repo', agent(), { branches, runs }), { ok: true })
+  assert.deepEqual(calls, [['merge-branch', 'the-framework/work']])
+  assert.deepEqual(patches, [[agent().id, { landed: { commit: 'c'.repeat(40), from: 'b'.repeat(40) } }]], 'the branch is gone: the record keeps where its work began and ended')
+
+  // A branch the provider merged and kept (no agent's branch) still has its branch: nothing to record.
+  const kept = fakeBranches({}, { mergeBranch: { ok: true, into: 'main', commit: 'c'.repeat(40), from: 'b'.repeat(40), deleted: false } })
+  patches.length = 0
+  assert.deepEqual(await mergeAgentBranch('/repo', agent(), { branches: kept.branches, runs }), { ok: true })
+  assert.deepEqual(patches, [])
+
+  const conflict = fakeBranches({}, { mergeBranch: { ok: false, error: 'agent-x does not merge cleanly into main: it conflicts in a.ts; nothing was changed' } })
+  assert.deepEqual(await mergeAgentBranch('/repo', agent(), { branches: conflict.branches, runs }), { ok: false, error: 'agent-x does not merge cleanly into main: it conflicts in a.ts; nothing was changed' })
+  assert.deepEqual(patches, [], 'a merge that did not happen records nothing')
+  assert.deepEqual(await mergeAgentBranch('/repo', unbranched, { branches, runs }), { ok: false, error: 'this session recorded no branch to merge' })
+  assert.deepEqual(await mergeAgentBranch('/repo', agent(), { branches: noBranches, runs }), { ok: false, error: 'this project has no branches provider to merge with' })
+
+  const unrecorded = async () => ({ list: async () => [], show: async () => undefined, remove: async () => ({ ok: true as const }), patch: async () => ({ ok: false as const, error: 'no such run' }) })
+  assert.deepEqual(await mergeAgentBranch('/repo', agent(), { branches, runs: unrecorded }), { ok: false, error: 'merged into main, but the record was not updated: no such run' })
 })

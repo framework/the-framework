@@ -220,7 +220,7 @@ test('--local reads the checkout kept at .branches/agent-data, no fetch; --full 
   }
 })
 
-test('delete removes a run as one commit; patch sets the branch and the pull request; an unknown run is refused', async () => {
+test('delete removes a run as one commit; patch sets the branch and the pull request, or that the work landed; an unknown run is refused', async () => {
   const { agents, bare, cleanup } = await rig(1)
   const [a] = agents
   try {
@@ -230,6 +230,18 @@ test('delete removes a run as one commit; patch sets the branch and the pull req
     const card1 = (await run(a!, ['show', R1])).json
     assert.equal(card1.branch, 'agent-r1-fix')
     assert.deepEqual(card1.pr, { number: 9, url: 'https://x/pull/9' })
+    // Landed: the branch is gone from the card, and the two commits are kept under the writer's key.
+    const C = 'c'.repeat(40)
+    const B = 'b'.repeat(40)
+    assert.equal((await run(a!, ['patch', R1, '--landed', C, '--from', B])).code, 0)
+    const landed = (await run(a!, ['show', R1, '--full'])).json
+    assert.equal('branch' in landed, false)
+    assert.equal(landed.caller.landed, C)
+    assert.equal(landed.caller.baseCommit, B)
+    assert.deepEqual(landed.pr, { number: 9, url: 'https://x/pull/9' }, 'the rest of the card stays')
+    assert.equal((await run(a!, ['patch', R1, '--landed', C])).code, 2, 'landed needs where the work began')
+    assert.equal((await run(a!, ['patch', R1, '--landed', 'abc', '--from', B])).code, 2, 'a full commit id')
+    assert.equal((await run(a!, ['patch', R1, '--landed', C, '--from', B, '--branch', 'x'])).code, 2)
     const deleted = await run(a!, ['delete', R2])
     assert.equal(deleted.code, 0)
     assert.deepEqual((await run(a!, [])).json.map((c: { id: string }) => c.id), [R3, R1], 'gone from origin too: pushed')

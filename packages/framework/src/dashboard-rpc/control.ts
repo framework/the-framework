@@ -9,7 +9,7 @@ import { hostname } from 'node:os'
 import { findAgent, isPidAlive, isRunId, loadAgentEvents, projectRuns, readLiveMetas, type AgentMeta } from '../store/index.js'
 import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
-import { mergeAgentPr, openAgentPullRequest, pushAgentBranch, type HandoffResult } from '../dashboard/agent-handoff.js'
+import { mergeAgentPr, openAgentPullRequest, mergeAgentBranch, pushAgentBranch, type HandoffResult } from '../dashboard/agent-handoff.js'
 import { pendingChoices } from '../open-choices.js'
 import type {
   DeleteAgentResult,
@@ -232,6 +232,20 @@ export async function sendPush(projectId: string, agentId: string): Promise<Hand
     if (!target) return { ok: false, error: 'unknown session' }
     if (target.agent.status === 'running') return { ok: false, error: 'that session is still going' }
     return withAgentLock(agentLockKey(target.cwd, agentId), () => pushAgentBranch(target.cwd, target.agent))
+  }, { ok: false, error: 'could not reach the device' })
+}
+
+/**
+ * The user's "Merge into main" action: merge a finished run's branch into the project's default
+ * branch on this machine, for a project with no remote to push to. Under the agent lock, as the
+ * push is, so the merge cannot race a Remove.
+ */
+export async function sendMergeBranch(projectId: string, agentId: string): Promise<HandoffResult> {
+  return relayOr(agentId, 'sendMergeBranch', [projectId, agentId], async () => {
+    const target = await handoffTargetFor(projectId, agentId)
+    if (!target) return { ok: false, error: 'unknown session' }
+    if (target.agent.status === 'running') return { ok: false, error: 'that session is still going' }
+    return withAgentLock(agentLockKey(target.cwd, agentId), () => mergeAgentBranch(target.cwd, target.agent))
   }, { ok: false, error: 'could not reach the device' })
 }
 

@@ -25,7 +25,7 @@ The recording program's [1] side of the runs [2]: reads and writes of `agents/<w
 - **Listing every run** - every card in every person's directory, newest first; one that does not parse is skipped; a start time may filter; a missing directory means no runs.
 - **Reading one run** - its card, its diary (empty for a run with no diary file), or its two file paths; none for a run that is not there.
 - **Recording a run** - card and diary as one commit, "logs: record run <id>", under the directory of the person the repository commits as, or where the run already sits; an unsafe id is refused before anything is touched.
-- **Patching the late facts** - the branch or the pull request onto the card, as one commit, "logs: patch run <id>"; true once committed even when the push is still owed; false for a run that is not there.
+- **Patching the late facts** - the branch or the pull request onto the card, or that the work landed (the card loses its branch and keeps the branch's last commit as `landed` and the commit the work began at as `baseCommit`, one already there kept, under the writer's key), as one commit, "logs: patch run <id>"; true once committed even when the push is still owed; false for a run that is not there.
 - **Deleting a run** - its card, its diary and every other file named after its id, as one commit, "logs: delete run <id>"; a run that is not there is a landed no-op.
 
 ## Business logic

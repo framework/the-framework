@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { AgentHandoff } from '../../src/index.js'
 import { ChevronDown, GitMerge, GitPullRequest, Upload } from 'lucide-react'
-import { sendMerge, sendOpenPullRequest, sendPush } from '../rpc/control.js'
+import { sendMerge, sendMergeBranch, sendOpenPullRequest, sendPush } from '../rpc/control.js'
 import type { AgentHandoffState } from '../lib/use-agent-handoff.js'
 import { cn } from '../lib/utils.js'
 import { DiffStat } from './DiffStat.js'
@@ -78,6 +78,11 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
  * of the bar where it is always in view. What it left uncommitted is still named, since nothing
  * lands that.
  */
+/** The project's main branch by name, when the handoff was measured from it; a run measured from a commit only knows it as "the main branch". */
+function mainBranchName(base: string | undefined): string {
+  return base !== undefined && !/^[0-9a-f]{40}$/.test(base) ? base.replace(/^origin\//, '') : 'the main branch'
+}
+
 export function HandoffActions({
   projectId,
   agentId: agentId,
@@ -95,6 +100,8 @@ export function HandoffActions({
     if (handoff.landed) return <Reason>landed</Reason>
     return handoff.empty ? <Uncommitted paths={handoff.pendingFiles ?? []} /> : <Reason>not landed</Reason>
   }
+  // Merged into the project's main branch on this machine: the work is in, and its branch went with it.
+  if (handoff.landed) return <Reason>Merged into the main branch.</Reason>
   // While the PR lookup is still out (#1028), nothing is offered: acting on "not known yet" is
   // how a second PR gets opened.
   if (handoff.prPending) return null
@@ -124,7 +131,24 @@ export function HandoffActions({
   // this bar exists to prevent. When the tree holds uncommitted work, that work is named — the
   // reader's next step is to have the session commit it (the composer is right below).
   if (handoff.empty) return <Uncommitted paths={handoff.pendingFiles ?? []} />
-  if (!handoff.hasRemote) return <Reason>No remote to push to.</Reason>
+  // No remote: nothing to push to and no pull request to open, so the work reaches the project's
+  // own folder by a merge on this machine, and that is the one step offered.
+  if (!handoff.hasRemote) {
+    if (handoff.merged) return <Reason>Merged into {mainBranchName(handoff.base)}.</Reason>
+    return (
+      <>
+        <Reason>Not in {mainBranchName(handoff.base)} yet.</Reason>
+        <Button
+          size="xs"
+          disabled={busy}
+          onClick={() => act('merge-branch', () => sendMergeBranch(projectId, agentId), 'Could not merge the branch.')}
+        >
+          <GitMerge className="h-3.5 w-3.5" />
+          {pending === 'merge-branch' ? 'Merging…' : `Merge into ${mainBranchName(handoff.base)}`}
+        </Button>
+      </>
+    )
+  }
   const push = () => act('push', () => sendPush(projectId, agentId), 'Could not push the branch.')
   // No git host package (#1820): nothing opens a pull request for this project, so the last step is
   // the push, and a pushed branch is where the handoff ends.

@@ -13,7 +13,7 @@ import { providedCommand } from '../built-in.js'
  *   `<command> --local --full --limit N`   the runs, newest first, whole cards
  *   `<command> show <id> --local --full`   one run: the whole card plus `diary`, every line
  *   `<command> delete <id>`                remove a run
- *   `<command> patch <id> [--branch <b>] [--pr <n> --pr-url <url>]`   the two late facts
+ *   `<command> patch <id> [--branch <b>] [--pr <n> --pr-url <url>] [--landed <commit> --from <commit>]`   the late facts
  * `--local` reads the copy on this machine, no network: the framework polls.
  *
  * The shapes, owned here: {@link RunCard} and {@link AnyDiaryLine}. A running agent's own card in
@@ -43,7 +43,10 @@ export interface RunCard {
 }
 
 /** The two late facts a finished run's card may still learn: the branch its work landed on, its pull request. */
-export type RunPatch = Partial<Pick<RunCard, 'branch' | 'pr'>>
+export type RunPatch = Partial<Pick<RunCard, 'branch' | 'pr'>> & {
+  /** The run's work was merged and its branch deleted: its last commit, and the commit its work began at. */
+  landed?: { commit: string; from: string }
+}
 
 /** One line of a run's diary: a JSON object with a `kind`. */
 export type AnyDiaryLine = { kind: string } & Record<string, unknown>
@@ -180,7 +183,7 @@ function commandRuns(root: string, command: ProvidedCommand, now: () => number):
     },
     async patch(id, patch) {
       if (!isRunId(id)) return { ok: false, error: `not a run id: ${id}` }
-      const args = ['patch', id, ...(patch.branch !== undefined ? ['--branch', patch.branch] : []), ...(patch.pr ? ['--pr', String(patch.pr.number), '--pr-url', patch.pr.url] : [])]
+      const args = ['patch', id, ...(patch.branch !== undefined ? ['--branch', patch.branch] : []), ...(patch.pr ? ['--pr', String(patch.pr.number), '--pr-url', patch.pr.url] : []), ...(patch.landed ? ['--landed', patch.landed.commit, '--from', patch.landed.from] : [])]
       const result = await runPackageCommand(root, command, args)
       drop()
       return result.ok ? { ok: true } : { ok: false, error: result.error }

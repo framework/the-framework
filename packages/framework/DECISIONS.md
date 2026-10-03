@@ -32,6 +32,12 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   has no pull requests, and a finished run's last step is Push. Picked over the branches
   package opening the request, which put the git host inside the git skill, and over a git host
   adapter inside it, which made another git host a change to that package.
+- A project with no remote is offered one step on a finished agent's page: "Merge into
+  main", which merges the agent's branch into the project's default branch on this machine,
+  through the branches provider. A conflict changes nothing and is said. The merged branch
+  is deleted, and the run's record keeps its last commit and where its work began, so the
+  page still shows what the agent changed. Picked over "No remote to push to", which left
+  the work on a branch the person could only reach from a terminal.
 - A subagent's page offers no pull request, no merge and no push. It says landed or not
   landed. Picked over saying nothing in their place.
 - Which package provides a kind of data when several installed packages declare it: the

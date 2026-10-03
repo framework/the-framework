@@ -48,7 +48,7 @@ The provider's command runs with Node, in the project's root, never through a sh
 - `<command> --local --full --limit 10000`: every finished agent's whole card [3] (with `caller`), newest first. A failure is no agents.
 - `<command> show <id> --local --full`: one agent's whole card with `diary`, every line of it. A failure, or a refusal because there is no such agent, is no agent.
 - `<command> delete <id>`: remove the agent, card and diary. A failure answers the command's last line of error output.
-- `<command> patch <id> [--branch <branch>] [--pr <number> --pr-url <link>]`: set the branch the agent's work landed on, and its pull request. A failure answers the same way.
+- `<command> patch <id> [--branch <branch>] [--pr <number> --pr-url <link>] [--landed <commit> --from <commit>]`: set the branch the agent's work is on, its pull request, or that its work landed (its branch's last commit and the commit its work began at, once the branch was merged and deleted). A failure answers the same way.
 `--local` asks for the copy of the agent records kept on this machine, read without contacting the remote, because The Framework polls. An id that is not letters, digits, `-` and `_` never reaches the command.
 
 ### The shape

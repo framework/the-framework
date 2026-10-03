@@ -39,6 +39,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 - **Publishing a branch** - the branches provider pushes the branch, then the git host provider opens its pull request, or answers the open one it already has; a project missing either provider, or a push the branches provider refuses, ends the action before the git host is asked; the answer's URL and number come back, and the cached "no pull request" is forgotten.
 - **The "Open PR" button** - refused for a subagent [20]; the agent's existing pull request first, even for a gone branch, unless the agent moved past it; a gone branch and an empty branch are refused with a reason; otherwise the branch is published ready for review.
 - **"Publish branch"** - the branches provider pushes the agent's recorded branch, nothing more: the push with no pull request, and the last step where the project has no git host; refused for an agent with no branch or a project with no branches provider.
+- **"Merge into main"** - for a project with no remote: the branches provider merges the agent's recorded branch into the default branch on this machine and deletes it, and the agent's run then records the branch's last commit and where its work began; a refusal is the provider's own line.
 - **A pull request for a branch only the remote has** - a cloud session's own branch is published as a draft, through the same two providers.
 - **The "Merge" button on a finished agent** - refused when the agent has no pull request or it is no longer open, or the project has no git host; otherwise the git host provider lands the pull request.
 - **The pull request's title** - the name the branches provider answers for its branch, else the branch, else "Session <agent id>"; never the prompt, and never a branch with its prefix cut off by the framework.
@@ -178,6 +179,16 @@ A subagent [20], an agent whose record names a `parent`, is refused before anyth
 #### Business logic
 
 An agent [1] that recorded no branch is refused with "this session recorded no branch to push"; a project with no branches provider [14] with "this project has no branches provider to push with". Otherwise the branches provider is asked to push the recorded branch, by the same rule as above, and its refusal is the error. Nothing is opened, no cache is touched. ("Publish branch" on an agent still running is refused with "that session is still going" in `../dashboard-rpc/control.ts`.)
+
+### "Merge into main"
+
+#### Context
+
+**User story**: the user's project has no remote. An agent [1] finished, and the user presses "Merge into main" on its page: the agent's work is in the project's folder, and the page says it is merged and still shows what the agent changed.
+
+#### Business logic
+
+An agent [1] that recorded no branch is refused with "this session recorded no branch to merge"; a project with no branches provider [14] with "this project has no branches provider to merge with". Otherwise the branches provider merges the branch into the project's default branch on this machine (`skill-branches`' `merge`), and a refusal (a conflict, uncommitted work, a folder on another branch) comes back in the provider's own words, with nothing changed. When the provider deleted the branch, the agent's run [12] is patched through the runs provider with the branch's last commit and the commit its work began at: the record loses its branch and says landed, so the handoff is read from those two commits from then on. A record that could not be written is answered as an error naming the merge that did happen. A branch the provider kept needs no record: it still exists and reads as merged.
 
 ### A pull request for a branch only the remote has
 

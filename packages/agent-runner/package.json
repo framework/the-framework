@@ -19,11 +19,15 @@
   "bin": {
     "agent-runner": "bin/agent-runner"
   },
+  "framework": {
+    "hooks": "agent-runner"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "pnpm -C ../agent-data build && pnpm -C ../skill-branches build && pnpm -C ../skill-logs build && pnpm -C ../agent-driver/core build && pnpm -C ../agent-driver/claude build && pnpm -C ../agent-driver/codex build && tsc -p tsconfig.build.json",

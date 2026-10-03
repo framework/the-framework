@@ -17,6 +17,7 @@ Which of a project's installed packages provides one kind of The Framework's dat
 - **The project's installed packages** - every name the project's `package.json` lists under `dependencies` then `devDependencies`, read once, resolved from its `node_modules` with links followed; a missing `package.json`, a name that is not a package name and an uninstalled dependency contribute nothing.
 - **A package's commands** - its `bin` entries by name, as absolute paths; a `bin` given as one path is one command named after the package without its scope.
 - **Who provides a kind** - the packages whose own `package.json` declares the kind naming one of their commands are its providers; exactly one provider provides; several: the one the project's line [3] names, else none, with the reason; a line naming a package that is not a provider: none, with the reason; no provider: nothing, and no problem.
+- **Packages the caller ships** - a caller may hand the lookup packages it brings for every project (a dashboard's built-in ones); they are asked only when none of the project's own packages declares the kind, so a project's own package wins and a project with nothing installed still has a provider.
 - **Running a package's command** - with Node, in the project root, never through a shell, 30 seconds and 16 MB at most; its standard output read as JSON, a failure answered by the command's own last error line.
 
 ## Business logic

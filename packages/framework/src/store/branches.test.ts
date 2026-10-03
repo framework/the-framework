@@ -45,11 +45,11 @@ const BRANCHES = { branches: { bin: { branches: 'provider.cjs' }, framework: { b
 const calls = async (root: string, pkg: string): Promise<string[]> =>
   (await readFile(join(root, 'node_modules', pkg, 'calls.log'), 'utf8').catch(() => '')).split('\n').filter(Boolean)
 
-test('a project with no branches provider has no checkouts; one with a provider is read and moved through its command line', async () => {
+test('a project with no branches provider of its own is read by the built-in one; one with a provider is read and moved through its command line', async () => {
   const none = await project({ plain: { bin: { plain: 'provider.cjs' } } })
   const root = await project(BRANCHES)
   try {
-    assert.equal(await providedBranches()(none), undefined)
+    assert.ok(await providedBranches()(none), 'the built-in branches package')
     const branches = (await providedBranches()(root))!
     assert.ok(branches)
     assert.deepEqual(await branches.list(), [{ id: 'run-1', path: ROW.path, branch: ROW.branch }])

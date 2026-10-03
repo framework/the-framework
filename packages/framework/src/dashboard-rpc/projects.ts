@@ -13,14 +13,15 @@ import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.
 // The live event stream is its own endpoint rather than a call (`GET /_rpc/events`).
 //
 // Each project also carries what the daemon's background jobs found wrong with it (#1500) —
-// a data branch that cannot reach origin, say (#1599). It rides this list rather than a read of
-// its own because the list is what every project surface already polls, so an error reaches the
-// sidebar dot and the project's banner with nothing new to subscribe to.
+// a data branch that cannot reach origin, say (#1599) — and whether its repository has no remote.
+// Both ride this list rather than a read of their own because the list is what every project
+// surface already polls, so an error reaches the sidebar dot and the project's banner with
+// nothing new to subscribe to.
 export async function onProjects(): Promise<ProjectSummary[]> {
-  const errors = contextProjectErrors()
+  const state = contextProjectErrors()
   return (await contextProjects().list()).map(project => {
-    const found = errors(project.path)
-    return found.length > 0 ? { ...project, errors: found } : project
+    const { errors, localOnly } = state(project.path)
+    return { ...project, ...(errors.length > 0 ? { errors } : {}), ...(localOnly ? { localOnly: true as const } : {}) }
   })
 }
 

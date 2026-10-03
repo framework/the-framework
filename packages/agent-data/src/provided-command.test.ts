@@ -66,6 +66,21 @@ test('two packages declaring a kind: the one the project names provides; none na
   }
 })
 
+test('packages the caller ships provide a kind only when none of the project\'s own packages declares it', async () => {
+  const shippedRoot = await project({ shipped: { bin: { s: 'cmd.cjs' }, framework: { runs: 's' } } })
+  const shipped = [{ name: 'shipped', dir: join(shippedRoot, 'node_modules', 'shipped'), manifest: { name: 'shipped', bin: { s: 'cmd.cjs' }, framework: { runs: 's' } } }]
+  const bare = await project({ plain: { bin: { plain: 'cmd.cjs' } } })
+  const own = await project({ logs: { bin: { records: 'cmd.cjs' }, framework: { runs: 'records' } } })
+  try {
+    assert.equal((await lookupProvidedCommand(bare, 'runs', shipped)).command?.package, 'shipped')
+    assert.equal((await lookupProvidedCommand(join(bare, 'nowhere'), 'runs', shipped)).command?.package, 'shipped', 'no package.json at all')
+    assert.equal((await lookupProvidedCommand(own, 'runs', shipped)).command?.package, 'logs', 'the project\'s own package wins')
+    assert.deepEqual(await lookupProvidedCommand(bare, 'tickets', shipped), {}, 'a kind no shipped package declares')
+  } finally {
+    for (const dir of [shippedRoot, bare, own]) await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('a package command runs with Node in the project and answers its JSON, its last stderr line, or that it printed none', async () => {
   const root = await project({ tool: { bin: { tool: 'cmd.cjs' }, framework: { thing: 'tool' } } })
   const dir = join(root, 'node_modules', 'tool')

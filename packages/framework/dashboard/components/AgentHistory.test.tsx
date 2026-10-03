@@ -533,6 +533,16 @@ describe('the project select (#1513)', () => {
     expect(within(quiet).getByText('Not activated')).toBeTruthy()
   })
 
+  test('an activated project whose repository has no remote says so in grey, with no red dot', async () => {
+    const local = { ...idle, id: 'p3', name: 'gamma', activated: true, localOnly: true as const }
+    renderRail(<AgentHistory projectId={null} agents={[]} recentAgents={[]} selectedAgentId={null} onSelect={() => {}} projects={[stranded, local]} />)
+    await openMenu(screen.getByRole('button', { name: 'Project: All projects' }))
+    const item = screen.getByRole('menuitem', { name: /gamma/ })
+    expect(item.querySelector('.bg-danger')).toBeNull()
+    expect(within(item).getByText('Local only, no remote').className).toContain('text-muted-foreground')
+    expect(within(screen.getByRole('menuitem', { name: /alpha/ })).queryByText('Local only, no remote')).toBeNull()
+  })
+
   test('with all projects showing, the row of the agent on screen is the highlighted one', () => {
     const recentAgents = [
       { projectId: 'p1', projectName: 'alpha', agent: agent({ id: 'a1', status: 'done', intent: 'first' }) },

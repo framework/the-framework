@@ -1,4 +1,5 @@
-import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
+import { runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
+import { providedCommand } from '../built-in.js'
 import { isRunId } from './runs.js'
 
 /**
@@ -268,7 +269,7 @@ export function providedBranches(now: () => number = Date.now): BranchesReader {
   const reader: BranchesFor = async root => {
     let known = sources.get(root)
     if (!known || now() - known.at >= CACHE_MS) {
-      const command = await readProvidedCommand(root, 'branches').catch(() => undefined)
+      const command = await providedCommand(root, 'branches').catch(() => undefined)
       const same = known?.command && command && known.command.bin === command.bin
       known = { at: now(), ...(command ? { command, source: same ? known!.source! : commandBranches(root, command, now) } : {}) }
       sources.set(root, known)

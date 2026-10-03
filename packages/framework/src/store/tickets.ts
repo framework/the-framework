@@ -1,4 +1,5 @@
-import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
+import { runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
+import { providedCommand } from '../built-in.js'
 
 /**
  * The tickets, as the framework reads them (#1774). The framework keeps no ticket and imports no
@@ -106,7 +107,7 @@ export function providedTickets(now: () => number = Date.now): TicketsReader {
   const reader: TicketsFor = async root => {
     let known = sources.get(root)
     if (!known || now() - known.at >= CACHE_MS) {
-      const command = await readProvidedCommand(root, 'tickets').catch(() => undefined)
+      const command = await providedCommand(root, 'tickets').catch(() => undefined)
       const same = known?.command && command && known.command.bin === command.bin
       known = { at: now(), ...(command ? { command, source: same ? known!.source! : commandTickets(root, command, now) } : {}) }
       sources.set(root, known)

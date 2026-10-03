@@ -3,9 +3,12 @@
  * the user has to fix — and can only fix if told — records it here, and clears it the moment the
  * state is good again. The dashboard renders what is recorded; nothing else reads it.
  *
- * The first emitter is the data-branch sync (#1599): a push origin rejects, or a repo with no
- * origin at all, used to be a console line on the daemon's stdout and nothing else, which is the
- * worst way to handle a state nobody can see.
+ * The first emitter is the data-branch sync (#1599): a push origin rejects used to be a console
+ * line on the daemon's stdout and nothing else, which is the worst way to handle a state nobody
+ * can see.
+ *
+ * A repository with no origin at all is not an error: a folder that was never shared is a normal
+ * project. The sync records it as `localOnly`, a note the dashboard says quietly.
  *
  * In memory on purpose. Every emitter re-evaluates on its own cadence — the sync every minute —
  * so a restarted daemon re-learns each error within a tick, and there is no stale record to
@@ -40,13 +43,25 @@ export interface ProjectErrors {
   clear(projectPath: string, code: ProjectErrorCode): void
   /** The project's current errors, oldest first. */
   list(projectPath: string): ProjectError[]
+  /** Whether the project's repository has no remote to sync with, as the last sync found it. */
+  setLocalOnly(projectPath: string, localOnly: boolean): void
+  /** What the dashboard shows of the project: its errors, and whether it is local only. */
+  read(projectPath: string): ProjectState
 }
 
-/** The dashboard's read side, wired into its context: what the project currently suffers from. */
-export type ProjectErrorsReader = ProjectErrors['list']
+/** What the background jobs currently know of a project: what is wrong with it, and whether its repository has no remote. */
+export interface ProjectState {
+  errors: ProjectError[]
+  localOnly: boolean
+}
+
+/** The dashboard's read side, wired into its context. */
+export type ProjectErrorsReader = ProjectErrors['read']
 
 export function projectErrorStore(now: () => Date = () => new Date()): ProjectErrors {
   const byProject = new Map<string, Map<ProjectErrorCode, ProjectError>>()
+  const localOnly = new Set<string>()
+  const list = (projectPath: string): ProjectError[] => [...(byProject.get(projectPath)?.values() ?? [])].sort((a, b) => a.since.localeCompare(b.since))
   return {
     set(projectPath, code, message) {
       let errors = byProject.get(projectPath)
@@ -60,8 +75,13 @@ export function projectErrorStore(now: () => Date = () => new Date()): ProjectEr
       errors.delete(code)
       if (errors.size === 0) byProject.delete(projectPath)
     },
-    list(projectPath) {
-      return [...(byProject.get(projectPath)?.values() ?? [])].sort((a, b) => a.since.localeCompare(b.since))
+    list,
+    setLocalOnly(projectPath, value) {
+      if (value) localOnly.add(projectPath)
+      else localOnly.delete(projectPath)
+    },
+    read(projectPath) {
+      return { errors: list(projectPath), localOnly: localOnly.has(projectPath) }
     },
   }
 }

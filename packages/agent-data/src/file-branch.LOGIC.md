@@ -31,7 +31,7 @@ Implements a branch of the project's repository used as a file store: files that
 - **A push that loses a race re-applies the change once** - the attempt's commit is wound back, the cycle re-syncs and re-applies; a second failed push keeps the commit local and reports it, for the next cycle to carry out; never a force push.
 - **A git command outside the lock is waited out** - git's refusal to take a lock of the checkout, its index or the branch's ref, which a git command run in the checkout outside this module causes, resets the checkout, waits half a second and runs the cycle again, three times at most.
 - **A failed change leaves the checkout clean** - any other failure, a timeout included, resets the checkout to its last commit, removes stray files, and is reported rather than thrown.
-- **The pull** - a write cycle with no change, run on the daemon's clock so this machine converges on what others pushed and pushes what an earlier cycle left stranded; a repository with no remote is an error it names.
+- **The pull** - a write cycle with no change, run on the daemon's clock so this machine converges on what others pushed and pushes what an earlier cycle left stranded; a repository with no remote is an error it names, and marks as that one.
 - **Reads from anywhere, and never a failure** - a file or a directory listing is read off the checkout, the local branch, or origin's copy, from any directory of the repository, an agent's checkout included; whatever is missing reads as absent.
 - **A one-shot reader opens the branch once** - one fetch, then every read off origin's copy, so a command sees every writer's pushes, its own one-shot writes included.
 - **The one-shot write from any clone** - a throwaway checkout of origin's tip, applied, committed, pushed straight to the branch and removed; it never touches the persistent checkout nor moves the local branch.
@@ -146,7 +146,7 @@ When anything else fails inside the cycle, the change itself, a git call that fa
 
 #### Business logic
 
-The pull is a write cycle [3] with an empty change and the commit message "sync", behind the same one-at-a-time rule: it creates the checkout [2] when needed, so a fresh clone converges on its first pull; syncs in what others pushed; and pushes anything an earlier failed cycle left stranded, by the same owed-push rule. It reports success when converged with origin, and an error when the cycle failed or when the repository has no remote: a repository nothing can reach is an error state the caller has to surface, not a mode the pull supports. An error is also logged as "[branches] <branch>: <reason>". The pull never throws.
+The pull is a write cycle [3] with an empty change and the commit message "sync", behind the same one-at-a-time rule: it creates the checkout [2] when needed, so a fresh clone converges on its first pull; syncs in what others pushed; and pushes anything an earlier failed cycle left stranded, by the same owed-push rule. It reports success when converged with origin, and an error when the cycle failed or when the repository has no remote: a repository nothing can reach did not converge. That error is marked as "no remote", so a caller can tell a repository that was never shared from a sync that broke. An error is also logged as "[branches] <branch>: <reason>". The pull never throws.
 
 ### Reads from anywhere, and never a failure
 

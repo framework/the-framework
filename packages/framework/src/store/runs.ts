@@ -1,4 +1,5 @@
-import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
+import { runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
+import { providedCommand } from '../built-in.js'
 
 /**
  * Finished runs, as the framework reads them (#1774). The framework keeps no run and imports no
@@ -199,7 +200,7 @@ export function providedRuns(now: () => number = Date.now): RunsReader {
   const reader: RunsFor = async root => {
     let known = sources.get(root)
     if (!known || now() - known.at >= CACHE_MS) {
-      const command = await readProvidedCommand(root, 'runs').catch(() => undefined)
+      const command = await providedCommand(root, 'runs').catch(() => undefined)
       const same = known?.command && command && known.command.bin === command.bin
       known = { at: now(), ...(command ? { command, source: same ? known!.source! : commandRuns(root, command, now) } : {}) }
       sources.set(root, known)

@@ -12,7 +12,7 @@ A project's modules [1]: which of its packages bring something to the dashboard,
 
 ## Business logic — TL;DR
 
-- **Finding a project's modules** - the dependencies and dev dependencies of the project's own `package.json`, installed in its `node_modules` (links followed), whose package exports `./dashboard` to a file inside the package; then the built-in modules, from The Framework's own install, each unless the project has its own copy.
+- **Finding a project's modules** - the dependencies and dev dependencies of the project's own `package.json`, installed in its `node_modules` (links followed), whose package exports `./dashboard` to a file inside the package; then the modules among The Framework's built-in packages (`built-in.ts`), each unless the project has its own copy.
 - **A module's server part** - the file its package exports as `./server`, inside the package, when it has one.
 - **Which files a module serves** - only files inside the directory of its module, symlinks resolved; nothing else of the package, nothing of the project.
 - **Running a module's command** - one of the module package's own commands, picked by name and bounded in arguments, then run the way the shared library runs any package command: with Node in the project root, never through a shell, bounded in time and output; its standard output is read as JSON, a failure answers the command's own last error line.

@@ -8,6 +8,7 @@ import { RelayedAgents, startRemoteAgent } from './dashboard/remote-run.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailAgentEvents } from './dashboard-rpc/events-tail.js'
 import { addProject, listProjects, projectId } from './registry.js'
+import { writeHookLines } from './built-in.js'
 import { installProject } from './install.js'
 import { runProjectHooks, runStartHook } from './project-hooks.js'
 import { publishLevelOf, publishPickIn } from './publish-levels.js'
@@ -129,6 +130,10 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
     if (!isDir) return { ok: false, error: `path does not exist or is not a directory: ${abs}` }
     const result = await installProject(abs)
     if (!result.ok) return { ok: false, error: result.error }
+    // Each package that writes hook lines writes its own (the built-in runner's start, resume and
+    // check among them), so the new project starts an agent with nothing typed by hand. A writer
+    // keeps every line already there, so adding a project again only fills what is missing.
+    for (const failed of await writeHookLines(abs)) console.log(`[framework] hook lines (${abs}): ${failed}`)
     await addProject(abs, new Date().toISOString()).catch(() => {})
     // The project's open hooks (#1774): a project added while the daemon runs is a project the
     // boot never saw, so its open lines run now, the way they would have at boot.

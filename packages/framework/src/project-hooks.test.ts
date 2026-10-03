@@ -1,10 +1,12 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runCheckHook, runProjectHooks, runResumeHook, runStartHook } from './project-hooks.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { initHooks } from 'agent-runner'
 
 // The hooks file and the runner (#1774), for real: `sh -c` in a throwaway project, the lines
 // leaving traces in files the assertions read back.
@@ -153,5 +155,29 @@ test('the check line gets the picked agent and answers its problems and warnings
     assert.deepEqual(await runCheckHook(mute, {}), { ok: false, error: 'the check hook: it answered no problems and warnings' })
   } finally {
     for (const dir of [cwd, none, failing, mute]) await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a line reaches its tool with nothing installed in the project: the dashboard brings the runner, and the project\'s own copy goes first', async () => {
+  // An empty folder with the runner's own lines, as adding a project writes them: no package.json, no node_modules.
+  const cwd = await project()
+  try {
+    execFileSync('git', ['init', '-q'], { cwd })
+    const written = await initHooks(cwd)
+    assert.ok(written.ok && written.added.includes('start') && written.added.includes('check'), JSON.stringify(written))
+    assert.ok(!(await readFile(join(cwd, PROJECT_HOOKS_FILE), 'utf8')).includes('npx'), 'no line asks npx for a package by name')
+    // A PATH with node and the shell's tools and no runner on it: the line still finds the dashboard's copy.
+    const bare = ['/usr/bin', '/bin', dirname(process.execPath)].join(delimiter)
+    const checked = await runCheckHook(cwd, {}, { env: { ...process.env, PATH: bare } })
+    assert.ok(checked.ok, JSON.stringify(checked))
+
+    // The project installed its own: that copy answers, not the dashboard's.
+    await mkdir(join(cwd, 'node_modules', '.bin'), { recursive: true })
+    const own = join(cwd, 'node_modules', '.bin', 'agent-runner')
+    await writeFile(own, '#!/bin/sh\necho \'{"problems":["the project\'"\'"\'s own copy answered"],"warnings":[]}\'\n')
+    await chmod(own, 0o755)
+    assert.deepEqual(await runCheckHook(cwd, {}, { env: { ...process.env, PATH: bare } }), { ok: true, problems: ["the project's own copy answered"], warnings: [] })
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
   }
 })

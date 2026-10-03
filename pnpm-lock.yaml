@@ -266,6 +266,12 @@ importers:
       '@gemstack/files':
         specifier: workspace:*
         version: link:../files
+      '@gemstack/skill-branches':
+        specifier: workspace:*
+        version: link:../skill-branches
+      '@gemstack/skill-logs':
+        specifier: workspace:*
+        version: link:../skill-logs
       '@puppeteer/browsers':
         specifier: 3.2.1
         version: 3.2.1
@@ -290,6 +296,9 @@ importers:
       agent-driver:
         specifier: workspace:*
         version: link:../agent-driver/core
+      agent-runner:
+        specifier: workspace:*
+        version: link:../agent-runner
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -315,12 +324,6 @@ importers:
         specifier: ^2.5.0
         version: 2.9.0
     devDependencies:
-      '@gemstack/skill-branches':
-        specifier: workspace:*
-        version: link:../skill-branches
-      '@gemstack/skill-logs':
-        specifier: workspace:*
-        version: link:../skill-logs
       '@gemstack/skill-queue':
         specifier: workspace:*
         version: link:../skill-queue

@@ -32,6 +32,7 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 - **A turn's end and the spend are not rows** - the end of each turn [7] and the spend so far are left out: the agent's details strip counts the turns and totals the spend.
 - **An end the agent went on after is not a row** - a clean end, or an end waiting on an answer, that a later prompt follows is left out, and so is the last clean end while the caller says the agent's job is still going; a failed or stopped end stays where it happened.
 - **The reply a question follows is shown whole** - the agent's last reply before a gate [4] in the same turn is not clamped: it is what the question is about.
+- **The question's block is not shown** - the JSON block an agent writes to ask is left out of the reply a gate [4] follows, and out of the message being written: the gate's card is the question.
 - **The session id is not a row** - the coding agent's session id update is plumbing, not conversation: it is left out of the list, and the run's menu reads it from the events.
 - **The quota only when it matters** - the coding agent reports the account's quota after every turn; a reading that is `allowed` is left out of the list, and one running low or used up is a row.
 - **Thinking stays folded** - a thought of the coding agent renders as one muted "💭 Thinking" line; clicking it opens the thought in place, in italics, and clicking again folds it.
@@ -105,6 +106,21 @@ A failed or stopped end is always a row, where it happened: it says why the next
 #### Business logic
 
 In each turn [7], the agent's last reply before a gate [4] is the reply that question follows; a gate in a later turn is not about a reply of the turn before, and a reply earlier in the same turn than the last one is not it either. That reply starts expanded instead of clamped, whether or not the transcript knows its project. The chevron still folds it and opens it again, and the user's click wins from then on. Every other long message is clamped as described in "The conversation reads as messages".
+
+### The question's block is not shown
+
+#### Context
+
+**User story**: the agent asks "What color do you prefer?" with four options. The user reads the question once, as a card with four buttons.
+
+**Problem**: an agent asks by ending its reply with a fenced block tagged `await-choices` that holds the question as JSON. The transcript shows replies as written, so the user saw the raw JSON and then the card saying the same thing.
+
+#### Business logic
+
+- The reply a gate [4] follows (the rule of "The reply a question follows is shown whole") is shown without its `await-choices` blocks. What the agent wrote around the block stays.
+- When nothing is left, the reply was only the block, and it is no row at all: the gate's card stands alone.
+- A reply no gate follows keeps its block as written. A block that did not parse makes no gate, and the raw block is how the user sees that the agent tried to ask.
+- The message being written is shown without the block too, from the block's opening fence on while its closing fence has not arrived. While nothing else is written, the "working" line shows instead.
 
 ### Thinking stays folded
 

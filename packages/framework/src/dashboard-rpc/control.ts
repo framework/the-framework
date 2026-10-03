@@ -11,6 +11,8 @@ import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
 import { mergeAgentPr, openAgentPullRequest, mergeAgentBranch, pushAgentBranch, type HandoffResult } from '../dashboard/agent-handoff.js'
 import { pendingChoices } from '../open-choices.js'
+import { createRepository, type CreateRepositoryResult } from '../store/repository.js'
+import { providedDataChanged } from '../store/provided.js'
 import type {
   DeleteAgentResult,
   RemoveWorktreeResult,
@@ -233,6 +235,19 @@ export async function sendPush(projectId: string, agentId: string): Promise<Hand
     if (target.agent.status === 'running') return { ok: false, error: 'that session is still going' }
     return withAgentLock(agentLockKey(target.cwd, agentId), () => pushAgentBranch(target.cwd, target.agent))
   }, { ok: false, error: 'could not reach the device' })
+}
+
+/**
+ * The user's "Create a repository" action, for a project with no remote: the project's repository
+ * provider creates it private, sets it as the origin and pushes. The git host is looked up again
+ * afterwards: the project has a page there now.
+ */
+export async function sendCreateRepository(projectId: string): Promise<CreateRepositoryResult> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
+  const created = await createRepository(cwd)
+  if (created.ok) providedDataChanged(cwd)
+  return created
 }
 
 /**

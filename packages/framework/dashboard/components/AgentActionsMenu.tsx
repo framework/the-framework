@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import type { GitHostHome, FrameworkEvent } from '../../src/index.js'
+import type { GitHostHome, FrameworkEvent, RepositoryOffer } from '../../src/index.js'
 import { sessionInfo } from '../../src/client.js'
-import { MoreVertical, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy } from 'lucide-react'
-import { onGitHostHome } from '../rpc/reads.js'
+import { MoreVertical, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy, CloudUpload } from 'lucide-react'
+import { onGitHostHome, onRepositoryOffer } from '../rpc/reads.js'
 import {
   sendOpenInApp,
   sendStop,
   sendRemoveWorktree,
   sendDeleteAgent,
+  sendCreateRepository,
 } from '../rpc/control.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
@@ -83,7 +84,14 @@ export function AgentActionsMenu({
     })
   }
   // Hold the last git host page while a new project's loads, so the item does not flicker.
-  const home = useLoaded<GitHostHome | null>(() => onGitHostHome(projectId), null, [projectId], 'previous')
+  // Asked again after a repository is created: the project has a page on its git host from then on.
+  const [created, setCreated] = useState(0)
+  const home = useLoaded<GitHostHome | null>(() => onGitHostHome(projectId), null, [projectId, created], 'previous')
+  // A project that lives on this machine only may be offered a repository on a host; the project's
+  // menu offers it, a session's does not. Creating one puts the project's code on a server under
+  // the person's account, so it is asked once more before it happens.
+  const offer = useLoaded<RepositoryOffer | null>(() => (agentId ? Promise.resolve(null) : onRepositoryOffer(projectId)), null, [projectId, agentId, created])
+  const [confirmCreate, setConfirmCreate] = useState(false)
 
   const { busy, error, run } = useAction()
 
@@ -133,6 +141,11 @@ export function AgentActionsMenu({
           {home && (
             <DropdownMenuItem render={<a href={home.url} target="_blank" rel="noreferrer" />}>
               <ExternalLink className="h-3.5 w-3.5 shrink-0" /> Open on {home.name}
+            </DropdownMenuItem>
+          )}
+          {offer && (
+            <DropdownMenuItem onClick={() => setConfirmCreate(true)}>
+              <CloudUpload className="h-3.5 w-3.5 shrink-0" /> Create a repository on {offer.name}…
             </DropdownMenuItem>
           )}
           {/* Named for what it actually opens (#1195): once a session's worktree is gone this
@@ -207,6 +220,25 @@ export function AgentActionsMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {offer && (
+        <ConfirmDialog
+          open={confirmCreate}
+          onOpenChange={setConfirmCreate}
+          title={`Create a private repository on ${offer.name}?`}
+          body={
+            <>
+              This creates the private repository <span className="font-medium text-foreground">{offer.repository}</span> on your{' '}
+              {offer.name} account and pushes this project to it. The project&rsquo;s code leaves this machine.
+            </>
+          }
+          confirmLabel="Create and push"
+          confirmBusyLabel="Creating…"
+          fallbackError="Could not create the repository."
+          destructive={false}
+          onConfirm={() => sendCreateRepository(projectId)}
+          onSuccess={() => setCreated(n => n + 1)}
+        />
+      )}
       {onDeleted && agentId && (
         <ConfirmDialog
           open={confirmDelete}

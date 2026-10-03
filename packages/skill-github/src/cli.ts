@@ -6,6 +6,7 @@ import { openRequest, type OpenOutcome } from './open.js'
 import { mergeRequest } from './merge.js'
 import { watchAndMerge } from './merge-watch.js'
 import { GIT_HOST_NAME, homeUrlFor } from './home.js'
+import { createRepository, offerRepository, type CreateOffer, type CreateOutcome } from './create.js'
 
 /**
  * The command line over the package (#1820): the same functions for an agent in a shell, and for
@@ -31,6 +32,8 @@ export const USAGE = `usage: github <command>
   merge <number>               land pull request <number>: a draft is marked ready, then the merge is armed as --merge arms it
   watch <number>               wait for pull request <number>'s checks and merge it once they pass; what --merge starts where the repository has no auto-merge
   home                         the project's page on GitHub, from its origin remote
+  create [--check]             create a private repository for a project with no origin, named <account>/<folder>, set it as origin and push;
+                               --check only says which repository that would be
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
 
@@ -146,12 +149,31 @@ const COMMANDS: Record<string, Command> = {
     return { ok: outcome.outcome === 'merged', number, ...outcome }
   },
 
+  async create(args, { cwd, gh, git }) {
+    const { values } = parse(args, { check: { type: 'boolean' } }, 0)
+    const outcome = values.check ? await offerRepository(cwd, { gh, git }) : await createRepository(cwd, { gh, git })
+    if (!outcome.ok) throw new Refused(outcome, createRefusalLine(outcome))
+    return { ...outcome, name: GIT_HOST_NAME }
+  },
+
   async home(args, { cwd, git }) {
     parse(args, {}, 0)
     const url = await homeUrlFor(cwd, git)
     if (!url) throw new Refused({ ok: false, reason: 'no-remote' }, 'no origin remote on GitHub')
     return { ok: true, url, name: GIT_HOST_NAME }
   },
+}
+
+/** Why no repository was created, as one line for a person. */
+function createRefusalLine(outcome: (CreateOffer | CreateOutcome) & { ok: false }): string {
+  switch (outcome.reason) {
+    case 'has-remote':
+      return 'this project already has an origin remote'
+    case 'not-logged-in':
+      return `GitHub could not be reached as you: ${outcome.detail}`
+    case 'create-failed':
+      return `the repository could not be created: ${outcome.detail}`
+  }
 }
 
 /** Why a request was not opened, as one line for a person. */

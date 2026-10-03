@@ -11,7 +11,7 @@ import { declaring, lookupProvidedCommand, packageBins, projectPackages, readMan
  * its hook lines by its `framework` key. This list is the one place the framework names a
  * package, and a project's own copy of any of them wins.
  */
-export const BUILT_IN_PACKAGES: readonly string[] = ['@gemstack/files', '@gemstack/skill-branches', '@gemstack/skill-logs', 'agent-runner']
+export const BUILT_IN_PACKAGES: readonly string[] = ['@gemstack/files', '@gemstack/skill-branches', '@gemstack/skill-github', '@gemstack/skill-logs', 'agent-runner']
 
 let resolved: Promise<ProjectPackage[]> | undefined
 
@@ -54,6 +54,12 @@ export async function lookupProvided(root: string, kind: string): Promise<Provid
 /** {@link lookupProvided}'s command, for a caller that only needs to run it. */
 export async function providedCommand(root: string, kind: string): Promise<ProvidedCommand | undefined> {
   return (await lookupProvided(root, kind)).command
+}
+
+/** Whether `command` comes from a built-in package the project has no copy of: one the project did not choose. */
+export async function isBuiltIn(root: string, command: ProvidedCommand): Promise<boolean> {
+  if ((await projectPackages(root)).some(pkg => pkg.name === command.package)) return false
+  return (await builtInPackages()).some(pkg => pkg.name === command.package)
 }
 
 /**

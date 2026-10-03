@@ -8,12 +8,12 @@ The packages The Framework ships for every project, the built-in packages [1]: w
 
 ## Glossary
 
-[1] built-in package: a package The Framework itself depends on and uses for every project, through the same contract as a project's own package. The list: `@gemstack/files`, `@gemstack/skill-branches`, `@gemstack/skill-logs`, `agent-runner`.
+[1] built-in package: a package The Framework itself depends on and uses for every project, through the same contract as a project's own package. The list: `@gemstack/files`, `@gemstack/skill-branches`, `@gemstack/skill-github`, `@gemstack/skill-logs`, `agent-runner`.
 [2] kind: one sort of The Framework's data a package may provide: `tickets`, `queue`, `runs`, `branches`, `git-host`.
 
 ## Business logic — TL;DR
 
-- **The list** - four packages, named in one place; nothing else in The Framework names a package. Each is found in The Framework's own install, once; one that is not installed is skipped.
+- **The list** - five packages, named in one place; nothing else in The Framework names a package. Each is found in The Framework's own install, once; one that is not installed is skipped.
 - **Who provides a kind** - the project's own packages first, by the shared library's rule; only when none of them declares the kind is a built-in package that declares it the provider.
 - **The commands a hook line can name** - the directories of the built-in packages' commands, which a hook line's `PATH` gains after the project's own installed tools.
 - **Writing hook lines** - every package that declares it writes hook lines is run with `init` in the project: the project's own packages, then the built-in ones the project has no copy of.
@@ -38,7 +38,7 @@ The built-in packages [1] are resolved from The Framework's own install, by name
 
 #### Business logic
 
-The lookup is the shared library's, handed the built-in packages [1]: the project's own installed packages are asked first, and the rule between several of them is unchanged. Only when none of the project's packages declares the kind is a built-in package that declares it the provider. So a project with nothing installed has its runs read by `@gemstack/skill-logs` and its checkouts by `@gemstack/skill-branches`, and has no tickets, no queue and no git host, since no built-in package declares those.
+The lookup is the shared library's, handed the built-in packages [1]: the project's own installed packages are asked first, and the rule between several of them is unchanged. Only when none of the project's packages declares the kind is a built-in package that declares it the provider. So a project with nothing installed has its runs read by `@gemstack/skill-logs` and its checkouts by `@gemstack/skill-branches`, is offered a repository to create by `@gemstack/skill-github` (`store/repository.ts`), and has no tickets and no queue, since no built-in package declares those. A git host is a special case: the built-in GitHub package is a project's git host only when the project's remote is on GitHub (`store/git-host.ts`).
 
 ### The commands a hook line can name
 

@@ -18,6 +18,7 @@ How The Framework reads a project's pull requests and acts on them: through the 
 
 ## Business logic — TL;DR
 
+- **A built-in git host** - a git host that comes from a built-in package (`../built-in.ts`), not from a package the project installed, is the project's only when it answers the project's page there; a project with no remote, or a remote on another host, has no git host.
 - **Which command provides** - the shared library's rule: the one dependency that declares a git host provider [1] naming one of its own commands, or, when several declare it, the one the project's own package.json names; no dependency declares one, the project has no git host.
 - **The command line it answers** - the project's pull requests (all, one branch's, by state, since a time), the opening of a branch's pull request, the landing of one, and the project's page on the git host.
 - **The shapes** - a pull request is kept only with a number, a link and a known state, its other fields as printed or empty; a page only with a link and a name; an opened pull request only with its number and link.

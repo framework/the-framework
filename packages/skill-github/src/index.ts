@@ -5,3 +5,4 @@ export { armMerge, mergeRequest, type MergeArming, type MergeOutcome, type Merge
 export { readPr, watchAndMerge, spawnMergeWatch, NO_CHECKS_GRACE_MS, WATCH_EVERY_MS, WATCH_FOR_MS, WATCH_LOG_DIR, type ChecksState, type WatchOptions, type WatchOutcome } from './merge-watch.js'
 export { homeUrlFromRemote, homeUrlFor, GIT_HOST_NAME } from './home.js'
 export { runCli, USAGE, type CliIo, type CliDeps, type CliRefusal } from './cli.js'
+export { createRepository, offerRepository, type CreateOffer, type CreateOutcome } from './create.js'

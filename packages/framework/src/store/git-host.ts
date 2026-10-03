@@ -1,5 +1,5 @@
 import { runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
-import { providedCommand } from '../built-in.js'
+import { isBuiltIn, providedCommand } from '../built-in.js'
 
 /**
  * The project's git host, as the framework reads and acts on it (#1820): the pull requests of the
@@ -8,7 +8,9 @@ import { providedCommand } from '../built-in.js'
  * provides it — `"framework": { "git-host": "<command>" }` in the package's own package.json — and
  * the framework asks by running that command. Swap the package for another that answers the same
  * command line and prints the same shapes, and nothing here changes. No package declares it: the
- * project has no git host, so no pull requests, and a finished run's last step is the push.
+ * project has no git host, so no pull requests, and a finished run's last step is the push. A
+ * built-in package's git host is the project's only when it answers the project's page there: a
+ * project whose remote is on another host, or that has no remote, has none.
  *
  * The command line a provider answers, each printing one JSON document and exiting 0 (a refusal
  * exits 1 with its reason on stderr):
@@ -154,7 +156,10 @@ export function providedGitHost(now: () => number = Date.now): GitHostReader {
   const reader: GitHostFor = async root => {
     let known = sources.get(root)
     if (!known || now() - known.at >= CACHE_MS) {
-      const command = await providedCommand(root, 'git-host').catch(() => undefined)
+      let command = await providedCommand(root, 'git-host').catch(() => undefined)
+      // A built-in git host is one the project did not choose: it is the project's only when it
+      // knows the project's page there (the origin remote is on that host).
+      if (command && (await isBuiltIn(root, command)) && !(await commandGitHost(root, command).home())) command = undefined
       const same = known?.command && command && known.command.bin === command.bin
       known = { at: now(), ...(command ? { command, source: same ? known!.source! : commandGitHost(root, command) } : {}) }
       sources.set(root, known)

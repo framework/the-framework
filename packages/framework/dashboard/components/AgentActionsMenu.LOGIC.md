@@ -19,7 +19,7 @@ One "⋮" menu at the end of an agent's [1] action bar, holding everything the u
 
 - **Opening the agent somewhere** - "Open on <git host name>" when the project's git host names a page; a folder item named for what it will open; an "Open in editor" submenu with the preferred-editor picker; "Open session (<id>)" when the driver session has a real link.
 - **Copying the resume command** - when the driver session id is known, one item copies the terminal command that reopens the conversation, or just the id when the directory it ran in is unknown, and confirms with "Copied".
-- **The menu for no agent** - on the project home the same menu, named "Project actions", holds only the items that open the project.
+- **The menu for no agent** - on the project home the same menu, named "Project actions", holds only the items that open the project, and, for a project that lives on this machine only and is offered one, "Create a repository on <host>…": a confirmation names the private repository and says the code leaves the machine, "Create and push" creates it, a refusal stays in the dialog, and the project's git host page and the offer are asked again afterwards.
 - **Stop, while the agent works** - "Stop agent", which reads "Stopping…" until the agent's end arrives. There is no merge here: an agent that is working is still writing its branch.
 - **Remove and delete, once the agent has ended** - "Remove worktree" only while the agent's checkout is kept; "Delete session" only for a finished agent, behind a confirmation that says the history is gone for good while the branch and pull request stay in git.
 - **Failures are said in the menu** - a failed action's reason is shown at the bottom of the menu instead of nothing happening.

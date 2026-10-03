@@ -137,3 +137,35 @@ test('home: the project page from origin, with the git host named; no origin, or
   const none = await run('/r', ['home'], { git: async () => Promise.reject(new Error('fatal: No such remote')) })
   assert.deepEqual(none.out, { ok: false, reason: 'no-remote' })
 })
+
+test('create: only for a project with no origin; --check names the repository; the real one creates it private, as origin, pushed; each refusal in words', async () => {
+  const noOrigin: GitRunner = async () => ''
+  const calls: string[][] = []
+  const gh: GhRunner = async args => {
+    calls.push(args)
+    return args[0] === 'api' ? 'suleiman\n' : 'https://github.com/suleiman/shop\n'
+  }
+  const offer = await run('/work/shop', ['create', '--check'], { gh, git: noOrigin })
+  assert.equal(offer.code, 0)
+  assert.deepEqual(offer.out, { ok: true, repository: 'suleiman/shop', name: 'GitHub' })
+  assert.deepEqual(calls, [['api', 'user', '--jq', '.login']], 'a check creates nothing')
+
+  calls.length = 0
+  const created = await run('/work/shop', ['create'], { gh, git: noOrigin })
+  assert.equal(created.code, 0)
+  assert.deepEqual(created.out, { ok: true, repository: 'suleiman/shop', url: 'https://github.com/suleiman/shop', name: 'GitHub' })
+  assert.deepEqual(calls[1], ['repo', 'create', 'suleiman/shop', '--private', '--source', '.', '--remote', 'origin', '--push'], 'private, set as origin, pushed')
+
+  calls.length = 0
+  const has = await run('/work/shop', ['create'], { gh, git: async () => 'origin\n' })
+  assert.equal(has.code, 1)
+  assert.deepEqual(has.out, { ok: false, reason: 'has-remote' })
+  assert.equal(has.err, 'this project already has an origin remote')
+  assert.deepEqual(calls, [], 'GitHub is not asked for a project that is already somewhere')
+
+  const loggedOut = await run('/work/shop', ['create', '--check'], { gh: async () => Promise.reject(new Error('gh: not logged in')), git: noOrigin })
+  assert.deepEqual(loggedOut.out, { ok: false, reason: 'not-logged-in', detail: 'gh: not logged in' })
+  const taken = await run('/work/shop', ['create'], { gh: async args => (args[0] === 'api' ? 'suleiman\n' : Promise.reject(new Error('Name already exists on this account'))), git: noOrigin })
+  assert.deepEqual(taken.out, { ok: false, reason: 'create-failed', detail: 'Name already exists on this account' })
+  assert.equal(taken.err, 'the repository could not be created: Name already exists on this account')
+})

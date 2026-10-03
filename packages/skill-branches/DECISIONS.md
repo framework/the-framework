@@ -176,7 +176,9 @@ ending.
   the project's folder, which must be on that branch. It is how a finished agent's work
   reaches the folder where there is no remote to push to and no pull request to merge. A
   merge that conflicts is undone and names the files: nothing is left half merged. Once the
-  work is in, an agent's branch is deleted, with its checkout when one is there, since the
-  default branch holds everything it held; a branch that is no agent's is kept. Picked over
+  work is in, an agent's branch is deleted, since the default branch holds everything it
+  held. A branch whose checkout is still there is kept with it: an agent may be working in
+  that checkout (one asked to merge its own work runs the command from inside it), and
+  removing it would take the agent's diary with it. A branch that is no agent's is kept. Picked over
   leaving the conflict in the person's folder to fix by hand, and over keeping the merged
   branch.

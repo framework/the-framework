@@ -35,8 +35,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A project with no remote is offered one step on a finished agent's page: "Merge into
   main", which merges the agent's branch into the project's default branch on this machine,
   through the branches provider. A conflict changes nothing and is said. The merged branch
-  is deleted, and the run's record keeps its last commit and where its work began, so the
-  page still shows what the agent changed. Picked over "No remote to push to", which left
+  is deleted once no checkout holds it, and the run's record then keeps its last commit and
+  where its work began, so the page still shows what the agent changed. Picked over "No remote to push to", which left
   the work on a branch the person could only reach from a terminal.
 - A project with no remote is offered "Create a repository on <host>…" in its project menu,
   when a package can create one: private, under the person's account, named after the folder,

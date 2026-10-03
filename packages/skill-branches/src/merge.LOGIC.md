@@ -17,7 +17,7 @@ Merges a finished agent's [1] branch into the project's default branch [2], on t
 - **What is merged is what is committed** - an agent's checkout that holds uncommitted work stops the merge before it starts.
 - **The merge** - a fast-forward when the default branch did not move, a merge commit "Merge branch '<branch>'" otherwise; a branch already in the default branch merges nothing.
 - **A conflict changes nothing** - the merge is undone and the conflicting files are named; any other refusal by git is answered in git's words, with nothing changed.
-- **The branch goes once the work is in** - an agent's branch is deleted, with its checkout when one is still there; a branch that is no agent's is kept.
+- **The branch goes once the work is in** - an agent's branch is deleted when no checkout is on it; a branch that still has its checkout is kept with it, and a branch that is no agent's is kept.
 - **What is answered** - the default branch's name, the branch's last commit and the commit its work began at, so what the branch changed can still be read once it is gone.
 
 ## Business logic
@@ -68,9 +68,11 @@ When the merge stops on conflicts, the files in conflict are read, the merge is 
 
 **Business logic story**: only an agent's [1] branch is ever deleted by this package (`branch-names.ts`).
 
+**Problem**: an agent asked to "merge" ran this command on its own branch. The command removed the agent's checkout while the agent was still running in it, and the agent's whole conversation, kept in that checkout until the run ends, was lost.
+
 #### Business logic
 
-After the merge, a branch named as an agent's is deleted; its checkout, when one is still there, is removed first. Any other branch is merged and kept.
+After the merge, a branch named as an agent's is deleted, when no checkout under `.branches/` is on it. A branch that still has its checkout is left with it: an agent [1] may be working there, and an agent asked to merge its own work runs this command from inside that checkout, so removing it would delete the directory under the agent and, with it, the diary its run keeps there. The checkout's owner reclaims both later, by the reclaim rule, since the branch then holds nothing the default branch lacks. Any other branch is merged and kept.
 
 ### What is answered
 

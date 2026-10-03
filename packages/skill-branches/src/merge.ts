@@ -1,6 +1,6 @@
 import { gitReason, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { isAgentBranch } from './branch-names.js'
-import { currentBranch, removeWorktree, worktreeBranch, worktreeClean, worktreeDirEntries } from './worktree.js'
+import { currentBranch, worktreeBranch, worktreeClean, worktreeDirEntries } from './worktree.js'
 
 /**
  * Merging a finished agent's branch into the project's default branch, on this machine: how the
@@ -10,8 +10,8 @@ import { currentBranch, removeWorktree, worktreeBranch, worktreeClean, worktreeD
  *
  * Nothing is left half done. A merge that conflicts is undone and the files it conflicted in are
  * named; nothing is committed on the agent's behalf, so a checkout with uncommitted work stops
- * the merge before it starts. Once the work is in, the agent's branch goes, with its checkout
- * when one is still there: the default branch holds everything it held.
+ * the merge before it starts. Once the work is in, the agent's branch goes, since the default
+ * branch holds everything it held; a branch whose checkout is still there is kept with it.
  */
 
 /** Why a branch was not merged. */
@@ -33,7 +33,8 @@ export type MergeOutcome =
   /**
    * `commit` is the branch's last commit and `from` the commit its work began at (where it left
    * the default branch): what the branch changed is read between the two once the branch is
-   * gone. `deleted` is false for a branch that is no agent's, which is never deleted.
+   * gone. `deleted` is false for a branch that is no agent's, which is never deleted, and for one
+   * whose checkout is still there.
    */
   | { ok: true; branch: string; into: string; commit: string; from: string; deleted: boolean }
   | { ok: false; reason: 'no-branch' | 'dirty'; branch: string }
@@ -80,11 +81,11 @@ export async function mergeBranch(repo: string, branch: string, git: GitRunner =
     }
   }
 
-  // Only an agent's branch is ever deleted, and only now that the default branch holds it.
-  const deleted = isAgentBranch(branch)
-  if (deleted) {
-    if (checkout) await removeWorktree(repo, checkout, git)
-    await git(['branch', '-D', branch], repo)
-  }
+  // Only an agent's branch is ever deleted, and only now that the default branch holds it. A
+  // branch that still has its checkout is left with it: an agent may be working there (one asked
+  // to merge its own work runs this from inside it), and removing the checkout under it would
+  // take its diary with it. The checkout's owner reclaims both, by the reclaim rule.
+  const deleted = isAgentBranch(branch) && checkout === undefined
+  if (deleted) await git(['branch', '-D', branch], repo)
   return { ok: true, branch, into, commit, from, deleted }
 }

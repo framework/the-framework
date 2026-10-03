@@ -1,0 +1,81 @@
+import { useState } from 'react'
+import { Check, ChevronsUpDown, Layers, Plus } from 'lucide-react'
+import type { ProjectSummary } from '../../src/index.js'
+import { cn } from '../lib/utils.js'
+import { AddProjectPanel } from './AddProjectPanel.js'
+import { projectErrorTitle } from './ProjectErrorBanner.js'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from './ui/dropdown-menu.js'
+
+/** A project's state as a dot: red when the daemon recorded an error for it (#1500), else whether it is activated. */
+function ProjectDot({ project }: { project: ProjectSummary }) {
+  return (
+    <span
+      aria-hidden
+      className={cn('h-2 w-2 shrink-0 rounded-full', project.errors?.length ? 'bg-danger' : project.activated ? 'bg-primary' : 'bg-muted-foreground')}
+    />
+  )
+}
+
+// The project every page shows (#1513): one project, or all of them. It sits at the very top of the
+// sidebar, under the brand, because what it picks applies to every page below it: the Overview, the
+// modules' pages and the list of recent agents. It filters; it does not navigate.
+export function ProjectSelect({
+  projects,
+  scope,
+  onScope,
+  onProjectAdded,
+}: {
+  projects: ProjectSummary[]
+  /** The one project every page shows, or null for all of them. */
+  scope: string | null
+  onScope: (projectId: string | null) => void
+  onProjectAdded?: (() => void) | undefined
+}) {
+  const [adding, setAdding] = useState(false)
+  const selected = scope === null ? undefined : projects.find(p => p.id === scope)
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Project: ${selected ? selected.name : 'All projects'}`}
+          className="flex w-full items-center gap-2 rounded-md border border-sidebar-border bg-background px-2 py-1.5 text-sm font-medium transition-colors hover:bg-sidebar-accent/60"
+        >
+          {selected ? <ProjectDot project={selected} /> : <Layers className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />}
+          <span className="flex-1 truncate text-left">{selected ? selected.name : 'All projects'}</span>
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+        </DropdownMenuTrigger>
+        {/* As wide as the button it drops from. */}
+        <DropdownMenuContent align="start" className="w-[var(--anchor-width)]">
+          <DropdownMenuItem onClick={() => onScope(null)}>
+            <Layers className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="flex-1">All projects</span>
+            {scope === null && <Check className="h-3.5 w-3.5 shrink-0" aria-label="selected" />}
+          </DropdownMenuItem>
+          {projects.length > 0 && <DropdownMenuSeparator />}
+          {projects.map(p => (
+            <DropdownMenuItem key={p.id} onClick={() => onScope(p.id)}>
+              <ProjectDot project={p} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{p.name}</span>
+                {/* What the daemon finds wrong with it, in words: the project's own page carries the detail. */}
+                {p.errors?.map(e => (
+                  <span key={e.code} title={e.message} className="block truncate text-xs text-danger">
+                    {projectErrorTitle(e.code)}
+                  </span>
+                ))}
+                {!p.errors?.length && !p.activated && <span className="block text-xs text-muted-foreground">Not activated</span>}
+              </span>
+              {p.id === scope && <Check className="h-3.5 w-3.5 shrink-0" aria-label="selected" />}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setAdding(true)} className="text-muted-foreground">
+            <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>Add project</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {adding && <AddProjectPanel onAdded={() => onProjectAdded?.()} onClose={() => setAdding(false)} />}
+    </>
+  )
+}

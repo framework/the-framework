@@ -22,6 +22,7 @@ import { useLiveEvents } from './lib/use-live-events.js'
 import { useAgents } from './lib/use-agents.js'
 import { usePolled } from './lib/use-async.js'
 import { useRoute } from './lib/use-route.js'
+import { formatRoute, type Route } from './lib/route.js'
 import { dataLinkRoute } from './lib/data-link.js'
 import { useActivityNotifications, useInterventionNotifications } from './lib/use-notifications.js'
 import { usePreferences, notificationsEnabled, newActivityEnabled, humanInterventionEnabled } from './lib/preferences.js'
@@ -62,14 +63,49 @@ const EMPTY_RECENT: RecentAgent[] = []
 // A route cannot disagree with itself, and a session becomes a link: paste it, reload it,
 // bookmark it, open two side by side. A refresh returns to the same project for free, which is
 // what the remembered-project state (#475) was for.
+//
+// The project select at the top of the sidebar (#1513) is in the URL too, as `?project=`: the one
+// project every page shows, or none for all of them. It filters what the pages show; it is not a
+// page of its own, so it rides along on every navigation.
 export function App() {
-  const { route, go } = useRoute()
+  const { route, go: navigate } = useRoute()
   const { view, projectId, agentId } = route
   // A module's page (#1774): the route names it by its segment, with no project selected.
   const pageSegment = route.page ?? null
   const modules = useModules()
   const { pages: modulePages, loaded: modulesLoaded } = modules
   const modulePage = pageSegment ? modulePages.find(page => page.segment === pageSegment) : undefined
+
+  // The registered projects, for the browser-tab title (#695/U3) — the selected project's name
+  // plus the needs-you count drive `document.title` so a backgrounded tab tells you which project
+  // needs attention — and for the sidebar's project select. Polled rather than read once (#1500):
+  // each project carries what the daemon currently finds wrong with it, a state that appears and
+  // clears on the daemon's own minute cadence, so the sidebar dot and the project's banner have to
+  // follow it. Slow, and reloadable so adding a project from the sidebar's "New" reflects at once
+  // (bump the key).
+  const [projectsKey, setProjectsKey] = useState(0)
+  const { value: projects } = usePolled<ProjectSummary[]>(onProjects, EMPTY_PROJECTS, 30_000, [projectsKey])
+  // The one project every page shows (#1513), or null for all of them. A project that is not
+  // registered (removed, or a link from another machine) picks nothing.
+  const scope = route.scope && (projects.length === 0 || projects.some(p => p.id === route.scope)) ? route.scope : null
+  const scopedProjects = useMemo(() => (scope ? projects.filter(p => p.id === scope) : projects), [projects, scope])
+
+  // Every navigation keeps the picked project, and one into another project's page picks that
+  // project: the pages never show a project the select does not name.
+  const go = (next: Route, options?: { replace?: boolean }) => navigate({ ...next, ...(scope ? { scope: next.projectId ?? scope } : {}) }, options)
+
+  // Pick the one project every page shows, or all of them. The page stays, with what it mirrored
+  // into the query (a list's filters), unless it is another project's: its launcher becomes the
+  // picked project's, and its agent's page the Overview. A module's page drops what follows its
+  // segment, which may name the project just left.
+  const selectScope = (next: string | null) => {
+    const { scope: _scope, ...here } = route
+    if (next === null) return navigate(here, { keepQuery: true })
+    if (here.projectId !== null && here.projectId !== next)
+      return navigate(here.agentId === null ? { projectId: next, agentId: null, scope: next } : { projectId: null, agentId: null, scope: next })
+    const { pagePath, ...page } = here
+    navigate({ ...page, scope: next }, { keepQuery: !pagePath?.length })
+  }
 
   // A just-started run: bump the tick so the Sessions rail shows an optimistic "starting…" row
   // with the typed prompt at once, before the run's tool writes its card. `id` is the one the
@@ -78,7 +114,9 @@ export function App() {
   // `runsOn` names the device a just-started remote agent executes on (#1067), so the live view can
   // mark where it runs and degrade the panels that are local-only. Undefined for a local agent.
   const [agentStart, setAgentStart] = useState<{ tick: number; intent: string; id: string | null; runsOn?: string }>({ tick: 0, intent: '', id: null })
-  const { agents: agents, reload, loaded: agentsLoaded } = useAgents(projectId)
+  // The agents of the project on screen, for its pages, or of the picked project, for the sidebar:
+  // the same project whenever both are set.
+  const { agents: agents, reload, loaded: agentsLoaded } = useAgents(projectId ?? scope)
 
   // The Context set lives in the shell (#492/#504) so the two surfaces that feed it share one
   // source of truth: the launcher's `@`/`#` chips and Context picker, and the right rail's file tree.
@@ -106,23 +144,16 @@ export function App() {
   // The cross-project "needs you" queue (#632): open PRs to review. Polled here in the shell so
   // the sidebar badge and the Overview card share one poll. Slow cadence — PRs change rarely and
   // each poll runs a git host read per project.
+  // The read as a whole goes to the notifier, which tells of every project's items whichever one
+  // is picked, and also needs to know which projects the poll actually reached before it calls
+  // anything "new" (#1625).
   const { value: interventionsRead } = usePolled<ProjectionRead<Intervention>>(onInterventions, EMPTY_INTERVENTIONS, 15000, [])
-  // The queue itself for every panel; the read as a whole for the notifier, which also needs to know
-  // which projects the poll actually reached before it calls anything "new" (#1625).
-  const interventions = interventionsRead.items
 
-  // The registered projects, for the browser-tab title (#695/U3) — the selected project's name
-  // plus the needs-you count drive `document.title` so a backgrounded tab tells you which project
-  // needs attention — and for the sidebar's Projects list. Polled rather than read once (#1500):
-  // each project carries what the daemon currently finds wrong with it, a state that appears and
-  // clears on the daemon's own minute cadence, so the sidebar dot and the project's banner have to
-  // follow it. Slow, and reloadable so adding a project from the sidebar's "New" reflects at once
-  // (bump the key).
-  const [projectsKey, setProjectsKey] = useState(0)
-  const { value: projects } = usePolled<ProjectSummary[]>(onProjects, EMPTY_PROJECTS, 30_000, [projectsKey])
   const project = projectId ? projects.find(p => p.id === projectId) : undefined
   const projectName = project?.name ?? null
-  useDocumentTitle(interventions.length, projectName)
+  // The Human Queue as the pages show it: the picked project's items, or every project's.
+  const interventions = scope ? interventionsRead.items.filter(item => item.projectId === scope) : interventionsRead.items
+  useDocumentTitle(interventions.length, projectName ?? projects.find(p => p.id === scope)?.name ?? null)
   // A URL naming a project that is not registered (renamed, removed, mistyped). A non-empty list
   // is the answer, so this never fires while the first read is still out.
   const unknownProject = projectId !== null && projects.length > 0 && !projects.some(p => p.id === projectId)
@@ -141,10 +172,9 @@ export function App() {
   const { value: activity } = usePolled<ProjectionRead<Activity>>(browserActivity ? onActivity : null, EMPTY_ACTIVITY, 15000, [browserActivity])
   useActivityNotifications(activity, browserActivity)
 
-  // The shared sidebar's recents on the Overview (#shared-shell): with no project selected the rail
-  // has no project runs to show, so it pools every project's sessions here. Polled only on the home
-  // route — a selected project's own `runs` (above) carry its rail.
-  const { value: recentAgents } = usePolled<RecentAgent[]>(projectId === null ? onRecentAgents : null, EMPTY_RECENT, 10_000, [projectId])
+  // The shared sidebar's recents when all projects show (#shared-shell): the rail pools every
+  // project's sessions here. Polled only then — a picked project's own agents (above) carry its rail.
+  const { value: recentAgents, reload: reloadRecent } = usePolled<RecentAgent[]>(scope === null ? onRecentAgents : null, EMPTY_RECENT, 10_000, [scope])
 
   // An agent just started in `inProject`, which is not always the selected one: the onboarding
   // checklist starts one from the Overview and the settings page, where nothing is selected (#1169).
@@ -161,6 +191,7 @@ export function App() {
     go({ projectId: inProject, agentId: startedId })
     // The new agent just appends to the rail; reload so its real row shows up quickly.
     reload()
+    reloadRecent()
   }
 
   /** The same, for the surfaces that start an agent inside the selected project. */
@@ -281,7 +312,7 @@ export function App() {
       return <SettingsPage onAgentStarted={agentStarted} onSelectProject={selectProject} onDone={showDashboard} />
     if (pageSegment) {
       if (modulePage)
-        return <ModulePageView page={modulePage} projects={projects} path={route.pagePath ?? []} />
+        return <ModulePageView page={modulePage} projects={scopedProjects} path={route.pagePath ?? []} />
       // Not loaded yet is not "no such page": the modules are imported after the first read.
       if (!modulesLoaded) return null
       return (
@@ -301,6 +332,7 @@ export function App() {
           onAgentStarted={agentStarted}
           interventions={interventions}
           projects={projects}
+          scope={scope}
         />
       )
     if (unknownProject)
@@ -316,6 +348,8 @@ export function App() {
       return (
         <ProjectHome
           projectId={projectId}
+          projectName={projectName}
+          scope={scope}
           events={events}
           onAgentStarted={onAgentStarted}
           files={files}
@@ -400,9 +434,13 @@ export function App() {
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <AgentHistory
           projectId={projectId}
+          scope={scope}
+          onScope={selectScope}
+          homeHref={formatRoute({ projectId: null, agentId: null, ...(scope ? { scope } : {}) })}
           agents={agents}
           selectedAgentId={agentId}
-          onSelect={selectAgent}
+          // A row of the picked project's list opens in that project, whichever page is showing.
+          onSelect={id => go({ projectId: scope ?? projectId, agentId: id })}
           recentAgents={recentAgents}
           onSelectRecent={selectAgentInProject}
           projects={projects}
@@ -416,7 +454,6 @@ export function App() {
           startId={agentStart.id}
           working={working}
           onDashboard={showDashboard}
-          onSelectProject={selectProject}
           onSettings={showSettings}
           pages={modulePages}
           activePage={pageSegment}

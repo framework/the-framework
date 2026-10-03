@@ -1,4 +1,4 @@
-The project home [1]: a project's own page, one scrolling column that stacks the project's actions, the daemon's current complaint about the project, the launcher [2], an overview of the project's agents [3], every open question [4] across projects, and the project's docs. The page is never taken over by an agent: starting one adds the agent to the rail and opens its agent view [5] alongside, while this page stays put so the user can launch again.
+The project home [1]: a project's own page, one scrolling column that stacks the project's actions, the daemon's current complaint about the project, the launcher [2], an overview of the project's agents [3], the open questions [4], every project's or only the picked project's when one is picked in the sidebar's project select, and the project's docs. The page is never taken over by an agent: starting one adds the agent to the rail and opens its agent view [5] alongside, while this page stays put so the user can launch again.
 
 ## Glossary
 
@@ -12,9 +12,9 @@ The project home [1]: a project's own page, one scrolling column that stacks the
 
 ## Business logic — TL;DR
 
-- **The project's actions first** (`ProjectActions.tsx`) - the row of actions on the project itself sits at the top.
+- **The project's name and actions first** (`ProjectActions.tsx`) - the row with the project's name and the actions on the project itself sits at the top.
 - **The error banner above the launcher** (`ProjectErrorBanner.tsx`) - what the daemon currently finds wrong with the project is shown before the Start form, so nobody starts an agent [3] on a project whose `agent-data` branch [6] cannot reach the remote without seeing it: such an agent would work from stale tickets and fill a queue nobody else will see.
 - **The launcher** (`StartAgentForm.tsx`) - the Start form, given the project's file list for the `#` picker and the Context [7] with its edits, which the shell owns and shares with the right rail's file tree; the id of a started agent is carried up to the shell so it can land on that agent.
 - **The agents overview** (`AgentOverview.tsx`) - shown only when the project has events to build it from.
-- **Open questions** (`OpenQuestions.tsx`) - every open question [4] across all projects, answerable here; opening one may switch to another project's agent.
+- **Open questions** (`OpenQuestions.tsx`) - every open question [4] across all projects, answerable here; opening one may switch to another project's agent. With a project picked in the sidebar's project select, only that project's questions show.
 - **Docs** (`ProjectDocs.tsx`) - the project's docs panel, shown in this column rather than in the right rail while this page is open.

@@ -1,4 +1,4 @@
-The dashboard's left column, present on every page: the brand mark, the "New agent" button, the "Overview" destination, one row per page the installed modules [15] add, the "Projects" destination, the "Recent agents" list, and a footer with the connection indicator, the theme toggle, the notifications menu and "Settings". The list shows a project's own agents [1] when a project is selected, and every project's agents pooled newest-first on the Overview [2], in both cases with a main agent's subagents [16] folded under it; each row says in one word what its agent is doing, when it started, where it runs and which coding agent [3] runs it, and a stand-in row says "starting…" for a just-started agent until its own row lands.
+The dashboard's left column, present on every page: the brand mark, the project select, which picks the one project every page shows, the "New agent" button, the "Overview" destination, one row per page the installed modules [15] add, the "Recent agents" list, and a footer with the connection indicator, the theme toggle, the notifications menu and "Settings". The list shows the picked project's [17] own agents [1], and every project's agents pooled newest-first when no project is picked, in both cases with a main agent's subagents [16] folded under it; each row says in one word what its agent is doing, when it started, where it runs and which coding agent [3] runs it, and a stand-in row says "starting…" for a just-started agent until its own row lands.
 
 ## Context
 
@@ -20,17 +20,18 @@ The dashboard's left column, present on every page: the brand mark, the "New age
 [14] driver: a coding agent wrapped as a black box. The user's driver choice is `claude-code` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [15] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [16] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent.
+[17] picked project: the one project the project select, the menu at the top of this column, names. Every page then shows only that project's data. When the select says "All projects", no project is picked and every page shows every project's data.
 
 ## Business logic — TL;DR
 
-- **One column on every page** - brand mark, the navigation group, the agents list and the footer controls, in a fixed-width column that never disappears, on the Overview and on an agent's page alike.
-- **"New agent"** - starts an agent where it can: in the open project, in the only project, from a picker when there are several, or, with no project at all, by offering to add one first.
+- **One column on every page** - brand mark, the project select, the navigation group, the agents list and the footer controls, in a fixed-width column that never disappears, on the Overview and on an agent's page alike.
+- **"New agent"** - starts an agent where it can: in the picked project [17], in the only project, from a picker when there are several and none is picked, or, with no project at all, by offering to add one first.
 - **"Overview" and the modules' pages** - the cross-project destinations, "Overview" carrying the count of items in the "Human Queue", then one row per page a module [15] adds, labelled by the module (the tickets' page among them, when a package brings one); only the current view carries the active fill, never two.
-- **"Projects"** - an expandable list of every registered project with a dot saying whether it is activated or in error, the error named on hover, and an "Add project" entry at its end.
-- **Which agents are listed** - a selected project's own agents, or on the Overview every project's recent agents pooled, each row naming its project; "No agents yet." when there is nothing.
+- **The project select** - at the top, above a rule: the picked project [17] or "All projects", applying to everything under it.
+- **Which agents are listed** - the picked project's [17] own agents, or with none picked every project's recent agents pooled, each row naming its project; "No agents yet." when there is nothing.
 - **Subagents under their main agent** - the list is a tree one level deep: a subagent [16] whose main agent is in the list sits under it, in a list that is open by itself while a subagent is working, waiting or the one selected, and folded otherwise; the main agent's row carries the count of its subagents on its first line, and a click on the count opens or folds the list without opening the agent, the user's choice winning from then on. A main agent that is `done` reads "running" while one of its subagents in the list still holds its job.
 - **The starting row** - a dimmed "starting…" stand-in appears once a start reports its agent's id, unless the list already holds that agent, and retires when that agent lands, whatever its status, or after 20 seconds without it.
-- **Which row is highlighted** - the selected agent's row, or the newest running agent's row while following a just-started agent, or the stand-in while the selected agent's row has not landed; nothing on the Overview.
+- **Which row is highlighted** - the selected agent's row, or the newest running agent's row while following a just-started agent, or the stand-in while the selected agent's row has not landed.
 - **What a row shows** - one status word with a dot, the project and the relative start time, the agent's title, and a cluster of glyphs for another machine's daemon, a device, a cloud session and the coding agent.
 - **The status word** - "waiting", "in cloud", "merged", "saving…" or the stored status, ranked so a row never says "done" about work still moving and never says "in cloud" about work that landed.
 - **Long titles** - a title that overflows the column fades at its end and shows the full text on hover; one that fits gets no tooltip.
@@ -45,7 +46,7 @@ See `## Context`.
 
 #### Business logic
 
-The column holds, top to bottom: the brand mark and word mark, which lead to the Overview [2] and animate while any agent [1] is working; the "New agent" button; the "Overview" row; one row per module page; the "Projects" row; the scrolling "Recent agents" list under a heading that stays pinned at the top of the scroll and is shown even when the list is empty, so "No agents yet." reads as the state of this list; and a footer with the connection indicator (which daemon this dashboard talks to), the theme toggle, the notifications menu (`NotificationsMenu.tsx`), and a gear button whose hover and accessible name read "Settings" and which opens the Settings page.
+The column holds, top to bottom: the brand mark and word mark, which lead to the Overview [2], keeping the picked project [17], and animate while any agent [1] is working; the project select; a rule; the "New agent" button; the "Overview" row; one row per module page; the scrolling "Recent agents" list under a heading that stays pinned at the top of the scroll and is shown even when the list is empty, so "No agents yet." reads as the state of this list; and a footer with the connection indicator (which daemon this dashboard talks to), the theme toggle, the notifications menu (`NotificationsMenu.tsx`), and a gear button whose hover and accessible name read "Settings" and which opens the Settings page.
 
 ### "New agent"
 
@@ -57,9 +58,9 @@ The column holds, top to bottom: the brand mark and word mark, which lead to the
 
 One button, always labeled "New agent" with a plus icon, whose behavior depends on the page:
 
-- With a project selected, or on the Overview [2] with exactly one registered project: starting opens that project's launcher [5] at once.
-- On the Overview with no registered project: there is nowhere to run an agent, so the hover reads "Add a project to start an agent" and the click opens the add-project panel (`AddProjectPanel.tsx`); once a project is added the caller refreshes its project list.
-- On the Overview with several projects: the button opens a picker listing every project by name, each with a dot that is filled when the project is activated and muted otherwise; picking one opens that project's launcher.
+- With a project picked [17], or with exactly one registered project: starting opens that project's launcher [5] at once.
+- With no registered project: there is nowhere to run an agent, so the hover reads "Add a project to start an agent" and the click opens the add-project panel (`AddProjectPanel.tsx`); once a project is added the caller refreshes its project list.
+- With several projects and none picked, on a project's own page too: the button opens a picker listing every project by name, each with a dot that is filled when the project is activated and muted otherwise; picking one opens that project's launcher.
 
 The button carries the active fill only when the project's launcher is the current view: a project selected, no agent picked, not following a just-started agent. Elsewhere it is plain, because "New agent" is an action, not a place.
 
@@ -75,19 +76,15 @@ The button carries the active fill only when the project's launcher is the curre
 - Below "Overview", one row per page the installed modules [15] add, in the order the shell hands them, each with the module's own label and icon (a generic blocks icon when the module gives none); a row opens its page and is the active one while that page is current.
 - All of these rows correspond to pages with no project selected, so "Overview" is the active one only when no module's page is current. The dashboard has no row of its own for tickets: the tickets' page is the tickets package's module's, listed here like any other module page.
 
-### "Projects"
+### The project select
 
 #### Context
 
-**User story**: the user switches project from the column, sees at a glance which projects are activated and which one the daemon has trouble with, and registers a new project from the same list.
+**User story**: the user picks, at the very top of the column, the one project the whole dashboard is about, or all of them. The pick is set apart from the rows under it, because it applies to every one of them. The menu, `ProjectSelect.tsx`, says which projects are activated and which one the daemon has trouble with, and registers a new project.
 
 #### Business logic
 
-The "Projects" row starts collapsed; opening it reveals an indented list under a connecting rule:
-
-- "No projects yet" when none is registered.
-- One entry per project, by name, with a dot in front: red when the daemon has recorded an error for the project, filled when the project is activated, muted otherwise. Hovering the dot reads "activated" or "not activated", or, in error, one line per error as "<what is wrong>: <the daemon's message>", where what is wrong is the error's title from `ProjectErrorBanner.tsx` (for a data-branch sync failure, "Not syncing with the remote"). A screen reader hears "Error: ", "Activated: " or "Not activated: " before the name. Selecting an entry navigates into that project; the selected project's entry carries the active fill.
-- "Add project" at the end opens the add-project panel (`AddProjectPanel.tsx`); once a project is added, the caller refreshes its list.
+The brand mark and the project select sit above a rule that separates them from the rest of the column. The select is a button showing the picked project's [17] name with its dot, or "All projects" when none is picked. What its menu lists and what a pick does are in `ProjectSelect.tsx`; what the pick changes on the pages is the caller's, `App.tsx`.
 
 ### Which agents are listed
 
@@ -97,7 +94,7 @@ See `## Context`.
 
 #### Business logic
 
-With a project selected, the list holds that project's own agents [1], in the order the caller gives them, newest first. On the Overview [2], the list holds every project's recent agents pooled, newest first, and each row's second line leads with its project's name, except a subagent's [16] under its main agent; selecting a pooled row jumps into that project and that agent, so both the project and the agent change at once. When neither the list nor the starting row has anything to show, "No agents yet." is shown under the heading.
+With a project picked [17], the list holds that project's own agents [1], in the order the caller gives them, newest first. With none picked, on every page, the list holds every project's recent agents pooled, newest first, and each row's second line leads with its project's name, except a subagent's [16] under its main agent; selecting a pooled row jumps into that project and that agent, so both the project and the agent change at once. When neither the list nor the starting row has anything to show, "No agents yet." is shown under the heading.
 
 ### Subagents under their main agent
 
@@ -109,7 +106,7 @@ With a project selected, the list holds that project's own agents [1], in the or
 
 #### Business logic
 
-The list, a project's own or the Overview's [2] pooled one, is shown as a tree one level deep (the rule in `lib/subagents.ts`): a subagent whose main agent is in the list sits under that main agent, oldest first, and no longer has a row of its own in the list's order; on the Overview the main agent is looked for among the same project's rows. A subagent whose main agent is not in the list, and an agent started for a subagent, are ordinary rows.
+The list, a project's own or the pooled one, is shown as a tree one level deep (the rule in `lib/subagents.ts`): a subagent whose main agent is in the list sits under that main agent, oldest first, and no longer has a row of its own in the list's order; in the pooled list the main agent is looked for among the same project's rows. A subagent whose main agent is not in the list, and an agent started for a subagent, are ordinary rows.
 
 Under a main agent's row that has subagents:
 
@@ -129,7 +126,7 @@ A main agent never waits in a process: it ends its turn after starting its subag
 
 #### Business logic
 
-Once the start reports the new agent's id, a dimmed stand-in row is shown at the top of the list: a pulsing dot, the badge "running", the subtitle "starting…", and as its title the prompt the user typed (or "New agent" when there was none). Clicking it goes to the project's launcher [5]. It is shown only within a project, never on the Overview [2], and never while an agent is already running.
+Once the start reports the new agent's id, a dimmed stand-in row is shown at the top of the list: a pulsing dot, the badge "running", the subtitle "starting…", and as its title the prompt the user typed (or "New agent" when there was none). Clicking it goes to the project's launcher [5]. It is shown in the picked project's [17] list and in the pooled one alike, and never while an agent in the list is already running. Picking another project drops it.
 
 The stand-in retires the moment the list holds the agent with the id the start reported, whatever status that agent landed in: an agent that starts and fails inside one polling interval is never once seen running, and it still counts as the handover. When the list already holds that agent as the start reports it, no stand-in is shown at all, so the agent never appears twice, running or ended. Any other agent in the list never counts. A start whose agent never appears is swept after 20 seconds with no running agent, so the column stops pretending; the launcher shows the actual error. Switching project drops the stand-in.
 
@@ -141,7 +138,7 @@ The stand-in retires the moment the list holds the agent with the id the start r
 
 #### Business logic
 
-Within a project, a row is highlighted when it is the selected agent's. The stand-in is highlighted while the selected agent's own row has not landed in the list yet. On the Overview [2] nothing is highlighted, since a row there navigates into its project.
+A row is highlighted when it is the selected agent's; in the pooled list, when it is that agent of the project whose page is open. The stand-in is highlighted while the selected agent's own row has not landed in the list yet.
 
 ### What a row shows
 
@@ -157,7 +154,7 @@ The first line, left to right:
 
 - a dot, only while the agent is running or waiting: pulsing in the primary color while it is working, still and muted while it waits for the user's answer; and, while the agent is saving [7], a pulsing green dot instead, the same window the agent's own status pill calls "saving…";
 - the status word (next section), in uppercase, colored by the stored status when it is the word (primary for running, green for done, amber for stopped, red for failed), muted when waiting or saving, primary for "in cloud", green for "merged";
-- the subtitle: on the Overview [2], "<project name> · <when it started>"; within a project, and for a subagent [16] under its main agent, just when it started, as "just now", "<N>m ago", "<N>h ago", "<N>d ago" up to a week, and the local date beyond it (the rule in `lib/format-date.ts`);
+- the subtitle: in the pooled list, "<project name> · <when it started>"; in a picked project's [17] list, and for a subagent [16] under its main agent, just when it started, as "just now", "<N>m ago", "<N>h ago", "<N>d ago" up to a week, and the local date beyond it (the rule in `lib/format-date.ts`);
 - at the right end, a cluster of small glyphs, each with a hover: on a main agent's row, first the count of its subagents [16] (see "Subagents under their main agent"); a laptop glyph named "Started on <host>" with the hover "Started on <host>, by that machine's daemon." when another machine's daemon started the agent, since the shared record lists every machine's agents here; a device glyph named "Runs on <device>" (or "Runs on a connected device" when the device has no label) when the agent is relayed [13]; a cloud glyph named "Runs as a Claude Code cloud session" with the hover "Runs as a Claude Code cloud session; it works and opens its PR over there." for a web agent; and the coding agent's logo, named "Claude Code" or "Codex". The logo names the driver [14] the agent recorded, and every surface Claude runs on — the local CLI, the cloud session, the Actions runner — is still "Claude Code": where it runs is the glyph beside it, not the logo.
 
 The second line is the title: what the user typed as the prompt; failing that, the branch itself; failing that, the moment it started as a short local date and time (the rule in `lib/agent-label.ts`). A subagent's [16] row under its main agent shows only the first line of that.

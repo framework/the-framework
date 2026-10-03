@@ -8,7 +8,6 @@ import {
   bucketUnionRange,
   defaultView,
   hasAnyFilter,
-  projectFacetCounts,
   rangeFacetCounts,
   sortByKey,
   stageFacetCounts,
@@ -203,15 +202,12 @@ const DIR_LABELS: Record<SortKey, Record<'asc' | 'desc', string>> = {
 export function TicketFilterBar({
   view,
   rows,
-  projects,
   onChange,
 }: {
   /** The page's viewing state; every control edits a copy and hands it back. */
   view: TicketsView
   /** The full unfiltered pool, for the option counts. */
   rows: TicketRow[]
-  /** The registered projects, for the Project facet (rendered only when there are two or more). */
-  projects: { id: string; name: string }[]
   onChange: (next: TicketsView) => void
 }) {
   const f = view.filters
@@ -239,7 +235,6 @@ export function TicketFilterBar({
   const notLinked = unlinkedCount(rows, f)
   const anyEffort = rows.some(r => r.ticket.effort !== undefined)
   const anyUncertainty = rows.some(r => r.ticket.uncertainty !== undefined)
-  const projectCounts = projects.length > 1 ? projectFacetCounts(rows, f) : {}
   const filtered = hasAnyFilter(f)
 
   return (
@@ -324,20 +319,6 @@ export function TicketFilterBar({
           counts={rangeFacetCounts(rows, f, 'uncertainty', UNCERTAINTY_BUCKETS)}
           onChange={uncertainty => set({ uncertainty })}
         />
-      )}
-
-      {projects.length > 1 && (
-        <CheckFacet label="Project" active={f.projects.length}>
-          {projects.map(project => (
-            <OptionRow
-              key={project.id}
-              label={project.name}
-              count={projectCounts[project.id] ?? 0}
-              checked={f.projects.includes(project.id)}
-              onChange={() => set({ projects: toggled(f.projects, project.id) })}
-            />
-          ))}
-        </CheckFacet>
       )}
 
       {(notLinked > 0 || f.unlinked) && (

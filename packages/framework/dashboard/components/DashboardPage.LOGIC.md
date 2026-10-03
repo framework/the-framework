@@ -1,4 +1,4 @@
-The Overview [1], the dashboard's landing page shown while no project is selected: an at-a-glance board of the onboarding checklist until it is dismissed, the quota [2] first, then side by side the "Human Queue" of interventions [3] only a person can clear and, stacked beside it, the agents [4] working now over the cards the installed packages declare (the queue package's "AI Queue", the tickets package's "Hot tickets", the scheduler package's "Scheduler", each a package's own summary of its data). The board's agents are re-read from the daemon every five seconds; the interventions arrive from the shell, the same set that fires the notifications. Every row jumps into its project, its agent or its pull request.
+The Overview [1], the dashboard's landing page: an at-a-glance board of the onboarding checklist until it is dismissed, the quota [2] first, then side by side the "Human Queue" of interventions [3] only a person can clear and, stacked beside it, the agents [4] working now over the cards the installed packages declare (the queue package's "AI Queue", the tickets package's "Hot tickets", the scheduler package's "Scheduler", each a package's own summary of its data). The board's agents are re-read from the daemon every five seconds; the interventions arrive from the shell, the same set that fires the notifications. Every row jumps into its project, its agent or its pull request. With one project picked in the sidebar's project select, the "Human Queue", the agents working now and the packages' cards show that project's only; the quota card stays the account's.
 
 ## Context
 
@@ -15,7 +15,7 @@ The Overview [1], the dashboard's landing page shown while no project is selecte
 ## Business logic — TL;DR
 
 - **The board's order** - onboarding checklist (until dismissed), the quota card, then the "Human Queue" beside the "Agents" card stacked on the cards the installed packages declare (`ModuleCards.tsx`, in their declared order).
-- **The Human Queue** - the interventions across every project, three kinds of row: "Awaiting" opens the agent parked on a gate, "Not published" opens the agent whose commits have not left the machine, and a pull request row opens it on the git host; "AI doesn't need you." when empty.
+- **The Human Queue** - the interventions across every project, or the picked project's only, three kinds of row: "Awaiting" opens the agent parked on a gate, "Not published" opens the agent whose commits have not left the machine, and a pull request row opens it on the git host; "AI doesn't need you." when empty.
 - **Dismissing the checklist** - hides it on the Overview only; the Settings page keeps it.
 
 ## Business logic
@@ -28,7 +28,7 @@ See `## Context`.
 
 #### Business logic
 
-From top to bottom: the onboarding checklist while it is not dismissed (`OnboardingChecklist.tsx`); the quota [2] card, first because it is the one figure that governs everything an agent [4] may do next (`Quota.tsx`, given the registered projects, for the stop line an installed package may put on its bar); then two columns: the "Human Queue" on the left, and on the right the "Agents" card (`Agents.tsx`) over the cards the installed packages declare (`ModuleCards.tsx`: each package's own card, drawn only where a project has the package, reading through the package's own command). The working agents come from one daemon read that is repeated every five seconds; until the first read answers, the "Agents" card shows its loading state. An agent started from the checklist lands the user on that agent.
+From top to bottom: the onboarding checklist while it is not dismissed (`OnboardingChecklist.tsx`); the quota [2] card, first because it is the one figure that governs everything an agent [4] may do next (`Quota.tsx`, given every registered project whichever one is picked, for the stop line an installed package may put on its bar); then two columns: the "Human Queue" on the left, and on the right the "Agents" card (`Agents.tsx`) over the cards the installed packages declare (`ModuleCards.tsx`: each package's own card, drawn only where a project has the package, reading through the package's own command, and given the picked project alone when one is picked). The working agents come from one daemon read that is repeated every five seconds, and with a project picked only that project's are listed; until the first read answers, the "Agents" card shows its loading state. An agent started from the checklist lands the user on that agent.
 
 ### The Human Queue
 

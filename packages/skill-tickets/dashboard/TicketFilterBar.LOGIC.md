@@ -1,4 +1,4 @@
-The toolbar above the dashboard's Tickets list at `/tickets`: a search box, one button per facet the backlog can be narrowed by (priority, topics, planning stage, effort, uncertainty, project, and tickets with no issue link), a way to clear every filter, and a menu that sets the sort order and whether the list is grouped by project. Every control hands the page a whole new viewing state, which the page writes into its address; what each filter actually hides, and how the address spells it, is decided by the rules in `lib/ticket-filter.ts`.
+The toolbar above the dashboard's Tickets list at `/tickets`: a search box, one button per facet the backlog can be narrowed by (priority, topics, planning stage, effort, uncertainty, and tickets with no issue link), a way to clear every filter, and a menu that sets the sort order and whether the list is grouped by project. Every control hands the page a whole new viewing state, which the page writes into its address; what each filter actually hides, and how the address spells it, is decided by the rules in `lib/ticket-filter.ts`.
 
 ## Context
 
@@ -16,7 +16,7 @@ The toolbar above the dashboard's Tickets list at `/tickets`: a search box, one 
 - **Search** - one box matching every word against a ticket's title, summary, file name and topics, focusable from anywhere on the page with the `/` key.
 - **What every option counts** - an option's count is how many tickets it would show under the other filters, ignoring its own facet's current selection.
 - **The numeric facets** - priority, effort and uncertainty each offer three named spans, a fine-grained range, and "names no value", the spans and the range being two ways to say one thing.
-- **Topics, stage and project** - three plain option lists, each shown only when it has something to say.
+- **Topics and stage** - two plain option lists, each shown only when it has something to say.
 - **Tickets linked to no issue** - one toggle for the tickets written here rather than imported.
 - **Clearing the filters** - one button, shown only while something is filtered, resetting the filters and leaving the sort and the grouping alone.
 - **Sort and grouping** - one menu: the sort key, the direction spelled out in the key's own words, and whether the list is grouped by project.
@@ -70,18 +70,17 @@ The "names no value" row appears only when at least one ticket names no value, o
 
 The priority facet is always offered. The effort and uncertainty facets are offered only when at least one ticket anywhere names that value, or when the facet is already filtering: before any ticket has a plan, there is nothing to filter by.
 
-### Topics, stage and project
+### Topics and stage
 
 #### Context
 
-**User story**: the user narrows to an area of the product by topic, to a step of the pipeline by stage — what still has no plan, what is planned, what an agent [1] is already holding — or, with several projects registered, to one project's tickets.
+**User story**: the user narrows to an area of the product by topic, to a step of the pipeline by stage — what still has no plan, what is planned, what an agent [1] is already holding. Narrowing to one project is done in the dashboard's project select, at the top of its sidebar, not here.
 
 #### Business logic
 
-Three facets that are plain lists of options with counts:
+Two facets that are plain lists of options with counts:
 - "Topics": one option per topic in the backlog, lowercased, most common first and alphabetically within an equal count, so the busy tags lead. A picked topic stays listed even when the other filters leave it at zero, or the user could not unpick it. Last, a "No topics" option for the tickets that name none, offered only when some ticket does name none or the clause is already on. The facet as a whole is offered only when it has something to list: at least one topic, or at least one ticket with none.
 - "Stage": exactly three options, "Unplanned", "Planned" and "Claimed". Claimed means an agent [1] holds the ticket's claim [2], whether to plan it or to implement it, which is why it composes with the other two rather than excluding them.
-- "Project": one option per registered project, by name. It is offered only when two or more projects are registered, since with one project every ticket is that project's.
 
 Picking several options within one facet widens the list; the facets narrow each other.
 
@@ -103,7 +102,7 @@ A "Not linked" toggle, carrying the count of tickets with no issue link, narrows
 
 #### Business logic
 
-A "Clear" button appears as soon as any filter is active — a non-blank search, any numeric clause, any topic, any stage, any project, or the "Not linked" toggle — and resets every one of them at once. The sort order and the grouping are a viewing preference rather than a filter: they reorder, never hide, so "Clear" leaves them as they are.
+A "Clear" button appears as soon as any filter is active — a non-blank search, any numeric clause, any topic, any stage, or the "Not linked" toggle — and resets every one of them at once. The sort order and the grouping are a viewing preference rather than a filter: they reorder, never hide, so "Clear" leaves them as they are.
 
 ### Sort and grouping
 

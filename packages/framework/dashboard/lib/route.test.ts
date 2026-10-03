@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseRoute, formatRoute } from './route.js'
+import { parseRoute, formatRoute, keepPageQuery } from './route.js'
 
 describe('parseRoute', () => {
   it('reads the Overview from the root', () => {
@@ -97,5 +97,41 @@ describe('formatRoute', () => {
     expect(parseRoute('/my-repo')).toEqual({ projectId: 'my-repo', agentId: null })
     expect(parseRoute('/settings')).toEqual({ view: 'settings', projectId: null, agentId: null })
     expect(formatRoute({ projectId: null, agentId: null, page: 'logs' })).toBe('/logs')
+  })
+})
+
+describe('the picked project (#1513)', () => {
+  it('reads `?project=` on the Overview, a module\'s page and Settings', () => {
+    expect(parseRoute('/?project=app-a1')).toEqual({ projectId: null, agentId: null, scope: 'app-a1' })
+    expect(parseRoute('/logs/x?project=app-a1')).toEqual({ projectId: null, agentId: null, page: 'logs', pagePath: ['x'], scope: 'app-a1' })
+    expect(parseRoute('/settings?project=app-a1')).toEqual({ view: 'settings', projectId: null, agentId: null, scope: 'app-a1' })
+  })
+
+  it('reads none when the parameter is absent or empty', () => {
+    expect(parseRoute('/?other=1')).toEqual({ projectId: null, agentId: null })
+    expect(parseRoute('/logs?project=')).toEqual({ projectId: null, agentId: null, page: 'logs', pagePath: [] })
+  })
+
+  it('on a project\'s own page, the picked project is that project, whatever the parameter says', () => {
+    expect(parseRoute('/app-a1/run-1?project=other-b2')).toEqual({ projectId: 'app-a1', agentId: 'run-1', scope: 'app-a1' })
+    expect(formatRoute({ projectId: 'app-a1', agentId: null, scope: 'other-b2' })).toBe('/app-a1?project=app-a1')
+    expect(parseRoute('/app-a1')).toEqual({ projectId: 'app-a1', agentId: null })
+  })
+
+  it('writes it after the path, encoded, and round-trips', () => {
+    expect(formatRoute({ projectId: null, agentId: null, scope: 'a b-1' })).toBe('/?project=a%20b-1')
+    expect(formatRoute({ view: 'settings', projectId: 'stale-1', agentId: null, scope: 'app-a1' })).toBe('/settings?project=app-a1')
+    for (const route of [
+      { projectId: null, agentId: null, scope: 'app-a1' },
+      { projectId: 'app-a1', agentId: 'run-1', scope: 'app-a1' },
+      { projectId: null, agentId: null, page: 'logs', pagePath: ['x', 'y'], scope: 'app-a1' },
+    ])
+      expect(parseRoute(formatRoute(route))).toEqual(route)
+  })
+
+  it('keeps what a page mirrored into the query, and replaces only the picked project', () => {
+    expect(keepPageQuery('/tickets?project=app-a1', '?q=races&project=old-b2')).toBe('/tickets?q=races&project=app-a1')
+    expect(keepPageQuery('/tickets', '?q=races&project=old-b2')).toBe('/tickets?q=races')
+    expect(keepPageQuery('/', '?project=old-b2')).toBe('/')
   })
 })

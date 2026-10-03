@@ -9,3 +9,4 @@ What the tests cover:
 - **The jump list** - absent with one question; with several, one row per question labeled by agent, and clicking a row scrolls its card into view.
 - **Answering collapses in place** - after a pick the live options are gone, the card is a single line with "Expand", the title stays visible and the heading count drops to 0; "Expand" shows the options with the pick marked and "Open session →" still opens the agent; "Collapse" hides them again.
 - **A failed post** - the failure's message is shown, the gate stays open and the heading still counts it.
+- **One project's questions** - given a project, the section shows and counts only that project's questions, and is absent when that project has none while another has.

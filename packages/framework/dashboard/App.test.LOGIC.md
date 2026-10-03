@@ -7,3 +7,8 @@ Covered:
 - A package's card is drawn on the Overview, given the projects that have the package, inside a host bound to the package.
 - Cards come out by their order, then by package name; a card that throws shows only its own error line, and the other cards still render.
 - A card's `startRun` with `land: false` starts the run and leaves the address on the Overview; without it the dashboard lands on the run.
+- With no project picked, the Overview's cards, "Human Queue" and working agents and the sidebar's agents are every project's; picking a project in the project select moves the address to `/?project=<id>` and each of them, and the tab title, shows that project's only.
+- The pick stays in the address when a module's page or Settings opens, the module's page is given the picked project alone, and a row of the sidebar's list opens that project's agent.
+- With a project picked, "New agent" opens its launcher; picking another project there opens that project's launcher, and picking "All projects" keeps the page.
+- With no project picked the sidebar lists every project's agents on an agent's page too; picking another project on an agent's page goes to the Overview; on a module's page it drops the segments after the page's word, and keeps the page's own query parameters when there are no such segments, as "All projects" does.
+- A `?project=` naming no registered project picks nothing.

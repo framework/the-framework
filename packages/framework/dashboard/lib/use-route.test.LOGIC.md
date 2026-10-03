@@ -4,4 +4,5 @@ What the tests cover:
 - **Navigating adds a history entry** - so Back returns to where the user came from.
 - **A correction replaces the current entry** - a navigation marked as a correction changes the address without adding a history entry.
 - **Going where you already are** - navigating to the address already shown adds no history entry.
+- **The picked project** - it is read off the address's query, and a navigation that changes it alone changes the address.
 - **Back and Forward** - the page follows the browser's own history moves and re-reads its selection from the address they land on.

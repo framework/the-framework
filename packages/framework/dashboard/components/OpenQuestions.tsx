@@ -34,12 +34,16 @@ interface Answered {
  * not accept any of them on its own.
  */
 export function OpenQuestions({
+  projectId = null,
   onOpenAgent,
 }: {
+  /** The one project whose questions show (#1513): the project picked in the sidebar; null shows every project's. */
+  projectId?: string | null
   /** Jump into the session a question belongs to — it may be another project's. */
   onOpenAgent: (projectId: string, agentId: string) => void
 }) {
-  const { value: questions, loaded } = usePolled<OpenQuestion[]>(onOpenQuestions, EMPTY_QUESTIONS, 5000, [])
+  const { value: polled, loaded } = usePolled<OpenQuestion[]>(onOpenQuestions, EMPTY_QUESTIONS, 5000, [])
+  const questions = projectId === null ? polled : polled.filter(q => q.projectId === projectId)
   const [answered, setAnswered] = useState<Map<string, Answered>>(() => new Map())
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
@@ -52,7 +56,7 @@ export function OpenQuestions({
   })
   const inPoll = new Set(rows.map(r => r.key))
   for (const [key, entry] of answered) {
-    if (!inPoll.has(key)) rows.push({ key, question: entry.question, answered: entry })
+    if (!inPoll.has(key) && (projectId === null || entry.question.projectId === projectId)) rows.push({ key, question: entry.question, answered: entry })
   }
 
   // No section at all when nothing is parked and nothing was just answered: an empty

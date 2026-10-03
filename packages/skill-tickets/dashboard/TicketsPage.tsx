@@ -72,7 +72,7 @@ export function TicketsPage({ projects }: { projects: ModuleProject[] }) {
   const setView = (next: TicketsView) => {
     setViewState(next)
     if (typeof window !== 'undefined') {
-      const qs = formatTicketsView(next)
+      const qs = formatTicketsView(next, window.location.search)
       window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''))
     }
   }
@@ -130,9 +130,6 @@ export function TicketsPage({ projects }: { projects: ModuleProject[] }) {
   // so the agent that works the entry writes the plan.
   const planAsks = (targets: { projectId: string; ticket: WorkspaceTicket }[]) => grouped(targets.map(({ projectId, ticket }) => ({ projectId, link: planLink(ticket) })))
 
-  // A project deselected in the Project facet disappears entirely — its section would otherwise
-  // just say "N hidden by filters", which is noise about a choice the reader made on purpose.
-  const shownGroups = view.filters.projects.length > 0 ? groups.filter(g => view.filters.projects.includes(g.projectId)) : groups
   const flatRows = sortRows(visible, view.sort)
 
   // The row selection (the list idiom of issue trackers): tick some rows and the queue buttons narrow to just
@@ -283,7 +280,6 @@ export function TicketsPage({ projects }: { projects: ModuleProject[] }) {
         <TicketFilterBar
           view={view}
           rows={rows}
-          projects={groups.map(g => ({ id: g.projectId, name: g.projectName }))}
           onChange={setView}
         />
       </div>
@@ -343,7 +339,7 @@ export function TicketsPage({ projects }: { projects: ModuleProject[] }) {
             </div>
           ) : (
             <div className="space-y-8">
-              {shownGroups.map(g => {
+              {groups.map(g => {
                 const groupRows = visible.filter(r => r.projectId === g.projectId)
                 const sorted = sortRows(groupRows, view.sort)
                 return (

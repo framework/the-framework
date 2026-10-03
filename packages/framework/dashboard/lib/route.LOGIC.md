@@ -1,4 +1,4 @@
-Makes the browser's address the dashboard's selection: the URL path alone says what the dashboard is looking at — the Overview [3], a project home [4], one agent view [5], Settings [6], or a page a module [8] adds — and this file reads a path into that selection and writes a selection back into a path. Because the selection is the address, a page is a link the user can paste, reload and open twice, and Back and Forward work without any extra bookkeeping.
+Makes the browser's address the dashboard's selection: the URL says what the dashboard is looking at. Its path names the page — the Overview [3], a project home [4], one agent view [5], Settings [6], or a page a module [8] adds — and its `project` query parameter names the one project every page shows. This file reads an address into that selection and writes a selection back into an address. Because the selection is the address, a page is a link the user can paste, reload and open twice, and Back and Forward work without any extra bookkeeping.
 
 ## Context
 
@@ -23,7 +23,8 @@ Makes the browser's address the dashboard's selection: the URL path alone says w
 - **Reserved words never collide with ids** - `settings` is the one reserved first segment, and only the exact word is reserved, because no project id can ever be that bare word; every other first segment without a dash names a module's page, since every project id has one, so the dashboard reserves nothing for any module's word, `tickets` included.
 - **Reading a path is lenient** - anything unparseable is the Overview, empty and extra segments are ignored, and a segment that cannot be percent-decoded is kept as typed.
 - **Writing a path** - the inverse of reading, with a view outranking stale ids, no agent without a project, and every segment percent-encoded so the path reads back to the same selection.
-- **What the path does not carry** - the query string is not part of the selection; a module's page may keep its own state there under its own rules.
+- **The picked project** - the query parameter `project` names the one project every page shows; on a project's own page it can only be that project.
+- **What else the query string carries** - nothing of the selection; a module's page may keep its own state there under its own rules, and a change of the picked project alone leaves that state in place.
 
 ## Business logic
 
@@ -85,12 +86,24 @@ Writing is the inverse of reading, with precedence rules for selections that car
 - A project with an agent id writes `/<project id>/<agent id>`; a project alone writes `/<project id>`.
 - Every segment is percent-encoded, so an id containing a space or a slash survives the round trip. Reading a written path gives back the selection it was written from.
 
-### What the path does not carry
+### The picked project
 
 #### Context
 
-**User story**: on the tickets page a module brings, the user narrows the list with filters, and the address reflects them so the filtered list can be shared; going back to the page restores the filters.
+**User story**: at the top of the sidebar the user picks one project, and every page shows that project alone; the address keeps the pick, so a copied link, a reload and Back all keep it too.
 
 #### Business logic
 
-Only the path is the selection. A module's page may mirror its own state, such as a list's filters, to the query string under its own rules; this file neither reads nor writes a query string, so such state never alters which page is selected.
+- `?project=<project id>` after any path names the picked project: the one project every page shows. Without the parameter, or with an empty one, no project is picked and every page shows every project.
+- On a project's own pages (`/<project id>` and `/<project id>/<agent id>`) the picked project is that project or none. Reading `/<a>?project=<b>` gives the picked project `<a>`, and writing a project's own page with any project picked writes its own id: a page of one project is never filtered to another.
+- The id is percent-encoded when written, and a written address reads back to the same selection and the same pick.
+
+### What else the query string carries
+
+#### Context
+
+**User story**: on the tickets page a module brings, the user narrows the list with filters, and the address reflects them so the filtered list can be shared; going back to the page restores the filters. Picking another project in the sidebar while on that page keeps the filters.
+
+#### Business logic
+
+Apart from `project`, nothing in the query string is the selection. A module's page may mirror its own state, such as a list's filters, to the other parameters under its own rules; this file reads none of them, so such state never alters which page is selected. A navigation writes an address without them. The one exception is a change of the picked project alone, which the caller asks to keep them: the new address is then the old one with only `project` replaced, or removed.

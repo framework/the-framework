@@ -60,4 +60,13 @@ describe('useRoute', () => {
     })
     expect(result.current.route).toEqual({ projectId: 'my-repo', agentId: null })
   })
+
+  it('reads the picked project off the query, and a change of it alone is a navigation (#1513)', () => {
+    at('/?project=my-repo')
+    const { result } = renderHook(() => useRoute())
+    expect(result.current.route).toEqual({ projectId: null, agentId: null, scope: 'my-repo' })
+    act(() => result.current.go({ projectId: null, agentId: null }))
+    expect(window.location.pathname + window.location.search).toBe('/')
+    expect(result.current.route).toEqual({ projectId: null, agentId: null })
+  })
 })

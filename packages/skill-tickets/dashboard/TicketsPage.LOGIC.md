@@ -1,4 +1,4 @@
-Shows the tickets of every project that has this package on one page, the module's Tickets page at `/tickets`: one backlog across projects, filtered, sorted and grouped by a view that lives in the page's address, with two heading buttons that hand every shown ticket (or every selected one), as a link [8], to the actions the installed modules [9] offer on links ("Add to queue" when a project has the queue package), either the ticket itself or the ask for its plan, and with each row offering to open the ticket, its plan, or the agent holding it, and to start an agent [1] on it.
+Shows the tickets of every project the dashboard hands it (every project that has this package, or the one picked in the dashboard's sidebar) on one page, the module's Tickets page at `/tickets`: one backlog across projects, filtered, sorted and grouped by a view that lives in the page's address, with two heading buttons that hand every shown ticket (or every selected one), as a link [8], to the actions the installed modules [9] offer on links ("Add to queue" when a project has the queue package), either the ticket itself or the ask for its plan, and with each row offering to open the ticket, its plan, or the agent holding it, and to start an agent [1] on it.
 
 ## Context
 
@@ -56,7 +56,7 @@ Before the first read succeeds the list area reads "Loading…". When no project
 
 The page's viewing state is one value: the filters, the sort (key and direction), and the grouping (by project or flat). On opening, the page reads it from the address's query string, and anything the query string does not say takes its default (no filter, newest first, grouped by project). The parsing and formatting rules, and which tokens the query string accepts, are in `lib/ticket-filter.ts`.
 
-Every change to the view rewrites the address in place: the address is replaced, not navigated to, so the browser's Back button steps over filter changes rather than through them, and the address stays copyable. Defaults are left out of the query string, so an untouched page stays at `/tickets`.
+Every change to the view rewrites the address in place: the address is replaced, not navigated to, so the browser's Back button steps over filter changes rather than through them, and the address stays copyable. Defaults are left out of the query string, so an untouched page stays at `/tickets`. Parameters of the address that are not the view's, the dashboard's `project` (the project picked in its sidebar) among them, are left as they are.
 
 "Clear filters" resets the filters only; the sort and the grouping are a viewing preference and stay.
 
@@ -68,7 +68,7 @@ See `## Context`.
 
 #### Business logic
 
-The filter bar (`TicketFilterBar.tsx`) sits under the heading and edits the view's filters; the rows it hides are decided by the rules in `lib/ticket-filter.ts`. The bar is offered the projects' names and every ticket, so its option counts reflect the whole backlog.
+The filter bar (`TicketFilterBar.tsx`) sits under the heading and edits the view's filters; the rows it hides are decided by the rules in `lib/ticket-filter.ts`. The bar is offered every ticket, so its option counts reflect the whole backlog.
 
 Two parts of a row filter on click, additively, so clicking a second one widens the selection instead of replacing it:
 - A row's topic badge adds that topic to the topic filter. The topic is lowercased on the way in, the one casing the filters hold, so a badge reading `UX` filters like `ux`. A topic already in the filter is not added twice.
@@ -82,7 +82,7 @@ Two parts of a row filter on click, additively, so clicking a second one widens 
 
 #### Business logic
 
-By default the page groups by project: one section per project, headed by the project's name, containing a project panel (`TicketsPanel.tsx`) with that project's shown tickets in the view's sort order. Each section is told how many of its own tickets the filters hide and, while any filter is active, given a way to clear the filters; how it shows both is the panel's business. A section is rendered for every project, even one with no tickets. A project deselected in the filter bar's project facet disappears entirely rather than staying as an empty section, since hiding it was the user's choice.
+By default the page groups by project: one section per project, headed by the project's name, containing a project panel (`TicketsPanel.tsx`) with that project's shown tickets in the view's sort order. Each section is told how many of its own tickets the filters hide and, while any filter is active, given a way to clear the filters; how it shows both is the panel's business. A section is rendered for every project, even one with no tickets.
 
 In flat mode (the address carries `group=none`), every shown ticket of every project is one list sorted as a single pool, and each row carries its project's name. No per-project import bar appears in flat mode; updating the tickets belongs to the project sections. Above the flat list, when a filter is active and hides at least one ticket: "N ticket hidden by the current filters." (or "N tickets …") with a "Clear filters" button. A flat list with nothing to show reads "No tickets in any project yet — group by project to import a project's issues." when no project has any ticket at all, and "No tickets match." otherwise.
 

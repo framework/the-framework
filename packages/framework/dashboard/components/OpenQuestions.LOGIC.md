@@ -1,4 +1,4 @@
-The "Waiting on you" section: every open question [1] across all projects, longest-waiting first, each rendered as the gate [2] card the agent [3] view itself shows and answerable in place — including questions a cloud session [7] is parked on, which are answered through the Claude web bridge [8]. An answered question collapses to one ✓ line and stays until the page is reloaded; nothing auto-accepts here.
+The "Waiting on you" section: every open question [1] across all projects, or only those of the project picked in the sidebar's project select when one is picked, longest-waiting first, each rendered as the gate [2] card the agent [3] view itself shows and answerable in place — including questions a cloud session [7] is parked on, which are answered through the Claude web bridge [8]. An answered question collapses to one ✓ line and stays until the page is reloaded; nothing auto-accepts here.
 
 ## Context
 
@@ -18,7 +18,7 @@ The "Waiting on you" section: every open question [1] across all projects, longe
 
 ## Business logic — TL;DR
 
-- **When the section exists** - the daemon's list of open questions [1] is re-read every 5 seconds; with nothing open and nothing just answered, no section at all.
+- **When the section exists** - the daemon's list of open questions [1] is re-read every 5 seconds, and narrowed to the picked project's when a project is picked; with nothing open and nothing just answered, no section at all.
 - **One card per question** - each card names the agent [3] and its project, offers "Open session →" into that agent, and shows the gate [2] card, which is never answered for the user.
 - **Answering** - a pick [4] is posted against the question's own project and agent (through the bridge [8] for a cloud session [7]); a failed post keeps the gate open with the reason shown.
 - **An answered question collapses and stays** - it becomes a ✓ line that expands to show the options with the pick marked, keeps "Open session →", and survives the daemon dropping the gate until the page is reloaded.

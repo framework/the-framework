@@ -119,13 +119,12 @@ describe('topics facet', () => {
   })
 })
 
-describe('project + unlinked facets', () => {
-  test('projects narrow by membership; unlinked keeps only tickets with no issue link', () => {
+describe('unlinked facet', () => {
+  test('unlinked keeps only tickets with no issue link', () => {
     const rows = [
       row('a.md', { issue: { label: '#1', url: 'https://x/1' } }, 'p1'),
       row('b.md', {}, 'p2'),
     ]
-    expect(filterRows(rows, filtersWith({ projects: ['p2'] })).map(r => r.ticket.file)).toEqual(['b.md'])
     expect(filterRows(rows, filtersWith({ unlinked: true })).map(r => r.ticket.file)).toEqual(['b.md'])
   })
 })
@@ -221,11 +220,19 @@ describe('URL codec', () => {
     view.filters.topics = ['dx', 'ux']
     view.filters.topicsNone = true
     view.filters.stage = ['unplanned', 'claimed']
-    view.filters.projects = ['p1']
     view.filters.unlinked = true
     view.sort = { key: 'priority', dir: 'asc' }
     view.group = 'none'
     expect(parseTicketsView(`?${formatTicketsView(view)}`)).toEqual(view)
+  })
+
+  test('parameters that are not the view\'s are kept as they are, and the view\'s own are replaced', () => {
+    const view = defaultView()
+    view.filters.q = 'races'
+    expect(formatTicketsView(view, '?project=app-a1&q=old&stage=planned')).toBe('project=app-a1&q=races')
+    expect(formatTicketsView(defaultView(), '?project=app-a1&sort=title')).toBe('project=app-a1')
+    // The dashboard's picked project is not a filter of the page's.
+    expect(parseTicketsView('?project=app-a1')).toEqual(defaultView())
   })
 
   test('a hand-typed URL is input: junk tokens are dropped, not thrown at', () => {

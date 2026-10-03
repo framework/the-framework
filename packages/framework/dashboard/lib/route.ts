@@ -1,5 +1,6 @@
 // The dashboard's address (#784): `/` is the Overview, `/{projectId}` a project's home/launcher,
-// `/{projectId}/{sessionId}` one session. The URL is the selection — what used to be three pieces
+// `/{projectId}/{sessionId}` one session. `?project={projectId}` on any of them is the one project
+// every page shows (#1513). The URL is the selection — what used to be three pieces
 // of React state guessing at each other, which is where the #761/#766/#768/#774 bugs came from.
 //
 // `sessionId` is the agent id (`AgentMeta.id`), not the agent's conversation id with its driver:
@@ -42,20 +43,53 @@ export interface Route {
   page?: string
   /** The segments after a module page's own, decoded: `/logs/a` carries `['a']`. */
   pagePath?: string[]
+  /**
+   * The one project every page shows (#1513), by id; absent when every project shows. Carried as
+   * `?project=<id>`. On a project's own pages it is that project or absent, never another one.
+   */
+  scope?: string
 }
 
-/** Read the route out of a path. Anything unparseable is the Overview, and extra segments are ignored. */
-export function parseRoute(pathname: string): Route {
+/** The query parameter that carries {@link Route.scope}. */
+const SCOPE_PARAM = 'project'
+
+/**
+ * Read the route out of a URL's path and query. Anything unparseable is the Overview, and extra
+ * segments are ignored. A project's own page scoped to another project is scoped to its own.
+ */
+export function parseRoute(url: string): Route {
+  const [pathname = '', search = ''] = url.split('?')
+  const scoped = new URLSearchParams(search).get(SCOPE_PARAM)
+  const scope = scoped ? { scope: scoped } : {}
   const segments = pathname.split('/').filter(Boolean).map(decodeSegment)
   const [first, second] = segments
-  if (first === SETTINGS_SEGMENT) return { view: 'settings', projectId: null, agentId: null }
-  if (!first) return { projectId: null, agentId: null }
-  if (isPageSegment(first)) return { projectId: null, agentId: null, page: first, pagePath: segments.slice(1) }
-  return { projectId: first, agentId: second ?? null }
+  if (first === SETTINGS_SEGMENT) return { view: 'settings', projectId: null, agentId: null, ...scope }
+  if (!first) return { projectId: null, agentId: null, ...scope }
+  if (isPageSegment(first)) return { projectId: null, agentId: null, page: first, pagePath: segments.slice(1), ...scope }
+  return { projectId: first, agentId: second ?? null, ...(scoped ? { scope: first } : {}) }
 }
 
-/** The path for a route — the inverse of {@link parseRoute}. */
-export function formatRoute({ view, projectId, agentId, page, pagePath }: Route): string {
+/** The URL for a route, its path and its query — the inverse of {@link parseRoute}. */
+export function formatRoute(route: Route): string {
+  const ownProject = !route.view && !route.page ? route.projectId : null
+  const scope = route.scope ? (ownProject ?? route.scope) : null
+  return formatPath(route) + (scope ? `?${SCOPE_PARAM}=${encodeURIComponent(scope)}` : '')
+}
+
+/**
+ * `url` with the query parameters of `search` that are not the route's own added to it: what a
+ * module's page mirrored there (a list's filters) stays when only the picked project changes.
+ */
+export function keepPageQuery(url: string, search: string): string {
+  const [path = '', own = ''] = url.split('?')
+  const params = new URLSearchParams(search)
+  params.delete(SCOPE_PARAM)
+  for (const [name, value] of new URLSearchParams(own)) params.set(name, value)
+  const query = params.toString()
+  return query ? `${path}?${query}` : path
+}
+
+function formatPath({ view, projectId, agentId, page, pagePath }: Route): string {
   if (view === 'settings') return `/${SETTINGS_SEGMENT}`
   if (page) return ['', page, ...(pagePath ?? [])].map(encodeURIComponent).join('/')
   if (!projectId) return '/'

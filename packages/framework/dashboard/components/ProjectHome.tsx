@@ -22,6 +22,8 @@ import { ScrollArea } from './ui/scroll-area.js'
 // sections can be tall, which is why the whole column scrolls.
 export function ProjectHome({
   projectId,
+  projectName,
+  scope = null,
   events,
   onAgentStarted,
   files,
@@ -33,6 +35,10 @@ export function ProjectHome({
   errors,
 }: {
   projectId: string
+  /** The project's name, for the bar at the top; absent until the projects are read. */
+  projectName?: string | null | undefined
+  /** The project picked in the sidebar (#1513), or null for all: the open questions shown are its only. */
+  scope?: string | null
   events: FrameworkEvent[]
   /** Carries the started agent's id through to the shell; dropping it is what #1169 was. */
   onAgentStarted?: ((intent: string, agentId: string, runsOn?: string) => void) | undefined
@@ -49,7 +55,7 @@ export function ProjectHome({
 }) {
   return (
     <ScrollArea className="min-h-0 flex-1">
-      <ProjectActions projectId={projectId} />
+      <ProjectActions projectId={projectId} projectName={projectName} />
       {/* Above the start form, because an agent started on a project whose agent-data branch cannot
           reach origin (#1599) works from stale tickets and a queue nobody else will see. */}
       <ProjectErrorBanner errors={errors} />
@@ -63,7 +69,7 @@ export function ProjectHome({
         toggleContext={toggleContext}
       />
       {events.length > 0 && <AgentOverview events={events} />}
-      <OpenQuestions onOpenAgent={onOpenAgent} />
+      <OpenQuestions projectId={scope} onOpenAgent={onOpenAgent} />
       <ProjectDocs projectId={projectId} />
     </ScrollArea>
   )

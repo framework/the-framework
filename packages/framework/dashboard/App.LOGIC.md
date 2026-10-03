@@ -27,19 +27,21 @@ Composes the dashboard: reads what is selected off the URL, keeps the sidebar, t
 [18] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
 [19] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [20] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent.
+[21] picked project: the one project the project select, the menu at the top of the sidebar, names. Every page then shows only that project's data. When the select says "All projects", no project is picked and every page shows every project's data. Picking a project filters the pages; it opens no page.
 
 ## Business logic — TL;DR
 
 - **The URL is the selection** - every page, project and agent [1] the dashboard can show is a path, so Back, reload, bookmarks and side-by-side tabs all work and no two parts of the page can disagree about what is selected.
+- **The picked project filters every page** - the picked project [21] is in the URL too, as `?project=<id>`, and stays through every navigation; the Overview [4], the modules' pages, the sidebar's badge and its list of agents show only its data.
 - **The shell's services for modules** - every module page and link action is handed the same services, none naming a skill: open an agent, open a page a module adds, start a run with the user's picks and land on it (or, when the module asks not to land, stay put and only refresh the sidebar), open a project's launcher with a prompt drafted in, and list a project's runs (`lib/host-services.ts`).
 - **The frames around every page** - the sidebar is on every page, the right rail only while a project is selected and never beside a module's page, and a warning bar sits above everything while the daemon is not answering.
 - **What the main pane shows** - the URL resolves, in order, to Settings [3], a module's [19] page (or "No such page"), the Overview [4], "No such project", the project home [5], "This agent is gone", or the agent view [6], which is one and the same page for a running and a finished agent.
 - **Starting an agent from any page** - a start goes to the new agent at once, on the strength of the id the project's start hook answered, before the agent's record exists.
 - **One Context for the launcher and the Files tab** - the Context [18] is held here and handed to the project home's [5] launcher and to the right rail, which hands its files to the modules' tabs (the Files tab); it is emptied when the project changes, when an agent starts or is continued, and on the sidebar's "New".
-- **What is polled, and how often** - the polls that several pages share run once here: the project's agents every 2 seconds (and at once when the selected agent's feed shows it ended, so its page stops reading as running without waiting for the poll), its files every 10, the interventions [7] every 15, the registered projects every 30, the activity feed only while it can notify, the cross-project recents only on the Overview, and "is any agent working" and "is the daemon answering" every 5.
+- **What is polled, and how often** - the polls that several pages share run once here: the project's agents every 2 seconds (and at once when the selected agent's feed shows it ended, so its page stops reading as running without waiting for the poll), its files every 10, the interventions [7] every 15, the registered projects every 30, the activity feed only while it can notify, the cross-project recents only while no project is picked [21], and "is any agent working" and "is the daemon answering" every 5.
 - **The selected agent's live stream** - one live stream follows the agent in the URL and feeds both the agent view and the rail's views [8]; a new start empties it, a continuation keeps it.
 - **Browser notifications** - a new intervention notifies when its category (default on) and browser delivery (default on) are both on; a started or finished agent notifies only when the "New activity" category (default off) is on as well.
-- **The browser tab reports the state** - the tab title carries the intervention count and the selected project's name, and the tab icon animates while any agent anywhere is running.
+- **The browser tab reports the state** - the tab title carries the intervention count and the name of the selected project, else of the picked project [21], and the tab icon animates while any agent anywhere is running.
 - **The daemon-unreachable banner** - a probe every 5 seconds turns a silent daemon into the bar "The daemon is not answering — retrying. Everything on this page is frozen until it returns."
 
 ## Business logic
@@ -52,7 +54,7 @@ See `## Context`.
 
 #### Business logic
 
-The path names the page; the rule that reads it lives in `lib/route.ts`:
+The path names the page, and the query names the picked project [21] (see "The picked project filters every page"); the rule that reads both lives in `lib/route.ts`:
 
 - `/` is the Overview [4].
 - `/settings` is Settings [3].
@@ -65,21 +67,38 @@ Every click that changes the selection writes a new path, and so a new browser h
 
 Where each control lands:
 
-- Selecting a project in the sidebar's picker lands on its project home, never on one of its agents.
 - "New" in the sidebar lands on the named project's home, even when that project is already the selected one.
 - A subagent [20] clicked on its main agent's page lands on that subagent's agent view, in the same project.
-- A row naming an agent of another project (the Overview's recent agents, its agents, the packages' cards) lands on that agent directly, without passing through its project's launcher.
+- A row naming an agent of another project (the sidebar's recent agents, the Overview's agents, the packages' cards) lands on that agent directly, without passing through its project's launcher.
 - The brand mark and "Overview" land on the Overview; the sidebar's "Settings" gear lands on Settings; a module's row lands on its page. A link into a project's files (a queued entry's `tickets/<file>`) lands on the module page named by the link's first segment, at `/<segment>/<project>/<rest>`, when an installed module brings such a page, and is plain text otherwise (`lib/data-link.ts`).
+
+### The picked project filters every page
+
+#### Context
+
+**User story**: the user works on several projects. At the top of the sidebar they pick one, and from then on the whole dashboard is about that project: the Overview [4], the Logs, Queue and Tickets pages, the list of recent agents. They pick "All projects" to see everything again. A link they copy keeps the pick.
+
+#### Business logic
+
+- The picked project [21] is the `?project=<id>` part of the URL, on any page. Without it, no project is picked.
+- Every navigation keeps it: opening the Overview, a module's [19] page, Settings [3], the project home [5] or an agent [1] leaves the pick as it is.
+- On a project's own pages (its project home and its agents' views) the picked project is that project or none, never another one. Opening such a page of another project while one is picked picks that other project. A URL that says otherwise is read as picking the page's own project.
+- A `?project=` that names no registered project picks nothing, once the projects are read.
+- What the pick filters: the open questions on the project home [5]; the interventions [7] shown by the Overview's card, the badge on "Overview" and the tab title; the agents at work and the packages' cards on the Overview; the projects a module's page is given; the sidebar's list of agents, which is the picked project's own agents, and every project's recent agents pooled when none is picked.
+- What it does not filter: the usage bar, which is the account's; Settings; the notifications, which tell of every project's interventions; the tab icon.
+- Picking a project in the select keeps the page, with three exceptions. On another project's home, the page becomes the picked project's home. On another project's agent view, the page becomes the Overview. On a module's page, the segments after the page's word are dropped, since they may name the project just left.
+- Picking "All projects" keeps the page as it is.
+- With a project picked, "New" in the sidebar lands on its project home. With none picked and several projects registered, "New" asks which project.
 
 ### The frames around every page
 
 #### Context
 
-**User story**: whatever page is open, the user keeps the sidebar on the left: "New", "Overview", one row per page the installed modules add, the projects picker, the "Recent agents" list and, in its footer, which daemon the dashboard is talking to, the theme, notifications and "Settings". While a project is selected, the rail on the right offers the "Files", "Views" and "Docs" tabs.
+**User story**: whatever page is open, the user keeps the sidebar on the left: "New", "Overview", the project select [21] at the top, then one row per page the installed modules add, the "Recent agents" list and, in its footer, which daemon the dashboard is talking to, the theme, notifications and "Settings". While a project is selected, the rail on the right offers the "Files", "Views" and "Docs" tabs.
 
 #### Business logic
 
-- The sidebar is present on every page and collapses and reopens with Cmd/Ctrl+B (the shortcut lives in `components/ui/sidebar.tsx`). It is handed everything it shows: the selected project's agents [1] and which one is selected; on the Overview [4], the recent agents pooled across every project; the registered projects; the count of interventions [7], for the badge on "Overview"; whether any agent is working, for the animated brand mark; the prompt and id of a just-started agent, for its "starting…" row; and the modules' [19] pages with the current one, so that only one of "Overview", "Tickets" and the module rows is highlighted. Adding a project from the sidebar reloads the projects and the agents at once instead of waiting for their next poll. What its rows and menus do is described in `components/AgentHistory.tsx`.
+- The sidebar is present on every page and collapses and reopens with Cmd/Ctrl+B (the shortcut lives in `components/ui/sidebar.tsx`). It is handed everything it shows: the picked project [21]; that project's agents [1] and which one is selected; with no project picked, the recent agents pooled across every project; the registered projects; the count of the interventions [7] the pick leaves, for the badge on "Overview"; whether any agent is working, for the animated brand mark; the prompt and id of a just-started agent, for its "starting…" row; and the modules' [19] pages with the current one, so that only one of "Overview", "Tickets" and the module rows is highlighted. Adding a project from the sidebar reloads the projects and the agents at once instead of waiting for their next poll. What its rows and menus do is described in `components/AgentHistory.tsx`.
 - The main pane shows the page the URL names (see "What the main pane shows").
 - The right rail exists only while a project is selected, and never beside a module's [19] page, which takes the full width. It is handed the selected agent's views [8]; the project's files, for its "Files" tab; the Context [18] and its toggle, so the tree shows and changes the picked files; and whether the project home [5] is already showing the docs in its own column. That last is the case exactly when the project home is the main view (a registered project selected, no agent selected or being adopted, not Settings [3]), and the rail then withholds its "Docs" tab. Which tabs the rail offers is decided in `components/RightRail.tsx`.
 - Above the whole workspace, while the daemon is not answering, sits the bar described in "The daemon-unreachable banner".
@@ -96,10 +115,10 @@ Where each control lands:
 The first rule that matches decides the page:
 
 1. Settings [3], when the path says so: from there the onboarding checklist can start an agent and select a project, and "Done" returns to the Overview [4].
-2. A module's [19] page, when the path names one: the page a loaded module claims under that word, handed the projects that have the module's package and the segments after its word; opening an agent from it lands on that agent's view. While the modules are still loading, the main pane stays empty; once they are loaded and none claims the word, "No such page": `No installed package adds a page at "/<word>".` with "Go to the Overview". What a module page receives and may do is in `components/ModulePageView.tsx` and `module/index.ts`.
-3. The Overview, when no project is selected; it is handed the interventions [7] for its card.
+2. A module's [19] page, when the path names one: the page a loaded module claims under that word, handed the projects that have the module's package, only the picked project [21] when one is picked, and the segments after its word; opening an agent from it lands on that agent's view. While the modules are still loading, the main pane stays empty; once they are loaded and none claims the word, "No such page": `No installed package adds a page at "/<word>".` with "Go to the Overview". What a module page receives and may do is in `components/ModulePageView.tsx` and `module/index.ts`.
+3. The Overview, when no project is selected; it is handed the interventions [7] for its card, and the picked project [21], whose data alone it then shows.
 4. "No such project", when the project id is not among the registered projects. The page reads `No project is registered as "<id>". It may have been removed, or the link may be from another machine.` and offers "Go to the Overview". It is declared only once the projects poll has answered with at least one project, so a link never flashes it while the first read is still out; with an empty registry the check never fires.
-5. With no agent selected: the project home [5], handed the live events, the files, the Context [18] with its edits, and what the daemon currently finds wrong with the project, for its banner.
+5. With no agent selected: the project home [5], handed the project's name, the live events, the files, the Context [18] with its edits, and what the daemon currently finds wrong with the project, for its banner.
 6. With an agent id that is not among the project's agents: if it is the agent just started here, the agent view, live, labeled with the typed prompt, because the record lands a beat after the start; if the agents list has not been read yet, the agent view with whether the agent runs marked as not known yet, because a bookmarked link or an agent opened from the Overview must not flash "gone" before the first read, nor be shown as running when it has ended. Otherwise "This agent is gone": `There is no record of this agent. Once its checkout is removed, a finished agent is kept only when the project has a logs skill installed.` — the capability is named, never a package with "Back to the project", which returns to the project home.
 7. The agent view of the listed agent: live exactly while its status is `running`; labeled by what the user typed, else its branch, else its start time (the rule in `lib/agent-label.ts`), and a subagent [20] by its task, the first line of that, as its rows are (`lib/subagents.ts`); told its location [10] and the device it runs on when relayed; handed the agent's listed record, so its status word can read the record's status, pull request and saving mark, and its details strip the coding agent and model the record names; handed its subagents [20], the agents of the project's list whose card names it as their parent, oldest first (`lib/subagents.ts`), for the rows in its transcript and the line above its composer, with a click on one selecting that subagent as a click on its row in the sidebar does. The not-yet-listed agent of rule 6 has no record to hand over, and is handed no subagents. A running and a finished agent get the same page, so an agent ending changes what its bar, feed and composer say without replacing the page. Deleting the agent from its page returns to the project home and reloads the agents list so its row is gone.
 
@@ -135,12 +154,12 @@ The Context [18] (`lib/use-context-set.ts`) is held here, once, and handed to th
 
 #### Business logic
 
-- The selected project's agents, live and archived [16], every 2 seconds (`lib/use-agents.ts`): the sidebar's rows, the main pane's routing and the selected agent's subagents [20] read one list.
+- The agents, live and archived [16], of the selected project, else of the picked project [21], every 2 seconds (`lib/use-agents.ts`): the sidebar's rows, the main pane's routing and the selected agent's subagents [20] read one list.
 - The selected project's files every 10 seconds, scoped to the selected agent's checkout [11] when an agent is selected (the same checkout its branch, preview and open-folder actions act on), so a file the agent creates shows up without a reload; empty when no project is selected.
-- The interventions [7] across every project every 15 seconds, always: they feed the sidebar's badge, the Overview's [4] card, the tab title and the notifications. The cadence is slow because each poll asks GitHub once per project.
-- The registered projects every 30 seconds: the sidebar's picker, the tab title, the "No such project" check and the project home's [5] banner of what the daemon currently finds wrong with the project all read it, and that last state appears and clears on the daemon's own cadence. Adding a project reloads it at once.
+- The interventions [7] across every project every 15 seconds, always: they feed the sidebar's badge, the Overview's [4] card and the tab title, each showing only the picked project's [21] when one is picked, and the notifications, which tell of every project's. The cadence is slow because each poll asks GitHub once per project.
+- The registered projects every 30 seconds: the sidebar's project select, the tab title, the "No such project" check and the project home's [5] banner of what the daemon currently finds wrong with the project all read it, and that last state appears and clears on the daemon's own cadence. Adding a project reloads it at once.
 - The activity feed every 15 seconds, only while it can notify (see "Browser notifications"): the notification is its only reader on this page.
-- The recent agents pooled across every project every 10 seconds, only on the Overview: a selected project's own agents fill the sidebar otherwise.
+- The recent agents pooled across every project every 10 seconds, only while no project is picked [21]: the picked project's own agents fill the sidebar otherwise. A start reloads them at once.
 - Whether any agent in any project is running, every 5 seconds (`lib/use-working.ts`).
 - Whether the daemon answers at all, every 5 seconds (see "The daemon-unreachable banner").
 - The installed modules [19] every 30 seconds, each module's browser part imported once (`lib/use-modules.ts`): the sidebar's module rows, the module pages, the right rail's module tabs, an agent page's run slots, the Settings page's module sections and the link actions every page may show read one list, which the shell provides around everything it renders.
@@ -179,7 +198,7 @@ The Context [18] (`lib/use-context-set.ts`) is held here, once, and handed to th
 
 #### Business logic
 
-The tab title is `(N) <project> — The Framework`: the intervention [7] count, omitted when zero, then the selected project's name, omitted on cross-project pages (composed in `lib/document-title.ts`). The tab icon is the animated brand mark while any agent [1] in any project is running and the still mark otherwise, deliberately not scoped to the selected project: an agent left going elsewhere still means the AI is working for the user (`lib/favicon.ts`).
+The tab title is `(N) <project> — The Framework`: the intervention [7] count, omitted when zero, then the selected project's name, else the picked project's [21], omitted when there is neither (composed in `lib/document-title.ts`). The tab icon is the animated brand mark while any agent [1] in any project is running and the still mark otherwise, deliberately not scoped to the selected project: an agent left going elsewhere still means the AI is working for the user (`lib/favicon.ts`).
 
 ### The daemon-unreachable banner
 

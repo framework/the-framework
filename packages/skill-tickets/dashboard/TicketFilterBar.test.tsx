@@ -10,9 +10,9 @@ const row = (file: string, over: Partial<WorkspaceTicket> = {}, projectId = 'p1'
   ticket: { file, title: file, summary: '', date: '2026-01-01T00:00:00.000Z', planned: false, ...over },
 })
 
-const renderBar = (rows: TicketRow[], view: TicketsView = defaultView(), projects = [{ id: 'p1', name: 'Alpha' }]) => {
+const renderBar = (rows: TicketRow[], view: TicketsView = defaultView()) => {
   const onChange = vi.fn()
-  render(<TicketFilterBar view={view} rows={rows} projects={projects} onChange={onChange} />)
+  render(<TicketFilterBar view={view} rows={rows} onChange={onChange} />)
   return { onChange }
 }
 
@@ -56,17 +56,6 @@ describe('TicketFilterBar (#1144)', () => {
     fireEvent.click(await screen.findByLabelText('ux'))
     const next = onChange.mock.calls[0]![0] as TicketsView
     expect(next.filters.topics).toEqual(['ux'])
-  })
-
-  test('the project facet appears only with more than one project', () => {
-    renderBar([row('a.md')], defaultView(), [{ id: 'p1', name: 'Alpha' }])
-    expect(screen.queryByRole('button', { name: /project/i })).toBeNull()
-    cleanup()
-    renderBar([row('a.md'), row('b.md', {}, 'p2')], defaultView(), [
-      { id: 'p1', name: 'Alpha' },
-      { id: 'p2', name: 'Beta' },
-    ])
-    expect(screen.getByRole('button', { name: /project/i })).toBeTruthy()
   })
 
   test('the stage facet counts claimed as the lock, composing with planned', async () => {

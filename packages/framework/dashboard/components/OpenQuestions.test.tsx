@@ -65,6 +65,22 @@ describe('OpenQuestions (#1455 item 4)', () => {
     await waitFor(() => expect(sendChoice).toHaveBeenCalledWith('p2', 'gate-2', 'ok', 'run-9'))
   })
 
+  test('with one project named, only its questions show', async () => {
+    onOpenQuestions.mockResolvedValue([
+      question(),
+      question({ projectId: 'p2', projectName: 'beta', agentId: 'run-9', intent: 'fix-ci', choice: { id: 'gate-2', title: 'Approve the fix?', options: [{ id: 'ok', label: 'Approve it' }], recommended: 'ok' } }),
+    ])
+    const { unmount } = render(<OpenQuestions projectId="p2" onOpenAgent={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('Waiting on you · 1')).toBeTruthy())
+    expect(screen.getByText('Approve the fix?')).toBeTruthy()
+    expect(screen.queryByText('Start the next backlog item?')).toBeNull()
+    unmount()
+    // A project with no question of its own shows no section at all.
+    const { container } = render(<OpenQuestions projectId="p3" onOpenAgent={vi.fn()} />)
+    await waitFor(() => expect(onOpenQuestions).toHaveBeenCalledTimes(2))
+    expect(container.querySelector('section')).toBeNull()
+  })
+
   test('the card header jumps into the question session, project and all', async () => {
     onOpenQuestions.mockResolvedValue([question()])
     const onOpenAgent = vi.fn()

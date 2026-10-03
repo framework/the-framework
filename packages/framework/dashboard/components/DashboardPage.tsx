@@ -18,7 +18,8 @@ import { ScrollArea } from './ui/scroll-area.js'
 // declare (#1818: the queue package's AI Queue, the tickets package's hot tickets, the scheduler
 // package's Scheduler). The framework's own cards are projections of the same .the-framework files
 // over the `onDashboard` RPC, polled so they stay live; selecting a row jumps into its project or
-// straight into a session. Shown by the shell when no project is picked.
+// straight into a session. With one project picked in the sidebar's project select (#1513), every
+// part but the usage bar shows that project's only.
 //
 // It replaced the denser board this started as (#471) — KPI tiles, a two-week activity chart, agent
 // outcomes, and a projects table — cut here as redundant (#1139). The chart and the outcomes dial
@@ -31,21 +32,27 @@ export function DashboardPage({
   onAgentStarted,
   interventions,
   projects,
+  scope,
 }: {
   onSelectProject: (id: string) => void
   /** Open one session (project + run): the Agents rows link straight to a session. */
   onSelectAgent: (projectId: string, agentId: string) => void
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
   onAgentStarted: (projectId: string, intent: string, agentId: string) => void
+  /** The Human Queue's items, already only the picked project's when one is picked. */
   interventions: Intervention[]
-  /** The registered projects, for the cards the installed packages declare: each is given the ones that have its package. */
+  /** Every registered project. The usage bar is given all of them: usage is the account's, not a project's. */
   projects: ProjectSummary[]
+  /** The one project the page shows (#1513), or null for all: the agents at work and the packages' cards show only its. */
+  scope: string | null
 }) {
   const { value: data } = usePolled<DashboardData | null>(onDashboard, null, 5000, [])
   // Dismissing only hides it here (#958); the settings page keeps it, which is what the
   // dismiss control says.
   const onboardingDismissed = usePreferences().onboardingDismissed ?? false
   const loading = data === null
+  const working = (data?.active ?? []).filter(agent => scope === null || agent.projectId === scope)
+  const shownProjects = scope === null ? projects : projects.filter(project => project.id === scope)
 
   return (
     <ScrollArea className="min-h-0 flex-1">
@@ -63,10 +70,10 @@ export function DashboardPage({
         <div className="grid items-start gap-4 lg:grid-cols-2">
           <HumanQueue items={interventions} onSelectProject={onSelectProject} onSelectAgent={onSelectAgent} />
           <div className="space-y-4">
-            <Agents working={data?.active ?? []} loading={loading} onSelectAgent={onSelectAgent} />
+            <Agents working={working} loading={loading} onSelectAgent={onSelectAgent} />
             {/* The cards the installed packages declare (#1818), under the agents at work: a package's own
                 summary of its data, only where a project has the package. */}
-            <ModuleCards projects={projects} />
+            <ModuleCards projects={shownProjects} />
           </div>
         </div>
       </div>

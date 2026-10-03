@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Plus, ChevronDown, Bot, Cloud, Laptop, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Blocks } from 'lucide-react'
+import { Plus, ChevronDown, Bot, Cloud, Laptop, MonitorSmartphone, Settings, LayoutDashboard, Blocks } from 'lucide-react'
 import type { ComponentType } from 'react'
 import type { AgentMeta, AgentStatus, RecentAgent, ProjectSummary } from '../../src/index.js'
 import { DRIVER_LABELS, driverFromImpl, cloudRunState, type CloudRunState } from '../../src/client.js'
@@ -14,7 +14,7 @@ import { DriverLogo } from './driver-logos.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
-import { projectErrorTitle } from './ProjectErrorBanner.js'
+import { ProjectSelect } from './ProjectSelect.js'
 import {
   Sidebar,
   SidebarContent,
@@ -43,13 +43,16 @@ type Row = { key: string; agent: AgentMeta; project?: string; active: boolean; o
 // every route, so the home/Overview and a session page share the exact same left column instead of
 // the rail vanishing the moment no project is selected. "New" is the permanent home/launcher —
 // selecting it shows the Start form + cards (ProjectHome), and it is never consumed by an agent. Below
-// it sit the recent sessions: a project's own agents when one is selected, and — on the Overview,
-// where no project is — every project's sessions pooled newest-first (`recentAgents`), each row
-// naming its project and jumping into it when selected. `agents`/`recentAgents` are owned by the shell
+// it sit the recent sessions: the one project's own agents when the project select at the top names
+// one (#1513), and every project's sessions pooled newest-first (`recentAgents`) when it says all
+// projects, each row naming its project and jumping into it when selected. `agents`/`recentAgents` are owned by the shell
 // so the rail and the main pane share one list. `startTick`/`startIntent`/`startId` seed an optimistic
 // "starting…" row once a start reports its run, until that run's real card lands.
 export function AgentHistory({
   projectId,
+  scope = null,
+  onScope = () => {},
+  homeHref = '/',
   agents,
   selectedAgentId,
   onSelect,
@@ -63,14 +66,21 @@ export function AgentHistory({
   startId = null,
   working = false,
   onDashboard = () => {},
-  onSelectProject = () => {},
   onSettings = () => {},
   pages = [],
   activePage = null,
   onPage = () => {},
   interventionCount = 0,
 }: {
+  /** The project of the page being shown, its launcher or one of its agents; null on every other page. */
   projectId: string | null
+  /** The one project every page shows (#1513), picked at the top of the rail; null when all show. */
+  scope?: string | null
+  /** Pick the one project every page shows, or null for all of them. */
+  onScope?: (projectId: string | null) => void
+  /** The Overview's address, which keeps the picked project: where the brand links to. */
+  homeHref?: string
+  /** The picked project's agents; unused when all projects show, where `recentAgents` is the list. */
   agents: AgentMeta[]
   selectedAgentId: string | null
   onSelect: (agentId: string | null) => void
@@ -79,8 +89,6 @@ export function AgentHistory({
   /** Go to the Overview (no project): the brand mark and the Overview item both call it. Defaults
    *  to a no-op so a focused unit test can mount the rail without wiring the shell's chrome. */
   onDashboard?: () => void
-  /** Select a project in the picker (its own element now, not fused with Overview). */
-  onSelectProject?: (projectId: string) => void
   /** Open Settings, from the sidebar footer where the navbar gear moved. */
   onSettings?: () => void
   /** The pages the installed modules add (#1774), one nav row each, below Overview. */
@@ -91,7 +99,7 @@ export function AgentHistory({
   onPage?: (segment: string) => void
   /** Human Queue count, shown on the Overview item and the picker (#632). */
   interventionCount?: number
-  /** Cross-project recents for the Overview (no project selected): every project's sessions pooled. */
+  /** Cross-project recents, for when all projects show: every project's sessions pooled. */
   recentAgents?: RecentAgent[]
   /** Select a pooled recent: jump into its project's session (project + run both change). */
   onSelectRecent?: (projectId: string, agentId: string) => void
@@ -116,7 +124,11 @@ export function AgentHistory({
     if (startTick > 0) setOptimistic({ intent: startIntent, id: startId })
   }, [startTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasRunning = agents.some(agent => agent.status === 'running')
+  // All projects show: the rail pools every project's sessions. One project: just its own.
+  const crossProject = scope === null && recentAgents !== undefined
+  const listed = crossProject ? recentAgents!.map(recent => recent.agent) : agents
+
+  const hasRunning = listed.some(agent => agent.status === 'running')
   // The handover: the row this one stands in for has landed once the list holds the run the start
   // reported — whatever its status.
   //
@@ -130,13 +142,13 @@ export function AgentHistory({
   // hand over to: it sat beside the finished session's own row, claiming a second session was
   // starting, until the deadline below swept it. That was hard to hit while a broken agent hung as
   // `running` forever; it stopped being hard once such agents began failing in milliseconds.
-  const landed = optimistic !== null && agents.some(agent => agent.id === optimistic.id)
+  const landed = optimistic !== null && listed.some(agent => agent.id === optimistic.id)
   useEffect(() => {
     if (landed) setOptimistic(null)
   }, [landed])
   useEffect(() => {
     setOptimistic(null)
-  }, [projectId])
+  }, [scope])
   // A start that never produces an agent at all has nothing to hand over to either, so without a
   // deadline the row said "starting…" forever (#948). The Start form surfaces the actual error;
   // this just stops the rail pretending. Still the backstop, not the usual path: `landed` above
@@ -147,24 +159,21 @@ export function AgentHistory({
     return () => clearTimeout(timer)
   }, [optimistic, hasRunning])
 
-  // The Overview pools every project's sessions; a selected project shows just its own.
-  const crossProject = projectId === null && recentAgents !== undefined
-  // On the Overview the optimistic launch row belongs to a project, so it only applies in-project.
   // `landed` is checked here as well as in its effect so the stand-in and the real row are never
   // painted together for a frame while the effect is still queued.
-  const showOptimistic = !crossProject && optimistic !== null && !hasRunning && !landed
+  const showOptimistic = optimistic !== null && !hasRunning && !landed
 
   // A session selected but not in the list is one just started, whose row lands with its card
   // a beat later (#784): the optimistic row is standing in for it, so highlight that. Following a
   // just-started run (#705) counts too, before its id is known.
-  const starting = selectedAgentId !== null && !agents.some(agent => agent.id === selectedAgentId)
+  const starting = selectedAgentId !== null && !listed.some(agent => agent.id === selectedAgentId)
 
   const rows: Row[] = crossProject
     ? recentAgents!.map(rr => ({
         key: `${rr.projectId}:${rr.agent.id}`,
         agent: rr.agent,
         project: rr.projectName,
-        active: false, // nothing is selected on the Overview; a row navigates into its project
+        active: rr.projectId === projectId && rr.agent.id === selectedAgentId,
         onClick: () => onSelectRecent?.(rr.projectId, rr.agent.id),
       }))
     : agents.map(agent => ({
@@ -216,19 +225,23 @@ export function AgentHistory({
     // follow-up), the sidebar carries the app's chrome — brand, global nav, and the utility
     // controls in the footer — so the workspace and right rail get the full height.
     <Sidebar collapsible="none" className="w-(--sidebar-width) border-r border-sidebar-border">
-      <SidebarHeader className="gap-0.5 pb-2">
-        {/* The mark + wordmark, the way home (#909), now that there is no navbar to hold them.
-            A clear gap below it pushes New down; then New/Overview/Projects stack tight as one nav
-            group (gap-0.5), with a little space again below the group (the header's pb-2) before
-            the session list. */}
-        <div className="px-1 pt-1 pb-4">
-          <BrandLink working={working} onNavigate={onDashboard} />
+      {/* The brand and the project select, set apart from everything below by a rule (#1513): the
+          project picked here is the one every page under it shows. */}
+      <SidebarHeader className="gap-3 border-b border-sidebar-border pb-3">
+        {/* The mark + wordmark, the way home (#909), now that there is no navbar to hold them. */}
+        <div className="px-1 pt-1">
+          <BrandLink working={working} href={homeHref} onNavigate={onDashboard} />
         </div>
+        <ProjectSelect projects={projects} scope={scope} onScope={onScope} onProjectAdded={onProjectAdded} />
+      </SidebarHeader>
+      {/* New/Overview/the modules' pages stack tight as one nav group (gap-0.5), with a little space
+          below the group (pb-2) before the session list. */}
+      <SidebarHeader className="gap-0.5 pb-2">
         {/* "New" starts a session — but where depends on what exists: with no project it prompts to
-            add one first, with one project it starts there, with several it opens a picker. In a
-            project already, it just starts another session there. */}
+            add one first, with one project it starts there, with several it opens a picker. With
+            one project picked at the top, it starts there. */}
         <NewButton
-          projectId={projectId}
+          scope={scope}
           projects={projects}
           active={atProjectLauncher}
           onNewAgentInProject={onNewAgentInProject}
@@ -244,15 +257,6 @@ export function AgentHistory({
         {pages.map(page => (
           <NavRow key={page.segment} icon={page.icon ?? Blocks} label={page.label} active={activePage === page.segment} onClick={() => onPage(page.segment)} />
         ))}
-        {/* Projects: its own nav item under Overview, same row style, expanding to an indented list
-            of projects (not a dropdown). Selecting one navigates into it — the interim, until the
-            filter-vs-navigate call is made. */}
-        <ProjectsNav
-          projects={projects}
-          selectedId={projectId}
-          onSelect={onSelectProject}
-          onProjectAdded={onProjectAdded}
-        />
       </SidebarHeader>
       {/* The themed ScrollArea (#913) instead of the sidebar's native overflow bar, matching the
           Overview: suppress SidebarContent's own `overflow-auto` and let the ScrollArea own it. */}
@@ -391,107 +395,19 @@ function OverviewButton({ active, count, onClick }: { active: boolean; count: nu
   )
 }
 
-// Projects: the project selector as an expandable nav item (Rom), the same row style as Overview,
-// opening an indented sub-list rather than a dropdown. Selecting a project navigates into it (the
-// interim behaviour; the filter-vs-navigate call is still open). Starts collapsed — you open it to
-// switch projects. Uses the `projects` the shell already loaded.
-function ProjectsNav({
-  projects,
-  selectedId,
-  onSelect,
-  onProjectAdded,
-}: {
-  projects: ProjectSummary[]
-  selectedId: string | null
-  onSelect: (projectId: string) => void
-  onProjectAdded?: (() => void) | undefined
-}) {
-  const [open, setOpen] = useState(false)
-  const [adding, setAdding] = useState(false)
-  return (
-    <div className="flex flex-col">
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        aria-expanded={open}
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-sidebar-accent/60"
-      >
-        <FolderGit2 className="h-4 w-4 shrink-0" aria-hidden />
-        <span className="flex-1 text-left">Projects</span>
-        <ChevronDown className={cn('h-4 w-4 shrink-0 opacity-70 transition-transform', open || '-rotate-90')} aria-hidden />
-      </button>
-      {open && (
-        // The indented sub-list, with the connecting rule the reference draws down the group.
-        <div className="mt-0.5 ml-4 flex flex-col gap-0.5 border-l border-sidebar-border pl-2">
-          {projects.length === 0 && <p className="px-2 py-1 text-sm text-muted-foreground">No projects yet</p>}
-          {projects.map(p => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => onSelect(p.id)}
-              aria-current={p.id === selectedId ? 'page' : undefined}
-              className={cn(
-                'flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm transition-colors',
-                p.id === selectedId
-                  ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-                  : 'text-foreground hover:bg-sidebar-accent/60',
-              )}
-            >
-              {/* The activated dot the picker used, kept so the two project lists still read alike.
-                  A project the daemon has recorded an error for (#1500) turns it red, and the
-                  tooltip says what is wrong — the project's own page carries the full banner. */}
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <span
-                      aria-hidden
-                      className={cn(
-                        'h-2 w-2 shrink-0 rounded-full',
-                        p.errors?.length ? 'bg-danger' : p.activated ? 'bg-primary' : 'bg-muted-foreground',
-                      )}
-                    />
-                  }
-                />
-                <TooltipContent className="whitespace-pre-line">
-                  {p.errors?.length
-                    ? p.errors.map(e => `${projectErrorTitle(e.code)}: ${e.message}`).join('\n')
-                    : p.activated
-                      ? 'activated'
-                      : 'not activated'}
-                </TooltipContent>
-              </Tooltip>
-              <span className="sr-only">{p.errors?.length ? 'Error' : p.activated ? 'Activated' : 'Not activated'}: </span>
-              <span className="flex-1 truncate text-left">{p.name}</span>
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-foreground"
-          >
-            <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            <span>Add project</span>
-          </button>
-        </div>
-      )}
-      {adding && <AddProjectPanel onAdded={() => onProjectAdded?.()} onClose={() => setAdding(false)} />}
-    </div>
-  )
-}
-
-// The "New" launcher, project-count aware (#new-button). In a project, it starts another session
-// there. On the Overview it adapts to how many projects exist: none -> open the add-project dialog
+// The "New" launcher, project-count aware (#new-button). With one project picked at the top of the
+// rail, it starts a session there. With all projects showing it adapts to how many exist: none -> open the add-project dialog
 // (you cannot start a session with nowhere to run it); one -> start there; several -> a small picker
 // so you choose where. The label + Plus stay the same in every case, so it reads as one button.
 function NewButton({
-  projectId,
+  scope,
   projects,
   active = false,
   onNewAgentInProject,
   onSelect,
   onProjectAdded,
 }: {
-  projectId: string | null
+  scope: string | null
   projects: ProjectSummary[]
   /** On a project's launcher (its "New" screen), so New reads as the current view. Off on the
    *  Overview, where the Overview item is the active one instead — the two are never both active. */
@@ -510,9 +426,9 @@ function NewButton({
   )
   const start = (id: string) => (onNewAgentInProject ? onNewAgentInProject(id) : onSelect(null))
 
-  // In a project, or on the Overview with exactly one: start a session straight away.
-  if (projectId !== null || projects.length === 1) {
-    const target = projectId ?? projects[0]!.id
+  // One project picked, or exactly one registered: start a session straight away.
+  if (scope !== null || projects.length === 1) {
+    const target = scope ?? projects[0]!.id
     return (
       <Button variant="ghost" className={cls} onClick={() => start(target)}>
         <Plus className="h-4 w-4 shrink-0" />

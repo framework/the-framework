@@ -1,4 +1,4 @@
-Decides which tickets [1] the tickets page shows, in what order and under which headings: the text search, the priority, effort and uncertainty facets, the topics, the planning stage, the project, the "Not linked" switch, the sort, the grouping, the per-option counts beside each facet option, and the query string that carries the whole thing in the address so a filtered list is a link.
+Decides which tickets [1] the tickets page shows, in what order and under which headings: the text search, the priority, effort and uncertainty facets, the topics, the planning stage, the "Not linked" switch, the sort, the grouping, the per-option counts beside each facet option, and the query string that carries the whole thing in the address so a filtered list is a link.
 
 ## Context
 
@@ -27,7 +27,7 @@ Decides which tickets [1] the tickets page shows, in what order and under which 
 - **Buckets and the range never both apply** - picking a bucket clears the range and setting a range clears the buckets; the "no value" option survives both.
 - **Topics** - a ticket matches if it carries any selected topic, matched without regard to case, and "No topics" matches the tickets that carry none.
 - **Planning stage** - "Unplanned", "Planned" and "Claimed", where claimed is independent of planned rather than exclusive with it.
-- **Project and "Not linked"** - a selection of projects, and a switch that keeps only tickets carrying no issue link.
+- **"Not linked"** - a switch that keeps only tickets carrying no issue link.
 - **Sorting** - by date, priority, title or effort, each with its own natural direction, a ticket that names no value always last, and newest-first as the tiebreak.
 - **Grouping** - one section per project by default, or one flat cross-project list.
 - **The counts beside each option** - every option's count is computed with all the other facets applied but its own facet ignored, so options never collapse to zero as soon as one is picked.
@@ -135,15 +135,15 @@ Three stages, selectable together:
 
 Claimed is not exclusive with the other two: a claimed ticket is also either planned or unplanned, and selecting "Planned" and "Claimed" together shows every ticket that is either.
 
-### Project and "Not linked"
+### "Not linked"
 
 #### Context
 
-**User story**: on the cross-project page the user narrows to one or two projects [3]; and "Not linked" answers "which tickets exist only here", the ones that track no issue in the tracker.
+**User story**: "Not linked" answers "which tickets exist only here", the ones that track no issue in the tracker. Narrowing to one project [3] is not this page's: the dashboard's project select, at the top of its sidebar, hands the page that project alone.
 
 #### Business logic
 
-With projects selected, only tickets [1] belonging to one of them pass; with none selected every project passes. The "Not linked" switch keeps only the tickets that carry no issue link. The switch and its count are only offered when there is at least one such ticket, or the switch is already on.
+The "Not linked" switch keeps only the tickets that carry no issue link. The switch and its count are only offered when there is at least one such ticket, or the switch is already on.
 
 ### Sorting
 
@@ -204,10 +204,11 @@ What is written:
 - `priority`, `effort`, `uncertainty`: a comma-separated list of the selected bucket names, then the hand-set range as `<min>-<max>`, then `none` when tickets naming no value are included.
 - `topics`: the selected topics, with `none` appended when "No topics" is on. `none` is reserved and is never read back as a topic name.
 - `stage`: the selected stages, comma-separated.
-- `project`: the selected project [3] ids, comma-separated.
 - `issue`: the single value `none` when the "Not linked" switch is on.
 - `sort`: the sort key, omitted when it is the default date.
 - `dir`: the direction, omitted when it is the chosen key's natural direction.
 - `group`: the single value `none` when grouping is off.
+
+The parameters of the address that are not in this list are not the view's, and writing the view leaves them as they are: `project`, the dashboard's own, which names the project picked in its sidebar, stays through every filter change.
 
 Reading is deliberately tolerant. Unknown parameters are ignored. Within a numeric facet, an unknown token is ignored rather than rejected, a range token must be two numbers of at most two digits each with the first not above the second and the second not above 10, and a later valid range replaces an earlier one. A stage that is not one of the three is dropped. A sort key that is not one of the four leaves the sort at date. A direction that is neither `asc` nor `desc` falls back to the natural direction of whichever key was read. Grouping is only turned off by the exact value `none`. Anything absent is the default, so a truncated address still opens a usable page.

@@ -1,6 +1,6 @@
 Makes the browser's address the dashboard's live selection: every part of the page reads what the address currently selects, and navigating is writing a new address. Because the address is the selection, Back and Forward work with no extra bookkeeping, and every page is a link the user can paste, reload and open twice.
 
-The path is read into a selection and a selection written back into a path by the rules in `route.ts`; only the path is read, so the query string a page keeps its own filters in never changes what is selected.
+The address is read into a selection and a selection written back into an address by the rules in `route.ts`: the path, and the query parameter `project`, the one project every page shows. The other query parameters, where a page keeps its own filters, never change what is selected; a navigation drops them, except one that asks to keep them, which is how a change of the picked project alone leaves a page's filters in place.
 
 ## Glossary
 

@@ -81,8 +81,6 @@ export interface TicketFilters {
   /** Include tickets that name no topics at all. */
   topicsNone: boolean
   stage: StageId[]
-  /** Selected project ids; empty means every project. */
-  projects: string[]
   /** Only tickets with no issue link — the locally written ones. */
   unlinked: boolean
 }
@@ -117,7 +115,6 @@ export function defaultView(): TicketsView {
       topics: [],
       topicsNone: false,
       stage: [],
-      projects: [],
       unlinked: false,
     },
     sort: { key: 'date', dir: 'desc' },
@@ -136,7 +133,6 @@ export function hasAnyFilter(f: TicketFilters): boolean {
     f.topics.length > 0 ||
     f.topicsNone ||
     f.stage.length > 0 ||
-    f.projects.length > 0 ||
     f.unlinked
   )
 }
@@ -190,7 +186,6 @@ function matchesFilters(row: TicketRow, f: TicketFilters): boolean {
     if (!hit) return false
   }
   if (f.stage.length > 0 && !f.stage.some(stage => matchesStage(t, stage))) return false
-  if (f.projects.length > 0 && !f.projects.includes(row.projectId)) return false
   if (f.unlinked && t.issue !== undefined) return false
   return true
 }
@@ -324,13 +319,6 @@ export function stageFacetCounts(rows: TicketRow[], f: TicketFilters): Record<St
   }
 }
 
-export function projectFacetCounts(rows: TicketRow[], f: TicketFilters): Record<string, number> {
-  const pool = rowsForFacet(rows, f, { projects: [] })
-  const counts: Record<string, number> = {}
-  for (const row of pool) counts[row.projectId] = (counts[row.projectId] ?? 0) + 1
-  return counts
-}
-
 export function unlinkedCount(rows: TicketRow[], f: TicketFilters): number {
   return rowsForFacet(rows, f, { unlinked: false }).filter(r => r.ticket.issue === undefined).length
 }
@@ -383,7 +371,6 @@ export function parseTicketsView(search: string): TicketsView {
   view.filters.stage = (params.get('stage') ?? '')
     .split(',')
     .filter((s): s is StageId => STAGES.some(stage => stage.id === s))
-  view.filters.projects = (params.get('project') ?? '').split(',').filter(Boolean)
   view.filters.unlinked = params.get('issue') === 'none'
   const sortKey = params.get('sort')
   if (sortKey && SORT_KEYS.includes(sortKey as SortKey)) view.sort.key = sortKey as SortKey
@@ -393,9 +380,17 @@ export function parseTicketsView(search: string): TicketsView {
   return view
 }
 
-/** The query string (no leading `?`) for a view; `''` when everything is at its default. */
-export function formatTicketsView(view: TicketsView): string {
-  const params = new URLSearchParams()
+/** The query parameters a view is written in; every other parameter of the address is someone else's. */
+const VIEW_PARAMS = ['q', 'priority', 'effort', 'uncertainty', 'topics', 'stage', 'issue', 'sort', 'dir', 'group'] as const
+
+/**
+ * The query string (no leading `?`) for a view; nothing of the view when everything is at its
+ * default. `search` is the address's current query: the parameters in it that are not the view's
+ * (the dashboard's picked project) are kept as they are.
+ */
+export function formatTicketsView(view: TicketsView, search = ''): string {
+  const params = new URLSearchParams(search)
+  for (const name of VIEW_PARAMS) params.delete(name)
   const f = view.filters
   if (f.q.trim()) params.set('q', f.q.trim())
   for (const [name, filter] of [
@@ -409,7 +404,6 @@ export function formatTicketsView(view: TicketsView): string {
   const topics = [...f.topics, ...(f.topicsNone ? ['none'] : [])]
   if (topics.length) params.set('topics', topics.join(','))
   if (f.stage.length) params.set('stage', f.stage.join(','))
-  if (f.projects.length) params.set('project', f.projects.join(','))
   if (f.unlinked) params.set('issue', 'none')
   if (view.sort.key !== 'date') params.set('sort', view.sort.key)
   if (view.sort.dir !== DEFAULT_DIR[view.sort.key]) params.set('dir', view.sort.dir)

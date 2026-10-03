@@ -38,32 +38,40 @@ export function SubagentsSettings({ projects }: ModuleSettingsProps) {
     10_000,
     [key],
   )
-  // What was last picked, shown until a read made after every save brings the settings back: the
-  // menus build each save on it, so a second pick made before the first is read back keeps the first.
+  // What was last picked, shown until a read made after the last save brings the settings back:
+  // the menus build each save on it, so a second pick made before the first is saved keeps the
+  // first. Saves go one at a time, each to every project: a pick made while one is on its way waits,
+  // and only the latest waiting pick is sent.
   const [picked, setPicked] = useState<Settings | undefined>()
-  const inFlight = useRef(0)
+  const sending = useRef(false)
+  const waiting = useRef<Settings | undefined>(undefined)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
   useEffect(() => {
-    if (inFlight.current === 0) setPicked(undefined)
+    if (!sending.current) setPicked(undefined)
   }, [read])
   const settings = picked ?? read.settings
 
+  const send = async (next: Settings): Promise<void> => {
+    sending.current = true
+    const answers = await Promise.all(projects.map(async project => ({ project, answer: await host.runCommand(project.id, ['settings', JSON.stringify(next)]) })))
+    const failed = answers.flatMap(({ project, answer }) => (answer.ok ? [] : [`${project.name}: ${answer.error}`]))
+    if (failed.length > 0) setError(failed.join('; '))
+    const after = waiting.current
+    waiting.current = undefined
+    if (after !== undefined) return send(after)
+    sending.current = false
+    setSaving(false)
+    // A refused save shows what is saved again; a saved one stays shown until the read has it.
+    if (failed.length > 0) setPicked(undefined)
+    reload()
+  }
   const save = (next: Settings): void => {
-    inFlight.current++
     setPicked(next)
     setSaving(true)
     setError(undefined)
-    void Promise.all(projects.map(async project => ({ project, answer: await host.runCommand(project.id, ['settings', JSON.stringify(next)]) }))).then(answers => {
-      inFlight.current--
-      const failed = answers.flatMap(({ project, answer }) => (answer.ok ? [] : [`${project.name}: ${answer.error}`]))
-      if (failed.length > 0) setError(failed.join('; '))
-      if (inFlight.current > 0) return
-      setSaving(false)
-      // A refused save shows what is saved again; a saved one stays shown until the read has it.
-      if (failed.length > 0) setPicked(undefined)
-      reload()
-    })
+    if (sending.current) waiting.current = next
+    else void send(next)
   }
   const level = (name: Level) => (value: string) => {
     const { [name]: _old, ...rest } = settings

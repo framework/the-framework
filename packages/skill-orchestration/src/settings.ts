@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
 import { isDriverName } from 'agent-runner'
@@ -62,11 +63,17 @@ export async function readSettings(repo: string): Promise<Settings> {
   }
 }
 
-/** Write the settings whole. The first write also hides the directory from git; best-effort, as the scheduler's is. */
+/**
+ * Write the settings whole, through a file of its own then a rename, so two writes at once leave
+ * one of them whole rather than both mixed. The first write also hides the directory from git;
+ * best-effort, as the scheduler's is.
+ */
 export async function writeSettings(repo: string, settings: Settings, git: GitRunner = nodeGitRunner()): Promise<void> {
   await mkdir(join(repo, SETTINGS_DIR), { recursive: true })
   await excludeFromGit(repo, `/${SETTINGS_DIR}`, undefined, git).catch(() => {})
-  await writeFile(settingsPath(repo), JSON.stringify(settings, null, 2) + '\n')
+  const next = `${settingsPath(repo)}.${process.pid}.${randomUUID()}`
+  await writeFile(next, JSON.stringify(settings, null, 2) + '\n')
+  await rename(next, settingsPath(repo))
 }
 
 /**

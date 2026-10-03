@@ -80,17 +80,29 @@ describe('Subagents settings', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  test('a second pick made before the first is saved keeps the first', async () => {
+  test('a second pick made before the first is saved keeps the first; saves go one at a time, the latest waiting pick sent next', async () => {
     const { host, runCommand } = fakeHost()
     show(host)
     await screen.findByLabelText('Simple tasks')
-    let finish: (value: ModuleCommandResult) => void = () => {}
-    runCommand.mockImplementationOnce(() => new Promise(resolve => (finish = resolve)))
+    const finish: Array<(value: ModuleCommandResult) => void> = []
+    runCommand.mockImplementation((_projectId: string, args: string[]) => (args.length === 2 ? new Promise(resolve => finish.push(resolve)) : Promise.resolve({ ok: true, output: { ok: true } })))
+    const saves = () => runCommand.mock.calls.filter(([, args]) => args.length === 2).map(([projectId, args]) => [projectId, JSON.parse(args[1]!)])
     fireEvent.change(screen.getByLabelText('Simple tasks'), { target: { value: 'codex' } })
     expect((screen.getByLabelText('Simple tasks') as HTMLSelectElement).value).toBe('codex')
     fireEvent.change(screen.getByLabelText('Hard tasks'), { target: { value: 'claude-code opus' } })
-    await waitFor(() => expect(runCommand).toHaveBeenLastCalledWith('p2', ['settings', JSON.stringify({ simple: { driver: 'codex' }, hard: { driver: 'claude-code', model: 'opus' } })]))
-    finish({ ok: true, output: { ok: true } })
+    fireEvent.change(screen.getByLabelText('At once'), { target: { value: '2' } })
+    // Only the first save is on its way, to both projects.
+    expect(saves()).toEqual([
+      ['p1', { simple: { driver: 'codex' } }],
+      ['p2', { simple: { driver: 'codex' } }],
+    ])
+    for (const done of finish.splice(0)) done({ ok: true, output: { ok: true } })
+    // Then the latest pick alone, built on both earlier ones.
+    const latest = { simple: { driver: 'codex' }, hard: { driver: 'claude-code', model: 'opus' }, atOnce: 2 }
+    await waitFor(() => expect(saves().slice(2)).toEqual([['p1', latest], ['p2', latest]]))
+    for (const done of finish.splice(0)) done({ ok: true, output: { ok: true } })
+    await waitFor(() => expect(screen.queryByText('Saving…')).toBeNull())
+    expect(saves()).toHaveLength(4)
   })
 
   test('a save a project refused says which and why, and the menu shows what is saved again; nothing read says why', async () => {

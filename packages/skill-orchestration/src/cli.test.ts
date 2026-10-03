@@ -1,7 +1,10 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { isDeepStrictEqual, promisify } from 'node:util'
+import { execFile } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { continuationPrompt, logCardFile, logDiaryFile } from 'agent-driver'
 import { DATA_BRANCH, withFileBranch } from '@gemstack/agent-data'
@@ -227,6 +230,20 @@ test('settings: saved whole on this machine, hidden from git, read back; setting
       assert.equal(refused.code, 2, bad)
     }
     assert.deepEqual((await run(repo, undefined, ['settings'])).out, { ok: true, hard: { driver: 'codex' } })
+
+    // A save replaces the file whole, never writes into it: a reader, or a second save, never meets half of one.
+    const before = (await stat(join(repo, '.orchestration', 'settings.json'))).ino
+    assert.equal((await run(repo, undefined, ['settings', JSON.stringify({ atOnce: 2 })])).code, 0)
+    assert.notEqual((await stat(join(repo, '.orchestration', 'settings.json'))).ino, before)
+
+    // Saves at once, each its own process as the dashboard runs them, leave one of them whole,
+    // never several mixed, and nothing beside the file.
+    const many = Array.from({ length: 12 }, (_, n) => ({ atOnce: n + 1, ...(n % 2 ? { simple: { driver: 'codex', model: `m${'x'.repeat(n * 400)}` } } : {}) }))
+    const bin = fileURLToPath(new URL('../bin/orchestration', import.meta.url))
+    await Promise.all(many.map(settings => promisify(execFile)(process.execPath, [bin, 'settings', JSON.stringify(settings)], { cwd: repo })))
+    const after = JSON.parse(await readFile(join(repo, '.orchestration', 'settings.json'), 'utf8'))
+    assert.ok(many.some(settings => isDeepStrictEqual(settings, after)), JSON.stringify(after))
+    assert.deepEqual(await readdir(join(repo, '.orchestration')), ['settings.json'])
   } finally {
     await removeRepo(repo)
   }

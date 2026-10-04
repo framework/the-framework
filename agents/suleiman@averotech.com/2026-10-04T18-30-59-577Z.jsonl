@@ -9,3 +9,10 @@
 {"kind":"cost","usd":0.056163000000000005,"at":"2026-10-04T18:31:15.746Z"}
 {"kind":"question","title":"What is your favorite color?","options":[{"id":"opt:0","label":"Blue","detail":"calm, sky and sea"},{"id":"opt:1","label":"Green","detail":"fresh, forests and fields"},{"id":"opt:2","label":"Red","detail":"bold, warm and energetic"},{"id":"opt:3","label":"Purple","detail":"rich, somewhere between the two"}],"recommended":"opt:0","at":"2026-10-04T18:31:15.747Z"}
 {"kind":"ended","status":"waiting","at":"2026-10-04T18:31:16.382Z"}
+{"kind":"start","prompt":"You paused to ask: \"What is your favorite color?\". The user chose: Blue. Continue with that decision.","at":"2026-10-04T18:35:35.076Z"}
+{"kind":"session","sessionId":"1f59eb97-9052-4af3-99f8-5d4838395742","at":"2026-10-04T18:35:35.813Z"}
+{"kind":"said","text":"Blue it is — a solid pick. Nothing else was riding on the answer, so there's no further work to do here.","at":"2026-10-04T18:35:37.793Z"}
+{"kind":"rate-limit","limit":{"status":"allowed","window":"five_hour","resetsAt":1791154200000},"at":"2026-10-04T18:35:37.804Z"}
+{"kind":"result","text":"Blue it is — a solid pick. Nothing else was riding on the answer, so there's no further work to do here.","sessionId":"1f59eb97-9052-4af3-99f8-5d4838395742","at":"2026-10-04T18:35:38.571Z"}
+{"kind":"cost","usd":0.0625054,"at":"2026-10-04T18:35:38.571Z"}
+{"kind":"ended","status":"done","at":"2026-10-04T18:35:39.106Z"}

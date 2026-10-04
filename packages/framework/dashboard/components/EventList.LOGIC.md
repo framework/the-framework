@@ -25,8 +25,8 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 ## Business logic — TL;DR
 
 - **One row per event, as the terminal's line** - every event [2] is one row: a kind badge, the terminal's one-line text for that event, and, on a row that opens a group, the time its diary line was written.
-- **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown; the reply whole, in the page's own font; a prompt clamped to one line beyond 100 characters and expanding in place on click.
-- **The message just sent** - a message sent to an ended agent is one more "YOU" row after the last, a prompt like any other, so the scroller brings it into view; the prompt line of the continuation takes the same row when it arrives.
+- **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown in the page's own font; the reply whole; the user's prompt as a grey box on the right with no label, cut short behind "Show more" when long, its time shown under it while the pointer is on it.
+- **The message just sent** - a message sent to an ended agent is one more grey box after the last row, a prompt like any other, so the scroller brings it into view; the prompt line of the continuation takes the same row when it arrives.
 - **A spinner while the agent works** - while the agent works and writes nothing, the last row is a spinner reading "Starting…" when the row above it is a prompt, "Working…" otherwise; it gives way to the message being written, and goes when the agent ends.
 - **The message being written grows in place** - while the agent writes a message, it is one more agent row after the last, drawn as a finished reply is, badged "AGENT" unless the row above is already the agent's; when the whole message arrives, its own row replaces it and nothing moves.
 - **A turn's end and the spend are not rows** - the end of each turn [7] and the spend so far are left out: the agent's details strip counts the turns and totals the spend.
@@ -40,8 +40,8 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 - **A screen is live where the agent used it** - the newest `screen` line at an address, on this machine's loopback and with neither an `ended` line for that address nor the agent's end after it (an end waiting on an answer does not count), is the live page itself, framed in the transcript; an earlier or ended one stays its one line, and every `ended` line is hidden.
 - **A subagent has a row where it was started** - when the transcript is given the agent's subagents [16], each has a "SUBAGENT" row before the first row written after it started: its task, then what it is doing now or how it ended, read off the subagent's card so the row changes in place.
 - **A subagent's end is not the user's prompt** - the prompt that told the agent one of its subagents ended is a "SUBAGENT" row saying `ended <status>`, with the rest of the message folded under it, and no blue.
-- **Badges once per group, colored as a scanning aid** - the kind badge shows on the first of consecutive rows of one group, "YOU" for the user's prompt; only failures, the user's turn, gates, milestones and pushed surfaces get a color.
-- **Failures read red, the user's turn blue** - a failed row is red on a red wash, the user's prompt blue on a blue wash (a subagent's end is not the user's and gets neither), a clean finish on a green wash; a stopped agent stays neutral.
+- **Badges once per group, colored as a scanning aid** - the kind badge shows on the first of consecutive rows of one group; the user's prompt has none; only failures, gates, milestones and pushed surfaces get a color.
+- **Failures read red** - a failed row is red on a red wash, a clean finish on a green wash; a stopped agent stays neutral.
 - **The time each line was written** - a row that opens a group shows the time its diary line was written, the same live, after a reload and once the agent has ended; a line with no time shows none.
 - **Following the newest row** - a live transcript keeps the newest row in view until the reader scrolls up and offers "Jump to latest"; a replay opens at its end or its start as the caller decides.
 - **The view never jumps back when the agent goes on** - only the newest prompt is the scroller's anchor, a row keeps its identity when another row stops being shown, and an end that is no longer a row keeps an empty place where it was.
@@ -56,7 +56,7 @@ See `## Context`.
 
 #### Business logic
 
-Each event [2] is one row with three columns: a fixed-width badge column, the row's body, and, on rows that open a group (see "Badges once per group, colored as a scanning aid"), the time the event's diary line was written. Unless a rule below gives the event a special body, the body is the one-line text the terminal prints for the same event (the wording rules live in `src/terminal.ts`), with its leading indentation trimmed. For example: the coding agent's [5] actions read as "· <action>" lines, the agent's end as "✓ finished", "■ stopped", "? waiting for an answer" or "✗ failed: <detail>", and the agent settling [8] as "◆ done for now — waiting for your next message". An error the agent reported itself keeps its headline and its detail lines. The transcript is monospaced, except for the interactive rows described below, which use the dashboard's regular typeface because they are controls rather than text.
+Each event [2] but the user's own prompt (see "The conversation reads as messages") is one row with three columns: a fixed-width badge column, the row's body, and, on rows that open a group (see "Badges once per group, colored as a scanning aid"), the time the event's diary line was written. Unless a rule below gives the event a special body, the body is the one-line text the terminal prints for the same event (the wording rules live in `src/terminal.ts`), with its leading indentation trimmed. For example: the coding agent's [5] actions read as "· <action>" lines, the agent's end as "✓ finished", "■ stopped", "? waiting for an answer" or "✗ failed: <detail>", and the agent settling [8] as "◆ done for now — waiting for your next message". An error the agent reported itself keeps its headline and its detail lines. The transcript is monospaced, except for the interactive rows described below, which use the dashboard's regular typeface because they are controls rather than text.
 
 ### The conversation reads as messages
 
@@ -70,7 +70,12 @@ Two events carry conversation text: the prompt that opens a turn [7] (the user's
 
 The agent's reply renders whole, however long, at the page's reading size and in the page's own font rather than the transcript's monospace: it is what the user came to read. The message being written is drawn exactly the same way, so when the finished reply takes its place nothing moves; a reply used to grow tall while written and fold to one line the moment it was done, and everything under it jumped up.
 
-A prompt renders as compact Markdown in the transcript's font. A prompt whose text, with runs of whitespace collapsed to one space, is at most 100 characters renders whole. A longer prompt is clamped to its first line with a chevron ("›") in front of it; clicking either the chevron or the clamped text expands the same rendered Markdown in place, so the opening is never shown twice, and the chevron turns to point down and folds it back on click. The chevron's accessible name is "Expand message" while folded and "Collapse message" while expanded.
+The user's own prompt is drawn as a chat message: a grey box with round corners at the right edge of the transcript, at most 85% of its width, holding the prompt as Markdown at the page's reading size and in the page's own font. The row has no badge, no color and no time column: the box and its place say whose message it is. Its accessible name is "Your message".
+
+- **A long prompt is cut short.** A prompt of more than 600 characters, or of more than 8 lines, shows only its beginning (the box is cut at a fixed height), with a "Show more" button inside the box under the text. The button opens the whole prompt and then reads "Show less", which cuts it short again. A shorter prompt renders whole with no button.
+- **The time shows on hover.** Under the box, at its right, one small line holds the time the prompt's diary line was written (hours, minutes and seconds in the reader's locale; the full date and time as its tooltip). The line is invisible until the pointer is on the message, and it is always there, also for a prompt that has no time: nothing moves when the time shows or arrives.
+
+A prompt that is the end of a subagent [16] is not the user's and is not drawn this way (see "A subagent's end is not the user's prompt").
 
 ### A turn's end and the spend are not rows
 
@@ -187,18 +192,18 @@ The row after a subagent's row opens a new group: it shows its own badge and tim
 
 #### Context
 
-**Problem**: when a subagent [16] ends, the tool that runs agents tells its main agent with a message, which reaches the transcript as a prompt, the same kind of event as the user's own messages. It read as a "YOU" row, blue, as if the user had typed "The run 2026-10-01T10-01-00-000Z, started for this run, ended done.".
+**Problem**: when a subagent [16] ends, the tool that runs agents tells its main agent with a message, which reaches the transcript as a prompt, the same kind of event as the user's own messages. It read as the user's own message, as if the user had typed "The run 2026-10-01T10-01-00-000Z, started for this run, ended done.".
 
 #### Business logic
 
 A prompt that is the end of one of the agent's subagents (the rule in `lib/subagents.ts`: its first line is the line the tool sends, and the agent it names is one of the subagents the transcript was given) is a row about the subagent:
 
 - its badge is "SUBAGENT", muted, and it forms a group apart from the user's prompts: a subagent's end right after a prompt of the user's shows its own badge, and consecutive ends, or an end right under the row of a subagent just started, share one;
-- it has no blue text and no blue wash;
+- it is not a grey box on the right: it is a row like the agent's, with the badge column and the time column;
 - its body is the subagent's line for an end (`SubagentLine.tsx`): the subagent's task, which opens the subagent's page on a click, then `ended <status>` and the reason when the message gives one. It says how the subagent ended at that moment and never changes, whatever the subagent does afterwards;
-- under it, the rest of the message (where the subagent's work is, its last words) renders as a prompt does: whole when short, clamped to its first line with the chevron when long. The line the tool sent is not shown as text.
+- under it, the rest of the message (where the subagent's work is, its last words) renders as compact Markdown in the transcript's font. A rest whose text, with runs of whitespace collapsed to one space, is at most 100 characters renders whole. A longer one is clamped to its first line with a chevron ("›") in front of it; clicking either the chevron or the clamped text expands the same rendered Markdown in place, and the chevron turns to point down and folds it back on click. The chevron's accessible name is "Expand message" while folded and "Collapse message" while expanded. The line the tool sent is not shown as text.
 
-The same words in a prompt about an agent that is not one of these subagents, or with other words before them, stay the user's "YOU" row. The row is still a prompt for everything else: while it is the newest prompt it is the anchor the scroller brings into view, and a spinner under it reads "Starting…".
+The same words in a prompt about an agent that is not one of these subagents, or with other words before them, stay the user's own message. The row is still a prompt for everything else: while it is the newest prompt it is the anchor the scroller brings into view, and a spinner under it reads "Starting…".
 
 ### Badges once per group, colored as a scanning aid
 
@@ -208,11 +213,11 @@ The same words in a prompt about an agent that is not one of these subagents, or
 
 #### Business logic
 
-Consecutive rows of the same group share one badge, shown on the group's first row. The group is the event's kind, except that the user's prompt forms its own group apart from the rest of the coding agent's events, so each of the user's turns opens a new group, and that a prompt that is a subagent's [16] end forms a third (see "A subagent's end is not the user's prompt"). The badge word is "you" for the user's prompt, "subagent" for a subagent's end, and otherwise the kind's plain-language label (the label rules in `lib/event-labels.ts`: "agent" for the coding agent's own events, "waiting" for the agent settling [8], and every other kind's name with hyphens turned to spaces, such as "choice resolved"); the badge is shown uppercased. The badge column is wide enough for "choice resolved" on one line, and the body column aligns whether or not the row shows a badge.
+Consecutive rows of the same group share one badge, shown on the group's first row. The group is the event's kind, except that the user's prompt forms its own group apart from the rest of the coding agent's events, so each of the user's turns opens a new group, and that a prompt that is a subagent's [16] end forms a third (see "A subagent's end is not the user's prompt"). The user's prompt shows no badge. The badge word is "subagent" for a subagent's end, and otherwise the kind's plain-language label (the label rules in `lib/event-labels.ts`: "agent" for the coding agent's own events, "waiting" for the agent settling [8], and every other kind's name with hyphens turned to spaces, such as "choice resolved"); the badge is shown uppercased. The badge column is wide enough for "choice resolved" on one line, and the body column aligns whether or not the row shows a badge.
 
-The badge's color is a navigation aid: a failing row's badge is red and the user's prompt's badge is blue (those two win over everything below); a gate [4] and its resolution are amber, the rows the reader most wants to find; a clean end is green, as a milestone; a pushed surface (a view [11] or a screen [15]) takes the dashboard's primary accent, as the agent showing the user something; every other badge is muted. A stopped or failed end is not a milestone and stays out of green, and the handoff [12] report stays muted because its body may report mixed outcomes.
+The badge's color is a navigation aid: a failing row's badge is red (which wins over everything below); a gate [4] and its resolution are amber, the rows the reader most wants to find; a clean end is green, as a milestone; a pushed surface (a view [11] or a screen [15]) takes the dashboard's primary accent, as the agent showing the user something; every other badge is muted. A stopped or failed end is not a milestone and stays out of green, and the handoff [12] report stays muted because its body may report mixed outcomes.
 
-### Failures read red, the user's turn blue
+### Failures read red
 
 #### Context
 
@@ -220,7 +225,7 @@ See `## Context`.
 
 #### Business logic
 
-A row reports a failure when it is the coding agent [5] (or its transport) erroring mid-run, an error the agent reported itself, or an end that is neither successful nor a stop. A failing row's text is red and its whole line is washed with a faint red tint, findable from the scrollbar's distance. The user's prompt is blue on a faint blue wash; a prompt that is a subagent's [16] end is not the user's and gets neither. A clean end keeps its text tone on a faint green wash. A stopped agent's end is neither a failure nor a milestone: it keeps the neutral tone, since the user asked for the stop. Every other row keeps the muted transcript tone with no wash.
+A row reports a failure when it is the coding agent [5] (or its transport) erroring mid-run, an error the agent reported itself, or an end that is neither successful nor a stop. A failing row's text is red and its whole line is washed with a faint red tint, findable from the scrollbar's distance. A clean end keeps its text tone on a faint green wash. A stopped agent's end is neither a failure nor a milestone: it keeps the neutral tone, since the user asked for the stop. Every other row keeps the muted transcript tone with no wash.
 
 ### The time each line was written
 
@@ -230,7 +235,7 @@ A row reports a failure when it is the coding agent [5] (or its transport) error
 
 #### Business logic
 
-An event [2] read from a diary line that says when it was written carries that time (`src/store/run-record.ts`). A row that opens a group and whose event carries a time shows it, as hours, minutes and seconds in the reader's locale, at the right edge, with the full date and time in a tooltip. A row whose event carries no time, such as one read from a line written before the diary kept times, shows no time.
+An event [2] read from a diary line that says when it was written carries that time (`src/store/run-record.ts`). A row that opens a group and whose event carries a time shows it (the user's own prompt shows its time under its box instead, see "The conversation reads as messages"), as hours, minutes and seconds in the reader's locale, at the right edge, with the full date and time in a tooltip. A row whose event carries no time, such as one read from a line written before the diary kept times, shows no time.
 
 ### Following the newest row
 

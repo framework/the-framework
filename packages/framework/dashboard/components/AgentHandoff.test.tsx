@@ -6,8 +6,9 @@ const sendOpenPullRequest = vi.fn(async () => ({ ok: true }) as unknown)
 const sendMerge = vi.fn(async () => ({ ok: true }) as unknown)
 const sendPush = vi.fn(async () => ({ ok: true }) as unknown)
 const sendMergeBranch = vi.fn(async () => ({ ok: true }) as unknown)
+const sendMessage = vi.fn(async () => ({ ok: true }) as unknown)
 vi.mock('../rpc/reads.js', () => ({ onAgentHandoff }))
-vi.mock('../rpc/control.js', () => ({ sendOpenPullRequest, sendMerge, sendPush, sendMergeBranch }))
+vi.mock('../rpc/control.js', () => ({ sendOpenPullRequest, sendMerge, sendPush, sendMergeBranch, sendMessage }))
 
 const { HandoffActions, HandoffSummary, AgentHandoffDetails, handoffExpandable } = await import('./AgentHandoff.js')
 const { useAgentHandoff } = await import('../lib/use-agent-handoff.js')
@@ -51,6 +52,8 @@ beforeEach(() => {
   sendPush.mockClear()
   sendPush.mockResolvedValue({ ok: true })
   sendMergeBranch.mockClear()
+  sendMessage.mockClear()
+  sendMessage.mockResolvedValue({ ok: true })
   sendMergeBranch.mockResolvedValue({ ok: true })
 })
 afterEach(cleanup)
@@ -120,6 +123,34 @@ describe('run handoff (#799)', () => {
     expect(screen.queryByText('Open PR')).toBeNull()
     expect(screen.getByText('Uncommitted files')).toBeTruthy()
     expect(screen.getByText('index.html')).toBeTruthy()
+  })
+
+  test('uncommitted work gets a Commit button that asks the agent to commit; a subagent, and a branch with nothing left behind, get none', async () => {
+    const left = { ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true, pendingFiles: ['index.html'] }
+    onAgentHandoff.mockResolvedValue(left)
+    render(<Harness open={false} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit' }))
+    // The agent is asked: it writes the commit, the dashboard commits nothing itself.
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith('p1', 'Commit your work.', 'run-1'))
+    cleanup()
+
+    sendMessage.mockClear()
+    sendMessage.mockResolvedValue({ ok: false, error: 'this project has no resume hook' })
+    render(<Harness open={false} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit' }))
+    await waitFor(() => expect(screen.getByText(/this project has no resume hook/)).toBeTruthy())
+    cleanup()
+
+    onAgentHandoff.mockResolvedValue({ ...left, pendingFiles: [] })
+    render(<Harness open={false} />)
+    await waitFor(() => expect(onAgentHandoff).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull()
+    cleanup()
+
+    onAgentHandoff.mockResolvedValue(left)
+    render(<Harness open={false} subagent />)
+    await waitFor(() => expect(screen.getByText('Nothing committed — index.html left uncommitted.')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull()
   })
 
   test('past two uncommitted files the rest are counted, and the hover carries them all (#1173)', async () => {
@@ -233,7 +264,7 @@ describe('run handoff (#799)', () => {
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('Not in main yet.')).toBeTruthy())
     expect(screen.queryByText(/Open PR|Publish branch/)).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Merge into main' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Merge' }))
     await waitFor(() => expect(sendMergeBranch).toHaveBeenCalledWith('p1', 'run-1'))
     expect(sendPush).not.toHaveBeenCalled()
   })
@@ -242,7 +273,7 @@ describe('run handoff (#799)', () => {
     onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false, base: 'main' })
     sendMergeBranch.mockResolvedValue({ ok: false, error: 'agent-x does not merge cleanly into main: it conflicts in a.ts; nothing was changed' })
     render(<Harness />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Merge into main' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Merge' }))
     await waitFor(() => expect(screen.getByText(/does not merge cleanly into main/)).toBeTruthy())
     cleanup()
 

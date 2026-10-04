@@ -14,7 +14,7 @@ Says how a tool call [2] of the coding agent [3] reads in an agent's [1] transcr
 
 ## Business logic — TL;DR
 
-- **One call as a verb and a target** - the label picks the verb and the kind of the call; the detail is the target, a file reading as its name alone.
+- **One call as a verb and a target** - the label picks the verb, its form for a call still going on, and the kind of the call; the detail is the target, a file reading as its name alone.
 - **Several calls as counts** - each kind counted, in the order the kinds first came.
 
 ## Business logic
@@ -27,23 +27,23 @@ See `## Context`.
 
 #### Business logic
 
-The label picks the verb and the kind of the call [2]:
+The label picks the verb, the verb's form while the call is still going on, and the kind of the call [2]:
 
-| Label (Claude Code) | Label (Codex) | Verb | Kind |
-| --- | --- | --- | --- |
-| Bash | commandExecution | Ran | command |
-| Read | | Read | read |
-| Edit, MultiEdit, NotebookEdit | fileChange | Edited | edit |
-| Write | | Wrote | edit |
-| Grep, Glob | | Searched | search |
-| WebSearch | webSearch | Searched the web | search |
-| WebFetch | | Fetched | other |
-| Skill | | Used skill | other |
-| Task, Agent | | Started agent | other |
-| TodoWrite | | Updated todos | other |
-| | mcpToolCall | Called | other |
+| Label (Claude Code) | Label (Codex) | Verb | While going on | Kind |
+| --- | --- | --- | --- | --- |
+| Bash | commandExecution | Ran | Running | command |
+| Read | | Read | Reading | read |
+| Edit, MultiEdit, NotebookEdit | fileChange | Edited | Editing | edit |
+| Write | | Wrote | Writing | edit |
+| Grep, Glob | | Searched | Searching | search |
+| WebSearch | webSearch | Searched the web | Searching the web | search |
+| WebFetch | | Fetched | Fetching | other |
+| Skill | | Used skill | Using skill | other |
+| Task, Agent | | Started agent | Starting agent | other |
+| TodoWrite | | Updated todos | Updating todos | other |
+| | mcpToolCall | Called | Calling | other |
 
-A label not in the table is its own verb, of the kind "other": a label written as one camel-case word, as Codex's kinds are, reads as words with a capital first ("imageView" reads "Image view"), and any other label reads as it is.
+A label not in the table is its own verb, in both forms, of the kind "other": a label written as one camel-case word, as Codex's kinds are, reads as words with a capital first ("imageView" reads "Image view"), and any other label reads as it is.
 
 The target is the detail. For a read and for an edit, the target is the file's name alone, the last part of the path; when the detail names several files, separated by a comma and a space as Codex names the files of one change, each is cut to its name. The detail is kept whole beside the target, for a reader who opens the call. A call with no detail has no target.
 

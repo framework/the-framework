@@ -10,6 +10,8 @@ type CallKind = 'command' | 'read' | 'edit' | 'search' | 'other'
 export interface ToolCall {
   /** The grey word: what was done. */
   verb: string
+  /** The same word while the call is still going on: "Running", "Reading". */
+  doing: string
   /** The dark words: what it was done to. A file reads as its name alone. */
   target?: string
   /** The detail as the driver gave it: the whole path, the command. */
@@ -17,27 +19,27 @@ export interface ToolCall {
   kind: CallKind
 }
 
-const CALLS: Record<string, { verb: string; kind: CallKind; file?: true }> = {
+const CALLS: Record<string, { verb: string; doing: string; kind: CallKind; file?: true }> = {
   // Claude Code: the tool's name.
-  Bash: { verb: 'Ran', kind: 'command' },
-  Read: { verb: 'Read', kind: 'read', file: true },
-  Edit: { verb: 'Edited', kind: 'edit', file: true },
-  MultiEdit: { verb: 'Edited', kind: 'edit', file: true },
-  NotebookEdit: { verb: 'Edited', kind: 'edit', file: true },
-  Write: { verb: 'Wrote', kind: 'edit', file: true },
-  Grep: { verb: 'Searched', kind: 'search' },
-  Glob: { verb: 'Searched', kind: 'search' },
-  WebSearch: { verb: 'Searched the web', kind: 'search' },
-  WebFetch: { verb: 'Fetched', kind: 'other' },
-  Skill: { verb: 'Used skill', kind: 'other' },
-  Task: { verb: 'Started agent', kind: 'other' },
-  Agent: { verb: 'Started agent', kind: 'other' },
-  TodoWrite: { verb: 'Updated todos', kind: 'other' },
+  Bash: { verb: 'Ran', doing: 'Running', kind: 'command' },
+  Read: { verb: 'Read', doing: 'Reading', kind: 'read', file: true },
+  Edit: { verb: 'Edited', doing: 'Editing', kind: 'edit', file: true },
+  MultiEdit: { verb: 'Edited', doing: 'Editing', kind: 'edit', file: true },
+  NotebookEdit: { verb: 'Edited', doing: 'Editing', kind: 'edit', file: true },
+  Write: { verb: 'Wrote', doing: 'Writing', kind: 'edit', file: true },
+  Grep: { verb: 'Searched', doing: 'Searching', kind: 'search' },
+  Glob: { verb: 'Searched', doing: 'Searching', kind: 'search' },
+  WebSearch: { verb: 'Searched the web', doing: 'Searching the web', kind: 'search' },
+  WebFetch: { verb: 'Fetched', doing: 'Fetching', kind: 'other' },
+  Skill: { verb: 'Used skill', doing: 'Using skill', kind: 'other' },
+  Task: { verb: 'Started agent', doing: 'Starting agent', kind: 'other' },
+  Agent: { verb: 'Started agent', doing: 'Starting agent', kind: 'other' },
+  TodoWrite: { verb: 'Updated todos', doing: 'Updating todos', kind: 'other' },
   // Codex: the kind of the item.
-  commandExecution: { verb: 'Ran', kind: 'command' },
-  fileChange: { verb: 'Edited', kind: 'edit', file: true },
-  mcpToolCall: { verb: 'Called', kind: 'other' },
-  webSearch: { verb: 'Searched the web', kind: 'search' },
+  commandExecution: { verb: 'Ran', doing: 'Running', kind: 'command' },
+  fileChange: { verb: 'Edited', doing: 'Editing', kind: 'edit', file: true },
+  mcpToolCall: { verb: 'Called', doing: 'Calling', kind: 'other' },
+  webSearch: { verb: 'Searched the web', doing: 'Searching the web', kind: 'search' },
 }
 
 /** `imageView` reads "Image view"; a name that is already words is left as it is. */
@@ -58,7 +60,7 @@ function fileNames(detail: string): string {
 /** One call as the chat says it. A label the map does not know is its own verb. */
 export function toolCall(label: string, detail?: string): ToolCall {
   const known = CALLS[label]
-  const call: ToolCall = { verb: known?.verb ?? asWords(label), kind: known?.kind ?? 'other' }
+  const call: ToolCall = { verb: known?.verb ?? asWords(label), doing: known?.doing ?? asWords(label), kind: known?.kind ?? 'other' }
   if (detail !== undefined) {
     call.detail = detail
     call.target = known?.file ? fileNames(detail) : detail

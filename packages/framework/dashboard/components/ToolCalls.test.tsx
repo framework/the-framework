@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, test } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { ToolCalls, type ToolStep } from './ToolCalls.js'
+import { afterEach, describe, expect, test, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { LiveLine, ToolCalls, type ToolStep } from './ToolCalls.js'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 const bash = (detail: string): ToolStep => ({ type: 'action', label: 'Bash', detail })
 
@@ -67,5 +70,48 @@ describe('ToolCalls', () => {
   test('thoughts with no call draw nothing', () => {
     const { container } = render(<ToolCalls steps={[{ type: 'thought', text: 'hm' }]} />)
     expect(container.firstChild).toBeNull()
+  })
+})
+
+describe('LiveLine', () => {
+  test('the call going on now reads in the present, shimmering, behind moving dots', () => {
+    const { container } = render(<LiveLine call={{ label: 'Read', detail: '/repo/AGENTS.md' }} word="Working…" />)
+    const status = screen.getByRole('status')
+    expect(status.textContent).toBe('ReadingAGENTS.md')
+    expect(screen.getByText('Reading').className).toContain('text-shimmer')
+    expect(screen.getByText('AGENTS.md').className).toContain('text-shimmer')
+    expect(container.querySelectorAll('.dot-wave > span')).toHaveLength(3)
+    expect(screen.queryByText('Working…')).toBeNull()
+  })
+
+  test('it opens to its detail like any call', () => {
+    render(<LiveLine call={{ label: 'Bash', detail: 'pnpm test' }} word="Working…" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Running pnpm test' }))
+    expect(screen.getByText('pnpm test', { selector: 'pre' })).toBeTruthy()
+  })
+
+  test('the seconds since the call began count up, and turn to minutes', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-04T10:00:09.500Z'))
+    render(<LiveLine call={{ label: 'Bash', detail: 'pnpm test' }} word="Working…" since="2026-10-04T10:00:00.000Z" />)
+    expect(screen.getByText('9s')).toBeTruthy()
+    act(() => void vi.advanceTimersByTime(1000))
+    expect(screen.getByText('10s')).toBeTruthy()
+    act(() => void vi.advanceTimersByTime(55_000))
+    expect(screen.getByText('1m 5s')).toBeTruthy()
+  })
+
+  test('a call that does not say when it began counts nothing', () => {
+    render(<LiveLine call={{ label: 'Bash', detail: 'pnpm test' }} word="Working…" />)
+    expect(screen.queryByText(/^\d+s$/)).toBeNull()
+  })
+
+  test('with no call going on, the line is the word, shimmering, with its seconds', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-04T10:00:03.000Z'))
+    const { container } = render(<LiveLine word="Working…" since="2026-10-04T10:00:00.000Z" />)
+    expect(screen.getByText('Working…').className).toContain('text-shimmer')
+    expect(screen.getByText('3s')).toBeTruthy()
+    expect(container.querySelector('.dot-wave')).toBeTruthy()
   })
 })

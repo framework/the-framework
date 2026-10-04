@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { callsSummary, toolCall } from '../lib/tool-calls.js'
 import { cn } from '../lib/utils.js'
@@ -7,15 +7,39 @@ import { Markdown } from './Markdown.js'
 /** One step of the coding agent between two messages: a tool call, or what it thought. */
 export type ToolStep = { type: 'action'; label: string; detail?: string } | { type: 'thought'; text: string }
 
+// How long ago `since` was, counted up every second: "9s", then "1m 5s".
+function Seconds({ since }: { since: string }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(tick)
+  }, [])
+  const seconds = Math.max(0, Math.floor((now - Date.parse(since)) / 1000))
+  return <span className="shrink-0 tabular-nums">{seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`}</span>
+}
+
+// Three dots moving in a wave: the agent is at it.
+function Dots() {
+  return (
+    <span className="dot-wave shrink-0" aria-hidden>
+      <span />
+      <span />
+      <span />
+    </span>
+  )
+}
+
 // One tool call: the verb in grey, what it was done to in dark, on one line. With a detail it
-// opens, on a click, to the detail whole.
-function CallLine({ label, detail }: { label: string; detail?: string }) {
+// opens, on a click, to the detail whole. A call still going on (`live`) reads in the present
+// ("Running"), shimmers, and counts the seconds since it began when it says when that was.
+function CallLine({ label, detail, live }: { label: string; detail?: string; live?: { since: string | undefined } }) {
   const [open, setOpen] = useState(false)
   const call = toolCall(label, detail)
   const words = (
     <>
-      <span className="shrink-0">{call.verb}</span>
-      {call.target !== undefined && <span className="truncate text-foreground">{call.target}</span>}
+      <span className={cn('shrink-0', live && 'text-shimmer')}>{live ? call.doing : call.verb}</span>
+      {call.target !== undefined && <span className={cn('truncate', live ? 'text-shimmer' : 'text-foreground')}>{call.target}</span>}
+      {live?.since !== undefined && <Seconds since={live.since} />}
     </>
   )
   if (call.detail === undefined) return <div className="flex min-w-0 items-center gap-1.5">{words}</div>
@@ -25,7 +49,7 @@ function CallLine({ label, detail }: { label: string; detail?: string }) {
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        aria-label={call.target === undefined ? call.verb : `${call.verb} ${call.target}`}
+        aria-label={[live ? call.doing : call.verb, call.target].filter(Boolean).join(' ')}
         className="flex max-w-full min-w-0 items-center gap-1.5 text-left hover:text-foreground"
       >
         {words}
@@ -49,6 +73,25 @@ function ThoughtLine({ text }: { text: string }) {
         <div className="mt-1 italic">
           <Markdown text={text} compact />
         </div>
+      )}
+    </div>
+  )
+}
+
+// The last line of the chat while the agent works, in place of a spinner: the call going on now
+// ("Running pnpm test 9s"), or, between calls, a word saying it is at it ("Working…"). Moving dots
+// in front, the text shimmering, the seconds counting.
+export function LiveLine({ call, word, since }: { call?: { label: string; detail?: string } | undefined; word: string; since?: string | undefined }) {
+  return (
+    <div role="status" className="flex min-w-0 flex-1 items-center gap-2 font-sans text-sm text-muted-foreground">
+      <Dots />
+      {call ? (
+        <CallLine label={call.label} {...(call.detail !== undefined ? { detail: call.detail } : {})} live={{ since }} />
+      ) : (
+        <>
+          <span className="text-shimmer">{word}</span>
+          {since !== undefined && <Seconds since={since} />}
+        </>
       )}
     </div>
   )

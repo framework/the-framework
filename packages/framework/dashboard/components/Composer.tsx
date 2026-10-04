@@ -50,6 +50,7 @@ export interface ComposerHandle {
 
 // The shared agent composer (#721): the Tiptap editor (`/` `@` `#` triggers) plus the control
 // row — the commands menu, the agent/model select, the "Run on" pick, and the submit button.
+// The launcher adds a row under the box, which then holds the agent/model select.
 // Factored out of the launcher (StartAgentForm) so the run-view chat (AgentComposer) gets the
 // same surface, wired to the same data (files, commands, saved prompts, prefs). The caller owns
 // what happens on submit: the launcher starts a run, the chat says the text to the run. The `@`
@@ -62,8 +63,11 @@ export const Composer = forwardRef<ComposerHandle, {
   addContext?: ((path: string) => void) | undefined
   /** Drop a path from the Context when its `@`/`#` chip leaves the editor (#948). */
   removeContext?: ((path: string) => void) | undefined
-  /** The controls the launcher hangs at the start of the control row (#1046): the Context picker and the post-merge cleanup box. */
+  /** The control the launcher hangs at the start of the control row (#1046): the Context picker. */
   launcherControls?: ReactNode
+  /** A row under the box, the launcher's: this content at its left (the "Auto" menu), and the
+   *  agent/model select at its right instead of inside the box. */
+  belowControls?: ReactNode
   /** Run the composed text. */
   onSubmit: (text: string) => void | Promise<void>
   /** Mirror the live prompt out, so the launcher can drive its note. */
@@ -93,7 +97,7 @@ export const Composer = forwardRef<ComposerHandle, {
    *  without one the slot keeps its collapse-when-empty behavior for the launcher. */
   idleControl?: ReactNode
 }>(function Composer(
-  { files, addContext, removeContext, launcherControls, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, canSubmit = true, idleControl },
+  { files, addContext, removeContext, launcherControls, belowControls, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, canSubmit = true, idleControl },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
@@ -287,6 +291,8 @@ export const Composer = forwardRef<ComposerHandle, {
     </Tooltip>
   )
 
+  const below = belowControls !== undefined
+
   // One slot, three states (#1455): with an idleControl, the empty box shows it (Stop / Resume)
   // and typing swaps in the send arrow — instead of the launcher's collapse-to-nothing.
   const slotEl = !hasPrompt && idleControl ? idleControl : submitButton
@@ -324,17 +330,27 @@ export const Composer = forwardRef<ComposerHandle, {
       <div className="rounded-lg border border-border bg-transparent focus-within:border-muted-foreground/40">
         {editorEl}
         {/* Run controls (#649/#650/#654/#668): the commands menu and the Context picker at the
-            start, the agent+model select, the "Run on" pick and submit clustered at the end. */}
+            start, the agent+model select, the "Run on" pick and submit clustered at the end. With
+            a row under the box, the agent+model select is there instead. */}
         <div className="flex flex-wrap items-center gap-1.5 px-2 pb-2">
           {commandsEl}
           {launcherControls}
           <div className="ml-auto flex items-center gap-1.5">
-            {driverModelEl}
+            {!below && driverModelEl}
             {runOnEl}
             {slotEl}
           </div>
         </div>
       </div>
+
+      {/* The row under the box. A fixed height and no wrap, and the left side is the one that
+          gives way: a longer label there never moves the agent+model select or the page below. */}
+      {below && (
+        <div className="mt-1 flex h-8 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center">{belowControls}</div>
+          <div className="shrink-0">{driverModelEl}</div>
+        </div>
+      )}
 
       {offlineNote}
 

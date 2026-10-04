@@ -260,6 +260,46 @@ describe('Composer (#721)', () => {
   })
 })
 
+// The bordered box: the nearest element holding both the editor and the Commands button.
+const box = (): HTMLElement => {
+  const editor = screen.getByLabelText('prompt')
+  let el: HTMLElement = screen.getByRole('button', { name: 'Commands' })
+  while (!el.contains(editor)) el = el.parentElement!
+  return el
+}
+
+describe('the row under the box', () => {
+  test('with belowControls, its content and the agent/model select are in one row under the box, and the select is not in the box', () => {
+    renderComposer({ belowControls: <span>below-left</span> })
+    const select = agentTrigger()
+    expect(box().contains(select)).toBe(false)
+    expect(box().compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const row = box().nextElementSibling!
+    const left = screen.getByText('below-left')
+    expect(row.contains(left)).toBe(true)
+    expect(row.contains(select)).toBe(true)
+    expect(left.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // The rest of the box's own row stays in the box.
+    expect(box().contains(screen.getByRole('button', { name: 'Run on' }))).toBe(true)
+    // One line of a fixed height: a longer label at the left cannot move the select or the page.
+    expect(row.className).toContain('h-8')
+    expect(row.className).not.toContain('flex-wrap')
+    expect(select.parentElement!.className).toContain('shrink-0')
+  })
+
+  test('with belowControls holding nothing, the row still carries the agent/model select', () => {
+    renderComposer({ belowControls: null })
+    expect(box().contains(agentTrigger())).toBe(false)
+    expect(box().nextElementSibling!.contains(agentTrigger())).toBe(true)
+  })
+
+  test('without belowControls there is no row under the box: the agent/model select is inside the box', () => {
+    renderComposer()
+    expect(box().contains(agentTrigger())).toBe(true)
+    expect(box().nextElementSibling).toBeNull()
+  })
+})
+
 describe('in a session', () => {
   test('there is no "Run on" pick: a session already runs where it was started', () => {
     renderComposer({ inAgent: true })

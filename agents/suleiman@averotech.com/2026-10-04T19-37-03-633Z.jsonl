@@ -9,3 +9,10 @@
 {"kind":"cost","usd":0.0717894,"at":"2026-10-04T19:37:10.600Z"}
 {"kind":"question","title":"What is your favorite color?","options":[{"id":"opt:0","label":"Blue","detail":"calm, like sky and sea"},{"id":"opt:1","label":"Green","detail":"fresh, like forests and gems"},{"id":"opt:2","label":"Red","detail":"bold and warm"},{"id":"opt:3","label":"Purple","detail":"rich and a little unusual"}],"recommended":"opt:1","at":"2026-10-04T19:37:10.600Z"}
 {"kind":"ended","status":"waiting","at":"2026-10-04T19:37:11.224Z"}
+{"kind":"start","prompt":"You paused to ask: \"What is your favorite color?\". The user chose: Red. Continue with that decision.","at":"2026-10-04T19:57:46.016Z"}
+{"kind":"session","sessionId":"78dda8e1-eb0c-4c1e-8462-daf778a48e01","at":"2026-10-04T19:57:47.023Z"}
+{"kind":"said","text":"Red it is: bold and warm. Noted as your favorite color.","at":"2026-10-04T19:57:48.209Z"}
+{"kind":"rate-limit","limit":{"status":"allowed","window":"five_hour","resetsAt":1791154200000},"at":"2026-10-04T19:57:48.223Z"}
+{"kind":"result","text":"Red it is: bold and warm. Noted as your favorite color.","sessionId":"78dda8e1-eb0c-4c1e-8462-daf778a48e01","at":"2026-10-04T19:57:49.096Z"}
+{"kind":"cost","usd":0.0780914,"at":"2026-10-04T19:57:49.096Z"}
+{"kind":"ended","status":"done","at":"2026-10-04T19:57:49.745Z"}

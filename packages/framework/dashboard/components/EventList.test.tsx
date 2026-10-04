@@ -162,6 +162,56 @@ describe('EventList conversation rows', () => {
   })
 })
 
+// The agent's steps between two messages (tool calls, thoughts) are one folded line, as Claude Code
+// on the web draws them, and the chat has no thinking row.
+describe('EventList tool calls', () => {
+  const prompt: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'go' } }
+  const call = (label: string, detail: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'action', label, detail } })
+  const thought = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'thought', text } })
+  const said = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'text', text } })
+  const ids = () => Array.from(document.querySelectorAll('[data-message-id]')).map(n => n.getAttribute('data-message-id'))
+
+  test('calls in a row are one line, and a message between two runs makes two lines', () => {
+    render(<EventList events={[prompt, call('Bash', 'ls'), call('Bash', 'pwd'), said('Now the file.'), call('Read', '/repo/AGENTS.md')]} stick={false} />)
+    expect(screen.getByRole('button', { name: 'Ran 2 commands' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Read AGENTS.md' })).toBeTruthy()
+    expect(screen.queryByText(/· Bash/)).toBeNull()
+  })
+
+  test('the line is known by its first call, so it stays the same row while calls are added', () => {
+    const { rerender } = render(<EventList events={[prompt, call('Bash', 'ls')]} stick={false} />)
+    expect(ids()).toEqual(['0', '1'])
+    rerender(<EventList events={[prompt, call('Bash', 'ls'), thought('next'), call('Bash', 'pwd')]} stick={false} />)
+    expect(ids()).toEqual(['0', '1'])
+    expect(screen.getByRole('button', { name: 'Ran 2 commands' })).toBeTruthy()
+  })
+
+  test('a thought is no row: among calls it is inside their line, and with no call it shows nowhere', () => {
+    render(<EventList events={[prompt, thought('plan it'), call('Bash', 'ls'), said('Done.'), thought('all good'), said('Bye.')]} stick={false} />)
+    expect(screen.queryByText(/Thinking|Thought|plan it|all good/)).toBeNull()
+    expect(ids()).toEqual(['0', '1', '3', '5'])
+    fireEvent.click(screen.getByRole('button', { name: 'Ran 1 command' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Thought' }))
+    expect(screen.getByText('plan it')).toBeTruthy()
+  })
+
+  test('the reply after a thought that is no row still opens under the AGENT badge', () => {
+    render(<EventList events={[prompt, thought('hm'), said('Hello.')]} stick={false} />)
+    expect(screen.getAllByText('agent')).toHaveLength(1)
+  })
+
+  test('while only a thought has come since the prompt, the spinner reads "Working…", not "Starting…"', () => {
+    render(<EventList events={[prompt, thought('hm')]} working stick={false} />)
+    expect(screen.getByText('Working…')).toBeTruthy()
+  })
+
+  test('another kind of row between calls ends the run', () => {
+    render(<EventList events={[prompt, call('Bash', 'ls'), { kind: 'view', id: 'v1', title: 'Plan', markdown: '# p' }, call('Bash', 'pwd')]} stick={false} />)
+    expect(screen.getByRole('button', { name: 'Ran ls' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ran pwd' })).toBeTruthy()
+  })
+})
+
 // Colour carries meaning in the log (#1199): a failure is red, and a stopped agent is not, since
 // stopping was asked for.
 describe('EventList row colour', () => {

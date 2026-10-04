@@ -27,14 +27,14 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 - **One row per event, as the terminal's line** - every event [2] is one row: a kind badge, the terminal's one-line text for that event, and, on a row that opens a group, the time its diary line was written.
 - **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown in the page's own font; the reply whole; the user's prompt as a grey box on the right with no label, cut short behind "Show more" when long, its time shown under it while the pointer is on it.
 - **The message just sent** - a message sent to an ended agent is one more grey box after the last row, a prompt like any other, so the scroller brings it into view; the prompt line of the continuation takes the same row when it arrives.
-- **A spinner while the agent works** - while the agent works and writes nothing, the last row is a spinner reading "Starting…" when the row above it is a prompt, "Working…" otherwise; it gives way to the message being written, and goes when the agent ends.
+- **A spinner while the agent works** - while the agent works and writes nothing, the last row is a spinner reading "Starting…" when the row above it is a prompt, "Working…" otherwise; it gives way to the message being written, and goes when the agent ends. A thought that is no row still counts as something after the prompt: the spinner then reads "Working…".
 - **The message being written grows in place** - while the agent writes a message, it is one more agent row after the last, drawn as a finished reply is, badged "AGENT" unless the row above is already the agent's; when the whole message arrives, its own row replaces it and nothing moves.
 - **A turn's end and the spend are not rows** - the end of each turn [7] and the spend so far are left out: the agent's details strip counts the turns and totals the spend.
 - **An end the agent went on after is not a row** - a clean end, or an end waiting on an answer, that a later prompt follows is left out, and so is the last clean end while the caller says the agent's job is still going; a failed or stopped end stays where it happened.
 - **The question's block is not shown** - the JSON block an agent writes to ask is left out of the reply a gate [4] follows, and out of the message being written: the gate's card is the question.
 - **The session id is not a row** - the coding agent's session id update is plumbing, not conversation: it is left out of the list, and the run's menu reads it from the events.
 - **The quota only when it matters** - the coding agent reports the account's quota after every turn; a reading that is `allowed` is left out of the list, and one running low or used up is a row.
-- **Thinking stays folded** - a thought of the coding agent renders as one muted "💭 Thinking" line; clicking it opens the thought in place, in italics, and clicking again folds it.
+- **The agent's steps are one folded line** - a run of tool calls and thoughts with no other row between them is one row, a folded line counting the calls; a thought is no row, and thoughts with no call among them show nowhere.
 - **The first prompt opens the transcript** - the first prompt is hoisted above the rows emitted before it, so the transcript starts with what the user asked.
 - **A gate is answered where it happened** - when the transcript knows its project, an open gate [4] renders as the interactive gate panel inline, an answered one as a collapsed card that replaces its "✓ chose" line, and a gate whose agent ended unanswered stays text.
 - **A screen is live where the agent used it** - the newest `screen` line at an address, on this machine's loopback and with neither an `ended` line for that address nor the agent's end after it (an end waiting on an answer does not count), is the live page itself, framed in the transcript; an earlier or ended one stays its one line, and every `ended` line is hidden.
@@ -56,7 +56,7 @@ See `## Context`.
 
 #### Business logic
 
-Each event [2] but the user's own prompt (see "The conversation reads as messages") is one row with three columns: a fixed-width badge column, the row's body, and, on rows that open a group (see "Badges once per group, colored as a scanning aid"), the time the event's diary line was written. Unless a rule below gives the event a special body, the body is the one-line text the terminal prints for the same event (the wording rules live in `src/terminal.ts`), with its leading indentation trimmed. For example: the coding agent's [5] actions read as "· <action>" lines, the agent's end as "✓ finished", "■ stopped", "? waiting for an answer" or "✗ failed: <detail>", and the agent settling [8] as "◆ done for now — waiting for your next message". An error the agent reported itself keeps its headline and its detail lines. The transcript is monospaced, except for the interactive rows described below, which use the dashboard's regular typeface because they are controls rather than text.
+Each event [2] but the user's own prompt (see "The conversation reads as messages") is one row with three columns: a fixed-width badge column, the row's body, and, on rows that open a group (see "Badges once per group, colored as a scanning aid"), the time the event's diary line was written. Unless a rule below gives the event a special body, the body is the one-line text the terminal prints for the same event (the wording rules live in `src/terminal.ts`), with its leading indentation trimmed. For example: the agent's end reads as "✓ finished", "■ stopped", "? waiting for an answer" or "✗ failed: <detail>", and the agent settling [8] as "◆ done for now — waiting for your next message". An error the agent reported itself keeps its headline and its detail lines. The transcript is monospaced, except for the interactive rows described below, which use the dashboard's regular typeface because they are controls rather than text.
 
 ### The conversation reads as messages
 
@@ -118,15 +118,21 @@ A failed or stopped end is always a row, where it happened: it says why the next
 - A reply no gate follows keeps its block as written. A block that did not parse makes no gate, and the raw block is how the user sees that the agent tried to ask.
 - The message being written is shown without the block too, from the block's opening fence on while its closing fence has not arrived. While nothing else is written, the "working" line shows instead.
 
-### Thinking stays folded
+### The agent's steps are one folded line
 
 #### Context
 
-**User story**: the user watching an agent sees what it thought before each step, without the thinking drowning the steps themselves.
+**User story**: between the user's question and the agent's answer, the user reads one short grey line saying what the coding agent [5] did, as Claude Code on the web draws it, and opens it for the details. The user sees no thinking row, as on Claude Code on the web.
+
+**Problem**: every tool call was a row ("· Bash  pnpm test") and every thought a "💭 Thinking" row, so a turn [7] of fifty calls was fifty rows.
 
 #### Business logic
 
-A `thought` event renders as one muted line, a chevron ("›") and "💭 Thinking", instead of the terminal's line. Clicking the line opens the thought below it, as compact Markdown in italics, and turns the chevron to point down; clicking again folds it. Every thought starts folded, however short.
+A step is an event that is a tool call of the coding agent, or a thought of it. Among the events that are rows, each run of steps with no other row between them is one row, drawn by `ToolCalls.tsx`: one folded line counting the calls ("Ran 2 commands"), or the call itself when the run is one call ("Read AGENTS.md"); opened, one line per step. A message of the agent, a prompt, a gate [4] or any other row ends the run, so an agent that writes between its calls has a line of calls, its message, then another line of calls.
+
+- **The row is the run's first step.** Its identity is that of the run's first event, so the row stays the same row while the agent adds calls to it, and its text changes in place ("Ran 1 command" becomes "Ran 2 commands").
+- **A thought is no row.** Inside a run that holds a call, the thought is reachable in the opened line, at its place. A run with no call in it (the coding agent thought, then wrote) is no row at all, and the rows around it are grouped as if it were not there: the reply after it opens under the "AGENT" badge when it is the first row after the prompt.
+- **A subagent's row comes after the run.** A subagent [16] started by a call in the middle of a run has its row under the run's line, not inside it (the place rule of "A subagent has a row where it was started", read off the run's first step).
 
 ### The first prompt opens the transcript
 

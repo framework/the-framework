@@ -10,6 +10,7 @@ import { ChoicePanel } from './ChoicePanel.js'
 import { InlineScreen, isLoopbackScreen } from './InlineScreen.js'
 import { Markdown } from './Markdown.js'
 import { SubagentLine } from './SubagentLine.js'
+import { ToolCalls, type ToolStep } from './ToolCalls.js'
 import { Badge } from './ui/badge.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
@@ -27,7 +28,8 @@ import {
 //   - The message text: the user's prompt (`driver` `start`) and the agent's reply (`driver` `text`)
 //     render their raw text inline, truncated to one line when long and expanding in place on click
 //     (#476/#520). The user's own prompt is a grey box on the right, as in a chat.
-//   - The agent's thinking (`driver` `thought`): one muted "Thinking" line that opens in place.
+//   - The agent's steps between two messages (`driver` `action` and `thought`): one folded line
+//     for the whole run of them (ToolCalls), opening to one line per step.
 //   - Choice gates, when the log knows its project (#1455 item 6): an open gate renders the same
 //     interactive ChoicePanel the rail used to hold, so the question is answered from the flow;
 //     a resolved one collapses to the AnsweredChoice ✓ card and hides its "✓ chose" line.
@@ -347,22 +349,37 @@ function Message({ text }: { text: string }) {
   )
 }
 
-// What the agent thought before it acted: folded to one muted "Thinking" line, opened in place on click.
-function Thought({ text }: { text: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="min-w-0 flex-1 text-muted-foreground">
-      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex items-center gap-1.5">
-        <span className={`select-none transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
-        <span>💭 Thinking</span>
-      </button>
-      {open && (
-        <div className="pl-3.5 italic">
-          <Markdown text={text} compact />
-        </div>
-      )}
-    </div>
-  )
+/** A tool call or a thought of the coding agent: a step between two of its messages. */
+function stepOf(e: FrameworkEvent): ToolStep | undefined {
+  return e.kind === 'driver' && (e.event.type === 'action' || e.event.type === 'thought') ? e.event : undefined
+}
+
+/**
+ * Fold each run of the agent's steps (tool calls and thoughts with no other row between them)
+ * into its first row, which stands for the whole run. A run with no call in it, thoughts alone,
+ * is no row at all: the chat has no thinking row.
+ */
+export function foldSteps(events: readonly FrameworkEvent[]): { rows: FrameworkEvent[]; steps: Map<FrameworkEvent, ToolStep[]> } {
+  const rows: FrameworkEvent[] = []
+  const steps = new Map<FrameworkEvent, ToolStep[]>()
+  let run: { head: FrameworkEvent; steps: ToolStep[] } | undefined
+  const close = (): void => {
+    if (run?.steps.some(step => step.type === 'action')) {
+      rows.push(run.head)
+      steps.set(run.head, run.steps)
+    }
+    run = undefined
+  }
+  for (const e of events) {
+    const step = stepOf(e)
+    if (step === undefined) {
+      close()
+      rows.push(e)
+    } else if (run) run.steps.push(step)
+    else run = { head: e, steps: [step] }
+  }
+  close()
+  return { rows, steps }
 }
 
 /** The badge word, and the grouping key, of a row about one of the run's subagents. */
@@ -444,7 +461,11 @@ export function EventList({
     return text !== null && asked.has(e) ? withoutQuestionBlock(text) : text
   }
   // A reply that was only its question's block is no row: the card under it is the question.
-  const shown = kept.filter(e => !passed.has(e) && textOf(e) !== '')
+  // A run of the agent's steps is one row, its first.
+  const unfolded = kept.filter(e => !passed.has(e) && textOf(e) !== '')
+  const { rows: shown, steps } = foldSteps(unfolded)
+  // Nothing has come since the prompt, not even a thought that is no row: the agent is starting.
+  const starting = unfolded.length > 0 && isTurnBoundary(unfolded[unfolded.length - 1]!)
   const written = withoutQuestionBlock(writing)
   // The prompts that told this run one of its subagents ended: SUBAGENT rows, not the reader's own.
   const ends = new Map<FrameworkEvent, SubagentEnd>()
@@ -534,8 +555,8 @@ export function EventList({
                   ) : message !== null ? (
                     // A reply (AGENT), shown whole.
                     <Reply text={message} />
-                  ) : e.kind === 'driver' && e.event.type === 'thought' ? (
-                    <Thought text={e.event.text} />
+                  ) : steps.has(e) ? (
+                    <ToolCalls steps={steps.get(e)!} />
                   ) : choiceRow && projectId ? (
                     // The interaction itself, in the flow (#1455 item 6). font-sans: these are
                     // controls, not log text, so they drop the log's mono.
@@ -592,7 +613,7 @@ export function EventList({
               <MessageScrollerItem messageId="working" className="-mx-1.5 flex items-center gap-2 rounded-sm px-1.5 text-muted-foreground">
                 <span className="w-28 shrink-0" />
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                <span role="status">{shown.length > 0 && isTurnBoundary(shown[shown.length - 1]!) ? 'Starting…' : 'Working…'}</span>
+                <span role="status">{starting ? 'Starting…' : 'Working…'}</span>
               </MessageScrollerItem>
             )}
             {tail}

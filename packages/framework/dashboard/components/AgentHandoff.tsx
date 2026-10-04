@@ -134,12 +134,15 @@ export function HandoffActions({
   // this bar exists to prevent. When the tree holds uncommitted work, that work is named, and the
   // next step is offered: the agent is asked to commit it. The agent commits, not the dashboard:
   // it knows what it changed and writes the message, and nothing is committed on its behalf.
-  if (handoff.empty) {
-    const paths = handoff.pendingFiles ?? []
+  // The same holds for a branch that has commits and uncommitted work on top (an agent that
+  // committed, was asked for more, and left that uncommitted): every step below would be refused
+  // while the checkout is unclean, and would leave the newest work behind, so Commit comes first.
+  const paths = handoff.pendingFiles ?? []
+  if (handoff.empty || paths.length > 0) {
     if (paths.length === 0) return null
     return (
       <>
-        <Uncommitted paths={paths} />
+        <Uncommitted paths={paths} committed={!handoff.empty} />
         <Button size="xs" disabled={busy} onClick={() => act('commit', () => sendMessage(projectId, COMMIT_MESSAGE, agentId), 'Could not ask the agent to commit.')}>
           <GitCommitHorizontal className="h-3.5 w-3.5" />
           {pending === 'commit' ? 'Asking…' : 'Commit'}
@@ -231,10 +234,18 @@ function NotPublished() {
   return <Reason>not published</Reason>
 }
 
-/** The work an empty branch's checkout holds uncommitted, named; nothing when the tree is clean. */
-function Uncommitted({ paths }: { paths: string[] }) {
+/**
+ * The work a checkout holds uncommitted, named; nothing when the tree is clean. `committed` says
+ * the branch has commits already, so "Nothing committed" would be false.
+ */
+function Uncommitted({ paths, committed = false }: { paths: string[]; committed?: boolean }) {
   if (paths.length === 0) return null
-  return <Reason title={paths.join('\n')}>Nothing committed — {namePending(paths)} left uncommitted.</Reason>
+  return (
+    <Reason title={paths.join('\n')}>
+      {committed ? '' : 'Nothing committed — '}
+      {namePending(paths)} left uncommitted.
+    </Reason>
+  )
 }
 
 /**

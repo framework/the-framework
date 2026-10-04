@@ -1,25 +1,18 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import type { ChoiceRequest } from '../../src/index.js'
 import { pickedIds } from '../../src/client.js'
 import { cn } from '../lib/utils.js'
 
 // An answered gate, collapsed to one line (#1455 bonus 2 / item 6): what was decided stays
 // visible and expandable instead of vanishing under the cursor, but takes no more of the page
-// than a row. Shared by the launcher's questions hub (which adds a session label and an
-// Open-session link) and the transcript's resolved `choice` rows (which add nothing).
+// than a row. Used by the transcript's resolved `choice` rows.
 export function AnsweredChoice({
   choice,
   pick,
-  meta,
-  footer,
 }: {
   choice: ChoiceRequest
   /** What was picked: an option id, or the selected subset of ids for a multi select. */
   pick: string | readonly string[]
-  /** Extra collapsed-line context after the title (the hub: which session asked). */
-  meta?: ReactNode
-  /** Extra expanded content under the options (the hub: the Open-session link). */
-  footer?: ReactNode
 }) {
   const [expanded, setExpanded] = useState(false)
   const picked = new Set(pickedIds(pick))
@@ -33,7 +26,6 @@ export function AnsweredChoice({
       >
         <span className="shrink-0 text-success">✓</span>
         <span className="truncate font-medium text-foreground">{choice.title}</span>
-        {meta}
         <span className="ml-auto shrink-0">{expanded ? 'Collapse' : 'Expand'}</span>
       </button>
       {expanded && (
@@ -47,7 +39,6 @@ export function AnsweredChoice({
             ))}
             {picked.size === 0 && <li className="text-muted-foreground">Accepted none</li>}
           </ul>
-          {footer}
         </div>
       )}
     </div>

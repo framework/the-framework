@@ -168,4 +168,58 @@ describe('QuestionPanel', () => {
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith('p1', 'Lint, and the type check', 'r1'))
     expect(sendChoice).not.toHaveBeenCalled()
   })
+
+  describe('with `send`, the pick goes through it and the usual calls are not made', () => {
+    const usualCallsNotMade = () => {
+      expect(sendChoice).not.toHaveBeenCalled()
+      expect(sendMessage).not.toHaveBeenCalled()
+    }
+
+    test('a picked option', async () => {
+      const send = vi.fn(async () => undefined)
+      render(panel({ send }))
+      fireEvent.click(option(/SQLite/))
+      expect(send).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+      await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/Answer sent/))
+      expect(send.mock.calls).toEqual([['lite']])
+      usualCallsNotMade()
+    })
+
+    test('the checked options', async () => {
+      const send = vi.fn(async () => undefined)
+      render(panel({ choice: several, send }))
+      fireEvent.click(screen.getByRole('checkbox', { name: /Tests/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+      await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/Answer sent/))
+      expect(send.mock.calls).toEqual([[['lint', 'tests']]])
+      usualCallsNotMade()
+    })
+
+    test('only the options are offered: no "Other" row and no Skip, which are there without `send`', () => {
+      const { unmount } = render(panel({ send: vi.fn(), active: true }))
+      expect(screen.getAllByRole('listitem')).toHaveLength(2)
+      expect(screen.queryByLabelText('Other')).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Skip' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Submit' })).toBeTruthy()
+      // The key that would reach "Other" is no key of this panel.
+      expect(fireEvent.keyDown(window, { key: '3' })).toBe(true)
+      unmount()
+      render(panel())
+      expect(screen.getAllByRole('listitem')).toHaveLength(3)
+      expect(screen.getByLabelText('Other')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Skip' })).toBeTruthy()
+    })
+
+    test('a send that fails says why, and the question stays answerable', async () => {
+      const send = vi.fn(async () => {
+        throw new Error('that session has no parked question')
+      })
+      render(panel({ send }))
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+      await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('that session has no parked question'))
+      expect(screen.queryByRole('status')).toBeNull()
+      expect((screen.getByRole('button', { name: 'Submit' }) as HTMLButtonElement).disabled).toBe(false)
+    })
+  })
 })

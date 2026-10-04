@@ -2,7 +2,7 @@ The one rule for which questions [1] an agent [2] still waits on, read off the a
 
 ## Context
 
-**User story**: an agent's turn ends on a question; the agent ends `waiting` and its question stays answerable on its page and in the questions hub until the user answers, however long that takes. Once the agent goes on, the card is history.
+**User story**: an agent's turn ends on a question; the agent ends `waiting` and its question stays answerable on its page, and its agent stays listed in the questions hub, until the user answers, however long that takes. Once the agent goes on, the card is history.
 
 **Problem**: a question used to close at the agent's end, because an agent that died holding a question has nobody left to read the pick. An agent that ended ON its question is the opposite case: the end is the wait.
 

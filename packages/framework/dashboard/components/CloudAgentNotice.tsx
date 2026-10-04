@@ -5,7 +5,7 @@ import { bridgeChoiceRequest } from '../../src/client.js'
 import { onBridgeQuestion, onBridgeEvents, onBridgeAnswer } from '../rpc/reads.js'
 import { sendBridgeAnswer, sendBridgeAnswerCancel } from '../rpc/control.js'
 import { cloudSession } from '../lib/live-state.js'
-import { ChoicePanel } from './ChoicePanel.js'
+import { QuestionPanel } from './QuestionPanel.js'
 import { CopyButton } from './ui/copy-button.js'
 
 /** How often to ask the daemon whether the bridge reported a question. */
@@ -24,7 +24,7 @@ export function CloudAgentNotice({
 }: {
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
   events: readonly FrameworkEvent[]
-  /** The run this notice belongs to: what the gate panel is keyed on. */
+  /** The agent this notice belongs to: what the question panel is given. */
   projectId: string
   agentId: string
 }) {
@@ -76,11 +76,11 @@ export function CloudAgentNotice({
 
 /**
  * How a pick reaches a Claude web session (#1237/#1554): queued on the daemon for the extension,
- * which types the continuation into the session's composer. Shaped for `ChoicePanel.send`, so the
- * bridged gate is the same panel a local gate gets; the RPC's `{ok:false}` is thrown so the
+ * which types the continuation into the session's composer. Shaped for `QuestionPanel.send`, so the
+ * bridged question is the same panel a local one gets; the RPC's `{ok:false}` is thrown so the
  * panel's action hook shows the reason. The option ids are the labels (see `bridgeChoiceRequest`).
  */
-export function bridgeSend(sessionId: string): (pick: string | string[]) => Promise<void> {
+function bridgeSend(sessionId: string): (pick: string | string[]) => Promise<void> {
   return async pick => {
     const result = await sendBridgeAnswer(sessionId, Array.isArray(pick) ? pick : [pick])
     if (!result.ok) throw new Error(result.error ?? 'could not queue the answer')
@@ -89,9 +89,9 @@ export function bridgeSend(sessionId: string): (pick: string | string[]) => Prom
 
 /**
  * The question the session is parked on, once the browser bridge has reported one (#1237),
- * rendered as the gate it is (#1554): the same panel a local agent's question gets, posting
- * through the bridge instead of the path a local agent's answer takes. The link out stays as the manual path for
- * whoever prefers to answer over there.
+ * rendered as the gate it is (#1554): the same panel a local agent's question gets, every answer
+ * going through the bridge instead of the path a local agent's answer takes. The link out stays as
+ * the manual path for whoever prefers to answer over there.
  */
 function ParkedQuestion({
   question,
@@ -116,8 +116,9 @@ function ParkedQuestion({
           Sending “{failure.labels.join(', ')}” failed{failure.note ? `: ${failure.note}` : ''}. Pick again, or answer in the session.
         </p>
       )}
-      <ChoicePanel projectId={projectId} agentId={agentId} choice={bridgeChoiceRequest(question)} inline send={bridgeSend(sessionId)} />
-      <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 px-4 pb-2.5 text-xs text-primary hover:underline">
+      {/* Not `active`: the keys belong to the question above the message box, and to the message box. */}
+      <QuestionPanel key={question.title} projectId={projectId} agentId={agentId} choice={bridgeChoiceRequest(question)} send={bridgeSend(sessionId)} />
+      <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 px-4 py-2.5 text-xs text-primary hover:underline">
         Answer it in the session
         <ExternalLink className="h-3 w-3" aria-hidden />
       </a>

@@ -1,37 +1,16 @@
-import { useRef, useState } from 'react'
+import { ArrowRight } from 'lucide-react'
 import type { OpenQuestion } from '../../src/index.js'
 import { onOpenQuestions } from '../rpc/reads.js'
-import { bridgeSend } from './CloudAgentNotice.js'
 import { usePolled } from '../lib/use-async.js'
-import { AnsweredChoice } from './AnsweredChoice.js'
-import { ChoicePanel } from './ChoicePanel.js'
-import { ScrollArea } from './ui/scroll-area.js'
-import { cn } from '../lib/utils.js'
+import { formatRelative } from '../lib/format-date.js'
 
 /** Stable initial for the poll, so it does not churn on every render. */
 const EMPTY_QUESTIONS: OpenQuestion[] = []
 
-/** One key per gate; also keys the answered memory, so a re-fired gate is a fresh card. */
-const keyOf = (q: OpenQuestion) => `${q.projectId} ${q.agentId} ${q.choice.id}`
-
-/** What the hub remembers about a gate answered from here (#1455 bonus 2). */
-interface Answered {
-  question: OpenQuestion
-  pick: string | string[]
-}
-
 /**
- * Every session's open question, answerable in one place (#1455 item 4) — now the launcher's
- * main event (bonus 1, the shape (#299)): all choices at once in one big view with its own
- * scroll area, and a sticky jump-nav on the right instead of pagination. Longest-waiting
- * first, from the server.
- *
- * A question answered here collapses to a single line and stays (bonus 2): the card does not
- * vanish under the cursor when the poll drops the resolved gate, and clicking the line
- * re-expands what was picked. The memory is per-mount on purpose — a reload starts clean.
- *
- * Nothing here is ever answered for the user: a hub that renders every parked gate at once must
- * not accept any of them on its own.
+ * The agents that wait on the person, as rows: one line per agent, longest-waiting first, from
+ * the server. A row says who waits and on what, and opens the agent; the question is answered
+ * there, in the panel above the message box, never here.
  */
 export function OpenQuestions({
   projectId = null,
@@ -39,120 +18,53 @@ export function OpenQuestions({
 }: {
   /** The one project whose questions show (#1513): the project picked in the sidebar; null shows every project's. */
   projectId?: string | null
-  /** Jump into the session a question belongs to — it may be another project's. */
+  /** Open the agent a question belongs to — it may be another project's. */
   onOpenAgent: (projectId: string, agentId: string) => void
 }) {
   const { value: polled, loaded } = usePolled<OpenQuestion[]>(onOpenQuestions, EMPTY_QUESTIONS, 5000, [])
   const questions = projectId === null ? polled : polled.filter(q => q.projectId === projectId)
-  const [answered, setAnswered] = useState<Map<string, Answered>>(() => new Map())
-  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
-  // One row per card, open ones first in the server's order, then the answered leftovers the
-  // poll no longer returns (still shown as their collapsed line). An answered gate the poll
-  // still carries renders collapsed in place, so nothing jumps while the daemon catches up.
-  const rows: { key: string; question: OpenQuestion; answered?: Answered }[] = questions.map(q => {
-    const key = keyOf(q)
-    return { key, question: q, ...(answered.has(key) ? { answered: answered.get(key)! } : {}) }
-  })
-  const inPoll = new Set(rows.map(r => r.key))
-  for (const [key, entry] of answered) {
-    if (!inPoll.has(key) && (projectId === null || entry.question.projectId === projectId)) rows.push({ key, question: entry.question, answered: entry })
-  }
-
-  // No section at all when nothing is parked and nothing was just answered: an empty
-  // "Waiting on you" is noise on every launch.
-  if (!loaded || rows.length === 0) return null
-
-  const openCount = rows.filter(r => !r.answered).length
-  const jumpTo = (key: string) => cardRefs.current.get(key)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // No section at all when nothing waits: an empty "Waiting on you" is noise on every launch.
+  if (!loaded || questions.length === 0) return null
 
   return (
     <section aria-label="Open questions" className="border-t border-border p-3">
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Waiting on you · {openCount}
+        Waiting on you · {questions.length}
       </h2>
-      <div className="flex items-start gap-3">
-        {/* The one big view (#299): every card, scrolling inside its own area rather than paging. */}
-        <ScrollArea className="min-w-0 flex-1" viewportClassName="max-h-[70vh]">
-          <div className="space-y-3">
-            {rows.map(({ key, question, answered: done }) => (
-              <div
-                key={key}
-                ref={el => {
-                  if (el) cardRefs.current.set(key, el)
-                  else cardRefs.current.delete(key)
-                }}
-              >
-                {done ? (
-                  // The shared answered card (#1455 bonus 2), with the hub's extras: which
-                  // session asked on the collapsed line, and the way into it when expanded.
-                  <AnsweredChoice
-                    choice={question.choice}
-                    pick={done.pick}
-                    meta={<span className="truncate">{agentLabel(question)}</span>}
-                    footer={
-                      <button
-                        type="button"
-                        onClick={() => onOpenAgent(question.projectId, question.agentId)}
-                        className="mt-3 text-xs text-muted-foreground hover:text-foreground"
-                      >
-                        Open session →
-                      </button>
-                    }
-                  />
-                ) : (
-                  <div className="overflow-hidden rounded-md border border-border">
-                    <button
-                      type="button"
-                      onClick={() => onOpenAgent(question.projectId, question.agentId)}
-                      className="flex w-full items-baseline gap-2 px-4 py-2 text-left text-xs text-muted-foreground hover:bg-accent/40"
-                      title="Open this session"
-                    >
-                      <span className="truncate font-medium text-foreground">{agentLabel(question)}</span>
-                      <span className="truncate">{question.projectName}</span>
-                      <span className="ml-auto shrink-0">Open session →</span>
-                    </button>
-                    <ChoicePanel
-                      projectId={question.projectId}
-                      agentId={question.agentId}
-                      choice={question.choice}
-                      onAnswered={pick =>
-                        setAnswered(prev => new Map(prev).set(key, { question, pick }))
-                      }
-                      send={question.bridge ? bridgeSend(question.bridge.sessionId) : undefined}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-        {/* The jump-nav (bonus 1): on the right, beside the scroll area so it holds still while
-            the cards scroll. Earned by plurality — one card needs no map to it. */}
-        {rows.length > 1 && (
-          <nav aria-label="Jump to a question" className="sticky top-2 w-44 shrink-0 space-y-1 self-start">
-            {rows.map(({ key, question, answered: done }) => (
+      {/* A long list scrolls in place, so the rest of the Overview stays in reach. */}
+      <ul className="max-h-[70vh] overflow-y-auto">
+        {questions.map(question => {
+          const label = agentLabel(question)
+          const waiting = formatRelative(question.updatedAt, '')
+          return (
+            // Keyed by the agent, not the question: a row stays put when its agent asks the next one.
+            <li key={`${question.projectId} ${question.agentId}`}>
               <button
-                key={key}
                 type="button"
-                onClick={() => jumpTo(key)}
-                className={cn(
-                  'flex w-full items-baseline gap-1.5 rounded px-2 py-1 text-left text-xs hover:bg-accent/40',
-                  done ? 'text-muted-foreground/60' : 'text-muted-foreground',
-                )}
+                aria-label={`Open ${label}: needs input, ${question.choice.title}`}
+                onClick={() => onOpenAgent(question.projectId, question.agentId)}
+                className="flex w-full items-center gap-3 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent/40"
               >
-                {done && <span className="shrink-0 text-success">✓</span>}
-                <span className="truncate">{agentLabel(question)}</span>
+                <span className="flex shrink-0 items-center gap-1.5 text-xs text-warning">
+                  <span className="h-2 w-2 rounded-full bg-warning" aria-hidden />
+                  Needs input
+                </span>
+                <span className="max-w-[50%] shrink-0 truncate text-foreground">{label}</span>
+                <span className="min-w-0 flex-1 truncate text-muted-foreground">{question.choice.title}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{question.projectName}</span>
+                {waiting && <span className="shrink-0 text-xs text-muted-foreground">{waiting}</span>}
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
               </button>
-            ))}
-          </nav>
-        )}
-      </div>
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }
 
-/** The card's label for its session: its chosen name, else the intent's first line, else the id. */
+/** The row's title for its agent: the first line of its intent, else its id. */
 function agentLabel(q: OpenQuestion): string {
   return q.intent?.split('\n')[0]?.slice(0, 80) ?? q.agentId
 }

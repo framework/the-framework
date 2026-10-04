@@ -57,7 +57,7 @@ An `end` with nothing of the agent's own after it is no boundary: it is how the 
 
 #### Context
 
-**User story**: the agent's turn ends on a question with options; the agent ends waiting, and the user sees the question as a card in the transcript, in the right rail and among the open questions, answers it, and the agent goes on.
+**User story**: the agent's turn ends on a question with options; the agent ends waiting, and the user sees the agent among the open questions, answers the question in the panel above the message box of the agent's page, and the agent goes on.
 
 **Problem**: the agent has ENDED by the time the user reads its question, so "an end closes every question" would make every question unanswerable. But an agent that died or was stopped while holding a question must not stay answerable forever: nobody is left to read its pick [11].
 

@@ -24,8 +24,8 @@ vi.mock('../rpc/control.js', () => ({
   sendStart: vi.fn(async () => null),
   sendChoice: vi.fn(async () => null),
 }))
-// The feed's inline choice rows (#1455 item 6) pull ChoicePanel — and with it the preferences
-// module, whose RPC reads must not fetch a daemon that is not there.
+// The page's parts read the preferences module, whose RPC reads must not fetch a daemon that is
+// not there.
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => ({}),
   updatePreferences: vi.fn(),

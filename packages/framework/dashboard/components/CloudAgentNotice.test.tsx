@@ -81,12 +81,25 @@ describe('the parked question the bridge reports (#1237)', () => {
     onBridgeQuestion.mockResolvedValue(QUESTION)
     render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     await waitFor(() => expect(screen.getByText(QUESTION.title)).toBeTruthy())
-    expect(screen.getByRole('button', { name: /One page, both routes/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Cross-project only/ })).toBeTruthy()
-    expect(screen.getByText(/recommended/i)).toBeTruthy()
-    // The gate a local agent gets (#1554): same panel, same heading.
+    // The panel a local agent's question gets (#1554), with the options only: the bridge types
+    // nothing but the question's own labels, so there is no "Other" row and no Skip.
     expect(screen.getByRole('region', { name: QUESTION.title })).toBeTruthy()
-    expect(screen.getByText('Your call')).toBeTruthy()
+    expect(screen.getByRole('radio', { name: /One page, both routes/ }).textContent).toBe('One page, both routesRecommendedlists every project1')
+    expect(screen.getByRole('radio', { name: /Cross-project only/ }).getAttribute('aria-checked')).toBe('false')
+    expect(screen.queryByLabelText('Other')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Skip' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeTruthy()
+  })
+
+  test('its number keys are not bound: they belong to the question above the message box', async () => {
+    onBridgeQuestion.mockResolvedValue(QUESTION)
+    render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
+    await screen.findByRole('region', { name: QUESTION.title })
+    fireEvent.keyDown(window, { key: '2' })
+    expect(screen.getByRole('radio', { name: /Cross-project only/ }).getAttribute('aria-checked')).toBe('false')
+    fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true })
+    expect(sendBridgeAnswer).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Number keys pick/)).toBeNull()
   })
 
   test('is asked for by cloud session id, which is what the bridge can see', async () => {
@@ -124,10 +137,12 @@ describe('answering from the dashboard (#1237)', () => {
     state: 'queued' as const,
   }
 
-  test('one click answers, through the bridge rather than the local answer path (#1554)', async () => {
+  test('a picked option goes through the bridge on Submit, never the local answer path (#1554)', async () => {
     onBridgeQuestion.mockResolvedValue(QUESTION)
     render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
-    fireEvent.click(await screen.findByRole('button', { name: /Cross-project only/i }))
+    fireEvent.click(await screen.findByRole('radio', { name: /Cross-project only/i }))
+    expect(sendBridgeAnswer).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
     await waitFor(() => expect(sendBridgeAnswer).toHaveBeenCalledWith('session_01ABCdefGHIjklMNO', ['Cross-project only']))
     expect(sendChoice).not.toHaveBeenCalled()
   })
@@ -141,8 +156,8 @@ describe('answering from the dashboard (#1237)', () => {
     })
     render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
     await screen.findByRole('region', { name: QUESTION.title })
-    fireEvent.click(screen.getByLabelText('Tests'))
-    fireEvent.click(screen.getByRole('button', { name: /Accept 2 selected/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Tests/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
     await waitFor(() => expect(sendBridgeAnswer).toHaveBeenCalledWith('session_01ABCdefGHIjklMNO', ['Lint', 'Tests']))
   })
 
@@ -150,7 +165,7 @@ describe('answering from the dashboard (#1237)', () => {
     onBridgeQuestion.mockResolvedValue(QUESTION)
     sendBridgeAnswer.mockResolvedValue({ ok: false, error: 'that session has no parked question' })
     render(<CloudAgentNotice target="web" events={[handOff()]} projectId="p" agentId="a" />)
-    fireEvent.click(await screen.findByRole('button', { name: /Cross-project only/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Submit' }))
     await waitFor(() => expect(screen.getByText(/that session has no parked question/)).toBeTruthy())
   })
 

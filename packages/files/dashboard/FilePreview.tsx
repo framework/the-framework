@@ -26,12 +26,15 @@ export function FilePreviewCard({
   agentId: agentId,
   path,
   changed = true,
+  commit,
 }: {
   projectId: string
   agentId?: string | null | undefined
   path: string
   /** The tree saw a git status for this file, so there is a diff rather than only contents. */
   changed?: boolean
+  /** One commit of the run's work: the diff is then what that commit alone changed in the file. */
+  commit?: string | undefined
 }) {
   // Polled, not read once: the card is open over a session that is still editing, so what is under
   // the pointer keeps up rather than freezing at whatever it was when you hovered.
@@ -39,11 +42,11 @@ export function FilePreviewCard({
   const { value, loaded } = usePolled<FileDiff | FileContent | null>(
     () =>
       changed
-        ? readDiff(host, projectId, path, agentId ?? undefined)
+        ? readDiff(host, projectId, path, agentId ?? undefined, commit)
         : readContent(host, projectId, path, agentId ?? undefined),
     null,
     5_000,
-    [projectId, agentId, path, changed],
+    [projectId, agentId, path, changed, commit],
   )
 
   return (

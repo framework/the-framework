@@ -63,3 +63,26 @@ test('a tree read for a run the host does not know yet is starting, from the pro
   assert.equal(((await read('tree', { agentId: 'run-unknown' })) as { source: string }).source, 'starting')
   assert.deepEqual(await read('tree', {}), { source: 'gone' })
 })
+
+test('a run’s commits and one commit’s changes and diff are read for the run; with no run, or a commit that is not the run’s, nothing is', async () => {
+  const checkout = join(dir, 'wt-commits')
+  git(root, 'worktree', 'add', '-q', '-b', 'agent-c', checkout, 'main')
+  await writeFile(join(checkout, 'c.txt'), 'c\n')
+  git(checkout, 'add', '-A')
+  git(checkout, 'commit', '-q', '-m', 'Add c')
+  const sha = git(checkout, 'rev-parse', 'HEAD')
+  const runs = { 'run-c': { checkout, changedNothing: false } }
+  assert.deepEqual(((await read('commits', { agentId: 'run-c' }, runs)) as { sha: string; subject: string }[]).map(c => [c.sha, c.subject]), [[sha, 'Add c']])
+  assert.deepEqual(await read('commits', {}, runs), [])
+  assert.deepEqual(await read('commit', { agentId: 'run-c', commit: sha }, runs), { 'c.txt': { status: 'added', committed: true } })
+  assert.equal(await read('commit', { agentId: 'run-c', commit: git(root, 'rev-parse', 'main') }, runs), null)
+  assert.equal(await read('commit', { commit: sha }, runs), null)
+  // A later commit changes the file again: the first commit's diff is still its own, not the run's whole change.
+  await writeFile(join(checkout, 'c.txt'), 'c\nmore\n')
+  git(checkout, 'commit', '-q', '-am', 'More c')
+  const inCommit = ((await read('diff', { agentId: 'run-c', path: 'c.txt', commit: sha }, runs)) as { patch: string }).patch
+  assert.match(inCommit, /\+c/)
+  assert.doesNotMatch(inCommit, /\+more/)
+  assert.match(((await read('diff', { agentId: 'run-c', path: 'c.txt' }, runs)) as { patch: string }).patch, /\+more/)
+  assert.equal(await read('diff', { agentId: 'run-c', path: 'a.txt', commit: sha }, runs), null)
+})

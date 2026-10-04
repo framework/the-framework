@@ -81,7 +81,7 @@ describe('a working run’s changes (#817)', () => {
     // A session that touched forty files would otherwise be forty diffs nobody asked for.
     expect(readDiff).not.toHaveBeenCalled()
     fireEvent.click(screen.getByText('a.ts'))
-    await waitFor(() => expect(readDiff).toHaveBeenCalledWith(expect.anything(), 'p1', 'src/a.ts', agentId))
+    await waitFor(() => expect(readDiff).toHaveBeenCalledWith(expect.anything(), 'p1', 'src/a.ts', agentId, undefined))
     await waitFor(() => expect(screen.getByText('+const b = 3')).toBeTruthy())
   })
 

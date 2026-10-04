@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 import type { ModuleServerHost } from 'framework/module-server'
-import { readAgentFileContent, readAgentFileDiff, readAgentTree, resolveAgentFiles } from './tree.js'
+import { readAgentCommitChanges, readAgentCommitFileDiff, readAgentCommits, readAgentFileContent, readAgentFileDiff, readAgentTree, resolveAgentFiles } from './tree.js'
 
 let dir: string
 let root: string
@@ -368,4 +368,41 @@ test('whether a run’s work is merged: not while the default branch lacks it, o
   git(root, 'branch', '-q', '-D', 'agent-waiting')
   const landed = await readAgentTree(root, await resolve(deps({ status: 'done', host: 'this-machine', baseCommit: start, landed: tip })))
   assert.equal(landed.source === 'landed' && landed.merged, true)
+})
+
+test('a run’s commits are listed newest first, uncommitted work in none; one commit reads as what it alone changed; a commit that is not the run’s is not read', async () => {
+  const path = join(dir, 'wt-commits')
+  git(root, 'worktree', 'add', '-q', '-b', 'agent-commits', path, 'main')
+  const base = git(root, 'rev-parse', 'main')
+  const first = commit(path, 'Add b', { 'b.txt': 'b\n' })
+  const second = commit(path, 'Change a, drop b', { 'a.txt': 'a3\n' }, ['b.txt'])
+  await writeFile(join(path, 'e.txt'), 'not committed\n')
+
+  const at = await resolveAgentFiles(inCheckout(path), 'run-commits')
+  const commits = await readAgentCommits(root, at)
+  assert.deepEqual(commits.map(c => [c.sha, c.subject, c.author]), [[second, 'Change a, drop b', 't'], [first, 'Add b', 't']])
+  assert.equal(commits[0]!.short, second.slice(0, commits[0]!.short.length))
+  assert.ok(!Number.isNaN(Date.parse(commits[0]!.date)))
+
+  // All changes: b.txt came and went, so it is not marked. One commit: only its own change.
+  const tree = await readAgentTree(root, at)
+  assert.deepEqual(Object.keys('changes' in tree ? tree.changes : {}).sort(), ['a.txt', 'e.txt'])
+  assert.deepEqual(await readAgentCommitChanges(root, at, first), { 'b.txt': { status: 'added', committed: true } })
+  assert.deepEqual(await readAgentCommitChanges(root, at, second), { 'a.txt': { status: 'modified', committed: true }, 'b.txt': { status: 'deleted', committed: true } })
+  assert.match((await readAgentCommitFileDiff(root, at, first, 'b.txt'))?.patch ?? '', /\+b/)
+  assert.match((await readAgentCommitFileDiff(root, at, second, 'a.txt'))?.patch ?? '', /\+a3/)
+  assert.equal(await readAgentCommitFileDiff(root, at, first, 'a.txt'), null, 'a path the commit did not change')
+  assert.equal(await readAgentCommitFileDiff(root, at, second, '../outside'), null)
+
+  // The project's own commit is not one of the run's, and neither is a name that is no commit id.
+  assert.equal(await readAgentCommitChanges(root, at, base), null)
+  assert.equal(await readAgentCommitFileDiff(root, at, base, 'a.txt'), null)
+  assert.equal(await readAgentCommitChanges(root, at, 'main'), null)
+
+  // The same list once the checkout is gone, read from the branch; none for a run with nothing measured.
+  const onBranch = await resolve(deps({ status: 'done', host: 'this-machine', branch: 'agent-commits' }))
+  assert.deepEqual((await readAgentCommits(root, onBranch)).map(c => c.sha), [second, first])
+  assert.deepEqual(await readAgentCommitChanges(root, onBranch, first), { 'b.txt': { status: 'added', committed: true } })
+  assert.deepEqual(await readAgentCommits(root, { source: 'gone' }), [])
+  assert.deepEqual(await readAgentCommits(root, { source: 'unchanged', ref: base }), [])
 })

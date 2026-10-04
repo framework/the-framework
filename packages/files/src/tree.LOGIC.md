@@ -1,4 +1,4 @@
-Reads an agent's [1] files for the Files module's side-rail tab on the agent's page, for as long as git still holds them: from the agent's checkout [2] while it exists, then from the agent's branch, then from the commit its pull request merged as, or, for a subagent [6] its main agent landed, from the last commit its record kept. It answers the tree of files with each file the agent changed marked, whether all the agent changed is merged, one changed file's diff, and one unchanged file's content, all from the same source. An agent's record says the commit its own work begins at. An agent started from a branch other than the default one (a subagent starts from its main agent's branch) is measured from that commit, so the other branch's work is not marked as its own; so is an agent whose work the default branch already contains, so what it changed is still marked. An agent that finished on this machine [4], with none of those sources left and no recorded pull request, changed nothing, and its answer is the project's default branch with nothing marked. When none of the three is left otherwise, the answer is that the agent's changes are gone.
+Reads an agent's [1] files for the Files module's side-rail tab on the agent's page, for as long as git still holds them: from the agent's checkout [2] while it exists, then from the agent's branch, then from the commit its pull request merged as, or, for a subagent [6] its main agent landed, from the last commit its record kept. It answers the tree of files with each file the agent changed marked, whether all the agent changed is merged, one changed file's diff, one unchanged file's content, and the commits of the agent's work, each with what it alone changed, all from the same source. An agent's record says the commit its own work begins at. An agent started from a branch other than the default one (a subagent starts from its main agent's branch) is measured from that commit, so the other branch's work is not marked as its own; so is an agent whose work the default branch already contains, so what it changed is still marked. An agent that finished on this machine [4], with none of those sources left and no recorded pull request, changed nothing, and its answer is the project's default branch with nothing marked. When none of the three is left otherwise, the answer is that the agent's changes are gone.
 
 ## Context
 
@@ -29,6 +29,7 @@ Reads an agent's [1] files for the Files module's side-rail tab on the agent's p
 - **What is listed** - every file at the source's last state, plus the files the agent deleted while its work is not merged.
 - **An agent that changed nothing** - an agent that finished on this machine [4] with no checkout, no branch and no pull request left nothing to lose, so the default branch's files are listed, nothing marked, with no diff for any file; an agent from another machine, or one with any status but `done` or `failed`, is never judged so.
 - **One file's diff and content** - read from the same source as the tree, so the preview shows the change the tree marked.
+- **The commits of an agent's work** - the commits between the fork point [3] and the source's last commit, newest first, 200 at most; one of them read alone answers what that commit changed against the commit before it, and one file's diff in it; a commit that is not one of them is never read.
 - **Still looking** - while the agent's pull request is still being looked up and there is no branch to show, the answer is that it is not known yet.
 
 ## Business logic
@@ -157,6 +158,29 @@ The diff (the capping and counting rules are `diff.ts`'s):
 The content: in a checkout, the file on disk (`read.ts`). On a branch, at a merge commit, at a landed commit, or on the default branch for an agent that changed nothing, the file as that commit holds it, capped at 500 lines, flagged binary when it holds a NUL byte, and nothing for an unsafe path or a path the commit does not hold.
 
 When the agent's changes are gone, or still being looked up, there is no diff and no content.
+
+### The commits of an agent's work
+
+#### Context
+
+**User story**: the Changes tab lists an agent's commits under its changed files; a click on one shows what that commit alone changed (`../dashboard/ChangesPanel.tsx`).
+
+**Problem**: the read names a commit by its id, and the id comes from the browser. Answered for any id, the read would show any commit of the repository as if it were the agent's.
+
+#### Business logic
+
+The list of commits is read from the same source as the tree:
+
+- In a checkout: the commits from the fork point [3] to the checkout's last commit. On a branch, at a merge commit and at a landed commit: from the fork point to that commit (at a merge commit the fork point is its first parent, so a squash merge lists the squash commit alone).
+- Newest first, the newest 200 at most. Each commit carries its full id, its short id, its subject, its author's name and the time it was committed.
+- Uncommitted work is in no commit, so a checkout's list may hold less than its tree marks.
+- No commits are listed for an agent that changed nothing, one that is starting, one whose changes are still looked up or gone, and a source with no known fork point. A failed git read lists none.
+
+One commit read alone:
+
+- It is read only when its id is a full 40-character commit id and is one of the commits between the fork point and the source's last commit. For any other id (another commit of the repository, a branch name, a short id) the answer is nothing.
+- What it changed: each file that differs between the commit before it (its first parent) and it, marked added, modified or deleted, and committed. A commit with no parent is measured from an empty tree, so every file it holds is added.
+- One file's diff in it: the diff of that file between the commit before it and it. A path the commit did not change has no diff, and neither does an unsafe path (`read.ts`'s rule).
 
 ### Still looking
 

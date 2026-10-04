@@ -42,7 +42,7 @@ describe('FilePreviewHover (#816/#828)', () => {
 describe('FilePreviewCard (#816)', () => {
   test("reads the selected run's worktree and renders the diff", async () => {
     render(<FilePreviewCard projectId="p1" agentId="run-1" path="src/a.ts" />)
-    await waitFor(() => expect(readDiff).toHaveBeenCalledWith(expect.anything(), 'p1', 'src/a.ts', 'run-1'))
+    await waitFor(() => expect(readDiff).toHaveBeenCalledWith(expect.anything(), 'p1', 'src/a.ts', 'run-1', undefined))
     await waitFor(() => expect(screen.getByText('+const b = 3')).toBeTruthy())
     expect(screen.getByText('-const b = 2')).toBeTruthy()
     expect(screen.getByText('+1')).toBeTruthy()
@@ -51,7 +51,7 @@ describe('FilePreviewCard (#816)', () => {
 
   test('on the project home it reads the project checkout', async () => {
     render(<FilePreviewCard projectId="p1" path="src/a.ts" />)
-    await waitFor(() => expect(readDiff).toHaveBeenCalledWith(expect.anything(), 'p1', 'src/a.ts', undefined))
+    await waitFor(() => expect(readDiff).toHaveBeenCalledWith(expect.anything(), 'p1', 'src/a.ts', undefined, undefined))
   })
 
   test('a file with nothing to show says so instead of sitting on the spinner', async () => {

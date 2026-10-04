@@ -38,6 +38,8 @@ See `## Context`.
 
 Which read the card makes is decided by the tree: a file the tree saw a git status for is read as a diff, any other file as plain contents, so the status is never looked up a second time. The header shows the file's full path in a monospaced line and, for a diff, the count of added and removed lines at the right (the count is the dashboard's own "+added −removed" pair; the body's rendering rules are in `DiffView.tsx`; what a diff contains, how it is capped, and when a file counts as binary are the server part's rules in `src/diff.ts` and `src/read.ts`). The body renders the diff or the contents accordingly.
 
+The card's body is also what the Changes tab shows beside its list (`ChangesPanel.tsx`). There it may be given one commit of the agent's work: the diff read is then what that commit alone changed in the file.
+
 ### Read lazily, kept fresh
 
 #### Context

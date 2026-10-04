@@ -1,14 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import type { FrameworkEvent } from '../../src/index.js'
-import { agentStatusPill, type AgentCardFacts } from './agent-status.js'
+import { agentStatusPill } from './agent-status.js'
 
 const said = { kind: 'driver', event: { type: 'text', text: 'working' } } as FrameworkEvent
 const ended = (over: Record<string, unknown>) => ({ kind: 'end', ...over }) as FrameworkEvent
-const pr = { number: 7, url: 'https://github.com/o/r/pull/7' }
-const card = (over: Partial<AgentCardFacts> = {}): AgentCardFacts => ({ status: 'done', ...over })
 
 describe('agentStatusPill', () => {
-  test('says nothing with no line and no card', () => {
+  test('says nothing with no line in the feed', () => {
     expect(agentStatusPill([])).toBeNull()
   })
 
@@ -17,58 +15,13 @@ describe('agentStatusPill', () => {
     expect(agentStatusPill([said, ended({ ok: true })])).toMatchObject({ label: 'finished' })
   })
 
-  test('a card alone says the run builds, before its first line lands', () => {
-    expect(agentStatusPill([], card({ status: 'running' }))).toMatchObject({ label: 'building…' })
+  test('a stopped run says stopped', () => {
+    expect(agentStatusPill([said, ended({ ok: false, stopped: true })])).toMatchObject({ label: 'stopped', tone: 'text-warning' })
   })
 
-  test('ended clean with subagents still working, it says how many: the job is not finished', () => {
-    expect(agentStatusPill([said, ended({ ok: true })], card(), 2)).toMatchObject({ label: '2 subagents running' })
-    expect(agentStatusPill([said, ended({ ok: true })], card({ pr }), 1)).toMatchObject({ label: '1 subagent running' })
-    // Its own state wins while it works and when it did not end clean; the subagents win over its saving.
-    expect(agentStatusPill([said], card({ status: 'running' }), 2)).toMatchObject({ label: 'building…' })
-    expect(agentStatusPill([said, ended({ ok: true })], card({ saving: true }), 2)).toMatchObject({ label: '2 subagents running' })
-    expect(agentStatusPill([said, ended({ ok: false })], card({ status: 'failed' }), 2)).toMatchObject({ label: 'failed' })
-    expect(agentStatusPill([said, ended({ ok: false, stopped: true })], card({ status: 'stopped' }), 2)).toMatchObject({ label: 'stopped' })
-    expect(agentStatusPill([said, ended({ ok: false, waiting: true })], card({ status: 'waiting' }), 2)).toMatchObject({ label: 'waiting for an answer' })
-    expect(agentStatusPill([said, ended({ ok: true })], card(), 0)).toMatchObject({ label: 'finished' })
-  })
-
-  test('ready for merge, once the run ended clean with a pull request on its card', () => {
-    expect(agentStatusPill([said, ended({ ok: true })], card({ pr }))).toMatchObject({ label: 'ready for merge' })
-    // Still working, the pull request of an earlier leg is not the word yet.
-    expect(agentStatusPill([said], card({ status: 'running', pr }))).toMatchObject({ label: 'building…' })
-  })
-
-  // The states are exclusive by construction — one agent, one word. How the run ENDED wins over a
-  // pull request it opened on the way: the green would otherwise be a lie (#948).
-  test('stopped outranks a pull request', () => {
-    expect(agentStatusPill([said, ended({ ok: false, stopped: true })], card({ status: 'stopped', pr }))).toMatchObject({ label: 'stopped' })
-  })
-
-  test('failed outranks a pull request, and carries the reason', () => {
-    expect(agentStatusPill([said, ended({ ok: false, detail: 'exit 1' })], card({ status: 'failed', pr }))).toMatchObject({
-      label: 'failed',
-      detail: 'exit 1',
-    })
-  })
-
-  test('saving… while the daemon marks the ended run saving, above ready for merge (#1431)', () => {
-    const endedClean = [said, ended({ ok: true })]
-    expect(agentStatusPill(endedClean, card({ saving: true }))).toMatchObject({ label: 'saving…' })
-    expect(agentStatusPill(endedClean, card({ saving: true, pr }))).toMatchObject({ label: 'saving…' })
-    expect(agentStatusPill(endedClean, card({ pr }))).toMatchObject({ label: 'ready for merge' })
-    expect(agentStatusPill(endedClean, card())).toMatchObject({ label: 'finished' })
-  })
-
-  test('the feed says how the current leg ended, the card when the feed has no ending', () => {
-    // The feed is ahead of the 2 s runs poll: a leg that just ended is ended, whatever the card says yet.
-    expect(agentStatusPill([said, ended({ ok: false, stopped: true })], card({ status: 'running' }))).toMatchObject({ label: 'stopped' })
-    // No feed yet: the card's ending is the pill.
-    expect(agentStatusPill([], card({ status: 'failed' }))).toMatchObject({ label: 'failed' })
-    expect(agentStatusPill([], card({ status: 'waiting' }))).toMatchObject({ label: 'waiting for an answer' })
-    expect(agentStatusPill([], card({ pr }))).toMatchObject({ label: 'ready for merge' })
-    // A diary whose process died before its last line: the card's ending still settles the pill.
-    expect(agentStatusPill([said], card({ status: 'failed' }))).toMatchObject({ label: 'failed' })
+  test('a failed run says failed, and carries the reason', () => {
+    expect(agentStatusPill([said, ended({ ok: false, detail: 'exit 1' })])).toMatchObject({ label: 'failed', detail: 'exit 1' })
+    expect(agentStatusPill([said, ended({ ok: false })])).not.toHaveProperty('detail')
   })
 
   test('a resumed session builds again — the stopped segment does not hold the pill (#762)', () => {
@@ -89,23 +42,5 @@ describe('agentStatusPill', () => {
     const answered = [said, ended({ ok: false, waiting: true }), next]
     expect(agentStatusPill(answered)).toMatchObject({ label: 'building…' })
     expect(agentStatusPill([...answered, ended({ ok: true })])).toMatchObject({ label: 'finished' })
-  })
-
-  test('a message just sent says building at once, whatever the last leg ended as', () => {
-    const done = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'end', ok: true }] as FrameworkEvent[]
-    expect(agentStatusPill(done, { status: 'done' })?.label).toBe('finished')
-    expect(agentStatusPill(done, { status: 'done' }, 0, { starting: true })?.label).toBe('building…')
-    expect(agentStatusPill([], { status: 'stopped' }, 0, { starting: true })?.label).toBe('building…')
-    expect(agentStatusPill([], { status: 'failed' }, 0, { starting: true })?.label).toBe('building…')
-  })
-
-  test('a turn just seen ending clean says saving until the card has answered; any other ending says itself at once', () => {
-    const done = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'end', ok: true }] as FrameworkEvent[]
-    expect(agentStatusPill(done, { status: 'done' }, 0, { settling: true })?.label).toBe('saving…')
-    expect(agentStatusPill(done, { status: 'done', saving: true }, 0, { settling: false })?.label).toBe('saving…')
-    expect(agentStatusPill(done, { status: 'done' }, 0, { settling: false })?.label).toBe('finished')
-    expect(agentStatusPill([], { status: 'stopped' }, 0, { settling: true })?.label).toBe('stopped')
-    expect(agentStatusPill([], { status: 'failed' }, 0, { settling: true })?.label).toBe('failed')
-    expect(agentStatusPill([], { status: 'waiting' }, 0, { settling: true })?.label).toBe('waiting for an answer')
   })
 })

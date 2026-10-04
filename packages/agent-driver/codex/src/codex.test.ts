@@ -141,9 +141,9 @@ test('a Codex turn streams its messages word by word, what each tool call did, a
     { type: 'partial', text: 'I’ll create' },
     { type: 'partial', text: 'I’ll create it.' },
     { type: 'text', text: 'I’ll create it.' },
-    { type: 'action', label: 'commandExecution', detail: "printf 'hi' > hello.txt" },
+    { type: 'action', label: 'commandExecution', detail: "printf 'hi' > hello.txt", id: 'exec-1' },
     { type: 'thought', text: '**Checking the file**' },
-    { type: 'action', label: 'fileChange', detail: '/tmp/cx/hello.txt' },
+    { type: 'action', label: 'fileChange', detail: '/tmp/cx/hello.txt', id: 'fc_1' },
     // A new message starts from nothing.
     { type: 'partial', text: 'Created' },
     { type: 'partial', text: 'Created hello.txt' },
@@ -512,4 +512,29 @@ test('CodexDriver.listModels asks `codex debug models`, and says why when Codex 
   assert.deepEqual(asked, ['debug', 'models'])
   assert.equal(models.length, 3)
   await assert.rejects(new CodexDriver({ spawn: fakeSpawn([], undefined, 1) }).listModels(), /`codex debug models` failed \(code 1\)/)
+})
+
+test('a Codex command that finished says what it printed and its exit code, for the id of its call', async () => {
+  const events: DriverEvent[] = []
+  const command = (id: string, done: Record<string, unknown> | undefined) => item(done === undefined, { type: 'commandExecution', id, command: '/bin/zsh -lc "pnpm test\n  --run"', ...done })
+  const turn = [
+    command('exec-1', undefined),
+    command('exec-1', { status: 'completed', aggregatedOutput: '12 passed\n', exitCode: 0 }),
+    command('exec-2', undefined),
+    command('exec-2', { status: 'failed', aggregatedOutput: '', exitCode: 1 }),
+    // Nothing printed and no failure: nothing to say. A tool that is no command reports no output.
+    command('exec-3', { status: 'completed', aggregatedOutput: '', exitCode: 0 }),
+    item(false, { type: 'fileChange', id: 'fc_1', changes: [{ path: '/tmp/a', kind: 'add' }], status: 'completed' }),
+    item(false, { type: 'agentMessage', id: 'msg_1', text: 'Done', phase: 'final_answer' }),
+    completed('completed'),
+  ]
+  const session = await new CodexDriver({ spawn: fakeAppServer({ turn }) }).start({ cwd: '/ws', onEvent: e => events.push(e) })
+  await session.prompt('go')
+  assert.deepEqual(events.filter(e => e.type === 'action' || e.type === 'output'), [
+    // A command of two lines: the one line, and the command as it was given.
+    { type: 'action', label: 'commandExecution', detail: 'pnpm test --run', whole: 'pnpm test\n  --run', id: 'exec-1' },
+    { type: 'output', id: 'exec-1', text: '12 passed', exitCode: 0 },
+    { type: 'action', label: 'commandExecution', detail: 'pnpm test --run', whole: 'pnpm test\n  --run', id: 'exec-2' },
+    { type: 'output', id: 'exec-2', text: '', failed: true, exitCode: 1 },
+  ])
 })

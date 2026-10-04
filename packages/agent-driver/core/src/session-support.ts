@@ -47,3 +47,33 @@ export function oneLine(text: string): string {
   const flat = text.replace(/\s+/g, ' ').trim()
   return flat.length > DETAIL_MAX ? flat.slice(0, DETAIL_MAX - 1) + '…' : flat
 }
+
+/**
+ * How many characters of a tool call's output are kept. An output is a diary line, and the diary
+ * is copied onto the run's record: the limit keeps a run of many calls a small file.
+ */
+export const OUTPUT_MAX = 4000
+
+/**
+ * What a tool call printed, as a driver emits it: whole when it fits in {@link OUTPUT_MAX}
+ * characters, else its first half-limit and its last half-limit, with one line between them saying
+ * how many characters were cut. The start says what ran and the end says how it went.
+ */
+export function cutOutput(text: string): string {
+  const whole = text.replace(/\s+$/, '')
+  if (whole.length <= OUTPUT_MAX) return whole
+  const half = OUTPUT_MAX / 2
+  return `${whole.slice(0, half)}\n… ${whole.length - OUTPUT_MAX} characters cut …\n${whole.slice(-half)}`
+}
+
+/**
+ * The parts of an `action` event that say what the call was given: `detail`, the argument on one
+ * line and cut short, and `whole`, the argument as it was given (cut as an output is), only when
+ * `detail` is not all of it.
+ */
+export function callArgument(argument: string | undefined): { detail?: string; whole?: string } {
+  if (argument === undefined || argument.trim() === '') return {}
+  const detail = oneLine(argument)
+  const whole = cutOutput(argument.trim())
+  return whole === detail ? { detail } : { detail, whole }
+}

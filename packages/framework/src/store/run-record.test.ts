@@ -56,6 +56,8 @@ test('a diary agent-driver\'s own log wrote reads back as the framework\'s event
   assert.deepEqual(fromDiaryLine({ kind: 'start', prompt: '/work-queue' }), { kind: 'driver', event: { type: 'start', prompt: '/work-queue' } })
   assert.deepEqual(fromDiaryLine({ kind: 'action', label: 'Bash' }), { kind: 'driver', event: { type: 'action', label: 'Bash' } })
   assert.deepEqual(fromDiaryLine({ kind: 'action', label: 'Bash', detail: 'git status' }), { kind: 'driver', event: { type: 'action', label: 'Bash', detail: 'git status' } })
+  assert.deepEqual(fromDiaryLine({ kind: 'action', label: 'Bash', detail: 'a b', whole: 'a\nb', id: 't1' }), { kind: 'driver', event: { type: 'action', label: 'Bash', detail: 'a b', whole: 'a\nb', id: 't1' } })
+  assert.deepEqual(fromDiaryLine({ kind: 'output', id: 't1', text: 'ok', failed: true, exitCode: 1 }), { kind: 'driver', event: { type: 'output', id: 't1', text: 'ok', failed: true, exitCode: 1 } })
   assert.deepEqual(fromDiaryLine({ kind: 'thought', text: 'Check the test first.' }), { kind: 'driver', event: { type: 'thought', text: 'Check the test first.' } })
   assert.deepEqual(fromDiaryLine({ kind: 'notice', message: 'retried' }), { kind: 'driver', event: { type: 'notice', message: 'retried' } })
   assert.deepEqual(fromDiaryLine({ kind: 'error', message: 'claude exited with code 1' }), { kind: 'driver', event: { type: 'error', message: 'claude exited with code 1' } })

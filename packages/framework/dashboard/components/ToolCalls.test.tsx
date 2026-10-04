@@ -27,6 +27,45 @@ describe('ToolCalls', () => {
     expect(screen.queryByText('/repo/AGENTS.md')).toBeNull()
   })
 
+  test('an opened command shows the command whole with "$" in front and, under it, what it printed', () => {
+    render(<ToolCalls steps={[{ type: 'action', label: 'Bash', detail: 'pnpm test --run', whole: 'pnpm test\n  --run', id: 't1', output: { text: '12 passed' } }]} />)
+    expect(screen.queryByLabelText('Output')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Ran pnpm test --run' }))
+    expect(screen.getByLabelText('Command').textContent).toBe('$ pnpm test\n  --run')
+    const output = screen.getByLabelText('Output')
+    expect(output.textContent).toBe('12 passed')
+    // The box scrolls once it is tall.
+    expect(output.className).toContain('max-h-64')
+    expect(output.className).toContain('overflow-auto')
+    expect(screen.queryByText(/Failed/)).toBeNull()
+  })
+
+  test('a file that was read has no "$", and shows what the call gave back', () => {
+    render(<ToolCalls steps={[{ type: 'action', label: 'Read', detail: '/repo/AGENTS.md', id: 't1', output: { text: '1→hello' } }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Read AGENTS.md' }))
+    expect(screen.getByLabelText('Detail').textContent).toBe('/repo/AGENTS.md')
+    expect(screen.getByLabelText('Output').textContent).toBe('1→hello')
+  })
+
+  test('a call that failed says so: with its exit code when it has one, and with no empty output box', () => {
+    render(<ToolCalls steps={[{ type: 'action', label: 'commandExecution', detail: 'exit 3', output: { text: '', failed: true, exitCode: 3 } }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ran exit 3' }))
+    expect(screen.getByText('Failed: exit code 3')).toBeTruthy()
+    expect(screen.queryByLabelText('Output')).toBeNull()
+    cleanup()
+    render(<ToolCalls steps={[{ type: 'action', label: 'Bash', detail: 'pnpm lint', output: { text: 'boom', failed: true } }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ran pnpm lint' }))
+    expect(screen.getByText('Failed')).toBeTruthy()
+    expect(screen.getByLabelText('Output').textContent).toBe('boom')
+  })
+
+  test('a call with no detail opens when it gave something back', () => {
+    render(<ToolCalls steps={[{ type: 'action', label: 'TodoWrite', output: { text: 'Todos updated' } }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Updated todos' }))
+    expect(screen.getByLabelText('Output').textContent).toBe('Todos updated')
+    expect(screen.queryByLabelText('Detail')).toBeNull()
+  })
+
   test('a call with no detail is a line that does not open', () => {
     render(<ToolCalls steps={[{ type: 'action', label: 'TodoWrite' }]} />)
     expect(screen.getByText('Updated todos')).toBeTruthy()

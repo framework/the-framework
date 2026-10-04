@@ -4,8 +4,24 @@ import { callsSummary, toolCall } from '../lib/tool-calls.js'
 import { cn } from '../lib/utils.js'
 import { Markdown } from './Markdown.js'
 
+/** What a tool call gave back: what it printed, cut by the driver, and whether it failed. */
+export interface CallOutput {
+  text: string
+  failed?: true
+  exitCode?: number
+}
+
+/** A tool call: its name, what it was given on one line (`detail`) and whole (`whole`), what it gave back. */
+export interface Call {
+  label: string
+  detail?: string
+  whole?: string
+  id?: string
+  output?: CallOutput
+}
+
 /** One step of the coding agent between two messages: a tool call, or what it thought. */
-export type ToolStep = { type: 'action'; label: string; detail?: string } | { type: 'thought'; text: string }
+export type ToolStep = ({ type: 'action' } & Call) | { type: 'thought'; text: string }
 
 // How long ago `since` was, counted up every second: "9s", then "1m 5s".
 function Seconds({ since }: { since: string }) {
@@ -29,12 +45,18 @@ function Dots() {
   )
 }
 
-// One tool call: the verb in grey, what it was done to in dark, on one line. With a detail it
-// opens, on a click, to the detail whole. A call still going on (`live`) reads in the present
-// ("Running"), shimmers, and counts the seconds since it began when it says when that was.
-function CallLine({ label, detail, live }: { label: string; detail?: string; live?: { since: string | undefined } }) {
+// A box of an opened call: the page's code font, and it scrolls once it is taller than its limit.
+const BOX = 'max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-md px-2.5 py-1.5 font-mono text-xs text-foreground'
+
+// One tool call: the verb in grey, what it was done to in dark, on one line. With a detail or an
+// output it opens, on a click: the detail whole in a box (a command with "$" in front) and, under
+// it, what the call printed, in a box that scrolls; a call that failed says so, with its exit code
+// when it has one. A call still going on (`live`) reads in the present ("Running"), shimmers, and
+// counts the seconds since it began when it says when that was.
+function CallLine({ label, detail, whole, output, live }: Call & { live?: { since: string | undefined } }) {
   const [open, setOpen] = useState(false)
   const call = toolCall(label, detail)
+  const given = whole ?? call.detail
   const words = (
     <>
       <span className={cn('shrink-0', live && 'text-shimmer')}>{live ? call.doing : call.verb}</span>
@@ -42,7 +64,7 @@ function CallLine({ label, detail, live }: { label: string; detail?: string; liv
       {live?.since !== undefined && <Seconds since={live.since} />}
     </>
   )
-  if (call.detail === undefined) return <div className="flex min-w-0 items-center gap-1.5">{words}</div>
+  if (given === undefined && output === undefined) return <div className="flex min-w-0 items-center gap-1.5">{words}</div>
   return (
     <div className="min-w-0">
       <button
@@ -55,7 +77,22 @@ function CallLine({ label, detail, live }: { label: string; detail?: string; liv
         {words}
         <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 transition-transform', open && 'rotate-90')} aria-hidden />
       </button>
-      {open && <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-muted px-2.5 py-1.5 font-mono text-xs text-foreground">{call.detail}</pre>}
+      {open && (
+        <div className="mt-1 flex flex-col gap-1">
+          {given !== undefined && (
+            <pre aria-label={call.kind === 'command' ? 'Command' : 'Detail'} className={cn(BOX, 'bg-muted')}>
+              {call.kind === 'command' && <span className="select-none text-muted-foreground">$ </span>}
+              {given}
+            </pre>
+          )}
+          {output !== undefined && output.text !== '' && (
+            <pre aria-label="Output" className={cn(BOX, 'border border-border')}>
+              {output.text}
+            </pre>
+          )}
+          {output?.failed && <div className="text-xs text-destructive">{output.exitCode !== undefined ? `Failed: exit code ${output.exitCode}` : 'Failed'}</div>}
+        </div>
+      )}
     </div>
   )
 }
@@ -81,12 +118,12 @@ function ThoughtLine({ text }: { text: string }) {
 // The last line of the chat while the agent works, in place of a spinner: the call going on now
 // ("Running pnpm test 9s"), or, between calls, a word saying it is at it ("Working…"). Moving dots
 // in front, the text shimmering, the seconds counting.
-export function LiveLine({ call, word, since }: { call?: { label: string; detail?: string } | undefined; word: string; since?: string | undefined }) {
+export function LiveLine({ call, word, since }: { call?: Call | undefined; word: string; since?: string | undefined }) {
   return (
     <div role="status" className="flex min-w-0 flex-1 items-center gap-2 font-sans text-sm text-muted-foreground">
       <Dots />
       {call ? (
-        <CallLine label={call.label} {...(call.detail !== undefined ? { detail: call.detail } : {})} live={{ since }} />
+        <CallLine {...call} live={{ since }} />
       ) : (
         <>
           <span className="text-shimmer">{word}</span>
@@ -108,7 +145,7 @@ export function ToolCalls({ steps }: { steps: readonly ToolStep[] }) {
   if (only?.type === 'action') {
     return (
       <div className="min-w-0 flex-1 font-sans text-sm text-muted-foreground">
-        <CallLine label={only.label} {...(only.detail !== undefined ? { detail: only.detail } : {})} />
+        <CallLine {...only} />
       </div>
     )
   }
@@ -122,7 +159,7 @@ export function ToolCalls({ steps }: { steps: readonly ToolStep[] }) {
         <div className="mt-1.5 flex flex-col gap-1.5 rounded-lg border border-border px-3 py-2">
           {steps.map((step, at) =>
             step.type === 'action' ? (
-              <CallLine key={at} label={step.label} {...(step.detail !== undefined ? { detail: step.detail } : {})} />
+              <CallLine key={at} {...step} />
             ) : (
               <ThoughtLine key={at} text={step.text} />
             ),

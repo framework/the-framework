@@ -8,7 +8,7 @@ import { InlineScreen, isLoopbackScreen } from './InlineScreen.js'
 import { Markdown } from './Markdown.js'
 import { SessionLine, type SessionSetup } from './SessionLine.js'
 import { SubagentLine } from './SubagentLine.js'
-import { LiveLine, ToolCalls, type ToolStep } from './ToolCalls.js'
+import { LiveLine, ToolCalls, type CallOutput, type ToolStep } from './ToolCalls.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
   MessageScroller,
@@ -323,13 +323,19 @@ function Message({ text }: { text: string }) {
 
 /** A tool call or a thought of the coding agent: a step between two of its messages. */
 function stepOf(e: FrameworkEvent): ToolStep | undefined {
-  return e.kind === 'driver' && (e.event.type === 'action' || e.event.type === 'thought') ? e.event : undefined
+  return e.kind === 'driver' && (e.event.type === 'action' || e.event.type === 'thought') ? { ...e.event } : undefined
+}
+
+/** What a tool call gave back: no row and no step of its own, a part of its call. */
+function outputOf(e: FrameworkEvent): (CallOutput & { id: string }) | undefined {
+  return e.kind === 'driver' && e.event.type === 'output' ? e.event : undefined
 }
 
 /**
  * Fold each run of the agent's steps (tool calls and thoughts with no other row between them)
  * into its first row, which stands for the whole run. A run with no call in it, thoughts alone,
- * is no row at all: the chat has no thinking row. While the agent works (`live`), a call that is
+ * is no row at all: the chat has no thinking row. What a call gave back (its `output` event, by
+ * the call's id) is put on its call, wherever the call is. While the agent works (`live`), a call that is
  * the last event is the call going on now (`current`): it is not in its run yet, the chat's last
  * line says it.
  */
@@ -343,6 +349,7 @@ export function foldSteps(
   const rows: FrameworkEvent[] = []
   const steps = new Map<FrameworkEvent, ToolStep[]>()
   let run: { head: FrameworkEvent; steps: ToolStep[] } | undefined
+  const calls = new Map<string, Extract<ToolStep, { type: 'action' }>>()
   const close = (): void => {
     if (run?.steps.some(step => step.type === 'action')) {
       rows.push(run.head)
@@ -351,7 +358,14 @@ export function foldSteps(
     run = undefined
   }
   for (const e of events) {
+    const output = outputOf(e)
+    if (output) {
+      const call = calls.get(output.id)
+      if (call) call.output = { text: output.text, ...(output.failed ? { failed: true } : {}), ...(output.exitCode !== undefined ? { exitCode: output.exitCode } : {}) }
+      continue
+    }
     const step = stepOf(e)
+    if (step?.type === 'action' && step.id !== undefined) calls.set(step.id, step)
     if (step === undefined) {
       close()
       rows.push(e)

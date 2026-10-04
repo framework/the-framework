@@ -69,6 +69,8 @@ function formatDriverEvent(event: DriverEvent): string {
       return `    ${truncate(event.text)}`
     case 'action':
       return event.detail !== undefined ? `    · ${event.label}  ${truncate(event.detail, 140)}` : `    · ${event.label}`
+    case 'output':
+      return `      ${event.failed ? '✗' : '→'} ${truncate(event.text, 140)}`
     case 'thought':
       return `    💭 ${truncate(event.text, 140)}`
     case 'result':

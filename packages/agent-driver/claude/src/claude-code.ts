@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readClaudeQuota } from './claude-code-quota.js'
 import { readClaudeModels } from './claude-code-models.js'
-import { combineFraming, combineSignals, makeEmit, readWorkspaceFile, runCliSession, checkCliReady, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, finishTurn, agentEnv, oneLine, attachLog, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverModel, type DriverPromptOptions, type DriverQuota, type DriverRateLimit, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
+import { combineFraming, combineSignals, makeEmit, readWorkspaceFile, cutOutput, callArgument, runCliSession, checkCliReady, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, finishTurn, agentEnv, oneLine, attachLog, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverModel, type DriverPromptOptions, type DriverQuota, type DriverRateLimit, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /** Claude Code permission modes we pass through to the CLI. */
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
@@ -255,12 +255,30 @@ function stdinLines(text: string): string {
 /** The input keys, in order, whose value says what a tool call did; the first one present is the call's detail. */
 const DETAIL_KEYS = ['skill', 'command', 'file_path', 'notebook_path', 'path', 'url', 'pattern', 'query', 'description', 'prompt']
 
-/** The one argument that says what a tool call did, on one line and cut short. */
-export function toolDetail(input: unknown): string | undefined {
+/** The one argument that says what a tool call did, as it was given. */
+function toolArgument(input: unknown): string | undefined {
   if (typeof input !== 'object' || input === null) return undefined
   const fields = input as Record<string, unknown>
   const key = DETAIL_KEYS.find(k => typeof fields[k] === 'string' && (fields[k] as string).trim() !== '')
-  return key === undefined ? undefined : oneLine(fields[key] as string)
+  return key === undefined ? undefined : (fields[key] as string)
+}
+
+/** The one argument that says what a tool call did, on one line and cut short. */
+export function toolDetail(input: unknown): string | undefined {
+  return callArgument(toolArgument(input)).detail
+}
+
+/**
+ * What a tool gave back, from a `tool_result` block: its `content` is the text itself, or a list
+ * of blocks whose text ones hold it (an image block holds none).
+ */
+function resultText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return content
+    .map(part => (typeof part === 'object' && part !== null && (part as Record<string, unknown>)['type'] === 'text' ? (part as Record<string, unknown>)['text'] : undefined))
+    .filter(text => typeof text === 'string')
+    .join('\n')
 }
 
 /** How the CLI reports that the session id we asked it to resume is gone from its history (#778). */
@@ -273,8 +291,8 @@ function isConversationGone(err: unknown): boolean {
 
 /**
  * Incremental parser for Claude Code's `stream-json` output: newline-delimited
- * JSON, one object per line. We surface assistant text, thinking and tool calls as
- * {@link DriverEvent}s and keep the final `result` line as the turn text.
+ * JSON, one object per line. We surface assistant text, thinking, tool calls and what each call
+ * gave back as {@link DriverEvent}s and keep the final `result` line as the turn text.
  * Kept separate from the process plumbing so it is unit-testable in isolation.
  */
 export class StreamJsonParser {
@@ -315,6 +333,7 @@ export class StreamJsonParser {
     }
 
     if (type === 'assistant') return [...announced, ...this.handleAssistant(obj)]
+    if (type === 'user') return [...announced, ...this.handleResults(obj)]
     if (type === 'stream_event') return [...announced, ...this.handlePiece(obj['event'])]
     if (type === 'rate_limit_event') {
       const limit = parseRateLimit(obj)
@@ -362,11 +381,31 @@ export class StreamJsonParser {
         this.assistantText += block['text']
         events.push({ type: 'text', text: block['text'] })
       } else if (block['type'] === 'tool_use' && typeof block['name'] === 'string') {
-        const detail = toolDetail(block['input'])
-        events.push({ type: 'action', label: block['name'], ...(detail !== undefined ? { detail } : {}) })
+        events.push({ type: 'action', label: block['name'], ...callArgument(toolArgument(block['input'])), ...(typeof block['id'] === 'string' ? { id: block['id'] } : {}) })
       } else if (block['type'] === 'thinking' && typeof block['thinking'] === 'string' && block['thinking'].trim() !== '') {
         events.push({ type: 'thought', text: block['thinking'].trim() })
       }
+    }
+    return events
+  }
+
+  /**
+   * The CLI's own line after a tool call: a `user` message whose `tool_result` blocks each name
+   * the call (`tool_use_id`) and hold what it gave back. A result with no text says nothing.
+   */
+  private handleResults(obj: Record<string, unknown>): DriverEvent[] {
+    const message = obj['message']
+    if (typeof message !== 'object' || message === null) return []
+    const content = (message as Record<string, unknown>)['content']
+    if (!Array.isArray(content)) return []
+    const events: DriverEvent[] = []
+    for (const item of content) {
+      if (typeof item !== 'object' || item === null) continue
+      const block = item as Record<string, unknown>
+      if (block['type'] !== 'tool_result' || typeof block['tool_use_id'] !== 'string') continue
+      const text = cutOutput(resultText(block['content']))
+      if (text === '' && block['is_error'] !== true) continue
+      events.push({ type: 'output', id: block['tool_use_id'], text, ...(block['is_error'] === true ? { failed: true as const } : {}) })
     }
     return events
   }

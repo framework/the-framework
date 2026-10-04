@@ -80,6 +80,7 @@ function eventOf(line: AnyDiaryLine): FrameworkEvent | undefined {
     // agent's session id, and the question a turn ended on as the gate the dashboard shows.
     case 'start':
     case 'action':
+    case 'output':
     case 'thought':
     case 'rate-limit':
     case 'notice': {

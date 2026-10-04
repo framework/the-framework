@@ -28,7 +28,7 @@ Renders an agent's [1] event stream [2] in a terminal, one human-readable line p
 - **What the agent signals** - its log lines, errors with their detail indented, views by title, and "done for now" when it is settled.
 - **Gates and picks** - the question with one option per line, the recommended one marked, and the pick with who made it.
 - **Usage** - the price of one turn in dollars.
-- **The driver's own events** - the prompt, the text (a message being written reads as its text so far, though no diary holds one), the thoughts, the actions, the turn boundary, quota warnings only when the quota is tight, errors, notices, and the question a turn ended on.
+- **The driver's own events** - the prompt, the text (a message being written reads as its text so far, though no diary holds one), the thoughts, the actions and what each gave back, the turn boundary, quota warnings only when the quota is tight, errors, notices, and the question a turn ended on.
 - **The end** - "✓ finished", "■ stopped", "? waiting for an answer", or "✗ failed" with the detail.
 
 ## Business logic
@@ -82,7 +82,7 @@ Usage prints "spend: $<cost, four decimals>", the price of the one turn [4] the 
 
 #### Business logic
 
-A turn starts with "› prompt: <the prompt, flattened and cut to 140 characters>" and ends with "‹ turn complete". The coding agent's text prints flattened and cut to 100 characters, each action as "· <label>", followed by two spaces and its detail cut to 140 characters when it has one ("· Bash  git status"), each thought as "💭 <the thought, cut to 140 characters>", an error as "! agent error: <message>", a notice as "~ <message>", and the question a turn ended on as "? <its title, cut to 140 characters>". A session id the driver reports mid-stream prints as "session <id>" so a stray one reads as what it is, and the model the coding agent says a turn runs on as "model <its full id>". The quota [14] is quiet on the happy path: "✗ quota exhausted (<window>), resets <time>" when a request was rejected, "! quota running low (<window>), resets <time>" when the coding agent warns, and otherwise "· quota <status> (<window>), resets <time>", the time as an ISO timestamp.
+A turn starts with "› prompt: <the prompt, flattened and cut to 140 characters>" and ends with "‹ turn complete". The coding agent's text prints flattened and cut to 100 characters, each action as "· <label>", followed by two spaces and its detail cut to 140 characters when it has one ("· Bash  git status"), what an action gave back as "→ <its text, flattened and cut to 140 characters>" under it, with "✗" in place of the arrow when the call failed, each thought as "💭 <the thought, cut to 140 characters>", an error as "! agent error: <message>", a notice as "~ <message>", and the question a turn ended on as "? <its title, cut to 140 characters>". A session id the driver reports mid-stream prints as "session <id>" so a stray one reads as what it is, and the model the coding agent says a turn runs on as "model <its full id>". The quota [14] is quiet on the happy path: "✗ quota exhausted (<window>), resets <time>" when a request was rejected, "! quota running low (<window>), resets <time>" when the coding agent warns, and otherwise "· quota <status> (<window>), resets <time>", the time as an ISO timestamp.
 
 ### The end
 

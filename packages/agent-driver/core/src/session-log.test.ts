@@ -41,3 +41,20 @@ test('a run that ends mid-message leaves no live file', async () => {
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('a tool call and what it gave back are two diary lines, the second naming the first by its id', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'session-log-output-'))
+  try {
+    const log = new SessionLog(dir, { id: 'r1' }, false, () => '2026-10-04T10:00:00.000Z')
+    await log.open()
+    await log.record({ type: 'action', label: 'Bash', detail: 'pnpm test', id: 't1' })
+    await log.record({ type: 'output', id: 't1', text: '1 failed', failed: true, exitCode: 1 })
+    const lines = (await readFile(log.diaryPath, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+    assert.deepEqual(lines, [
+      { kind: 'action', label: 'Bash', detail: 'pnpm test', id: 't1', at: '2026-10-04T10:00:00.000Z' },
+      { kind: 'output', id: 't1', text: '1 failed', failed: true, exitCode: 1, at: '2026-10-04T10:00:00.000Z' },
+    ])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})

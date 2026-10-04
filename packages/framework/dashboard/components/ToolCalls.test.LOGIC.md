@@ -1,7 +1,10 @@
 What the tests cover, for the folded line of the coding agent's steps (`ToolCalls.tsx`):
 
 - **A lone call** - it is its own line, a button named by its verb and target ("Read AGENTS.md"), the verb grey and the target dark, with no count; it opens to the whole path and folds again.
-- **A call with no detail** - it reads as its verb and is no button.
+- **A call with no detail** - it reads as its verb and is no button, unless it gave something back: then it opens to that output alone.
+- **An opened command** - it shows the command whole, its lines kept, with "$" in front, and under it what it printed, in a box with a height limit that scrolls; nothing says it failed.
+- **An opened file read** - its path has no "$", and what the call gave back is under it.
+- **A failed call** - it says "Failed: exit code 3" with its exit code and has no empty output box, and "Failed" over its output when it has no code.
 - **Several calls** - they are one folded line counting them ("Ran 2 commands"), showing no command until opened.
 - **The opened box** - it holds one line per call, in order; a call inside opens to its detail; a second click on the counting line removes the box.
 - **Codex** - a command and a file change of Codex's read "Ran 1 command, edited 1 file", and each line inside reads with its verb.

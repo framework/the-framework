@@ -42,13 +42,35 @@ test('StreamJsonParser says what each tool call did, and passes thinking with te
   ]
   assert.deepEqual(p.push(JSON.stringify({ type: 'assistant', message: { role: 'assistant', content } })), [
     { type: 'thought', text: 'Checking 17*23 gives 391, so 19*21 is larger.' },
-    { type: 'action', label: 'Bash', detail: 'git status --short' },
+    // A command of two lines: the one line, and the command as it was given.
+    { type: 'action', label: 'Bash', detail: 'git status --short', whole: 'git status\n  --short' },
     { type: 'action', label: 'Skill', detail: 'tickets' },
     { type: 'action', label: 'Read', detail: '/repo/src/app.ts' },
     { type: 'action', label: 'WebFetch', detail: 'https://example.com' },
     { type: 'action', label: 'TodoWrite' },
-    { type: 'action', label: 'Bash', detail: 'x'.repeat(199) + '…' },
+    { type: 'action', label: 'Bash', detail: 'x'.repeat(199) + '…', whole: 'x'.repeat(300) },
   ])
+})
+
+test('StreamJsonParser gives each tool call its id, and what the call gave back as an output for that id', () => {
+  const p = new StreamJsonParser()
+  const call = { type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_1', name: 'Bash', input: { command: 'pnpm test' } }] } }
+  assert.deepEqual(p.push(JSON.stringify(call)), [{ type: 'action', label: 'Bash', detail: 'pnpm test', id: 'toolu_1' }])
+  const result = (blocks: unknown[]) => JSON.stringify({ type: 'user', message: { role: 'user', content: blocks } })
+  // The text itself, or a list of blocks whose text ones hold it.
+  assert.deepEqual(p.push(result([{ type: 'tool_result', tool_use_id: 'toolu_1', content: '12 passed\n' }])), [{ type: 'output', id: 'toolu_1', text: '12 passed' }])
+  assert.deepEqual(
+    p.push(result([{ type: 'tool_result', tool_use_id: 'toolu_2', content: [{ type: 'text', text: 'one' }, { type: 'image', source: {} }, { type: 'text', text: 'two' }] }])),
+    [{ type: 'output', id: 'toolu_2', text: 'one\ntwo' }],
+  )
+  // A call that failed says so, even with nothing printed.
+  assert.deepEqual(p.push(result([{ type: 'tool_result', tool_use_id: 'toolu_3', content: 'Exit code 1', is_error: true }])), [{ type: 'output', id: 'toolu_3', text: 'Exit code 1', failed: true }])
+  assert.deepEqual(p.push(result([{ type: 'tool_result', tool_use_id: 'toolu_4', content: '', is_error: true }])), [{ type: 'output', id: 'toolu_4', text: '', failed: true }])
+  // Nothing printed, or no call named: nothing to say. A user line that is not a result is none either.
+  assert.deepEqual(p.push(result([{ type: 'tool_result', tool_use_id: 'toolu_5', content: '' }, { type: 'tool_result', content: 'lost' }, { type: 'text', text: 'hello' }])), [])
+  // A long output is cut: its start and its end are kept.
+  const [long] = p.push(result([{ type: 'tool_result', tool_use_id: 'toolu_6', content: 'a'.repeat(5000) + 'END' }]))
+  assert.ok(long?.type === 'output' && long.text.startsWith('aaa') && long.text.endsWith('END') && long.text.includes('… 1003 characters cut …'))
 })
 
 test('StreamJsonParser passes the message being written as the text so far, each text block from empty', () => {

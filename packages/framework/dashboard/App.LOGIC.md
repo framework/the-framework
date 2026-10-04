@@ -131,7 +131,7 @@ The first rule that matches decides the page:
 #### Business logic
 
 - A start reports the project it started in (not always the selected one), the prompt that was typed, the agent id [9] the project's start hook answered, and, for an agent relayed [13] to a device [12], that device's label.
-- The dashboard goes to the new agent immediately, as a real history entry. The main pane shows the agent view [6] live on the strength of the id alone, before the agent's record exists; the sidebar shows a "starting…" row carrying the typed prompt until the real row lands; and the agents list is reloaded right away rather than at its next poll.
+- The dashboard goes to the new agent immediately, as a real history entry. The main pane shows the agent view [6] live on the strength of the id alone, before the agent's record exists; the sidebar shows a stand-in row carrying the typed prompt and the project it was started in, drawn as the real row will be, until the real row lands; and the agents list is reloaded right away rather than at its next poll.
 - The live feed on screen is emptied for a new agent, but not for a continuation: when the reported id is the agent already on screen in the same project, which is a message [15] resuming an ended agent, the transcript keeps its history and the new turn appends to it.
 - A start always names the agent it began, so the selection is always read off the URL and never inferred from which agent happens to be running.
 - Every start and every continuation empties the Context [18]: what was picked went with that agent, and the next launch starts from a clean focus.

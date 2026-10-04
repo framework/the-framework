@@ -84,9 +84,36 @@ describe('AgentHistory (#785)', () => {
     )
     const rows = [...container.querySelectorAll('button')]
     const home = rows.find(row => row.textContent?.trim() === 'New agent')
-    const starting = rows.find(row => row.textContent?.includes('starting…'))
+    const starting = rows.find(row => row.hasAttribute('data-stand-in'))
     expect(starting?.className).toContain('bg-accent')
     expect(home?.className).not.toContain('bg-accent')
+  })
+
+  test('the stand-in row reads as the run’s own row will: running, the project and "just now" where every project shows, the prompt, not dimmed', () => {
+    const { container, rerender } = renderRail(
+      <AgentHistory projectId="p1" scope={null} agents={[]} recentAgents={[]} selectedAgentId={null} onSelect={() => {}} startTick={0} startIntent="" />,
+    )
+    rerender(
+      <SidebarProvider>
+        <AgentHistory projectId="p1" scope={null} agents={[]} recentAgents={[]} selectedAgentId="run-2" onSelect={() => {}} startTick={1} startIntent="add dark mode" startId="run-2" startProjectName="alpha" />
+      </SidebarProvider>,
+    )
+    const row = [...container.querySelectorAll('button')].find(row => row.hasAttribute('data-stand-in'))!
+    expect(row.textContent).toBe('runningalpha · just nowadd dark mode')
+    expect(row.textContent).not.toContain('starting…')
+    expect(row.className).not.toContain('opacity-70')
+  })
+
+  test('with one project picked the stand-in row says the time alone, as a real row does there', () => {
+    const { container, rerender } = renderRail(
+      <AgentHistory projectId="p1" scope="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} startTick={0} startIntent="" />,
+    )
+    rerender(
+      <SidebarProvider>
+        <AgentHistory projectId="p1" scope="p1" agents={[]} selectedAgentId="run-3" onSelect={() => {}} startTick={1} startIntent="add a footer" startId="run-3" startProjectName="alpha" />
+      </SidebarProvider>,
+    )
+    expect([...container.querySelectorAll('button')].find(row => row.hasAttribute('data-stand-in'))!.textContent).toBe('runningjust nowadd a footer')
   })
 
   test('the starting row retires when the run it stands in for lands, even if it never ran', () => {
@@ -102,7 +129,7 @@ describe('AgentHistory (#785)', () => {
         <AgentHistory projectId="p1" scope="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} startTick={1} startIntent="hi" startId="run-9" />
       </SidebarProvider>,
     )
-    expect([...container.querySelectorAll('button')].some(row => row.textContent?.includes('starting…'))).toBe(true)
+    expect([...container.querySelectorAll('button')].some(row => row.hasAttribute('data-stand-in'))).toBe(true)
 
     // The poll catches up: the agent is already over, and was never seen running.
     rerender(
@@ -119,7 +146,7 @@ describe('AgentHistory (#785)', () => {
       </SidebarProvider>,
     )
     const rows = [...container.querySelectorAll('button')]
-    expect(rows.some(row => row.textContent?.includes('starting…'))).toBe(false)
+    expect(rows.some(row => row.hasAttribute('data-stand-in'))).toBe(false)
     expect(rows.some(row => row.textContent?.includes('failed'))).toBe(true)
   })
 
@@ -135,7 +162,7 @@ describe('AgentHistory (#785)', () => {
         <AgentHistory projectId="p1" scope="p1" agents={[older]} selectedAgentId={null} onSelect={() => {}} startTick={1} startIntent="hi" startId="run-new" />
       </SidebarProvider>,
     )
-    expect([...container.querySelectorAll('button')].some(row => row.textContent?.includes('starting…'))).toBe(true)
+    expect([...container.querySelectorAll('button')].some(row => row.hasAttribute('data-stand-in'))).toBe(true)
   })
 
   test('a run the list already holds when its start comes back gets no starting row, running or ended', () => {
@@ -145,7 +172,7 @@ describe('AgentHistory (#785)', () => {
     const { container, rerender } = renderRail(
       <AgentHistory projectId="p1" scope="p1" agents={[running]} selectedAgentId={null} onSelect={() => {}} startTick={0} startIntent="" />,
     )
-    const standIn = () => [...container.querySelectorAll('button')].some(row => row.textContent?.includes('starting…'))
+    const standIn = () => [...container.querySelectorAll('button')].some(row => row.hasAttribute('data-stand-in'))
     rerender(
       <SidebarProvider>
         <AgentHistory projectId="p1" scope="p1" agents={[running]} selectedAgentId="run-7" onSelect={() => {}} startTick={1} startIntent="hi" startId="run-7" />

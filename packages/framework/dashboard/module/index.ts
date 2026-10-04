@@ -193,25 +193,21 @@ export interface ModulePanel {
   Panel: ComponentType<ModulePanelProps>
 }
 
-/** What a run slot is rendered with: the run, and how the run's page shows it right now. */
+/** What a run slot is rendered with: the run, and whether its agent is working. */
 export interface ModuleRunProps {
   projectId: string
   agentId: string
   /** The run's agent is still working: a run that ended, or stopped on a question, is not. */
   working: boolean
-  /** The run's action bar is open, showing the run's details. */
-  expanded: boolean
 }
 
 /**
- * What a module adds to a run's page, under the run's action bar. `summary` is a few words in the
- * bar, shown until the run has ended and its branch has been read (the dashboard's own words about
- * the branch take over then); `details` is a block under the bar, rendered on every run's page,
- * which shows what it likes when the bar is open.
+ * What a module adds to a run's page: `summary`, a few words in the bar above the message box,
+ * shown until the run has ended and its branch has been read (the dashboard's own words about the
+ * branch take over then).
  */
 export interface ModuleRunSlots {
   summary?: ComponentType<ModuleRunProps>
-  details?: ComponentType<ModuleRunProps>
 }
 
 /** What a module's browser part default-exports. */

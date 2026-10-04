@@ -8,7 +8,7 @@ Loads the modules [1] the registered projects have and gives the shell their pag
 
 [1] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections, the usage bar's stop line): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [2] link action: one verb a module offers on any link a dashboard page shows, done by the module package's own command.
-[3] run slot: a place on an agent's page a module fills: the summary, a few words in the bar above the message box, shown while that bar is drawn and until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the action bar at the top of the page. Each is told the agent, whether it is still working, and whether the action bar is open.
+[3] run slot: a place on an agent's page a module fills: the summary, a few words in the bar above the message box, shown while that bar is drawn and until the agent has ended and its branch has been read (the handoff's own words take over then). It is told the agent and whether the agent is still working.
 [4] stop line: where a module's unattended work stops on the Overview's usage bar, as an offset from the quota boundary in percentage points; the module reads the offset and saves a new one, the bar draws the line and its handle.
 
 ## Business logic
@@ -21,6 +21,6 @@ The Settings sections are the definitions' sections, each carrying the package i
 
 The usage bar's stop line [4] is the first definition's that declares one, in package order, carrying the package it came from and the projects that have it; a later module's stop line is not mounted, since the bar has one handle. With no definition declaring one, none is mounted and the bar shows the account only (`components/Quota.tsx`).
 
-The side-rail tabs are every definition's tabs, and the run slots one entry per module that brings a summary or details, both in package order, each carrying the package it came from and the projects that have it: the rail and an agent's page offer them only for a project among those.
+The side-rail tabs are every definition's tabs, and the run slots one entry per module that brings a summary, both in package order, each carrying the package it came from and the projects that have it: the rail and an agent's page offer them only for a project among those.
 
 The shell reads all of this once and provides it to every component in it (`ModulesContext`, read with `useMountedModules`), so a page deep in the tree finds the link actions without being handed them; outside the shell, nothing is mounted and nothing is loaded.

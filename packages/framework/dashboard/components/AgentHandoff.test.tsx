@@ -10,7 +10,7 @@ const sendMessage = vi.fn(async () => ({ ok: true }) as unknown)
 vi.mock('../rpc/reads.js', () => ({ onAgentHandoff }))
 vi.mock('../rpc/control.js', () => ({ sendOpenPullRequest, sendMerge, sendPush, sendMergeBranch, sendMessage }))
 
-const { HandoffActions, HandoffSummary, AgentHandoffDetails, handoffExpandable, handoffSays } = await import('./AgentHandoff.js')
+const { HandoffActions, HandoffSummary, handoffSays } = await import('./AgentHandoff.js')
 const { useAgentHandoff } = await import('../lib/use-agent-handoff.js')
 
 /** A handoff for a session that did real work, on a repo with a remote and no PR yet. */
@@ -29,16 +29,14 @@ const worked = {
   gitHost: true,
 }
 
-// The same composition AgentView uses: the verdict and the next step in the action bar, the
-// commits and files behind the bar's disclosure.
-function Harness({ open = true, subagent = false }: { open?: boolean; subagent?: boolean }) {
+// The same composition AgentView uses: the verdict and the next step, side by side in one bar.
+function Harness({ subagent = false }: { subagent?: boolean }) {
   const state = useAgentHandoff('p1', 'run-1')
   return (
     <>
       <HandoffSummary handoff={state.handoff} subagent={subagent} />
       {state.error && <span>{state.error}</span>}
       <HandoffActions projectId="p1" agentId="run-1" state={state} subagent={subagent} />
-      {open && handoffExpandable(state.handoff) && <AgentHandoffDetails handoff={state.handoff} />}
     </>
   )
 }
@@ -59,22 +57,14 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('run handoff (#799)', () => {
-  test('summarises what a finished session produced, and lists it when expanded', async () => {
+  test('counts what a finished session produced and offers the next step, and lists neither the commits nor the files (#1023)', async () => {
     onAgentHandoff.mockResolvedValue(worked)
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('1 commit')).toBeTruthy())
     expect(screen.getByText('1 file')).toBeTruthy()
-    expect(screen.getByText('add dark mode')).toBeTruthy()
-    expect(screen.getByText('src/theme.ts')).toBeTruthy()
-  })
-
-  test('collapsed, it still says what the branch holds — without the lists (#1023)', async () => {
-    onAgentHandoff.mockResolvedValue(worked)
-    render(<Harness open={false} />)
-    await waitFor(() => expect(screen.getByText('1 commit')).toBeTruthy())
+    // The commits and the files themselves are in the side panel's Changes tab.
     expect(screen.queryByText('add dark mode')).toBeNull()
     expect(screen.queryByText('src/theme.ts')).toBeNull()
-    // The next step is never hidden behind the disclosure.
     expect(screen.getByText('Open PR')).toBeTruthy()
   })
 
@@ -85,11 +75,10 @@ describe('run handoff (#799)', () => {
     expect(screen.queryByText('the-framework/dark-mode')).toBeNull()
   })
 
-  test('a session that changed nothing reads no changes, says nothing more, and has nothing to expand', async () => {
+  test('a session that changed nothing reads no changes and says nothing more', async () => {
     onAgentHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true })
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('no changes')).toBeTruthy())
-    expect(handoffExpandable({ ...worked, commits: [], files: [], empty: true } as never)).toBe(false)
     // Nothing to hand off and nothing to do: no button and no sentence, since a run with work always
     // shows its button.
     expect(screen.queryByText('Open PR')).toBeNull()
@@ -118,17 +107,15 @@ describe('run handoff (#799)', () => {
     render(<Harness />)
     // A no-diff branch never gets the Open PR button — GitHub would refuse it with "No commits
     // between main and <branch>", the confusion this ticket started from. What is waiting is said
-    // by name instead, and the disclosure lists all of it.
+    // by name instead.
     await waitFor(() => expect(screen.getByText('Nothing committed — index.html, src/app.ts left uncommitted.')).toBeTruthy())
     expect(screen.queryByText('Open PR')).toBeNull()
-    expect(screen.getByText('Uncommitted files')).toBeTruthy()
-    expect(screen.getByText('index.html')).toBeTruthy()
   })
 
   test('uncommitted work gets a Commit button that asks the agent to commit; a subagent, and a branch with nothing left behind, get none', async () => {
     const left = { ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true, pendingFiles: ['index.html'] }
     onAgentHandoff.mockResolvedValue(left)
-    render(<Harness open={false} />)
+    render(<Harness />)
     fireEvent.click(await screen.findByRole('button', { name: 'Commit' }))
     // The agent is asked: it writes the commit, the dashboard commits nothing itself.
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith('p1', 'Commit your work.', 'run-1'))
@@ -136,19 +123,19 @@ describe('run handoff (#799)', () => {
 
     sendMessage.mockClear()
     sendMessage.mockResolvedValue({ ok: false, error: 'this project has no resume hook' })
-    render(<Harness open={false} />)
+    render(<Harness />)
     fireEvent.click(await screen.findByRole('button', { name: 'Commit' }))
     await waitFor(() => expect(screen.getByText(/this project has no resume hook/)).toBeTruthy())
     cleanup()
 
     onAgentHandoff.mockResolvedValue({ ...left, pendingFiles: [] })
-    render(<Harness open={false} />)
+    render(<Harness />)
     await waitFor(() => expect(onAgentHandoff).toHaveBeenCalled())
     expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull()
     cleanup()
 
     onAgentHandoff.mockResolvedValue(left)
-    render(<Harness open={false} subagent />)
+    render(<Harness subagent />)
     await waitFor(() => expect(screen.getByText('Nothing committed — index.html left uncommitted.')).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull()
   })
@@ -156,7 +143,7 @@ describe('run handoff (#799)', () => {
   test('uncommitted work on top of commits gets Commit first: no merge, no publish, until the checkout is clean', async () => {
     // The agent committed, was asked for more, and left that uncommitted.
     onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false, base: 'main', pendingFiles: ['index.html'] })
-    render(<Harness open={false} />)
+    render(<Harness />)
     await waitFor(() => expect(screen.getByText('index.html left uncommitted.')).toBeTruthy())
     expect(screen.queryByText(/Nothing committed/)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Merge' })).toBeNull()
@@ -166,38 +153,35 @@ describe('run handoff (#799)', () => {
 
     // With a remote and a git host too: Commit, not Open PR.
     onAgentHandoff.mockResolvedValue({ ...worked, pendingFiles: ['index.html'] })
-    render(<Harness open={false} />)
+    render(<Harness />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Commit' })).toBeTruthy())
     expect(screen.queryByText('Open PR')).toBeNull()
     cleanup()
 
     // Clean again: the next step is back.
     onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false, base: 'main' })
-    render(<Harness open={false} />)
+    render(<Harness />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Merge' })).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull()
   })
 
-  test('commits that cancel out are still counted and listed, and the bar says there is nothing to take', async () => {
+  test('commits that cancel out are still counted, and the bar says there is nothing to take', async () => {
     const cancelled = { ...worked, hasRemote: false, base: 'main', commits: [{ sha: 'a'.repeat(40), short: 'aaaaaaa', subject: 'Change to welcome' }, { sha: 'b'.repeat(40), short: 'bbbbbbb', subject: 'Change back to hello' }], files: [], insertions: 0, deletions: 0, empty: true }
     onAgentHandoff.mockResolvedValue(cancelled)
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('2 commits · no change left')).toBeTruthy())
     expect(screen.getByText('Nothing to merge: the commits cancel out.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Merge' })).toBeNull()
-    // The disclosure still lists what the agent did.
-    expect(screen.getByText('Change to welcome')).toBeTruthy()
-    expect(screen.getByText('Change back to hello')).toBeTruthy()
     cleanup()
 
     onAgentHandoff.mockResolvedValue({ ...cancelled, hasRemote: true })
-    render(<Harness open={false} />)
+    render(<Harness />)
     await waitFor(() => expect(screen.getByText('Nothing to publish: the commits cancel out.')).toBeTruthy())
     cleanup()
 
     // No commits at all is still "no changes", with nothing said where the button would be.
     onAgentHandoff.mockResolvedValue({ ...cancelled, commits: [] })
-    render(<Harness open={false} />)
+    render(<Harness />)
     await waitFor(() => expect(screen.getByText('no changes')).toBeTruthy())
     expect(screen.queryByText(/cancel out/)).toBeNull()
   })
@@ -205,7 +189,7 @@ describe('run handoff (#799)', () => {
   test('past two uncommitted files the rest are counted, and the hover carries them all (#1173)', async () => {
     const pendingFiles = ['a.ts', 'b.ts', 'c.ts', 'd.ts']
     onAgentHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true, pendingFiles })
-    render(<Harness open={false} />)
+    render(<Harness />)
     const reason = await screen.findByText('Nothing committed — a.ts, b.ts and 2 more left uncommitted.')
     expect(reason.getAttribute('title')).toBe(pendingFiles.join('\n'))
   })
@@ -410,7 +394,7 @@ describe('run handoff (#799)', () => {
     render(<Harness subagent />)
     await waitFor(() => expect(screen.getByText('landed')).toBeTruthy())
     expect(screen.getByText('1 commit')).toBeTruthy()
-    expect(screen.getByText('src/theme.ts')).toBeTruthy()
+    expect(screen.getByText('1 file')).toBeTruthy()
     expect(screen.queryByRole('button')).toBeNull()
     cleanup()
 

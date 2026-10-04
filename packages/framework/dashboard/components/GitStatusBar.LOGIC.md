@@ -92,7 +92,7 @@ Without a label (the project home), when the branch has a pull request, a link r
 
 #### Context
 
-**Problem**: the detail about an agent (which coding agent ran it, what it cost, what its branch holds) needs a way in that takes no row of its own; clicking the agent's name is how the detail below opens.
+**Problem**: the detail about an agent (which coding agent ran it, which model, what it cost) needs a way in that takes no row of its own; clicking the agent's name is how the detail below opens.
 
 #### Business logic
 

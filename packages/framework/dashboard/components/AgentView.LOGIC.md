@@ -24,7 +24,7 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 [15] stop: ending an agent before it finishes: the Stop button, Ctrl-C, or a pick marked to stop.
 [16] project home: a project's own page with the launcher (the Start form) and its composer.
 [17] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
-[18] run slot: a place on an agent's page a module fills: the summary, a few words in the bar above the message box, shown while that bar is drawn and until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the action bar at the top of the page. Each is told the agent, whether it is still working, and whether the action bar is open.
+[18] run slot: a place on an agent's page a module fills: the summary, a few words in the bar above the message box, shown while that bar is drawn and until the agent has ended and its branch has been read (the handoff's own words take over then). It is told the agent and whether the agent is still working.
 [19] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent. A subagent opens no pull request: its main agent lands its work, which merges it into the main agent's own branch.
 
 ## Business logic — TL;DR
@@ -42,7 +42,7 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 - **What the action bar says** - the agent's name with its project as a breadcrumb; whether its checkout is clean or dirty; the one status word, from the events shown and the agent's card. Not the agent's branch, nor its pull request, nor the next step.
 - **The bar above the message box** - between the feed and the composer, under any question panel, drawn while there is something to say: the branch has a pull request, the agent commits, a working agent's checkout holds uncommitted changes, or an ended agent's branch holds work; an agent that changed nothing has no bar. It says the project, the agent's branch and its pull request, from the agent's checkout, which the page reads once for both bars; until the branch's verdict is read, the installed modules' summaries (the Files module's count of what the checkout has changed); once not working, the verdict on what the branch holds and, at the end of the bar, the offered next step; for a subagent [19], no next step, and in its place whether its main agent landed its work.
 - **Switching between agents** - the action bar names the agent at once and shows its facts together once its own reads are in (at most a second later), and the bar above the message box gets its summary and its next step then too; an agent seen before shows its archive, its branch verdict and its facts at once, as last read, while they are read again.
-- **The disclosure** - opening the action bar's disclosure adds the agent's details strip and, once stopped, the commits and files its branch holds; the installed modules' details sit under the action bar in every state, told whether it is open (the Files module shows a working agent's changed files there).
+- **The disclosure** - opening the action bar's disclosure adds the agent's details strip: the coding agent, the model and the spend. What the agent changed is not listed there: the Changes tab of the side rail shows it.
 - **Removing a kept checkout** - a finished agent that kept its checkout (it failed or was stopped) is offered a Remove, which disappears at once when used.
 - **Notices for work that runs elsewhere** - an agent whose turns run on GitHub Actions, in a cloud session, or on a device gets a notice explaining what the feed can and cannot show.
 - **While the agent commits** - from a press on "Commit" the ask shows as the last prompt of the feed and the bar above the message box says "Committing…" where the next step would be, until the agent's turn has ended and its branch has been read again, so the place is never empty between the two; an ask that did not go through gives the button back. It is read off the last prompt, the message on its way or else the last prompt in the events shown, so a working agent whose last prompt is the button's ask says so after a refresh too, and any other prompt says nothing.
@@ -59,7 +59,7 @@ See `## Context`.
 
 #### Business logic
 
-The page for one agent [1] holds, top to bottom: the action bar (`AgentActionBar.tsx`), the optional details strip and the changes or the branch detail behind the action bar's disclosure, the notices for work that runs elsewhere, the feed of events [4] (`AgentFeed.tsx`), the subagents line while one of the agent's subagents [19] is working (see "The agent's subagents"), the panel of each question the agent waits on (`QuestionPanel.tsx`), the bar above the message box while there is something to say (`AgentWorkBar.tsx`, see "The bar above the message box"), and the composer [5] (`AgentComposer.tsx`). None of these parts is replaced when the agent's state changes; each is told whether the agent is still running and what it has to show, and adapts its contents.
+The page for one agent [1] holds, top to bottom: the action bar (`AgentActionBar.tsx`), the details strip behind the action bar's disclosure, the notices for work that runs elsewhere, the feed of events [4] (`AgentFeed.tsx`), the subagents line while one of the agent's subagents [19] is working (see "The agent's subagents"), the panel of each question the agent waits on (`QuestionPanel.tsx`), the bar above the message box while there is something to say (`AgentWorkBar.tsx`, see "The bar above the message box"), and the composer [5] (`AgentComposer.tsx`). None of these parts is replaced when the agent's state changes; each is told whether the agent is still running and what it has to show, and adapts its contents.
 
 The agent's name leads the action bar: the label the caller passes, the same label the history rail shows (what the user typed, else the branch, else the start time; for a subagent [19], its task: the first line of that). The project's name is shown before it as a "<project> ›" breadcrumb.
 
@@ -104,7 +104,7 @@ An agent [1] counts as working exactly while the daemon's list of agents says it
 
 - what the branch holds (the read in `lib/use-agent-handoff.ts`) is read once the agent is not working: a branch still being written to has nothing to offer yet. For this read and for the next step [9], an agent also counts as working from the moment a message is sent to it, and for as long as its events show a turn going, even while the daemon's list still says it ended: the list is read every 2 seconds, and the last step, its button with it, would stay in the bar above the message box for that long over an agent already at work. The answer remembered from before the agent worked again is dropped, so the old step is not put back for a moment when it ends. While its card [3] is marked saving, its checkout is being cleaned up, which deletes a branch that holds nothing, so a next step offered then would be gone moments later: the answer is shown then only for a branch with commits of its own, pushed or not, which the clean-up keeps, and the branch is read again the moment the mark is gone;
 - the end of the bar above the message box, where the next step goes, is empty while working (in the sense of the read above) — an agent that is working is still writing its branch — and holds the next step [9] once not working and no subagent [19] holds the agent's job (see "The agent's subagents");
-- the modules' run slots [18] are told whether the agent works: the Files module reads the checkout [7] only while it does; the branch's commits and files take over once not working.
+- the modules' run slots [18] are told whether the agent works: the Files module reads the checkout [7] only while it does; the one-line verdict on the branch takes over once not working.
 
 Until the daemon's list of agents has been read (an agent opened from the Overview, or from a link, before its project's list has answered), whether the agent runs is not known: it counts as neither working nor ended. Its archive, its branch and the project's kept checkouts are not read, the action bar waits and no next step is offered (see "Switching between agents"), and the feed stays blank until the list is read or a second has passed, then shows the live event stream's events.
 
@@ -179,7 +179,7 @@ While the daemon's list says the agent ended and the read of what its branch hol
 
 The summary, held back until the action bar's facts are ready (see "Switching between agents"):
 
-- Until the agent is not working and the read of what its branch holds has answered: the summary run slot [18] of every installed module [17] the project has, each told the agent, whether it is working and whether the action bar's disclosure is open. The Files module's says what the agent's checkout [7] has changed (files changed, lines added, lines removed).
+- Until the agent is not working and the read of what its branch holds has answered: the summary run slot [18] of every installed module [17] the project has, each told the agent and whether it is working. The Files module's says what the agent's checkout [7] has changed (files changed, lines added, lines removed).
 - Once the agent is not working and the read of what its branch holds has answered: the one-line verdict on the branch (`AgentHandoff.tsx`), followed, in the danger color, by the error of the last next-step [9] action the user pressed, when one failed.
 - Until that read has answered, a just-stopped agent keeps showing the modules' summaries (the Files module keeps the counts the agent ended with): the summary swaps once, to the branch verdict, instead of going blank for the beat the read takes.
 
@@ -195,16 +195,11 @@ The next step, at the end of the bar:
 
 #### Context
 
-**User story**: the user opens the action bar's disclosure to see the facts about this agent [1] (which coding agent, which driver session [11], what it cost) and what it touched.
+**User story**: the user opens the action bar's disclosure to see the facts about this agent [1]: which coding agent ran it, which model, what it cost. What the agent changed is in the Changes tab of the side rail, with each file's diff and the commits, so it is not listed a second time here.
 
 #### Business logic
 
-The disclosure toggles open and closed from the action bar: a click on the agent's name. While open it shows, above the feed:
-
-- the details strip (`AgentDetails.tsx`) with the coding agent and model off the agent's card [3] and the spend off its events, in every state;
-- once the agent is not working: the commits and files its branch holds (`AgentHandoff.tsx`).
-
-Under the action bar, in every state and whether the disclosure is open or not, sits the details run slot [18] of every installed module [17] the project has, told the agent, whether it is working and whether the disclosure is open; each decides what it shows. The Files module's lists a working agent's changed files while the disclosure is open. A relayed [13] agent's checkout lives on the device [12], and a module's reads about it are made there, so it is shown like a local agent's. A module's slot that throws shows its own error line and leaves the rest of the page standing.
+The disclosure toggles open and closed from the action bar: a click on the agent's name. While open it shows, above the feed, the details strip (`AgentDetails.tsx`) with the coding agent and model off the agent's card [3] and the spend off its events, in every state, and nothing else: no list of commits and no list of files, for a working agent or an ended one.
 
 ### Removing a kept checkout
 

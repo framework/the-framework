@@ -1,13 +1,13 @@
-Shows what actually changed in a checkout's [1] files, for the Files tab's hover card and the list of changed files on a working agent's page [2]: one file's unified diff (a tracked file against the last commit, hunks only; an untracked file rendered as all-added from its contents; a binary change reported as binary), capped at 500 lines, and the whole list of changed files with their added and removed line counts, bought with one git call rather than one diff per file. The read is made against whatever checkout the caller resolved, so an agent's [3] hover shows its own checkout and not the project's, and every path comes from the browser, so nothing is read before the path passes the guard in `read.ts`.
+Shows what actually changed in a checkout's [1] files, for the Files tab's hover card and the count of changed files on a working agent's page [2]: one file's unified diff (a tracked file against the last commit, hunks only; an untracked file rendered as all-added from its contents; a binary change reported as binary), capped at 500 lines, and the whole list of changed files with their added and removed line counts, bought with one git call rather than one diff per file. The read is made against whatever checkout the caller resolved, so an agent's [3] hover shows its own checkout and not the project's, and every path comes from the browser, so nothing is read before the path passes the guard in `read.ts`.
 
 ## Context
 
-**User story**: the Files tab's tree already marks a file as modified, untracked or deleted; hovering it shows what changed without leaving the dashboard for `git diff`, and a working agent's page lists every file the agent touched with how much moved, updating as the agent edits.
+**User story**: the Files tab's tree already marks a file as modified, untracked or deleted; hovering it shows what changed without leaving the dashboard for `git diff`, and a working agent's page counts the files the agent touched and how much moved, updating as the agent edits.
 
 ## Glossary
 
 [1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is the project's checkout.
-[2] agent's page: the dashboard page of one agent, where the Files module adds, while the agent works, the count of files it changed to the bar above the message box and their list under the action bar at the top of the page.
+[2] agent's page: the dashboard page of one agent, where the Files module adds, while the agent works, the count of files it changed to the bar above the message box.
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 
 ## Business logic — TL;DR
@@ -55,7 +55,7 @@ A path that fails the guard in `read.ts` (not a plain repository-relative path: 
 
 #### Context
 
-**User story**: a working agent's page [2] lists every file the agent [3] changed with how many lines were added and removed; an agent that touched forty files must not cost forty diffs.
+**User story**: a working agent's page [2] counts the files the agent [3] changed and how many lines were added and removed; an agent that touched forty files must not cost forty diffs.
 
 #### Business logic
 

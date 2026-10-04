@@ -13,20 +13,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 // finding out what it actually did meant leaving the dashboard for the command line.
 //
 // It used to be a panel of its own under the action bar, which repeated the bar's branch name and
-// pushed the session output down even when the answer was "nothing changed". It is now split: the
-// verdict and the next step ride in the action bar beside the branch they are about, and the
-// commits and files are what the bar expands to (#1023).
+// pushed the session output down even when the answer was "nothing changed". It is now the verdict
+// and the next step, in the bar above the message box beside the branch they are about (#1023).
+// The commits and the files themselves are in the side panel's Changes tab.
 //
 // The read is branch-addressed, so it survives the checkout: a clean agent's worktree is removed
 // when it ends.
-
-const MAX_COMMITS = 6
-const MAX_FILES = 10
-
-/** True when there is a commit list, a file list, or uncommitted work worth expanding the bar for. */
-export function handoffExpandable(handoff: AgentHandoff | null): boolean {
-  return Boolean(handoff && handoff.exists && (!handoff.empty || handoff.commits.length > 0 || handoff.pendingFiles?.length))
-}
 
 /**
  * The one-line verdict, in the action bar: what the session left behind, or that it left nothing.
@@ -108,7 +100,8 @@ export function Committing() {
 export function handoffSays(handoff: AgentHandoff | null): boolean {
   if (!handoff) return false
   if (handoff.landed) return true
-  return handoff.exists ? handoffExpandable(handoff) : !handoff.unchanged
+  if (!handoff.exists) return !handoff.unchanged
+  return !handoff.empty || handoff.commits.length > 0 || Boolean(handoff.pendingFiles?.length)
 }
 
 export function HandoffActions({
@@ -306,7 +299,7 @@ function Uncommitted({ paths, committed = false }: { paths: string[]; committed?
 
 /**
  * The uncommitted paths, worded for a one-line bar: the first couple named, the rest counted.
- * The full list is one hover (the Reason's title) or one disclosure (the details pane) away.
+ * The full list is one hover (the Reason's title) away.
  */
 function namePending(paths: string[]): string {
   const shown = paths.slice(0, 2).join(', ')
@@ -322,89 +315,5 @@ function Reason({ children, title }: { children: ReactNode; title?: string }) {
     <span className="inline-block max-w-[24rem] truncate align-middle text-xs text-muted-foreground" {...(title ? { title } : {})}>
       {children}
     </span>
-  )
-}
-
-/** What the branch holds, revealed by the bar's disclosure. Never rendered when there is nothing. */
-export function AgentHandoffDetails({ handoff }: { handoff: AgentHandoff | null }) {
-  if (!handoffExpandable(handoff) || !handoff) return null
-  // A column with no rows is a heading over nothing: a session can commit all of its work and
-  // leave the tree clean, and then "Changed files" has nothing to list.
-  const pendingFiles = handoff.pendingFiles ?? []
-  const sections = [handoff.commits.length > 0, handoff.files.length > 0, pendingFiles.length > 0].filter(Boolean).length
-  return (
-    <section
-      className={cn('grid gap-3 border-b border-border px-4 py-3 text-xs', sections > 1 && 'sm:grid-cols-2')}
-      aria-label="Agent handoff"
-    >
-      {handoff.commits.length > 0 && <Commits handoff={handoff} />}
-      {handoff.files.length > 0 && <Files handoff={handoff} />}
-      {pendingFiles.length > 0 && <PendingFiles paths={pendingFiles} />}
-    </section>
-  )
-}
-
-/** What the session committed. Capped, with the remainder counted rather than dropped silently. */
-function Commits({ handoff }: { handoff: AgentHandoff }) {
-  const shown = handoff.commits.slice(0, MAX_COMMITS)
-  const rest = handoff.commits.length - shown.length
-  return (
-    <div>
-      <h3 className="mb-1.5 text-muted-foreground">Commits</h3>
-      <ul className="space-y-1">
-        {shown.map(commit => (
-          <li key={commit.sha} className="flex gap-2">
-            <code className="shrink-0 text-muted-foreground">{commit.short}</code>
-            <span className="truncate" title={commit.subject}>
-              {commit.subject}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {rest > 0 && <p className="mt-1 text-muted-foreground">and {rest} more</p>}
-    </div>
-  )
-}
-
-/** The work the session never committed (#1173) — the full list behind the bar's one-line naming. */
-function PendingFiles({ paths }: { paths: string[] }) {
-  const shown = paths.slice(0, MAX_FILES)
-  const rest = paths.length - shown.length
-  return (
-    <div>
-      <h3 className="mb-1.5 text-muted-foreground">Uncommitted files</h3>
-      <ul className="space-y-1">
-        {shown.map(path => (
-          <li key={path} className="truncate" title={path}>
-            {path}
-          </li>
-        ))}
-      </ul>
-      {rest > 0 && <p className="mt-1 text-muted-foreground">and {rest} more</p>}
-    </div>
-  )
-}
-
-/** What the session changed. Same capping rule as the commits. */
-function Files({ handoff }: { handoff: AgentHandoff }) {
-  const shown = handoff.files.slice(0, MAX_FILES)
-  const rest = handoff.files.length - shown.length
-  return (
-    <div>
-      <h3 className="mb-1.5 text-muted-foreground">Changed files</h3>
-      <ul className="space-y-1">
-        {shown.map(file => (
-          <li key={file.path} className="flex items-center gap-2">
-            <span className="truncate" title={file.path}>
-              {file.path}
-            </span>
-            <span className="ml-auto shrink-0 text-muted-foreground">
-              {file.binary ? 'binary' : <DiffStat added={file.insertions} removed={file.deletions} className="text-xs" />}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {rest > 0 && <p className="mt-1 text-muted-foreground">and {rest} more</p>}
-    </div>
   )
 }

@@ -20,7 +20,6 @@ export function AgentFeed({
   emptyLabel = 'Waiting for the session to start…',
   tail,
   projectId,
-  agentId: agentId,
   subagents,
   doing,
   going,
@@ -28,11 +27,10 @@ export function AgentFeed({
   onOpenAgent,
 }: {
   events: FrameworkEvent[]
-  /** The feed's own project/run (#1455 item 6): the log's `choice` rows are the interaction
-   *  (inline panels/answered cards). Required, so no caller can silently downgrade an open gate
-   *  to log text — a gate rendered as text is a run parked with nothing to answer it (#846). */
+  /** The feed's own project: with it, an answered question is its ✓ card and an open one is no
+   *  row, since the agent's page asks it above the message box. Required, so no caller shows an
+   *  open question as log text by leaving it out. */
   projectId: string
-  agentId?: string | null | undefined
   lost?: boolean
   /** The message the agent is writing, as far as it has got: a row after the last, growing as it comes. */
   writing?: string
@@ -82,7 +80,6 @@ export function AgentFeed({
         {...(openAt ? { openAt } : {})}
         {...(tail ? { tail } : {})}
         projectId={projectId}
-        agentId={agentId}
         {...(subagents ? { subagents } : {})}
         {...(doing ? { doing } : {})}
         {...(going ? { going } : {})}

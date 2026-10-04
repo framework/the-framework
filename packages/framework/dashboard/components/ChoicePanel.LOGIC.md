@@ -2,7 +2,7 @@ The gate [1] as the dashboard renders it, the "Your call" card: the agent's [2] 
 
 ## Context
 
-**User story**: an agent's turn ends on "Approve this plan?" with two options, so the agent ends waiting [4] on it. The user sees a "Your call" card, in the agent view's [7] right rail, in its transcript, or among the Overview's open questions [8], clicks an option or presses Ctrl+Enter for the recommended one, and the agent continues on that answer.
+**User story**: an agent's turn ends on "Approve this plan?" with two options, so the agent ends waiting [4] on it. The user sees a "Your call" card among the Overview's open questions [8] or, for an agent handed to a cloud session, in that agent's notice (on an agent's own page the question is asked by `QuestionPanel.tsx` instead, above the message box), clicks an option or presses Ctrl+Enter for the recommended one, and the agent continues on that answer.
 
 **Problem**: a gate reaches a card only when somebody is watching, so the card must make the answer unambiguous, saying what "Accept" will send and whether the pick has landed, and it must never let an answer go out twice.
 

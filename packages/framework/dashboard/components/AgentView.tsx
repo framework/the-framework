@@ -3,7 +3,7 @@ import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
 import { onAgent, onAgentsDoing, onRetainedWorktrees } from '../rpc/reads.js'
 import { useLoaded, usePolled } from '../lib/use-async.js'
 import { useAgentHandoff } from '../lib/use-agent-handoff.js'
-import { isAgentActive, agentOutcome } from '../lib/live-state.js'
+import { isAgentActive, agentOutcome, pendingChoices } from '../lib/live-state.js'
 import type { AgentCardFacts } from '../lib/agent-status.js'
 import { AgentActionBar } from './AgentActionBar.js'
 import { AgentComposer } from './AgentComposer.js'
@@ -15,6 +15,7 @@ import { ModuleSlot } from './ModulePageView.js'
 import { useMountedModules } from '../lib/use-modules.js'
 import { Committing, HandoffActions, HandoffSummary, AgentHandoffDetails, isCommitAsk } from './AgentHandoff.js'
 import { AgentDetails, type AgentDetailsCard } from './AgentDetails.js'
+import { QuestionPanel } from './QuestionPanel.js'
 import { SubagentsBar } from './SubagentLine.js'
 import { holdsMainAgent } from '../lib/subagents.js'
 
@@ -229,6 +230,7 @@ export function AgentView({
   const committing = commitAsked && (going || (live === false && !handoff.loaded))
   // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
   const outcome = working ? undefined : agentOutcome(shown)
+  const questions = useMemo(() => pendingChoices(shown), [shown])
   // Until the handoff has actually loaded, a just-stopped agent keeps showing the modules' summaries
   // (the Files module's count of changed files, #1030): the summary swaps once, to the handoff,
   // instead of blanking for the beat the handoff read takes.
@@ -340,7 +342,6 @@ export function AgentView({
         <AgentFeed
           events={shown}
           projectId={projectId}
-          agentId={agentId}
           lost={lost}
           writing={feedLive ? writing : ''}
           {...(shownSending !== undefined ? { sending: shownSending } : {})}
@@ -358,6 +359,8 @@ export function AgentView({
       )}
       {/* Keyed by the run: a list opened for one main agent is not open for the next. */}
       <SubagentsBar key={agentId} subagents={subagents} doing={doing} onOpen={onOpenAgent} />
+      {/* The questions the agent stopped on, above the message box; the newest takes the keys. */}
+      {agentId && questions.map((choice, at) => <QuestionPanel key={`${agentId}:${choice.id}`} projectId={projectId} agentId={agentId} choice={choice} active={at === questions.length - 1} onSaid={onSending} />)}
       <AgentComposer
         projectId={projectId}
         agentId={agentId}

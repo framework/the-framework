@@ -11,7 +11,7 @@ The feed of one agent's [1] events [2] on the agent view: the list of events (`E
 - **The lost-stream banner** - whenever the live event stream is down, a warning reads "Live stream lost — reconnecting. The session keeps running; this view may be behind.", so a dead connection never looks like an agent that went quiet.
 - **The empty feed** - with no events, the feed shows the caller's label, or "Waiting for the session to start…" by default: a running agent is waiting for its first event, and a finished one says it has nothing to replay.
 - **Following and where it opens** - by default the list follows new output as it arrives; a finished agent's feed is told not to follow and to open at its end, where the outcome is.
-- **Gates stay answerable** - the feed always knows its project and agent, so a gate's [3] row is rendered as the interaction (an inline panel, or the answered card) and never downgraded to plain text, which would leave an agent parked with nothing to answer it.
+- **Gates are never plain text by accident** - the feed always hands the list its project, so an answered gate's [3] row is the answered card and an open gate is no row, the agent view asking it above the message box (`QuestionPanel.tsx`); no caller can show an open gate as plain text by leaving the project out.
 - **The message just sent** - handed in by the agent view and passed to the list as its last prompt; with it, an empty feed shows the list rather than the placeholder.
 - **The working spinner** - handed in by the agent view and passed to the list.
 - **The message being written** - handed in by the agent view while the agent runs and passed to the list, which shows it after the last row.

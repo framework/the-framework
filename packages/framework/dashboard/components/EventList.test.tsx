@@ -1,23 +1,11 @@
 import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
-// The inline choice rows (#1455 item 6) mount real ChoicePanels, which post over the control
-// stub; stub it (and the preferences plumbing) so nothing fetches a daemon that is not there.
-const sendChoice = vi.hoisted(() => vi.fn())
-vi.mock('../rpc/control.js', () => ({ sendChoice }))
 // The session line names the model as the daemon lists it; no daemon here, so the list never answers.
 vi.mock('../rpc/models.js', () => ({ onModels: () => new Promise(() => {}) }))
-vi.mock('../lib/preferences.js', () => ({
-  usePreferences: () => ({}),
-  updatePreferences: vi.fn(),
-}))
 
 const { EventList, askedReplies, passedEnds, withoutQuestionBlock } = await import('./EventList.js')
-
-beforeEach(() => {
-  sendChoice.mockReset().mockResolvedValue(undefined)
-})
 
 afterEach(cleanup)
 
@@ -370,10 +358,9 @@ describe('EventList prompt placement', () => {
   })
 })
 
-// A transcript entry that represents an interaction IS the interaction (#1455 item 6): with a
-// projectId, an open `choice` row renders the same ChoicePanel the rail used to hold, and a
+// With a projectId, an open `choice` is no row (its page asks it above the message box), and a
 // resolved one collapses to the AnsweredChoice ✓ card.
-describe('EventList inline choice rows (#1455 item 6)', () => {
+describe('EventList choice rows', () => {
   const gate = (id = 'gate-1'): FrameworkEvent => ({
     kind: 'choice',
     id,
@@ -386,10 +373,12 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
   })
   const resolved = (id = 'gate-1'): FrameworkEvent => ({ kind: 'choice-resolved', id, picked: 'work', by: 'user' })
 
-  test('an open gate renders the interactive panel, and a pick posts against the run', () => {
-    render(<EventList events={[gate()]} stick={false} projectId="p1" agentId="r1" />)
-    fireEvent.click(screen.getByText('Work on it'))
-    expect(sendChoice).toHaveBeenCalledWith('p1', 'gate-1', 'work', 'r1')
+  test('an open gate is no row: the question is asked above the message box, not in the flow', () => {
+    const said: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'Here is the plan.' } }
+    render(<EventList events={[said, gate()]} stick={false} projectId="p1" />)
+    expect(screen.getByText('Here is the plan.')).toBeTruthy()
+    expect(screen.queryByText(/Start the next backlog item\?|Work on it/)).toBeNull()
+    expect(document.querySelectorAll('[data-message-id]')).toHaveLength(1)
   })
 
   test('without a projectId the row keeps the formatter text', () => {
@@ -399,7 +388,7 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
   })
 
   test('a resolved gate collapses to a ✓ line and hides its "chose" row', () => {
-    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" agentId="r1" />)
+    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" />)
     const line = screen.getByRole('button', { name: /Start the next backlog item\?/ })
     expect(line.getAttribute('aria-expanded')).toBe('false')
     // The card says it better than the "✓ chose" formatter line, which is hidden with it there.
@@ -409,7 +398,7 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
   })
 
   test('the collapsed line expands to what was picked', () => {
-    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" agentId="r1" />)
+    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" />)
     fireEvent.click(screen.getByRole('button', { name: /Start the next backlog item\?/ }))
     expect(screen.getByText('Work on it')).toBeTruthy()
     expect(screen.getByText('Stop the loop')).toBeTruthy()
@@ -417,26 +406,25 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
 
   test('a gate closed by end without an answer stays text — its audience is gone (#1359)', () => {
     render(
-      <EventList events={[gate(), { kind: 'end', ok: false, stopped: true }]} stick={false} projectId="p1" agentId="r1" />,
+      <EventList events={[gate(), { kind: 'end', ok: false, stopped: true }]} stick={false} projectId="p1" />,
     )
     expect(screen.queryByRole('button', { name: /Work on it/ })).toBeNull()
     expect(screen.getByText(/Start the next backlog item\?/)).toBeTruthy()
   })
 
-  test('a run that ended waiting on its question keeps the question answerable, until the agent goes on (#1774)', () => {
+  test('a run that ended waiting on its question keeps the question out of the flow; once the agent went on with no recorded pick, the question is its text (#1774)', () => {
     const waiting: FrameworkEvent = { kind: 'end', ok: false, waiting: true }
-    const { rerender } = render(<EventList events={[gate(), waiting]} stick={false} projectId="p1" agentId="r1" />)
-    fireEvent.click(screen.getByText('Work on it'))
-    expect(sendChoice).toHaveBeenCalledWith('p1', 'gate-1', 'work', 'r1')
-    // The answer resumed the run: its next turn closes the question.
+    const { rerender } = render(<EventList events={[gate(), waiting]} stick={false} projectId="p1" />)
+    expect(screen.queryByText(/Start the next backlog item\?/)).toBeNull()
+    // The person's own message resumed the run: no pick was recorded, so the question stays as text.
     const next: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'On it.' } }
-    rerender(<EventList events={[gate(), waiting, next]} stick={false} projectId="p1" agentId="r1" />)
-    expect(screen.queryByRole('button', { name: /Work on it/ })).toBeNull()
+    rerender(<EventList events={[gate(), waiting, next]} stick={false} projectId="p1" />)
+    expect(screen.getByText(/Start the next backlog item\?/)).toBeTruthy()
   })
 
-  test('only the latest firing of a re-fired gate is interactive', () => {
-    render(<EventList events={[gate(), gate()]} stick={false} projectId="p1" agentId="r1" />)
-    expect(screen.getAllByText('Work on it')).toHaveLength(1)
+  test('of a re-fired gate only the latest firing is the open question: the earlier one keeps its text', () => {
+    render(<EventList events={[gate(), gate()]} stick={false} projectId="p1" />)
+    expect(screen.getAllByText(/Start the next backlog item\?/)).toHaveLength(1)
   })
 })
 

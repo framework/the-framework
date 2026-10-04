@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { mkdtemp, rm, mkdir, writeFile, readFile, realpath, stat } from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
-import { sendStop, sendMessage, sendChoice, sendRemoveWorktree } from './control.js'
+import { sendStop, sendMessage, sendChoice, sendRemoveWorktree, sendOpenPullRequest } from './control.js'
 import { onRetainedWorktrees, onAgents } from './reads.js'
 import { addProject, projectId as idFor } from '../registry.js'
 import { DATA_BRANCH, fileBranchPath, nodeGitRunner } from '@gemstack/agent-data'
@@ -367,6 +367,54 @@ test('a resumed run reads as running, not as its recorded first leg (#768)', asy
     const mine = agents.filter(agent => agent.id === ctx.agentId)
     assert.equal(mine.length, 1, 'still one row, not two')
     assert.equal(mine[0]?.status, 'running', 'and it reads as live, not as the recorded first leg')
+  } finally {
+    ctx.restore()
+    await rm(ctx.dir, { recursive: true, force: true })
+  }
+})
+
+/** A git host package that writes down each call and answers no pull request yet, then the one it opened. */
+const GIT_HOST_PROVIDER = `
+const { appendFileSync } = require('node:fs')
+const { join } = require('node:path')
+const args = process.argv.slice(2)
+appendFileSync(join(__dirname, 'calls.log'), args.join(' ') + '\\n')
+if (args[0] === 'requests') process.stdout.write('[]')
+else if (args[0] === 'open') process.stdout.write(JSON.stringify({ ok: true, request: { number: 9, url: 'https://x/pull/9' }, existing: false }))
+`
+
+// "Create draft PR" on the agent's page: the page sends `{ draft: true }`, and the call has to hand
+// it on to the project's git host, or the pull request opens ready for review.
+test('sendOpenPullRequest opens the pull request as a draft when asked to, and as a ready one otherwise', async () => {
+  const ctx = await projectWithWorktreeAgent({ pid: 0, host: 'elsewhere' }, { status: 'done' })
+  try {
+    const git = nodeGitRunner()
+    // The agent's work, committed on its branch, and a remote to push it to.
+    const worktree = worktreePath(ctx.dir, ctx.agentId)
+    // The run's own files are kept out of git, as a real run keeps them: the checkout is clean.
+    await writeFile(join(ctx.dir, '.git', 'info', 'exclude'), `${THE_FRAMEWORK_DIR}/\n`)
+    await writeFile(join(worktree, 'index.html'), '<h1>Hello, there!</h1>\n')
+    await git(['commit', '-q', '-am', 'Say hello'], worktree)
+    const remote = join(ctx.dir, 'remote.git')
+    await git(['init', '-q', '--bare', remote], ctx.dir)
+    await git(['remote', 'add', 'origin', remote], ctx.dir)
+    // The project's git host: a package that declares the command, beside the branches one.
+    const manifestPath = join(ctx.dir, 'package.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { devDependencies: Record<string, string> }
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, host: '*' } }))
+    const host = join(ctx.dir, 'node_modules', 'host')
+    await mkdir(host, { recursive: true })
+    await writeFile(join(host, 'package.json'), JSON.stringify({ name: 'host', bin: { host: 'provider.cjs' }, framework: { 'git-host': 'host' } }))
+    await writeFile(join(host, 'provider.cjs'), GIT_HOST_PROVIDER)
+    const opens = async (): Promise<string[]> => (await readFile(join(host, 'calls.log'), 'utf8').catch(() => '')).split('\n').filter(line => line.startsWith('open '))
+
+    assert.deepEqual(await sendOpenPullRequest(ctx.projectId, ctx.agentId, { draft: true }), { ok: true, url: 'https://x/pull/9', number: 9 })
+    assert.equal((await opens()).length, 1)
+    assert.match((await opens())[0]!, / --draft$/)
+
+    assert.deepEqual(await sendOpenPullRequest(ctx.projectId, ctx.agentId), { ok: true, url: 'https://x/pull/9', number: 9 })
+    assert.equal((await opens()).length, 2)
+    assert.doesNotMatch((await opens())[1]!, /--draft/)
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })

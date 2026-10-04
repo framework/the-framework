@@ -5,14 +5,14 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // The bar right above the message box, as Claude Code on the web has one: where the agent's work
 // is (the project, the branch), what the branch holds (commits, files, +N −N), its pull request,
-// and, at the end, the next step as a button. It is there from the moment the agent's branch is
-// known and stays, one row of one height, so the message box under it never moves; what changes
-// is what the row says.
+// and, at the end, the next step as a button. It is there while there is something to say: the
+// agent has changes, a pull request or a next step. An agent that changed nothing has no bar.
 export function AgentWorkBar({
   projectName,
   checkout,
   summary,
   actions,
+  show,
 }: {
   projectName?: string | null | undefined
   /** The agent's checkout as the page read it: its branch and its pull request. */
@@ -21,9 +21,11 @@ export function AgentWorkBar({
   summary?: ReactNode
   /** The next step (Commit, Open PR, Merge), or the words that stand where it would be. */
   actions?: ReactNode
+  /** Whether there is something to say: changes, a pull request or a next step. Nothing to say, no bar. */
+  show: boolean
 }) {
   const branch = checkout?.branch
-  if (branch === undefined) return null
+  if (branch === undefined || !show) return null
   return (
     <div className="mx-auto w-full max-w-3xl px-2 pt-2">
       <div role="group" aria-label="This agent's work" className="flex h-9 items-center gap-2 overflow-hidden rounded-lg border border-border px-3 text-xs">

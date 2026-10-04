@@ -14,7 +14,13 @@ It also covers when the view reads what the agent's branch holds:
 And the bar above the message box:
 
 - **One read of the checkout** - the agent's checkout is read once, for that project and agent, and the same answer (its branch) is handed to the action bar and to the bar above the message box.
-- **Where the next step is** - an ended agent's "Open PR" is inside the bar above the message box, and that bar comes after the action bar and before the composer in the page's order.
+- **Where the next step is** - an ended agent's "Open PR" is inside the bar above the message box, the bar is told to show, and that bar comes after the action bar and before the composer in the page's order.
+
+And when the bar above the message box is there:
+
+- **A working agent** - the bar is told not to show while the agent's checkout is clean, to show once the checkout holds uncommitted changes, and still to show once the checkout is clean again.
+- **An ended agent** - one whose branch holds no commit is told not to show; one whose checkout names a pull request (a merged one) is told to show.
+- **As the agent ends** - a working agent with uncommitted changes ends and its checkout is gone: the bar is still told to show while the read of what its branch holds is unanswered, and told not to show once the read answers that the branch holds nothing.
 
 And when the action bar is told its facts are ready:
 
@@ -37,7 +43,7 @@ And what the installed modules add to an agent's page:
 
 - **A continued agent reads as going** - an ended agent's feed gets a new segment: the composer is told the agent is live; the archive is read again and holds the same lines, the list still saying ended: still live; the segment's end arrives: not live. An ended agent whose archive holds a segment with no end, shown from the first read, is not live.
 - **While the agent commits** - an ended agent that left a file uncommitted: "Commit" pressed shows "Commit your work." in the feed and "Committing…" in the button's place, with no button, while the send is out; a refused send brings the button back and the line goes. A working agent whose last prompt is the ask, alone or with a publish sentence after it, says "Committing…"; one whose last prompt only begins with the same words says nothing; once the turn ends the button is back. While the ended agent's checkout is cleaned up and until its branch is read again, "Committing…" stays, the old "Commit" button never returns, and the new next step takes the line's place.
-- **The next step while the agent works again** - a merged agent sent a new message: once its events show the new turn, "Merged into the main branch." leaves the bar above the message box although the daemon's list still says it ended; when the turn ends, the old line does not come back before the new read answers, and then "Commit" is offered.
+- **The next step while the agent works again** - a merged agent: the bar above the message box is told to show and says "Merged into the main branch.". Sent a new message: once its events show the new turn, "Merged into the main branch." leaves the bar above the message box although the daemon's list still says it ended; when the turn ends, the old line does not come back before the new read answers, and then "Commit" is offered.
 
 The rules for when a resume is offered belong to the composer and are covered by its own tests; the view only hands it how the agent ended.
 - **The pull request lookup is waited for** - while the branch's read says its pull request lookup is still out, and while the next read is unanswered, the action bar is not ready; once the next read has the answer, it is.

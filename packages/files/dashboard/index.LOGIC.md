@@ -3,4 +3,4 @@ What the Files module adds to the dashboard, as its `./dashboard` export declare
 ## Glossary
 
 [1] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root.
-[2] run slot: a place on an agent's page a module fills: the summary, a few words in the bar above the message box, shown until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the action bar at the top of the page. Each is told the agent, whether it is still working, and whether the action bar is open.
+[2] run slot: a place on an agent's page a module fills: the summary, a few words in the bar above the message box, shown while that bar is drawn and until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the action bar at the top of the page. Each is told the agent, whether it is still working, and whether the action bar is open.

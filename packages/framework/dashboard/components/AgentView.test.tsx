@@ -44,8 +44,8 @@ vi.mock('./AgentActionBar.js', () => ({
   ),
 }))
 vi.mock('./AgentWorkBar.js', () => ({
-  AgentWorkBar: ({ actions, summary, checkout }: { actions?: ReactNode; summary?: ReactNode; checkout: unknown }) => (
-    <div data-testid="work-bar">
+  AgentWorkBar: ({ actions, summary, checkout, show }: { actions?: ReactNode; summary?: ReactNode; checkout: unknown; show: boolean }) => (
+    <div data-testid="work-bar" data-show={String(show)}>
       <span data-testid="work-checkout">{JSON.stringify(checkout)}</span>
       {summary}
       {actions}
@@ -201,10 +201,60 @@ describe('AgentView: the bar above the message box', () => {
     render(view())
     const step = await screen.findByRole('button', { name: 'Open PR' })
     expect(screen.getByTestId('work-bar').contains(step)).toBe(true)
+    expect(screen.getByTestId('work-bar').dataset.show).toBe('true')
     // After the top bar and before the message box, in the page's order.
     const order = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
     expect(order(screen.getByTestId('bar-ready'), screen.getByTestId('work-bar'))).toBe(true)
     expect(order(screen.getByTestId('work-bar'), screen.getByTestId('composer-live'))).toBe(true)
+  })
+})
+
+describe('AgentView: when the bar above the message box is there', () => {
+  const shown = () => screen.getByTestId('work-bar').dataset.show
+
+  test('a working agent has the bar once its checkout holds changes, and none before', async () => {
+    onAgentWorktree.mockResolvedValue({ branch: 'agent-x', checkout: { path: '/w', dirty: false } })
+    const { unmount } = render(view({ live: true }))
+    await waitFor(() => expect(screen.getByTestId('work-checkout').textContent).toContain('"dirty":false'))
+    expect(shown()).toBe('false')
+    unmount()
+    onAgentWorktree.mockResolvedValue({ branch: 'agent-y', checkout: { path: '/w', dirty: true } })
+    const { rerender } = render(view({ live: true, agentId: 'run-2' }))
+    await waitFor(() => expect(shown()).toBe('true'))
+    // It commits: its checkout is clean again, and the bar stays.
+    onAgentWorktree.mockResolvedValue({ branch: 'agent-y', checkout: { path: '/w', dirty: false } })
+    rerender(view({ live: true, agentId: 'run-2', events: [...LIVE_EVENTS, ...LIVE_EVENTS] }))
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(shown()).toBe('true')
+  })
+
+  test('an ended agent that changed nothing has no bar; one with a pull request has it', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValue({ ...PUSHED, empty: true, commits: [] })
+    const { unmount } = render(view())
+    await waitFor(() => expect(onAgentHandoff).toHaveBeenCalled())
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(shown()).toBe('false')
+    unmount()
+    onAgentWorktree.mockResolvedValue({ branch: 'agent-z', pr: { number: 3, url: 'https://x/pull/3', state: 'MERGED', title: 'T' } })
+    render(view({ agentId: 'run-3' }))
+    await waitFor(() => expect(shown()).toBe('true'))
+  })
+
+  test('as the agent ends, the bar stays while its branch is read, then says what the branch holds', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    onAgentWorktree.mockResolvedValue({ branch: 'agent-x', checkout: { path: '/w', dirty: true } })
+    let answer: (handoff: unknown) => void = () => {}
+    onAgentHandoff.mockReturnValue(new Promise(resolve => (answer = resolve)) as never)
+    const { rerender } = render(view({ live: true }))
+    await waitFor(() => expect(shown()).toBe('true'))
+    // Ended: its checkout is gone, its branch not read yet.
+    onAgentWorktree.mockResolvedValue({ branch: 'agent-x' })
+    rerender(view({ live: false }))
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(shown()).toBe('true')
+    answer({ ...PUSHED, empty: true, commits: [] })
+    await waitFor(() => expect(shown()).toBe('false'))
   })
 })
 
@@ -524,6 +574,7 @@ describe('AgentView: the next step while the agent works again', () => {
     onAgentHandoff.mockResolvedValue(MERGED)
     const { rerender } = render(view({ events: ended }))
     await waitFor(() => expect(screen.getByText('Merged into the main branch.')).toBeTruthy())
+    expect(screen.getByTestId('work-bar').dataset.show).toBe('true')
     // The feed shows the new turn; the poll still says ended.
     const again = [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a footer' } }] as FrameworkEvent[]
     rerender(view({ events: again, live: false }))

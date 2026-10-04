@@ -1,4 +1,4 @@
-What an agent [2] left behind, as the user meets it on the agent's page: a one-line verdict of what the agent's branch holds, the next step offered as a button once the agent has ended (or the reason there is nothing to press), and the commits and files the branch holds. The verdict and the next step ride in the bar above the message box (`AgentWorkBar.tsx`), beside the branch they are about; the lists are behind the disclosure of the action bar at the top of the page. A subagent [5] is offered no next step: where the button would be, the bar above the message box says "landed" or "not landed". Below, "the bar" is the bar above the message box.
+What an agent [2] left behind, as the user meets it on the agent's page: a one-line verdict of what the agent's branch holds, the next step offered as a button once the agent has ended (or the reason there is nothing to press), and the commits and files the branch holds. The verdict and the next step ride in the bar above the message box (`AgentWorkBar.tsx`), beside the branch they are about; the lists are behind the disclosure of the action bar at the top of the page. A subagent [5] is offered no next step: where the button would be, the bar above the message box says "landed" or "not landed". The bar is drawn for an ended agent only when its branch gives it something to say; an agent that changed nothing has no bar. Below, "the bar" is the bar above the message box.
 
 ## Context
 
@@ -7,6 +7,8 @@ What an agent [2] left behind, as the user meets it on the agent's page: a one-l
 **Problem**: what the branch holds is read by branch name, not from the agent's checkout [3], because a clean agent's checkout is removed when it ends; the branch survives it.
 
 **User story**: the user opens a subagent's [5] page. A subagent opens no pull request and nobody pushes its branch by hand: its main agent lands its work on the main agent's own branch. So the page offers no button; it says what the subagent changed and whether its main agent landed it yet.
+
+**User story**: an agent that changed nothing has no bar above the message box: a row saying "no changes" with nothing to press is in the way of the message box. An agent whose branch holds work, or whose work was merged or lost, keeps the bar, since there is something to read.
 
 ## Glossary
 
@@ -21,6 +23,7 @@ What an agent [2] left behind, as the user meets it on the agent's page: a one-l
 - **The one-line verdict** - what the branch holds, in a phrase: "branch gone" (or "no changes" when the agent changed nothing), "merged", "no changes", or the commit and file counts with the lines added and removed, plus "pushed" for a branch on the remote with no pull request; a subagent's [5] verdict says neither, and a landed one whose last commit is not on this machine has no verdict.
 - **A subagent: landed or not landed** - a subagent is offered no "Open PR", no "Merge PR" and no "Publish branch"; where the button would be, the bar says "landed" once its main agent landed its work and "not landed" while its branch holds commits that are not landed; work it left uncommitted is still named.
 - **The next step, or why there is none** - once the agent has stopped: "Open PR" with "Create draft PR" and "Publish branch" in the menu beside it, or "Merge PR" for an open pull request, or "Publish branch" alone where the project has no git host package, or "Merge" where the repository has no remote, or "Commit" where the agent left its work uncommitted, or one sentence saying why nothing can be pressed; never a button the git host would refuse, and nothing at all while the pull request lookup is still out.
+- **Whether the bar has something to say** - yes for an ended agent whose branch holds work (commits, changed files, or files left uncommitted), whose work landed, or whose branch is gone with work on it; no before the read has answered and for an agent that changed nothing.
 - **The lists behind the disclosure** - behind the action bar's disclosure, the commits (up to 6), the changed files (up to 10) and the uncommitted files (up to 10), the rest counted as "and N more"; shown only when there is something to list.
 
 ## Business logic
@@ -88,6 +91,23 @@ Shown once the agent has ended (the caller's decision, in `AgentView.tsx`); an a
   The other choices are in the menu, never a second button beside the first: the ready pull request is what the user most often wants. While the branch is not on the remote, "not published" is said before the button: an agent publishes nothing by itself, so work still only on this machine is the usual answer and must not read as silence, and "Open PR" does not itself say that it pushes.
 
 A reason is capped in width and truncated with an ellipsis, so a long file name never widens the row. Every button, and the arrow, is disabled while an action is in flight. A failed action reports "Could not merge the pull request.", "Could not open the pull request." or "Could not push the branch." unless the daemon answered with a more specific error, and the reason reaches the bar's summary line beside the verdict rather than nothing happening. After an action succeeds, the branch is read again so the bar shows the new state.
+
+### Whether the bar has something to say
+
+#### Context
+
+See the third user story in `## Context`. The agent's page draws the bar only while there is something to say (`AgentView.tsx`); for an ended agent it asks here, about what the agent's branch holds.
+
+#### Business logic
+
+The first rule that applies:
+
+- The read of the branch has not answered: nothing to say.
+- The daemon's read says the agent's work landed: something to say.
+- The branch is gone: something to say, unless the daemon marks it as belonging to an agent that changed nothing.
+- The branch exists: something to say exactly when there is something to list behind the disclosure (below): the branch holds commits beyond the base, commits that cancel out among them, or the checkout [3] holds uncommitted files. A branch with no commit and nothing left uncommitted, merged into the base or not, has nothing to say.
+
+The answer is the same for a subagent [5] as for any other agent. It does not look at the pull request: the page draws the bar for a branch with a pull request on its own.
 
 ### The lists behind the disclosure
 

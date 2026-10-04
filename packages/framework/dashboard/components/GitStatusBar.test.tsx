@@ -34,6 +34,24 @@ describe('GitStatusBar (#809)', () => {
     expect(onGitStatus).not.toHaveBeenCalled()
   })
 
+  test("an agent's page: the name, clean or dirty; its branch and its pull request are not said here", async () => {
+    onAgentWorktree.mockResolvedValue({ checkout: { path: '/repo/.branches/run-1', dirty: true }, branch: 'agent-dark-mode', pr: { number: 12, url: 'https://github.com/o/r/pull/12', state: 'OPEN', title: 'Dark mode' } })
+    render(<GitStatusBar projectId="p1" agentId="run-1" inline label="Dark mode" />)
+    await waitFor(() => expect(screen.getByText('dirty')).toBeTruthy())
+    expect(screen.getByText('Dark mode')).toBeTruthy()
+    expect(screen.queryByText('agent-dark-mode')).toBeNull()
+    expect(screen.queryByText(/PR #12/)).toBeNull()
+  })
+
+  test('given the checkout by its caller, it reads nothing itself', async () => {
+    const { rerender } = render(<GitStatusBar projectId="p1" agentId="run-1" inline label="Dark mode" checkout={null} />)
+    expect(screen.queryByText(/clean|dirty/)).toBeNull()
+    rerender(<GitStatusBar projectId="p1" agentId="run-1" inline label="Dark mode" checkout={{ checkout: { path: '/w', dirty: false }, branch: 'b' }} />)
+    expect(screen.getByText('clean')).toBeTruthy()
+    expect(onAgentWorktree).not.toHaveBeenCalled()
+    expect(onGitStatus).not.toHaveBeenCalled()
+  })
+
   test('beside a long session name the project stays, capped, and the session name is what gets cut', async () => {
     onAgentWorktree.mockResolvedValue({ checkout: { path: '/repo/.branches/run-1', dirty: false }, branch: 'agent-run-1' })
     const long = "Read packages/framework/package.json and tell me the package's name and how it builds"

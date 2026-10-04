@@ -7,7 +7,7 @@ Shows what actually changed in a checkout's [1] files, for the Files tab's hover
 ## Glossary
 
 [1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is the project's checkout.
-[2] agent's page: the dashboard page of one agent, where the Files module adds, while the agent works, the count of files it changed to the page's action bar and their list under the bar.
+[2] agent's page: the dashboard page of one agent, where the Files module adds, while the agent works, the count of files it changed to the bar above the message box and their list under the action bar at the top of the page.
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 
 ## Business logic — TL;DR

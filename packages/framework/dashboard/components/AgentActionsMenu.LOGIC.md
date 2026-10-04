@@ -69,7 +69,7 @@ Given no agent, the menu is named "Project actions" and holds only the items tha
 
 **User story**: the user wants to end an agent [1] that is working.
 
-**Problem**: the daemon runs no agent itself, so a stop is a signal to the process the agent's own record names. And a merge decided ahead of time has no place here: an agent that is working is still writing its branch, and merging its pull request is offered once it has ended, as the bar's next step [2].
+**Problem**: the daemon runs no agent itself, so a stop is a signal to the process the agent's own record names. And a merge decided ahead of time has no place here: an agent that is working is still writing its branch, and merging its pull request is offered once it has ended, as the next step [2] in the bar above the message box (`AgentWorkBar.tsx`).
 
 #### Business logic
 

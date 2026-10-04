@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { AgentHandoff } from '../../src/index.js'
-import { ChevronDown, GitCommitHorizontal, GitMerge, GitPullRequest, Upload } from 'lucide-react'
+import { ChevronDown, GitCommitHorizontal, GitMerge, GitPullRequest, GitPullRequestDraft, Upload } from 'lucide-react'
 import { sendMerge, sendMergeBranch, sendMessage, sendOpenPullRequest, sendPush } from '../rpc/control.js'
 import type { AgentHandoffState } from '../lib/use-agent-handoff.js'
 import { cn } from '../lib/utils.js'
@@ -223,27 +223,27 @@ export function HandoffActions({
       </>
     )
   }
-  // A split button: "Open PR" names the outcome and pushes the branch on the way, and the menu
-  // beside it holds the push alone, for work that should reach the remote with no pull request
-  // yet. Once the branch is pushed the menu has nothing left to offer, so the button stands alone.
+  // A split button: "Open PR" names the outcome and pushes the branch on the way, and the arrow
+  // beside it holds the other choices: a draft pull request, and the push alone, for work that
+  // should reach the remote with no pull request yet (gone once the branch is pushed).
+  const openPr = (draft: boolean) => act('pr', () => sendOpenPullRequest(projectId, agentId, { draft }), 'Could not open the pull request.')
   return (
     <>
       {!handoff.pushed && <NotPublished />}
       <span className="inline-flex">
         <Button
           size="xs"
-          className={cn(!handoff.pushed && 'rounded-r-none')}
+          className="rounded-r-none"
           disabled={busy}
-          onClick={() => act('pr', () => sendOpenPullRequest(projectId, agentId), 'Could not open the pull request.')}
+          onClick={() => openPr(false)}
         >
           <GitPullRequest className="h-3.5 w-3.5" />
           {pending === 'pr' ? 'Opening PR…' : pending === 'push' ? 'Publishing…' : 'Open PR'}
         </Button>
-        {!handoff.pushed && (
-          <DropdownMenu>
+        <DropdownMenu>
             <DropdownMenuTrigger
               type="button"
-              aria-label="More ways to publish"
+              aria-label="Other choices"
               disabled={busy}
               className={cn(
                 buttonVariants({ size: 'xs' }),
@@ -253,13 +253,18 @@ export function HandoffActions({
               <ChevronDown className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[10rem]">
-              <DropdownMenuItem onClick={push}>
-                <Upload className="h-3.5 w-3.5" />
-                Publish branch
+              <DropdownMenuItem onClick={() => openPr(true)}>
+                <GitPullRequestDraft className="h-3.5 w-3.5" />
+                Create draft PR
               </DropdownMenuItem>
+              {!handoff.pushed && (
+                <DropdownMenuItem onClick={push}>
+                  <Upload className="h-3.5 w-3.5" />
+                  Publish branch
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
       </span>
     </>
   )

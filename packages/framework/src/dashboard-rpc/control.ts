@@ -206,13 +206,13 @@ async function handoffTargetFor(
  * work with and the intent the user asked for. Nothing new is invented and nothing extra is asked
  * of the user, which is the point of "offer the next step rather than describe it".
  */
-export async function sendOpenPullRequest(projectId: string, agentId: string): Promise<HandoffResult> {
-  return relayOr(agentId, 'sendOpenPullRequest', [projectId, agentId], async () => {
+export async function sendOpenPullRequest(projectId: string, agentId: string, options: { draft?: boolean } = {}): Promise<HandoffResult> {
+  return relayOr(agentId, 'sendOpenPullRequest', [projectId, agentId, options], async () => {
     const target = await handoffTargetFor(projectId, agentId)
     if (!target) return { ok: false, error: 'unknown session' }
     // Under the agent lock, so the provider's push inside `openAgentPullRequest` cannot race a
     // Remove of the same checkout.
-    const opened = await withAgentLock(agentLockKey(target.cwd, agentId), () => openAgentPullRequest(target.cwd, target.agent))
+    const opened = await withAgentLock(agentLockKey(target.cwd, agentId), () => openAgentPullRequest(target.cwd, target.agent, options.draft === true ? { draft: true } : {}))
     // Record it on the finished run (E6), through the project's runs provider. The session's own
     // process is gone by now, so there is no event stream to carry the fact — but it is the same
     // fact, and every surface reads it from the same place either way rather than re-deriving it

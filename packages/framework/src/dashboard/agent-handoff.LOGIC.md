@@ -37,7 +37,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 - **Which pull request is the agent's** - out of the branch's whole pull request history: an open one always, a closed one only when created after the agent started; the first for identity, the latest for handoff decisions.
 - **The pull request the agent recorded** - the number the agent wrote down is the fact; its state is read live, and when nothing live is known the record stands on its own.
 - **Publishing a branch** - the branches provider pushes the branch, then the git host provider opens its pull request, or answers the open one it already has; a project missing either provider, or a push the branches provider refuses, ends the action before the git host is asked; the answer's URL and number come back, and the cached "no pull request" is forgotten.
-- **The "Open PR" button** - refused for a subagent [20]; the agent's existing pull request first, even for a gone branch, unless the agent moved past it; a gone branch, an empty branch and a branch whose work is already merged are refused with a reason; otherwise the branch is published ready for review.
+- **The "Open PR" button** - refused for a subagent [20]; the agent's existing pull request first, even for a gone branch, unless the agent moved past it; a gone branch, an empty branch and a branch whose work is already merged are refused with a reason; otherwise the branch is published ready for review, or as a draft when the user picked "Create draft PR".
 - **"Publish branch"** - the branches provider pushes the agent's recorded branch, nothing more: the push with no pull request, and the last step where the project has no git host; refused for an agent with no branch or a project with no branches provider.
 - **"Merge into main"** - for a project with no remote: the branches provider merges the agent's recorded branch into the default branch on this machine and deletes it, and the agent's run then records the branch's last commit and where its work began; a refusal is the provider's own line.
 - **A pull request for a branch only the remote has** - a cloud session's own branch is published as a draft, through the same two providers.
@@ -164,7 +164,7 @@ Two providers, in order. A project with no branches provider refuses with "this 
 
 #### Context
 
-**User story**: on a finished agent's [1] page the user presses "Open PR" and gets the pull request: the existing one when there is one, a new one otherwise, or a clear reason why there is none.
+**User story**: on a finished agent's [1] page the user presses "Open PR" and gets the pull request: the existing one when there is one, a new one otherwise, or a clear reason why there is none. Under the button's arrow, "Create draft PR" does the same and opens the new one as a draft.
 
 #### Business logic
 

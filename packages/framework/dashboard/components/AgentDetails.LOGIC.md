@@ -1,4 +1,4 @@
-The "about this agent [1]" strip behind the action bar's disclosure, always available: which coding agent [2] ran the agent and which model, read off the agent's card [5], the model by the name its coding agent gives it, and what it has spent so far, added up from the agent's events [3]. The branch, pull request and changes sit in the bar row right above and are not repeated here.
+The "about this agent [1]" strip behind the action bar's disclosure, always available: which coding agent [2] ran the agent and which model, read off the agent's card [5], the model by the name its coding agent gives it, and what it has spent so far, added up from the agent's events [3]. The branch, its pull request and what the branch holds sit in the bar above the message box (`AgentWorkBar.tsx`) and are not repeated here.
 
 ## Glossary
 

@@ -233,24 +233,33 @@ describe('run handoff (#799)', () => {
     // The push alone is in the menu, never a second button beside the first (#1173).
     expect(screen.queryByText('Publish branch')).toBeNull()
     fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => expect(sendOpenPullRequest).toHaveBeenCalledWith('p1', 'run-1'))
+    await waitFor(() => expect(sendOpenPullRequest).toHaveBeenCalledWith('p1', 'run-1', { draft: false }))
     expect(sendPush).not.toHaveBeenCalled()
+  })
+
+  test('Create draft PR, under the arrow, opens the pull request as a draft, pushed or not', async () => {
+    onAgentHandoff.mockResolvedValue(worked)
+    const { unmount } = render(<Harness />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Other choices' }))
+    fireEvent.click(await screen.findByText('Create draft PR'))
+    await waitFor(() => expect(sendOpenPullRequest).toHaveBeenCalledWith('p1', 'run-1', { draft: true }))
+    expect(sendPush).not.toHaveBeenCalled()
+    unmount()
+    onAgentHandoff.mockResolvedValue({ ...worked, pushed: true })
+    render(<Harness />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Other choices' }))
+    expect(await screen.findByText('Create draft PR')).toBeTruthy()
+    // The branch is on the remote already: the push alone is no choice any more.
+    expect(screen.queryByText('Publish branch')).toBeNull()
   })
 
   test('Publish branch, in the menu, pushes the branch and opens no pull request', async () => {
     onAgentHandoff.mockResolvedValue(worked)
     render(<Harness />)
-    fireEvent.click(await screen.findByRole('button', { name: 'More ways to publish' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Other choices' }))
     fireEvent.click(await screen.findByText('Publish branch'))
     await waitFor(() => expect(sendPush).toHaveBeenCalledWith('p1', 'run-1'))
     expect(sendOpenPullRequest).not.toHaveBeenCalled()
-  })
-
-  test('once the branch is pushed, Open PR stands alone: the menu has nothing left to offer', async () => {
-    onAgentHandoff.mockResolvedValue({ ...worked, pushed: true })
-    render(<Harness />)
-    await waitFor(() => expect(screen.getByText('Open PR')).toBeTruthy())
-    expect(screen.queryByRole('button', { name: 'More ways to publish' })).toBeNull()
   })
 
   test('a failed action surfaces its reason rather than doing nothing', async () => {
@@ -271,7 +280,7 @@ describe('run handoff (#799)', () => {
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('1 commit')).toBeTruthy())
     expect(screen.queryByText('Open PR')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'More ways to publish' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Other choices' })).toBeNull()
     // The bar links the pull request: pushed is not said beside it.
     expect(screen.queryByText('· pushed')).toBeNull()
     // The one step left for an open, unmerged PR is the human's Merge — the withheld-merge
@@ -298,7 +307,7 @@ describe('run handoff (#799)', () => {
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('Publish branch')).toBeTruthy())
     expect(screen.queryByText('Open PR')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'More ways to publish' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Other choices' })).toBeNull()
     fireEvent.click(screen.getByText('Publish branch'))
     await waitFor(() => expect(sendPush).toHaveBeenCalledWith('p1', 'run-1'))
     cleanup()

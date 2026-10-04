@@ -1,8 +1,8 @@
-One agent's [1] action bar, one row that never wraps: at the start, what the agent is (its name, its branch facts, its one-word status, and a summary of what its branch holds, together forming a disclosure), and at the end, what the user can do to it (the count of errors it hit, the handoff's [2] next step as a visible button, and one "⋮" menu holding everything else). The same bar serves the agent running and finished, so the controls stay put when the agent reaches its end.
+One agent's [1] action bar, the bar at the top of the agent's page, one row that never wraps: at the start, what the agent is (its name, whether its checkout [4] is clean or dirty, its one-word status and its checkout's size, together forming a disclosure), and at the end, the count of errors it hit and one "⋮" menu holding what the user can do to it. The agent's branch, what the branch holds, its pull request and the next step [2] are not here: they are in the bar above the message box (`AgentWorkBar.tsx`). The same bar serves the agent running and finished, so the controls stay put when the agent reaches its end.
 
 ## Context
 
-**User story**: the user reads one line and knows which agent this is, what state it is in and what its branch holds, and finds the one thing that moves the work forward (push, open a pull request) without hunting through icon buttons that come and go with the agent's state.
+**User story**: the user reads one line and knows which agent this is and what state it is in, and finds everything they can do to the agent in one menu, without hunting through icon buttons that come and go with the agent's state. The one thing that moves the work forward (commit, open a pull request, merge) is where they type, in the bar above the message box.
 
 ## Glossary
 
@@ -14,10 +14,11 @@ One agent's [1] action bar, one row that never wraps: at the start, what the age
 
 ## Business logic — TL;DR
 
-- **Facts at the start, controls at the end** - the row holds the agent's identity and branch facts first and its controls last, and only the facts give up width, so the controls never drop under them.
-- **One status word** - exactly one ranked status is shown beside the branch's clean/dirty dot, with a colored dot; a failure shows just "failed", its reason on hover.
-- **The controls cluster** - the error count, the next step [2] kept out as a visible button, and the "⋮" menu with every other action.
-- **Facts shown together** - until the caller says the agent's own facts have been read, the row names the agent and shows none of its facts: no status word, no summary, no error count, no next step; the "⋮" menu stays.
+- **Facts at the start, controls at the end** - the row holds the agent's identity and facts first and its controls last, and only the facts give up width, so the controls never drop under them.
+- **One read of the checkout** - the bar is handed the agent's checkout [4] as the agent's page read it, and reads nothing itself.
+- **One status word** - exactly one ranked status is shown beside the checkout's clean/dirty dot, with a colored dot; a failure shows just "failed", its reason on hover.
+- **The controls cluster** - the error count and the "⋮" menu with every action on the agent.
+- **Facts shown together** - until the caller says the agent's own facts have been read, the row names the agent and shows none of its facts: no clean or dirty, no status word, no size, no error count; the "⋮" menu stays.
 - **What the menu is told** - a Delete is only offered for a finished agent; a Remove only while the agent's checkout is still kept; a Stop addresses the agent by its id.
 
 ## Business logic
@@ -30,7 +31,17 @@ One agent's [1] action bar, one row that never wraps: at the start, what the age
 
 #### Business logic
 
-The row is always one line. Its start is the branch facts row (`GitStatusBar.tsx`), rendered inline and given: the agent's [1] label as the leading identity, its project name as a `project / session` breadcrumb, the caller's summary of what the branch holds, the status word described below, and, when the caller renders a detail under the bar, the toggle that makes the facts a disclosure with an expanded and collapsed state. The facts read from the agent's own checkout [4] when the agent's id is known. A spacer between facts and controls grows but never shrinks, so on a tight row the facts truncate and the controls keep their width.
+The row is always one line. Its start is the line of git facts (`GitStatusBar.tsx`), rendered inline and given: the agent's [1] label as the leading identity, its project name as a "<project> ›" breadcrumb, the status word described below, and, when the caller renders a detail under the bar, the toggle that makes the facts a disclosure with an expanded and collapsed state. Given a label, that line says whether the agent's checkout [4] is clean or dirty and its size, and neither its branch nor its pull request. A spacer between facts and controls grows but never shrinks, so on a tight row the facts truncate and the controls keep their width.
+
+### One read of the checkout
+
+#### Context
+
+**Problem**: the agent's checkout [4] is said in two bars of the agent's page: clean or dirty and the size here, the branch and the pull request in the bar above the message box. Read by each bar for itself, the two could disagree for a moment, and the daemon was asked twice.
+
+#### Business logic
+
+The caller hands the bar the agent's checkout as it read it (the agent's page reads it once for both bars, see `AgentView.tsx`), or says that the read has not answered yet. The bar passes it on to the line of git facts (`GitStatusBar.tsx`), which then reads nothing itself.
 
 ### One status word
 
@@ -40,7 +51,7 @@ The row is always one line. Its start is the branch facts row (`GitStatusBar.tsx
 
 #### Business logic
 
-The bar shows at most one status, decided by the ranking in `lib/agent-status.ts` from the agent's events and, when the caller hands it over, the agent's card [6] (its status, its pull request, and whether the daemon marks it saving) and the number of the agent's subagents (the agents started for it, when it split its task across them) that still hold its job, as the caller counts them: how the agent [1] ended ("failed", "stopped", or "waiting for an answer") outranks what it did on the way ("<N> subagents running" while an agent that ended clean still has subagents running, "saving…" while the daemon marks a cleanly ended agent saving, "ready for merge" once it ended clean with a pull request on its card, "building…" while it runs, "finished" otherwise). Nothing is shown while the agent has no event and no card. The status sits beside the branch's clean/dirty dot as one line of facts, drawn as a colored dot and the word in its tone. A failure shows the word "failed" alone, and hovering it shows the reason its end carried, whole: cut to fit the row, the reason read as "codex exited (1): Y…" and said nothing, and the feed's end line below says it whole anyway.
+The bar shows at most one status, decided by the ranking in `lib/agent-status.ts` from the agent's events and, when the caller hands it over, the agent's card [6] (its status, its pull request, and whether the daemon marks it saving) and the number of the agent's subagents (the agents started for it, when it split its task across them) that still hold its job, as the caller counts them: how the agent [1] ended ("failed", "stopped", or "waiting for an answer") outranks what it did on the way ("<N> subagents running" while an agent that ended clean still has subagents running, "saving…" while the daemon marks a cleanly ended agent saving, "ready for merge" once it ended clean with a pull request on its card, "building…" while it runs, "finished" otherwise). Nothing is shown while the agent has no event and no card. The status sits beside the checkout's clean/dirty dot as one line of facts, drawn as a colored dot and the word in its tone. A failure shows the word "failed" alone, and hovering it shows the reason its end carried, whole: cut to fit the row, the reason read as "codex exited (1): Y…" and said nothing, and the feed's end line below says it whole anyway.
 
 ### The controls cluster
 
@@ -52,9 +63,10 @@ See `## Context`.
 
 At the end of the row, in order:
 
-- the count of errors the agent [1] hit (`AgentErrorCount.tsx`), kept here with the controls rather than among the branch facts because a count is only useful when it is whole and the facts give up width;
-- the next step [2], passed in by the caller once the agent has ended ("Open PR", or "Merge PR", or the reason there is nothing to press; for a subagent, an agent started for another agent, no button, and "landed" or "not landed" in its place, `AgentHandoff.tsx`): the one control that moves the work forward, so it stays visible instead of going into the menu;
-- the "⋮" menu (`AgentActionsMenu.tsx`) with every other action.
+- the count of errors the agent [1] hit (`AgentErrorCount.tsx`), kept here with the controls rather than among the facts because a count is only useful when it is whole and the facts give up width;
+- the "⋮" menu (`AgentActionsMenu.tsx`) with every action on the agent.
+
+The next step [2] is not in this bar. It is a visible button at the end of the bar above the message box (`AgentWorkBar.tsx`).
 
 ### Facts shown together
 
@@ -64,7 +76,7 @@ At the end of the row, in order:
 
 #### Business logic
 
-The caller tells the bar whether the agent's [1] own facts have been read (the agent's page decides, see `AgentView.tsx`). Until they have, the bar shows the agent's name and project and holds back everything that describes the agent: the status word, the summary of what its branch holds, the branch facts (`GitStatusBar.tsx` is told the same), the error count and the next step [2]. The "⋮" menu stays, since it describes nothing. Once ready, they all show together. A caller that says nothing counts as ready.
+The caller tells the bar whether the agent's [1] own facts have been read (the agent's page decides, see `AgentView.tsx`). Until they have, the bar shows the agent's name and project and holds back everything that describes the agent: the status word, clean or dirty and the size (`GitStatusBar.tsx` is told the same), and the error count. The "⋮" menu stays, since it describes nothing. Once ready, they all show together. A caller that says nothing counts as ready.
 
 ### What the menu is told
 

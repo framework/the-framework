@@ -1,10 +1,10 @@
-Reads what an agent's [1] branch holds once its work has stopped — the commits, the changed files, whether the branch is pushed, merged or has a pull request — and carries out the handoff [2] steps the user clicks, so the agent's action bar and the detail it expands always agree about what is on the branch and what is left to do with it.
+Reads what an agent's [1] branch holds once its work has stopped — the commits, the changed files, whether the branch is pushed, merged or has a pull request — and carries out the handoff [2] steps the user clicks, so the bar above the message box of the agent's page and the detail behind the action bar's disclosure always agree about what is on the branch and what is left to do with it.
 
 ## Context
 
-**User story**: an agent ends, or ends waiting [3] on a question, and its page offers the one step that moves the work forward: "Open PR" when the branch has commits and a remote, "Merge PR" once a pull request exists, "Publish branch" for the push alone. While that step runs the button says what it is doing ("Opening PR…", "Merging…", "Publishing…"), and when it fails the reason is shown instead of the button silently doing nothing. The summary above the button says what the branch holds, and expanding it lists the commits and files.
+**User story**: an agent ends, or ends waiting [3] on a question, and its page offers the one step that moves the work forward: "Open PR" when the branch has commits and a remote, "Merge PR" once a pull request exists, "Publish branch" for the push alone. While that step runs the button says what it is doing ("Opening PR…", "Merging…", "Publishing…"), and when it fails the reason is shown instead of the button silently doing nothing. The summary before the button, in the same bar above the message box, says what the branch holds, and opening the disclosure of the action bar at the top of the page lists the commits and files.
 
-**Problem**: the same facts are needed in two places at once — the summary line and the actions in the action bar, and the commits and files the bar expands. Read separately they disagree with each other and cost twice the traffic.
+**Problem**: the same facts are needed in two places at once — the summary and the next step in the bar above the message box, and the commits and files behind the action bar's disclosure. Read separately they disagree with each other and cost twice the traffic.
 
 ## Glossary
 
@@ -49,7 +49,7 @@ The branch state is re-read every 15 seconds. While the answer says the pull req
 
 #### Context
 
-**Problem**: blanking the branch summary makes the action bar fall back to its rough live counts for a beat, which reads as the work having changed when only the page's own timing did.
+**Problem**: blanking the branch summary makes the bar above the message box fall back to its rough live counts for a beat, which reads as the work having changed when only the page's own timing did.
 
 #### Business logic
 

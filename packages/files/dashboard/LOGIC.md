@@ -4,7 +4,7 @@ The Files module's browser part: what it adds to the dashboard and the component
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root.
-[3] run slot: a place on an agent's page a module fills: the summary, a few words in the action bar, shown until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the bar. Each is told the agent, whether it is still working, and whether the bar is open.
+[3] run slot: a place on an agent's page a module fills: the summary, a few words in the bar above the message box, shown until the agent has ended and its branch has been read (the handoff's own words take over then); and the details, a block under the action bar at the top of the page. Each is told the agent, whether it is still working, and whether the action bar is open.
 
 ## Business logic — TL;DR
 
@@ -13,6 +13,6 @@ The Files module's browser part: what it adds to the dashboard and the component
 - **The Changes tab** (`ChangesPanel.tsx`) - only the files that changed, an agent's kept once its work is merged or the project folder's own, each opening to its diff.
 - **The hover card** (`FilePreview.tsx`) - a file's diff or contents, read when it opens and kept fresh.
 - **A file in a card** (`DiffView.tsx`) - a diff as colored lines and a file as numbered lines.
-- **A working agent's changes** (`AgentChanges.tsx`) - the count in the action bar and the list under it.
+- **A working agent's changes** (`AgentChanges.tsx`) - the count in the bar above the message box and the list under the action bar.
 - **The reads** (`reads.ts`) - the module's server reads, typed, a failed one kept from blanking what is shown.
 - **The tests' fake dashboard** (`test-host.tsx`) - every service of the dashboard a spy.

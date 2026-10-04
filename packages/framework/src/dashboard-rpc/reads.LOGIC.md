@@ -114,7 +114,7 @@ The answer is the ids of the checkouts the project's branches provider lists who
 
 #### Context
 
-**User story**: an agent's action bar says which checkout the agent has, on which branch, whether it holds uncommitted changes, how much disk the checkout takes once the agent is done, and which pull request its branch has. Once the agent has ended and its checkout is gone, the bar says only its branch and its pull request.
+**User story**: an agent's page says which checkout the agent has, on which branch, whether it holds uncommitted changes, how much disk the checkout takes once the agent is done, and which pull request its branch has: clean or dirty and the size in the action bar at its top, the branch and the pull request in the bar above the message box. Once the agent has ended and its checkout is gone, the page says only its branch and its pull request.
 
 **Problem**: the git status bar reads the project, so without this an agent's own branch was visible nowhere, and a retained checkout was a name in a list with no size and no way in. And an agent on a branch name an earlier agent already used must not wear a predecessor's merged pull request as its own. And an ended agent whose checkout is gone must not wear the user's own checkout's branch and "clean" as its own.
 

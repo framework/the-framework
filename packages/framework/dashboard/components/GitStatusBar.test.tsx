@@ -27,9 +27,8 @@ describe('GitStatusBar (#809)', () => {
       checkout: { path: '/repo/.the-framework/worktrees/run-1', dirty: true, sizeBytes: 5 * 1024 * 1024 },
       branch: 'the-framework/dark-mode',
     })
-    render(<GitStatusBar projectId="p1" agentId="run-1" inline />)
-    await waitFor(() => expect(screen.getByText('the-framework/dark-mode')).toBeTruthy())
-    expect(screen.getByText('dirty')).toBeTruthy()
+    render(<GitStatusBar projectId="p1" agentId="run-1" inline label="Dark mode" />)
+    await waitFor(() => expect(screen.getByText('dirty')).toBeTruthy())
     expect(screen.getByText('5 MB')).toBeTruthy()
     expect(onGitStatus).not.toHaveBeenCalled()
   })
@@ -41,6 +40,19 @@ describe('GitStatusBar (#809)', () => {
     expect(screen.getByText('Dark mode')).toBeTruthy()
     expect(screen.queryByText('agent-dark-mode')).toBeNull()
     expect(screen.queryByText(/PR #12/)).toBeNull()
+  })
+
+  test("an agent's page: the status word comes right after the name, before clean or dirty, so the word keeps its place when the checkout comes and goes", () => {
+    const { container, rerender } = render(<GitStatusBar projectId="p1" agentId="run-1" inline label="Dark mode" checkout={{ checkout: { path: '/w', dirty: true }, branch: 'b' }} agentState={<span>finished</span>} />)
+    expect(container.textContent).toBe('Dark modefinisheddirty')
+    rerender(<GitStatusBar projectId="p1" agentId="run-1" inline label="Dark mode" checkout={{ branch: 'b' }} agentState={<span>finished</span>} />)
+    expect(container.textContent).toBe('Dark modefinished')
+  })
+
+  test("an agent's page never says a branch, not even while the agent's name is not known yet", () => {
+    const { container } = render(<GitStatusBar projectId="p1" agentId="run-1" inline checkout={{ checkout: { path: '/w', dirty: false } }} />)
+    expect(container.textContent).toBe('clean')
+    expect(screen.queryByText('no branch')).toBeNull()
   })
 
   test('given the checkout by its caller, it reads nothing itself', async () => {
@@ -110,34 +122,33 @@ describe('GitStatusBar (#809)', () => {
     expect(screen.getByText('dirty')).toBeTruthy() // remembered, from the first frame
   })
 
-  test("a session's PR shows, the way the project's does", async () => {
-    // A session's branch is exactly the thing that has a PR, so hiding it there made the one
-    // page where it matters most the page without it.
-    onAgentWorktree.mockResolvedValue({
-      checkout: { path: '/repo/wt', dirty: false },
-      branch: 'the-framework/dark-mode',
-      pr: { number: 42, url: 'https://github.com/o/r/pull/42', state: 'OPEN', title: 'Dark mode' },
-    })
-    render(<GitStatusBar projectId="p1" agentId="run-1" inline />)
+  test("the project's pull request shows as a link with its state; an agent's line never links one, named or not", async () => {
+    onGitStatus.mockResolvedValue({ branch: 'dark-mode', dirty: false, pr: { number: 42, url: 'https://github.com/o/r/pull/42', state: 'OPEN', title: 'Dark mode' } })
+    const { unmount } = render(<GitStatusBar projectId="p1" />)
     await waitFor(() => expect(screen.getByText('PR #42')).toBeTruthy())
     expect(screen.getByText('open')).toBeTruthy()
+    unmount()
+    // The bar above the message box links an agent's pull request.
+    render(<GitStatusBar projectId="p1" agentId="run-1" inline checkout={{ checkout: { path: '/repo/wt', dirty: false }, branch: 'b', pr: { number: 42, url: 'https://github.com/o/r/pull/42', state: 'OPEN', title: 'Dark mode' } }} />)
+    expect(screen.getByText('clean')).toBeTruthy()
+    expect(screen.queryByText('PR #42')).toBeNull()
   })
 
   test('the size is omitted while it cannot be read', async () => {
     // A live session is being written to, so the server does not price it; the row must not
     // show a stray placeholder where the number would go.
     onAgentWorktree.mockResolvedValue({ checkout: { path: '/repo/wt', dirty: false }, branch: 'b' })
-    const { container } = render(<GitStatusBar projectId="p1" agentId="run-1" inline />)
-    await waitFor(() => expect(screen.getByText('b')).toBeTruthy())
+    const { container } = render(<GitStatusBar projectId="p1" agentId="run-1" inline label="Dark mode" />)
+    await waitFor(() => expect(screen.getByText('clean')).toBeTruthy())
     expect(container.textContent).not.toContain('–')
   })
 
-  test("a session whose checkout is gone shows its recorded branch, and no clean or dirty", async () => {
+  test("a session whose checkout is gone says no clean or dirty", async () => {
     // Its checkout was reclaimed, so there is no tree to be either: the user's own checkout's
-    // branch and "clean" used to stand in for it.
+    // "clean" used to stand in for it.
     onAgentWorktree.mockResolvedValue({ branch: 'agent-run-1' })
-    render(<GitStatusBar projectId="p1" agentId="run-1" inline />)
-    await waitFor(() => expect(screen.getByText('agent-run-1')).toBeTruthy())
+    render(<GitStatusBar projectId="p1" agentId="run-1" inline label="Dark mode" agentState={<span>finished</span>} />)
+    await waitFor(() => expect(screen.getByText('finished')).toBeTruthy())
     expect(screen.queryByText('clean')).toBeNull()
     expect(screen.queryByText('dirty')).toBeNull()
   })

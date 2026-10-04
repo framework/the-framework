@@ -1,13 +1,15 @@
 What the tests cover, for the line of git facts about the checkout [1] in play:
 
-- **Whose checkout** - on the project home the project's own checkout is read, showing its branch and "clean", and no agent's [2] checkout is asked for; with an agent selected that agent's checkout is read instead, showing its branch, "dirty", and what only an agent's checkout has, such as its size on disk ("5 MB").
+- **Whose checkout** - on the project home the project's own checkout is read, showing its branch and "clean", and no agent's [2] checkout is asked for; with an agent selected that agent's checkout is read instead, showing "dirty" and what only an agent's checkout has, such as its size on disk ("5 MB").
 - **An agent's page** - given the agent's name, the line shows the name and "dirty", and neither the agent's branch nor its pull request ("PR #12"), which the bar above the message box says.
+- **The state before clean or dirty** - on an agent's page the line reads the name, then the state ("finished"), then "dirty"; once the agent's checkout is gone it reads the name and the state alone, the state in the same place.
+- **Never a branch on an agent's line** - an agent's line given no name shows "clean" alone: no branch, and no "no branch".
 - **Given the checkout, it reads nothing** - handed the checkout by its caller, the line shows no "clean" or "dirty" while the caller's read has not answered, shows "clean" once handed a clean checkout, and asks the daemon about neither the agent's checkout nor the project's.
 - **The project beside a long name** - beside an agent name too long for the row, the "<project> ›" breadcrumb keeps its width up to its cap and cuts a longer project name, and the agent name is the one that truncates. The test DOM has no layout, so this is checked on the elements' styling.
 - **The name first, the facts together** - the agent's name shows while its checkout is still being read and no fact does; once read, the facts still wait until the caller says it is ready, then show.
 - **Switching agents** - after switching from an agent to one whose read has not answered, the first agent's "dirty" is not shown under the second's name; switching back shows the first agent's "dirty" from the first frame, remembered. The test fails when the line keeps the previous agent's facts instead.
-- **The pull request** - shown without the agent's name, an agent's branch's pull request shows as "PR #42" with its state "open", the way the project's does.
-- **An ended agent with no checkout** - shown without the agent's name, an agent whose checkout is gone shows the branch it recorded and neither "clean" nor "dirty".
+- **The pull request** - the project's branch's pull request shows as "PR #42" with its state "open"; an agent's line links none, with the agent's name or without it.
+- **An ended agent with no checkout** - an agent whose checkout is gone shows its state and neither "clean" nor "dirty".
 - **No size while unmeasured** - when the daemon has not measured the checkout's size, no placeholder appears where the number would go.
 - **Nothing to report** - when the daemon has no checkout to report, the line renders nothing.
 

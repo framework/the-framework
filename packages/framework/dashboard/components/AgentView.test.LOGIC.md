@@ -22,6 +22,11 @@ And when the bar above the message box is there:
 - **An ended agent** - one whose branch holds no commit is told not to show; one whose checkout names a pull request (a merged one) is told to show.
 - **As the agent ends** - a working agent with uncommitted changes ends and its checkout is gone: the bar is still told to show while the read of what its branch holds is unanswered, and told not to show once the read answers that the branch holds nothing.
 
+And what the page tells the status word:
+
+- **Starting** - an agent just started with a prompt is said to be starting while its events hold no prompt line, and no longer once they do.
+- **Settling** - a working agent whose turn ends while shown is said to be settling, and no longer after a little over 3 seconds; an agent opened after it ended is never said to be settling.
+
 And when the action bar is told its facts are ready:
 
 - **Once its own reads are in** - a finished agent's action bar is not ready while its archive is unanswered, still not once the archive has answered, and ready once the read of what its branch holds has answered too.

@@ -35,6 +35,9 @@ import { holdsMainAgent } from '../lib/subagents.js'
 // events already on screen.
 /** How long the bar waits for the run's own reads before it shows the facts that are in. */
 const READY_WAIT_MS = 1_000
+
+/** How long after a turn seen ending the status word waits for the card to say whether the run is saving: the agents poll is every 2 seconds. */
+export const SETTLE_MS = 3_000
 /** How often what the working subagents are doing is read: the runs poll's own pace. */
 const DOING_EVERY_MS = 2_000
 const NO_SUBAGENTS: readonly AgentMeta[] = []
@@ -212,6 +215,23 @@ export function AgentView({
   // The agent works, or is about to: on a message just sent, or as its feed shows before the
   // agents poll does.
   const going = feedLive || shownSending !== undefined
+  // The page just watched a turn end: for a moment the card has not said yet whether the run's
+  // process is saving its record. The status word says "saving…" through that moment after a clean
+  // end, in place of "finished", then "saving…", then "finished" again.
+  // A turn is one the events showed going, and it ends when they show its end: the agents poll
+  // says so up to two seconds later, and waiting for it left "finished" on screen until then. A
+  // message that was refused started no turn.
+  const turn = useRef<{ agentId: string | null; active: boolean; endedAt: number | null }>({ agentId: null, active: false, endedAt: null })
+  if (turn.current.agentId !== agentId) turn.current = { agentId, active, endedAt: null }
+  else if (turn.current.active !== active) turn.current = { agentId, active, endedAt: active ? null : Date.now() }
+  const endedAt = turn.current.endedAt
+  const settling = endedAt !== null && Date.now() - endedAt < SETTLE_MS
+  const [, settled] = useState(0)
+  useEffect(() => {
+    if (endedAt === null) return
+    const timer = setTimeout(() => settled(n => n + 1), Math.max(0, endedAt + SETTLE_MS - Date.now()))
+    return () => clearTimeout(timer)
+  }, [endedAt])
   // What the branch holds (#1023), read once for the bar above the message box. Read once
   // the agent stops rather than once the process does: while it is still writing to the branch
   // there is nothing to hand off yet, but a parked session's branch is finished work. "Stops" is
@@ -291,6 +311,7 @@ export function AgentView({
         events={shown}
         card={card}
         subagentsRunning={subagentsRunning}
+        page={{ starting: shownSending !== undefined, settling }}
         label={label}
         projectName={projectName}
         retainedWorktree={hasWorktree}

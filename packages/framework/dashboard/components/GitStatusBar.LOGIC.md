@@ -1,8 +1,8 @@
-The one line of git facts about the checkout [1] in play, shown on the project home for the project's own checkout (its branch, whether it is clean or dirty, and the linked pull request) and in the action bar at the top of an agent's [2] page for that agent's checkout (the agent's name, whether its checkout is clean or dirty, the agent's state, and the checkout's size on disk), kept current on a clock so it tracks an agent committing. An agent's branch and its pull request are not said in this line: they are in the bar above the message box (`AgentWorkBar.tsx`). It renders nothing when there is no repository or checkout to report, except the agent's name, which shows from the first frame.
+The one line of git facts about the checkout [1] in play, shown on the project home for the project's own checkout (its branch, whether it is clean or dirty, and the linked pull request) and in the action bar at the top of an agent's [2] page for that agent's checkout (the agent's name, the agent's state, whether its checkout is clean or dirty, and the checkout's size on disk), kept current on a clock so it tracks an agent committing. An agent's branch and its pull request are not said in this line: they are in the bar above the message box (`AgentWorkBar.tsx`). It renders nothing when there is no repository or checkout to report, except the agent's name, which shows from the first frame.
 
 ## Context
 
-**User story**: on a project's page the user sees which branch the project is on, whether there are uncommitted changes and whether the branch has a pull request. On an agent's [2] page the same line names the agent by its label with its project as a breadcrumb, then whether the agent has uncommitted work, what the agent is up to, and how much disk its checkout [1] takes; clicking the line opens the detail below it. The agent's branch, what the branch holds and the pull request it opened are right above the message box, beside the next step (`AgentWorkBar.tsx`).
+**User story**: on a project's page the user sees which branch the project is on, whether there are uncommitted changes and whether the branch has a pull request. On an agent's [2] page the same line names the agent by its label with its project as a breadcrumb, then what the agent is up to, whether the agent has uncommitted work, and how much disk its checkout [1] takes; clicking the line opens the detail below it. The agent's branch, what the branch holds and the pull request it opened are right above the message box, beside the next step (`AgentWorkBar.tsx`).
 
 ## Glossary
 
@@ -14,10 +14,10 @@ The one line of git facts about the checkout [1] in play, shown on the project h
 - **Whose checkout** - with an agent selected the line reports that agent's checkout, which alone has a path and a size while it exists; otherwise the project's own checkout; nothing renders when there is no checkout to report.
 - **Kept current** - the facts are re-read every 10 seconds, or every 0.3 seconds while the daemon's pull request lookup is still in flight (`lib/use-checkout-status.ts`); a caller that already read the checkout hands it in, and the line reads nothing itself.
 - **Switching agents** - the facts are remembered per checkout for as long as the page is open: going back to an agent shows its facts from the first frame while they are read again; an agent never shown has no facts until its own are read, never the previous agent's. Until then, and while the caller says its own facts are not in yet, the agent's name and project show alone.
-- **The agent's name, or the branch** - given the agent's name it leads in bold, prefixed by "<project> ›", which stays in view (capped) however long the name is, and no branch is shown; without a name the branch is the identity, with the full branch in its tooltip.
+- **The agent's name, or the branch** - given the agent's name it leads in bold, prefixed by "<project> ›", which stays in view (capped) however long the name is, and no branch is shown; the branch is the identity only on the project home, with the full branch in its tooltip; an agent's line never says a branch, also while its name is not given.
 - **Clean or dirty, neutrally** - a dot and the word "clean" in neutral gray or "dirty" in amber; the tooltip reads "Clean", "Uncommitted changes", or "Uncommitted changes in this agent" on an agent's checkout; an agent whose checkout is gone shows neither.
-- **State and size** - the agent's state sits beside the dot, and the checkout's size on disk shows once the daemon could measure it; the size drops out as the bar narrows.
-- **The pull request link** - without an agent's name: "PR #<number>" with its state in a pill, opening the pull request in a new tab, its title in the tooltip; given an agent's name, no link.
+- **State and size** - the agent's state sits right after the name, before clean or dirty, and the checkout's size on disk shows once the daemon could measure it; the size drops out as the bar narrows.
+- **The pull request link** - on the project home: "PR #<number>" with its state in a pill, opening the pull request in a new tab, its title in the tooltip; on an agent's line, no link.
 - **A disclosure when there is detail below** - when the caller renders detail under the bar, the facts become a button with a chevron that turns when expanded; the chevron is drawn, dimmed, even while the name shows alone, so the name never moves when the facts land.
 
 ## Business logic
@@ -52,11 +52,13 @@ The caller can also hold the facts back while its own facts about the agent are 
 
 #### Context
 
+**Problem**: for the moment an agent's name was not known yet, its line showed the branch in the name's place, or "no branch", and the name replaced it a moment later.
+
 **Problem**: the agent [2] renames its branch near the end of its work, while its label does not change under the user. And the agent's branch is what the next step acts on, so it is said beside the next step, above the message box, and not a second time here.
 
 #### Business logic
 
-When the caller gives the agent's label, it leads in bold and is the last element to truncate, so the identity never disappears. A project name given with it is prefixed as a muted "<project> ›" breadcrumb that is always shown (`›`, not `/`, so a label that is a command, such as `/update-tickets`, never reads as a doubled slash): it keeps its width up to a cap of 8rem (about 16 characters), a longer project name is cut there with "…", and a long agent name is what gives up the rest of the row. Given a label, no branch is shown in this line. Without a label (the project home) the branch is the identity, in bold, capped at 16 rem, its tooltip reading "branch <branch>"; for an agent's checkout [1] shown without a label, the tooltip shows the full branch and, while the agent has its checkout, the checkout's path on a second line. A checkout on no branch reads "no branch".
+When the caller gives the agent's label, it leads in bold and is the last element to truncate, so the identity never disappears. A project name given with it is prefixed as a muted "<project> ›" breadcrumb that is always shown (`›`, not `/`, so a label that is a command, such as `/update-tickets`, never reads as a doubled slash): it keeps its width up to a cap of 8rem (about 16 characters), a longer project name is cut there with "…", and a long agent name is what gives up the rest of the row. Given a label, no branch is shown in this line. On the project home (no label and no agent) the branch is the identity, in bold, capped at 16 rem, its tooltip reading "branch <branch>"; a checkout on no branch reads "no branch". For an agent's checkout [1] no branch is shown, with a label or without one: an agent's line shown without a label starts at the agent's state.
 
 ### Clean or dirty, neutrally
 
@@ -74,9 +76,11 @@ A dot and a word: "clean" with a neutral gray dot, or "dirty" with an amber dot.
 
 **Problem**: the agent's [2] state (stopped, ready for merge, and so on, as the caller words it) belongs with the tree's own clean or dirty, as one line of facts about the agent, while the far end of the bar is where its controls live.
 
+**Problem**: clean or dirty is there only while the agent has a checkout. With the state after it, the state jumped left when the checkout went and right when it came back.
+
 #### Business logic
 
-The agent's state, as worded by the caller, sits right after the dot. The checkout's [1] size on disk, rendered as a short byte count such as "5 MB", shows only for an agent's checkout and only once the daemon has measured it, which it does not while something is still writing to it; its tooltip reads "This agent's worktree on disk", and an unmeasured size shows nothing, not a placeholder. As the bar narrows, the size drops out, so the line never wraps or collides; only the label, or the branch when there is no label, truncates with an ellipsis. On a pane too narrow even for that, the line is cut off rather than painted over the controls beside it.
+The agent's state, as worded by the caller, sits right after the name (or the branch, on a line that shows one) and before the clean or dirty dot: clean or dirty comes and goes after the state, and the state keeps its place. The checkout's [1] size on disk, rendered as a short byte count such as "5 MB", shows only for an agent's checkout and only once the daemon has measured it, which it does not while something is still writing to it; its tooltip reads "This agent's worktree on disk", and an unmeasured size shows nothing, not a placeholder. As the bar narrows, the size drops out, so the line never wraps or collides; only the label, or the branch when there is no label, truncates with an ellipsis. On a pane too narrow even for that, the line is cut off rather than painted over the controls beside it.
 
 ### The pull request link
 
@@ -86,7 +90,7 @@ See `## Context`.
 
 #### Business logic
 
-Without a label (the project home), when the branch has a pull request, a link reads "PR #<number>" followed by the pull request's state in lowercase inside a small pill ("open", "merged", "closed"); it opens the pull request in a new tab and shows the pull request's title in its tooltip. On the full-width row it sits at the far right; inline, it follows the facts. An agent's [2] checkout shown without a label links its pull request the same way. Given a label (an agent's page), the line shows no pull request link: the bar above the message box links it (`AgentWorkBar.tsx`).
+On the project home, when the branch has a pull request, a link reads "PR #<number>" followed by the pull request's state in lowercase inside a small pill ("open", "merged", "closed"); it opens the pull request in a new tab and shows the pull request's title in its tooltip. On the full-width row it sits at the far right; inline, it follows the facts. An agent's [2] line shows no pull request link: the bar above the message box links it (`AgentWorkBar.tsx`).
 
 ### A disclosure when there is detail below
 

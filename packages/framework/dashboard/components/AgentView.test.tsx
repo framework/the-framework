@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import type { FrameworkEvent } from '../../src/index.js'
 import { ModulesContext, type MountedModules } from '../lib/use-modules.js'
@@ -36,8 +36,9 @@ vi.mock('../lib/preferences.js', () => ({
 // The `actions` and `summary` slots of the bar above the message box ARE rendered, so the handoff
 // cluster and the modules' summaries stay reachable.
 vi.mock('./AgentActionBar.js', () => ({
-  AgentActionBar: ({ ready, checkout, onToggle }: { ready?: boolean; checkout: unknown; onToggle?: () => void }) => (
+  AgentActionBar: ({ ready, checkout, onToggle, page }: { ready?: boolean; checkout: unknown; onToggle?: () => void; page?: { starting?: boolean; settling?: boolean } }) => (
     <>
+      <span data-testid="bar-page">{`${page?.starting ? 'starting' : ''}${page?.settling ? 'settling' : ''}`}</span>
       <button type="button" onClick={onToggle}>details</button>
       <span data-testid="bar-ready">{String(ready)}</span>
       <span data-testid="bar-checkout">{JSON.stringify(checkout)}</span>
@@ -56,7 +57,7 @@ vi.mock('./AgentWorkBar.js', () => ({
 // The composer shows only what the view tells it about the run going: the one fact of it under test here.
 vi.mock('./AgentComposer.js', () => ({ AgentComposer: ({ live }: { live: boolean }) => <span data-testid="composer-live">{String(live)}</span> }))
 
-const { AgentView } = await import('./AgentView.js')
+const { AgentView, SETTLE_MS } = await import('./AgentView.js')
 
 const LIVE_EVENTS = [{ kind: 'log', message: 'the channel delivered this line' }] as FrameworkEvent[]
 const ARCHIVED = [{ kind: 'log', message: 'the archive delivered this line' }] as FrameworkEvent[]
@@ -256,6 +257,36 @@ describe('AgentView: when the bar above the message box is there', () => {
     expect(shown()).toBe('true')
     answer({ ...PUSHED, empty: true, commits: [] })
     await waitFor(() => expect(shown()).toBe('false'))
+  })
+})
+
+describe('AgentView: what the page tells the status word', () => {
+  const said = () => screen.getByTestId('bar-page').textContent
+  const first = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a page' } }] as FrameworkEvent[]
+
+  test('an agent just started with a prompt is starting until its prompt line is in the feed', () => {
+    const { rerender } = render(view({ events: [], live: true, startedWith: 'Add a page' }))
+    expect(said()).toBe('starting')
+    rerender(view({ events: first, live: true, startedWith: 'Add a page' }))
+    expect(said()).toBe('')
+  })
+
+  test('a turn seen ending is settling for a moment, then not; an agent opened after it ended never is', async () => {
+    vi.useFakeTimers()
+    try {
+      const { rerender, unmount } = render(view({ events: first, live: true }))
+      expect(said()).toBe('')
+      // The events show the end; the agents poll still says it runs.
+      rerender(view({ events: [...first, { kind: 'end', ok: true }] as FrameworkEvent[], live: true }))
+      expect(said()).toBe('settling')
+      await act(async () => void vi.advanceTimersByTime(SETTLE_MS + 50))
+      expect(said()).toBe('')
+      unmount()
+      render(view({ agentId: 'run-2', events: [...first, { kind: 'end', ok: true }] as FrameworkEvent[], live: false }))
+      expect(said()).toBe('')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

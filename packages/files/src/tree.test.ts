@@ -292,3 +292,28 @@ test('a run started from another run’s branch is measured from the commit its 
   // A landed run whose commit this machine does not have is gone, never "changed nothing".
   assert.deepEqual(await resolve(deps({ status: 'done', host: 'this-machine', landed: '0'.repeat(40) })), { source: 'gone' })
 })
+
+test('a run from the default branch whose record names its start: what it took in from the default branch is not marked, and its changes are still marked once the default branch has them', async () => {
+  git(root, 'checkout', '-q', 'main')
+  const start = git(root, 'rev-parse', 'main')
+  const path = join(dir, 'wt-started')
+  git(root, 'worktree', 'add', '-q', '-b', 'agent-started', path, 'main')
+  commit(path, 'own work', { 'own.txt': 'own\n' })
+  // The default branch moves on, and the run takes it in.
+  commit(root, 'somebody else', { 'theirs.txt': 'theirs\n' })
+  git(path, 'merge', '-q', '--no-ff', '-m', 'take main in', 'main')
+  const own = { 'own.txt': { status: 'added', committed: true } }
+  const live = await readAgentTree(root, await resolveAgentFiles(inCheckout(path, { baseCommit: start }), 'run-started'))
+  assert.deepEqual(live.source === 'checkout' && live.changes, own)
+
+  // Merged into the default branch, its branch still here: measured from its start.
+  git(root, 'worktree', 'remove', path)
+  git(root, 'merge', '-q', '--ff-only', 'agent-started')
+  const merged = await readAgentTree(root, await resolve(deps({ status: 'done', host: 'this-machine', branch: 'agent-started', baseCommit: start })))
+  assert.equal(merged.source, 'branch')
+  assert.ok(merged.source === 'branch' && merged.changes['own.txt'], 'what it changed is still read')
+  // With no start on its record, nothing is left to mark once it is merged.
+  const unnamed = await readAgentTree(root, await resolve(deps({ status: 'done', host: 'this-machine', branch: 'agent-started' })))
+  assert.deepEqual(unnamed.source === 'branch' && unnamed.changes, {})
+  git(root, 'branch', '-q', '-D', 'agent-started')
+})

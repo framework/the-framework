@@ -43,8 +43,9 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
   // A branch that is gone and a branch that was never pushed are different facts, and the summary
   // is only useful if it tells them apart. Gone because the run changed nothing is no changes.
   if (!handoff.exists) return <span className="text-muted-foreground">{handoff.unchanged ? 'no changes' : 'branch gone'}</span>
-  // A merged branch reads as empty too — its commits are all on the base, so `base..branch` lists
-  // nothing — but "merged" and "no changes" are opposite verdicts, and only one of them is true.
+  // A merged branch whose record names no start reads as empty too — its commits are all on the
+  // base, so `base..branch` lists nothing — but "merged" and "no changes" are opposite verdicts,
+  // and only one of them is true. One whose record names its start keeps its count below.
   const commits = `${handoff.commits.length} commit${handoff.commits.length === 1 ? '' : 's'}`
   // Commits that undo each other leave the files as the base has them. The commits are still what
   // the agent did, so they are counted, and that nothing is left of them is said beside the count.
@@ -156,10 +157,12 @@ export function HandoffActions({
       </>
     )
   }
+  // The main branch already has the work: there is no step left, with a remote or without one.
+  // The commits and files stay counted beside it, measured from where the run's work began.
+  if (handoff.merged) return <Reason>Merged into {mainBranchName(handoff.base)}.</Reason>
   // No remote: nothing to push to and no pull request to open, so the work reaches the project's
   // own folder by a merge on this machine, and that is the one step offered.
   if (!handoff.hasRemote) {
-    if (handoff.merged) return <Reason>Merged into {mainBranchName(handoff.base)}.</Reason>
     return (
       <>
         <Reason>Not in {mainBranchName(handoff.base)} yet.</Reason>

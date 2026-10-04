@@ -20,7 +20,7 @@ import {
  * publishing a branch is a person's call, never a cleanup's.
  *
  * What the caller knows and git does not comes in as options: the branch the checkout was created
- * on, and the commit its branch started from.
+ * on, and the commit its branch was made at.
  */
 export interface ReclaimOptions {
   /**
@@ -30,8 +30,8 @@ export interface ReclaimOptions {
    */
   birthBranch?: string
   /**
-   * The commit the checkout's branch started from, when that is not origin's default branch: a
-   * branch started from another branch. A branch with no commit past it holds nothing of its own.
+   * The commit the checkout's branch was made at, when the caller knows it. A branch with no
+   * commit past it holds nothing of its own.
    */
   from?: string
   /** Run once removal is decided, just before the checkout goes: stop what serves the tree. */
@@ -122,26 +122,26 @@ export async function discardWorktree(repo: string, path: string, opts: Pick<Rec
 }
 
 /**
- * Whether a branch holds nothing of its own (#1650): no commit past where it started. Where it
- * started is the commit the caller names; with none named, origin's default branch, where every
- * agent branch starts unless told otherwise, read from the local remote-tracking ref and never
- * fetched.
+ * Whether a branch holds nothing of its own (#1650). Either answer is enough: it has no commit
+ * past the commit it was made at, when the caller names that commit and this machine has it; or
+ * origin's default branch already has everything on it, read from the local remote-tracking ref
+ * and never fetched. The first is the only one a project with no remote can give, and the only
+ * one for a branch made from another branch nobody published. The second is the only one for a
+ * caller that names no commit, and for a branch whose work was merged.
  *
  * Not "the tip is on the remote under another name", the earlier test: a branch another agent was
  * started from has its tip inside that agent's branch once that one is pushed, and it is still
- * the only branch that work is its own on. Nor must the named commit be on the remote: nothing is
- * there before a person publishes, and a branch started from an unpublished one that committed
- * nothing is as empty as any.
+ * the only branch that work is its own on.
  */
 async function branchHoldsNothing(repo: string, branch: string, from: string | undefined, git: GitRunner): Promise<boolean> {
   const tip = `refs/heads/${branch}`
-  if (from === undefined) {
-    const start = await originDefaultBranch(repo, git)
-    return start !== undefined && (await isAncestor(repo, tip, `refs/remotes/${start}`, git))
+  if (from !== undefined) {
+    // The commit itself, never the caller's words handed on to git; one this machine lacks proves nothing.
+    const start = await git(['rev-parse', '--verify', '--quiet', '--end-of-options', `${from}^{commit}`], repo).then(out => out.trim(), () => '')
+    if (start !== '' && (await isAncestor(repo, tip, start, git))) return true
   }
-  // The commit itself, never the caller's words handed on to git; one this machine lacks proves nothing.
-  const start = await git(['rev-parse', '--verify', '--quiet', '--end-of-options', `${from}^{commit}`], repo).then(out => out.trim(), () => '')
-  return start !== '' && (await isAncestor(repo, tip, start, git))
+  const main = await originDefaultBranch(repo, git)
+  return main !== undefined && (await isAncestor(repo, tip, `refs/remotes/${main}`, git))
 }
 
 /** Whether `inner` is `outer` or an ancestor of it — everything on it is on `outer` too. False on any doubt. */

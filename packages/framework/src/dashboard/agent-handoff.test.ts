@@ -230,8 +230,9 @@ test('a run’s handoff off its record: its branch from where its own work begin
   assert.equal(await readRunHandoff('/repo', run({}), deps), undefined)
 })
 
-test('the Open PR button refuses a session with no branch, a gone branch, an empty branch, a project with no branches provider, and one with no git host', async () => {
-  const { branches, gitHost } = fakeBranches({ gone: state({ branch: 'gone', exists: false, commits: [], files: [] }), empty: state({ branch: 'empty', commits: [], files: [] }), 'the-framework/work': state() })
+test('the Open PR button refuses a session with no branch, a gone branch, an empty branch, a merged branch, a project with no branches provider, and one with no git host', async () => {
+  const { branches, gitHost } = fakeBranches({ gone: state({ branch: 'gone', exists: false, commits: [], files: [] }), empty: state({ branch: 'empty', commits: [], files: [] }), merged: state({ branch: 'merged', merged: true }), 'the-framework/work': state() })
+  assert.deepEqual(await openAgentPullRequest('/repo', agent({ branch: 'merged' }), { branches, gitHost }), { ok: false, error: 'this session’s work is already merged' })
   assert.deepEqual(await openAgentPullRequest('/repo', unbranched, { branches, gitHost }), { ok: false, error: 'this session recorded no branch to open a PR from' })
   assert.deepEqual(await openAgentPullRequest('/repo', agent({ branch: 'gone' }), { branches, gitHost }), { ok: false, error: 'branch gone no longer exists' })
   assert.deepEqual(await openAgentPullRequest('/repo', agent({ branch: 'empty' }), { branches, gitHost }), { ok: false, error: 'this session produced no commits to open a PR for' })

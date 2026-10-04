@@ -44,13 +44,13 @@ A checkout [2] is removed only once its branch holds everything in it: a clean t
 
 #### Context
 
-**Business logic story**: the caller knows the branch the checkout [2] was created on, the commit its branch started from, and what serves the tree while the agent [1] runs. None of that is readable from git, so it comes in as the caller's word. The runner and the dashboard's "Remove" button name the birth branch [7], and name the commit the branch started from when the agent's record has one (an agent started from another branch). The command line passes the commit the branch started from (`--from` in `cli.ts`) and the birth branch its directory names.
+**Business logic story**: the caller knows the branch the checkout [2] was created on, the commit its branch started from, and what serves the tree while the agent [1] runs. None of that is readable from git, so it comes in as the caller's word. The runner and the dashboard's "Remove" button name the birth branch [7], and name the commit the branch was made at when the agent's record has one (every agent that made its own branch). The command line passes the commit the branch started from (`--from` in `cli.ts`) and the birth branch its directory names.
 
 #### Business logic
 
 Three things come from the caller:
 
-- The commit the checkout's branch started from, when that is not `origin`'s default branch: a branch started from another branch. It is what tells such a branch with nothing of its own from one that holds its own work (see "An agent branch that holds nothing goes with its checkout").
+- The commit the checkout's branch was made at, when the caller knows it. A branch with no commit past it holds nothing of its own. It is the only thing that says so for a branch made from another branch nobody published, and in a project with no remote (see "An agent branch that holds nothing goes with its checkout").
 - The birth branch [7], when it may differ from the branch the checkout ended on.
 - A hook to run once removal is decided and just before the checkout goes, to stop whatever serves the tree. The command line passes none.
 
@@ -96,14 +96,16 @@ The tree must be clean: no modified, staged or deleted tracked file and no untra
 
 **Problem**: the commit a branch started from is usually not on the remote: nothing is there before a person publishes. A branch started from an unpublished branch that committed nothing is as empty as any.
 
+**Problem**: a project with no remote has no `origin` default branch to compare a branch with. An agent that committed nothing there would leave its empty branch behind, with nothing to say it is empty but the commit it was made at.
+
 #### Business logic
 
-A branch holds nothing of its own when it has no commit past where it started. Where it started is one of two things:
+A branch holds nothing of its own when either of two tests says so:
 
-- When the caller names no commit: `origin`'s default branch (what `origin`'s HEAD points at, else `origin/main`, else `origin/master`), where every agent branch starts unless told otherwise. The branch holds nothing when its tip is that branch's tip or an ancestor of it. A repository with no such branch has no branch that holds nothing. The read takes the local remote-tracking ref, never a fetch, so it is at most behind the remote: a commit it does not cover yet reads as the branch's own.
-- When the caller names the commit the branch started from: the branch holds nothing when its tip is that commit or an ancestor of it. The commit does not have to be on the remote. A commit this machine does not have proves nothing: the branch reads as holding something. So does a branch started from another branch whose start the caller does not name: measured from the default branch, what it started on reads as its own.
+- It has no commit past the commit it was made at: the caller names that commit, this machine has it, and the branch's tip is that commit or an ancestor of it. The commit does not have to be on the remote, and the repository does not need a remote. A commit this machine does not have proves nothing by itself.
+- `origin`'s default branch (what `origin`'s HEAD points at, else `origin/main`, else `origin/master`) already has everything on it: the branch's tip is that branch's tip or an ancestor of it. This is the only test when the caller names no commit, and the one that answers for a branch whose work was merged. The read takes the local remote-tracking ref, never a fetch, so it is at most behind the remote: a commit it does not cover yet reads as the branch's own.
 
-A branch with a commit past where it started holds its own work, whatever other branch, here or on the remote, holds its tip.
+When neither says so, the branch holds its own work and stays: a branch with a commit past where it was made that `origin`'s default branch lacks, whatever other branch, here or on the remote, holds its tip; a branch made from another branch whose start the caller does not name, since what it started on reads as its own; and, in a repository with no remote, any branch whose start the caller does not name.
 
 The checkout [2] of a clean tree goes either way. Its branch goes with it, deleted after the checkout is removed, only when it holds nothing and is an agent branch [10]: a leftover checkout can sit on the user's own branch, and deleting that is never this package's call, even when it holds nothing; that branch stays. A branch that holds its own work stays on this machine, pushed or not: it is where the agent's work is, and may be the branch a pull request is open on.
 

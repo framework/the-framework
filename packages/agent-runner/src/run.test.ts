@@ -88,6 +88,7 @@ test('a run: marker, checkout, the live card, the prompt once, the record, the c
   const repo = await testRepo()
   try {
     const seen: { cwd: string; card?: unknown } = { cwd: '' }
+    const mainAt = (await git(['rev-parse', 'origin/main'], repo)).trim()
     const driver = committingDriver()
     const wrapped: Driver = {
       id: driver.id,
@@ -117,7 +118,7 @@ test('a run: marker, checkout, the live card, the prompt once, the record, the c
     assert.equal(card['intent'], '/work-queue')
     assert.equal(card['model'], 'opus', 'before the agent has run, the card holds the model it was given')
     assert.equal(card['branch'], 'agent-2026-09-16T14-01-00-000Z')
-    assert.deepEqual(card['caller'], { runner: { host: 'this-box', pid: 4242 }, pid: 4242, host: 'this-box', kind: 'prompt', workspace: seen.cwd })
+    assert.deepEqual(card['caller'], { runner: { host: 'this-box', pid: 4242, baseCommit: mainAt }, pid: 4242, host: 'this-box', baseCommit: mainAt, kind: 'prompt', workspace: seen.cwd })
 
     // The checkout went: the branch stays here, unpushed, and the record says where the work is.
     assert.equal(await stat(worktreePath(repo, outcome.id)).then(() => true, () => false), false)
@@ -131,7 +132,7 @@ test('a run: marker, checkout, the live card, the prompt once, the record, the c
     assert.equal(recorded?.model, 'claude-opus-5-5', 'the record names the model the agent ran, not the alias it was given')
     assert.equal(recorded?.driver, 'fake')
     assert.equal(recorded?.caller?.['sessionId'], 's-1')
-    assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242 })
+    assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242, baseCommit: mainAt })
     const diary = await readUntimedDiary(repo, outcome.id)
     assert.deepEqual(diary.map(line => line.kind), ['start', 'said', 'result', 'cost', 'ended'])
     assert.deepEqual(diary.find(l => l.kind === 'said'), { kind: 'said', text: 'Fixed it and committed.' })
@@ -474,7 +475,7 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
     assert.equal(outcome.status, 'done')
     assert.deepEqual(outcome.pr, { number: 12, url: 'https://example.com/x/y/pull/12' })
     assert.equal((await findRun(repo, outcome.id))?.intent, '/work-queue', 'the record keeps the bare prompt')
-    assert.deepEqual((await findRun(repo, outcome.id))?.caller?.['runner'], { host: 'this-box', pid: 4242, then: '/post-merge-cleanup' })
+    assert.deepEqual((await findRun(repo, outcome.id))?.caller?.['runner'], { host: 'this-box', pid: 4242, then: '/post-merge-cleanup', baseCommit: (await git(['rev-parse', 'origin/main'], repo)).trim() })
 
     const then = outcome.then!
     assert.notEqual(then.id, outcome.id, 'a fresh agent: a run of its own')
@@ -492,7 +493,7 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
     const recorded = await findRun(repo, then.id)
     assert.equal(recorded?.status, 'done')
     assert.equal(recorded?.intent, `/post-merge-cleanup ${outcome.id}`)
-    assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242 })
+    assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242 }, 'on a branch another run made: it writes down no start of its own')
     assert.equal((await git(['rev-parse', 'refs/remotes/origin/agent-fix-it'], repo)).trim(), (await git(['rev-parse', 'agent-fix-it'], repo)).trim(), 'the follow-up\'s commit is on the same branch, pushed')
     assert.deepEqual((await readFile(out, 'utf8')).split('\n').filter(Boolean), ['repo: "/work-queue" opened a pull request: https://example.com/x/y/pull/12'], 'the pull request is announced once, by the run that opened it, not again by its follow-up')
   } finally {
@@ -519,7 +520,7 @@ test('a run with a publish level: its agent is told the sentence, the record kee
     assert.deepEqual(prompts, [`Fix the typo\n\n${PUBLISH_LINES.pr}`])
     const recorded = await findRun(repo, first.id)
     assert.equal(recorded?.intent, 'Fix the typo', 'the record keeps the bare prompt')
-    assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242, publish: 'pr' })
+    assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242, publish: 'pr', baseCommit: (await git(['rev-parse', 'origin/main'], repo)).trim() })
 
     const resumed = await resumeRun(repo, { id: first.id, text: 'Go on.', driver: listening('Done.'), host: 'this-box', pid: 4243, now: ticking(), gitHost: noGitHost })
     assert.equal(resumed.status, 'done')
@@ -528,7 +529,7 @@ test('a run with a publish level: its agent is told the sentence, the record kee
 
     const plain = await runCommand(repo, { prompt: 'Fix the typo', driver: listening('Done.'), host: 'this-box', pid: 4242, now: ticking(), gitHost: noGitHost })
     assert.equal(prompts[2], 'Fix the typo', 'no level: the prompt as written')
-    assert.deepEqual((await findRun(repo, plain.id))?.caller?.['runner'], { host: 'this-box', pid: 4242 })
+    assert.deepEqual((await findRun(repo, plain.id))?.caller?.['runner'], { host: 'this-box', pid: 4242, baseCommit: (await git(['rev-parse', 'origin/main'], repo)).trim() })
   } finally {
     await removeRepo(repo)
   }
@@ -641,11 +642,66 @@ test('a run started from a base, continued after its empty branch went with its 
     assert.equal(runnerMark(again!)?.baseCommit, planNow, 'made again from the base as it is now: its own work begins there')
     assert.equal(again!.caller?.['baseCommit'], planNow)
 
-    // A run from origin's default branch records none: it is measured against that branch as it is.
-    const plain = await runCommand(repo, { prompt: 'Do task two', driver: new FakeDriver({ turns: [{ text: 'Nothing to change.' }] }), now: () => new Date(NOW.getTime() + 120_000), gitHost: noGitHost })
-    const plainCard = await findRun(repo, plain.id)
-    assert.equal(runnerMark(plainCard!)?.baseCommit, undefined)
-    assert.equal(plainCard!.caller?.['baseCommit'], undefined)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test("a run from origin's default branch writes down the commit its branch was made at, and one made again after its empty branch went writes the new one", async () => {
+  const repo = await testRepo()
+  try {
+    const mainAt = (await git(['rev-parse', 'origin/main'], repo)).trim()
+    const first = await runCommand(repo, { prompt: 'Do task one', driver: new FakeDriver({ turns: [{ text: 'Nothing to change.' }], sessionId: 's-1' }), now: () => NOW, gitHost: noGitHost })
+    const ended = await findRun(repo, first.id)
+    assert.equal(ended?.branch, undefined, 'the branch held nothing and went with the checkout')
+    assert.equal(runnerMark(ended!)?.baseCommit, mainAt)
+    assert.equal(ended!.caller?.['baseCommit'], mainAt)
+
+    // The default branch moves on before the run is continued.
+    await writeFile(join(repo, 'later.txt'), 'later\n')
+    await git(['add', '-A'], repo)
+    await git(['commit', '-q', '-m', 'Later'], repo)
+    await git(['push', '-q', 'origin', 'main'], repo)
+    const mainNow = (await git(['rev-parse', 'origin/main'], repo)).trim()
+    assert.notEqual(mainNow, mainAt)
+
+    const continued = await resumeRun(repo, { id: first.id, text: 'Look again.', driver: new FakeDriver({ turns: [{ text: 'Done.' }] }), now: () => new Date(NOW.getTime() + 60_000), gitHost: noGitHost })
+    assert.equal(continued.status, 'done')
+    const again = await findRun(repo, first.id)
+    assert.equal(runnerMark(again!)?.baseCommit, mainNow, 'made again from the default branch as it is now: its own work begins there')
+    assert.equal(again!.caller?.['baseCommit'], mainNow)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a run in a project with no remote: one that commits nothing loses its empty branch, one that commits keeps it, measured from the commit it was made at', async () => {
+  const repo = await testRepo()
+  try {
+    await git(['remote', 'remove', 'origin'], repo)
+    const startAt = (await git(['rev-parse', 'HEAD'], repo)).trim()
+    const idle = await runCommand(repo, { prompt: 'Look around', driver: new FakeDriver({ turns: [{ text: 'Nothing to change.' }] }), now: () => NOW, gitHost: noGitHost })
+    assert.deepEqual(idle.checkout, { reclaimed: true })
+    const idleCard = await findRun(repo, idle.id)
+    assert.equal(runnerMark(idleCard!)?.baseCommit, startAt)
+    assert.equal(idleCard?.branch, undefined, 'no commit past the commit it was made at: the branch went with the checkout')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/agent-${idle.id}`], repo))
+
+    const working: Driver = {
+      id: 'fake',
+      start: async opts =>
+        wrap(await new FakeDriver({ turns: [{ text: 'Done.' }] }).start(opts), async () => {
+          await writeFile(join(opts.cwd, 'work.txt'), 'done\n')
+          await git(['add', 'work.txt'], opts.cwd)
+          await git(['-c', 'user.email=agent@example.com', '-c', 'user.name=agent', 'commit', '-q', '-m', 'Work'], opts.cwd)
+        }),
+    }
+    const worked = await runCommand(repo, { prompt: 'Do the work', driver: working, now: () => new Date(NOW.getTime() + 60_000), gitHost: noGitHost })
+    assert.deepEqual(worked.checkout, { reclaimed: true })
+    const workedCard = await findRun(repo, worked.id)
+    assert.equal(workedCard?.branch, `agent-${worked.id}`)
+    assert.equal(workedCard!.caller?.['baseCommit'], startAt)
+    assert.match(await git(['show', `refs/heads/agent-${worked.id}:work.txt`], repo), /done/)
   } finally {
     await removeRepo(repo)
   }

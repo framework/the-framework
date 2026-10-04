@@ -71,10 +71,12 @@ ending.
 - Nothing is committed on the agent's behalf: a checkout with uncommitted work, untracked
   files included, is kept until a person commits or deletes it, and nothing of it is
   pushed.
-- An `agent-*` branch with no commit past where it started holds nothing of its own: it
-  goes with its checkout, deleted with `-D`: git's own merged test asks the wrong
-  question. Where it started is the commit the caller names (`remove --from`); with none
-  named, origin's default branch, read from the local remote-tracking ref, never a fetch.
+- An `agent-*` branch that holds nothing of its own goes with its checkout, deleted with
+  `-D`: git's own merged test asks the wrong question. It holds nothing when it has no
+  commit past the commit it was made at, which the caller names (`remove --from`), or when
+  origin's default branch already has everything on it, read from the local
+  remote-tracking ref, never a fetch. Either is enough: only the first can answer in a
+  project with no remote, only the second for a caller that names no commit.
   Any other name's remote-tracking ref holding the tip was the earlier rule and was
   dropped: a branch another agent was started from lost its branch once that agent's
   branch was pushed. The named commit having to be on the remote was dropped too: nothing
@@ -117,9 +119,11 @@ ending.
   it is pushed and merged, what its checkout left uncommitted; its pull request is the
   caller's question. Picked over the package asking the git host, which would have put a
   network call inside every poll.
-- `show` measures a branch from the commit the caller names (`--from`), in place of the
-  default branch. Picked over measuring every branch from the default branch: a branch
-  started from another branch would show that branch's work as its own.
+- `show` is told the commit a branch was made at (`--from`) and measures the branch from
+  it when the default branch cannot tell its own work: a branch made from another branch
+  would show that branch's work as its own, and a merged branch would show none. A branch
+  made from the default branch and not merged yet is still measured from the default
+  branch, so what it took in from there by a merge or a rebase is not counted as its own.
 - `show` reads a full commit id in place of a branch. Picked over a second command for a
   branch that is gone: the caller wants the same answer.
 - `list` and `show` answer a branch's `name`, the name the agent gave its work: the branch

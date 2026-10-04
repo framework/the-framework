@@ -10,9 +10,11 @@ import { cutToPreview, readFileContent, safeRepoPath, type FileContent } from '.
 // A run's files, for the agent page's Files tab, for as long as git still has them. The run's
 // checkout while it exists; once it is reclaimed, the run's branch, local or on origin; once the
 // branch is gone too, the commit its pull request merged as, or, for a run its main agent landed,
-// the last commit its record kept. A run started from a branch other than the default one (a
-// subagent starts from its main agent's) is measured from the commit its record says its own work
-// begins at: measured from the default branch, the other branch's work would read as its own.
+// the last commit its record kept. A run's record says the commit its own work begins at. A run
+// started from a branch other than the default one (a subagent starts from its main agent's) is
+// measured from it: measured from the default branch, the other branch's work would read as its
+// own. So is a run whose work the default branch already contains: measured from that branch,
+// nothing would be left of it.
 // A run that ended `done`, `failed`
 // or `stopped` on this machine and left no checkout, no branch and no pull request changed nothing:
 // its branch went with its checkout because the remote already had everything on it, so the tab
@@ -72,13 +74,23 @@ async function defaultBranch(ask: (args: string[]) => Promise<string>): Promise<
 }
 
 /**
- * What the run's changes are measured from: where `tip` left `from`, the commit the run's record
- * says its own work begins at, when it names one this machine has; else where it forked from the
- * default branch.
+ * What the run's changes are measured from: where `tip` left the default branch, or where it left
+ * `from`, the commit the run's record says its own work begins at, when it names one this machine
+ * has. The default branch's answer stands while the run left it at or after that commit and its
+ * work is not in it yet: what the run took in from the default branch since is then not marked
+ * as its own. The record's commit answers otherwise: for work the default branch already
+ * contains, where nothing would be left to mark, and for a run that left the default branch
+ * before that commit, which is one started from another branch.
  */
 async function forkPoint(ask: (args: string[]) => Promise<string>, tip: string, from: string | undefined): Promise<string | undefined> {
-  const base = (from !== undefined && (await commitOf(ask, from))) || (await defaultBranch(ask))
-  return base ? (await ask(['merge-base', base, tip])) || undefined : undefined
+  const main = await defaultBranch(ask)
+  const start = from !== undefined ? await commitOf(ask, from) : undefined
+  const fromMain = main ? (await ask(['merge-base', main, tip])) || undefined : undefined
+  if (!start) return fromMain
+  const fromStart = (await ask(['merge-base', start, tip])) || undefined
+  if (!fromMain || !fromStart) return fromStart ?? fromMain
+  if (fromMain === (await commitOf(ask, tip))) return fromStart
+  return (await ask(['merge-base', fromStart, fromMain])) === fromStart ? fromMain : fromStart
 }
 
 /**

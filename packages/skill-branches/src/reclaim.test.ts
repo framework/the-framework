@@ -243,15 +243,54 @@ test('a run branch started off the default branch, its start not named, is kept 
   }
 })
 
-test('a start commit this machine does not have proves nothing: the branch is kept', async () => {
+test('a start commit this machine does not have proves nothing: a branch the remote\'s default branch lacks is kept', async () => {
+  // Made from a branch nobody published, with no commit of its own: only its start could say so.
   const { repo, path, branch } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()
   try {
     await git(['push', '-q', 'origin', 'HEAD:main'], repo)
-    await git(['checkout', '--', '.'], path)
-    assert.deepEqual(await reclaimWorktree(repo, path, { ...ORDINARY, from: '0123456789abcdef0123456789abcdef01234567' }), { ok: true })
-    await git(['rev-parse', '--verify', `refs/heads/${branch}`], repo)
-    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo), 'and not pushed')
+    await commitWork(path)
+    const sub = await checkoutStartedFrom(repo, branch)
+    assert.deepEqual(await reclaimWorktree(repo, sub.path, { ...STARTED, from: '0123456789abcdef0123456789abcdef01234567' }), { ok: true })
+    assert.equal((await git(['rev-parse', '--verify', `refs/heads/${sub.branch}`], repo)).trim(), sub.from, 'kept')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a run branch whose start is named goes once the remote\'s default branch has its work, and stays while it does not', async () => {
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    const from = (await git(['rev-parse', 'HEAD'], repo)).trim()
+    await commitWork(path)
+    // Its work is its own: a commit past its start, which the default branch does not have.
+    const kept = await addWorktree(repo, { agentId: 'run3', branch: agentBranchName('run3'), base: branch }, git)
+    assert.deepEqual(await reclaimWorktree(repo, kept.path, { birthBranch: agentBranchName('run3'), from }), { ok: true })
+    await git(['rev-parse', '--verify', `refs/heads/${kept.branch}`], repo)
+    // Merged: the remote's default branch has every commit on it.
+    await git(['push', '-q', 'origin', `${branch}:main`], repo)
+    assert.deepEqual(await reclaimWorktree(repo, path, { ...ORDINARY, from }), { ok: true, branchesDeleted: [branch] })
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/${branch}`], repo), 'the branch went with the checkout')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('with no remote, a run branch with no commit past its start goes with its checkout, and one with a commit stays', async () => {
+  const { repo, path, branch } = await repoWithDirtyWorktree({ remote: false })
+  const git = nodeGitRunner()
+  try {
+    const from = (await git(['rev-parse', 'HEAD'], repo)).trim()
+    const idle = await addWorktree(repo, { agentId: 'run3', branch: agentBranchName('run3') }, git)
+    assert.deepEqual(await reclaimWorktree(repo, idle.path, { birthBranch: agentBranchName('run3'), from }), { ok: true, branchesDeleted: [idle.branch] })
+    // Its start not named: nothing says the branch is empty, so it is kept.
+    const unnamed = await addWorktree(repo, { agentId: 'run4', branch: agentBranchName('run4') }, git)
+    assert.deepEqual(await reclaimWorktree(repo, unnamed.path, { birthBranch: agentBranchName('run4') }), { ok: true })
+    await commitWork(path)
+    assert.deepEqual(await reclaimWorktree(repo, path, { ...ORDINARY, from }), { ok: true })
+    assert.match(await git(['show', `${branch}:index.html`], repo), /Welcome!/, 'the branch stays')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

@@ -19,7 +19,7 @@ How one subagent [2] reads on its main agent's page, on one line: its task, whic
 - **A subagent's line** - the task [3], then the status: while the subagent works, a pulsing dot, `running` and what it is doing now; with any other status, the status word and, once it has an end time, how long it took.
 - **The line of a subagent's end** - given the end as the main agent was told it, the line says `ended <status>` and the reason, and never changes.
 - **Opening a subagent** - a click on the task opens the subagent's own page.
-- **The subagents line above the message box** - shown only while at least one subagent is `running`: "Subagents · N of M running"; folded until the user opens it, and then one line per subagent.
+- **The subagents line above the message box** - shown only while at least one subagent is `running`: "Subagents · N of M running"; folded until the user opens it, and then one line per subagent, centered at the transcript's column width.
 
 ## Business logic
 

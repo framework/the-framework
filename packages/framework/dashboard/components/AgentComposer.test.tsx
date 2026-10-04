@@ -44,6 +44,16 @@ afterEach(cleanup)
 
 // One slot, three states (#1455): the empty box's submit slot holds Stop while the agent is live,
 // Resume once it was stopped, and nothing (the launcher collapse) otherwise.
+// The box sits in the chat's column: centered, at the transcript's width.
+describe('AgentComposer column', () => {
+  test('the box is centered at the transcript\'s column width', () => {
+    const { container } = render(<AgentComposer projectId="p1" agentId="run-1" live files={[]} />)
+    const box = container.firstElementChild!
+    expect(box.className).toContain('mx-auto')
+    expect(box.className).toContain('max-w-3xl')
+  })
+})
+
 describe('AgentComposer slot control (#1455)', () => {
   test('a live session offers Stop in the slot, and pressing it stops this run', async () => {
     sendStop.mockResolvedValue(undefined)

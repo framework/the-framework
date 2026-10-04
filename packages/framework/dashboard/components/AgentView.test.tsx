@@ -362,6 +362,16 @@ describe('a run just started', () => {
     expect(screen.getByText('Working…')).toBeTruthy()
   })
 
+  test('the chat says what was set up for the agent, off its card, and says nothing of it before the card is listed', () => {
+    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }] as FrameworkEvent[]
+    const { rerender } = render(view({ live: true, events }))
+    expect(screen.queryByText('Session set up')).toBeNull()
+    rerender(view({ live: true, events, card: { status: 'running', workspace: '/repo/.branches/agent-1', branch: 'agent-1', driver: 'codex' } }))
+    fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
+    expect(screen.getByText('/repo/.branches/agent-1')).toBeTruthy()
+    expect(screen.getByText('agent-1')).toBeTruthy()
+  })
+
   test('no spinner while the answer is being written, and none once the run has ended', () => {
     const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }] as FrameworkEvent[]
     const { rerender } = render(view({ live: true, events, writing: 'Hi th' }))

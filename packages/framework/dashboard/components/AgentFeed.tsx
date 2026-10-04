@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
 import { TriangleAlert } from 'lucide-react'
 import { EventList } from './EventList.js'
+import type { SessionSetup } from './SessionLine.js'
 
 // One agent's feed: the live/replayed event log, or a waiting placeholder before anything has
 // streamed. Rendered by the agent's own view (AgentView), whose action bar already carries the
@@ -23,6 +24,7 @@ export function AgentFeed({
   subagents,
   doing,
   going,
+  setup,
   onOpenAgent,
 }: {
   events: FrameworkEvent[]
@@ -50,6 +52,8 @@ export function AgentFeed({
   doing?: Record<string, string> | undefined
   /** The run's job is not over: its subagents still work. */
   going?: boolean | undefined
+  /** What was set up for the agent before it began: the chat's "Session set up" line. */
+  setup?: SessionSetup | undefined
   onOpenAgent?: ((agentId: string) => void) | undefined
 }) {
   const lostBanner = lost && (
@@ -82,6 +86,7 @@ export function AgentFeed({
         {...(subagents ? { subagents } : {})}
         {...(doing ? { doing } : {})}
         {...(going ? { going } : {})}
+        setup={setup}
         onOpenAgent={onOpenAgent}
       />
     </>

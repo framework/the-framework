@@ -8,6 +8,7 @@ import { AnsweredChoice } from './AnsweredChoice.js'
 import { ChoicePanel } from './ChoicePanel.js'
 import { InlineScreen, isLoopbackScreen } from './InlineScreen.js'
 import { Markdown } from './Markdown.js'
+import { SessionLine, type SessionSetup } from './SessionLine.js'
 import { SubagentLine } from './SubagentLine.js'
 import { LiveLine, ToolCalls, type ToolStep } from './ToolCalls.js'
 import { Badge } from './ui/badge.js'
@@ -421,6 +422,7 @@ export function EventList({
   subagents = NO_SUBAGENTS,
   doing = NOTHING_DOING,
   going = false,
+  setup,
   onOpenAgent,
 }: {
   events: FrameworkEvent[]
@@ -452,6 +454,9 @@ export function EventList({
   doing?: Record<string, string>
   /** The run's job is not over (its subagents still work): its last clean end is not shown as the end. */
   going?: boolean
+  /** What was set up for the agent before it began: the "Session set up" line under the first
+   *  prompt (the first row when the log has no prompt). Without it, no such line. */
+  setup?: SessionSetup | undefined
   /** Open another run's page: what a subagent's row does on a click. */
   onOpenAgent?: ((agentId: string) => void) | undefined
 }) {
@@ -521,6 +526,15 @@ export function EventList({
         </Tooltip>
       </MessageScrollerItem>
     ))
+  // The "Session set up" line: under the first prompt, which opens the log; above everything when
+  // the log has no prompt. It breaks the run of rows like a subagent's row: the row after it
+  // shows its badge.
+  const setupAt = setup === undefined ? -1 : shown.length > 0 && isTurnBoundary(shown[0]!) ? 1 : 0
+  const setupRow = setup !== undefined && (
+    <MessageScrollerItem key="setup" messageId="setup" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 empty:hidden">
+      <SessionLine setup={setup} />
+    </MessageScrollerItem>
+  )
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>
       <MessageScroller className="flex-1">
@@ -540,6 +554,7 @@ export function EventList({
               return (
                 <Fragment key={idOf(e)}>
                 {passedAbove.get(e)?.map(placeOf)}
+                {i === setupAt && setupRow}
                 {startedRows(i)}
                 {/* Every row carries the same -mx/px pair so a washed row's band and a plain row's
                     text share the exact same columns; only the background differs. */}
@@ -606,6 +621,7 @@ export function EventList({
               )
             })}
             {passedLast.map(placeOf)}
+            {shown.length === setupAt && setupRow}
             {startedRows(shown.length)}
             {written && (
               <MessageScrollerItem messageId="writing" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">

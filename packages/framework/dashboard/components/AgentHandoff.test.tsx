@@ -420,7 +420,8 @@ describe('run handoff (#799)', () => {
     onAgentHandoff.mockResolvedValue({ ...worked, commits: [], files: [], empty: true, pendingFiles: ['handtest/one.md'] })
     render(<Harness subagent />)
     await waitFor(() => expect(screen.getByText('Nothing committed — handtest/one.md left uncommitted.')).toBeTruthy())
-    expect(screen.getByText('no changes')).toBeTruthy()
+    // A file was changed and left on disk: "no changes" beside it would say the opposite.
+    expect(screen.queryByText('no changes')).toBeNull()
     expect(screen.queryByText('not landed')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
     cleanup()

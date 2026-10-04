@@ -337,9 +337,17 @@ export type DriverEvent =
   /**
    * The agent used a tool: its name, and `detail`, the one argument that says what it did (the
    * command, the file, the URL, the skill), on one line and cut short. A tool whose arguments hold
-   * none of those has no `detail`.
+   * none of those has no `detail`. `whole` is that argument as it was given, lines kept, when `detail`
+   * is not all of it (a command of several lines, or a long one); it is cut too, to the size limit
+   * of an output. `id` is the call's own id in its CLI, the one its `output` event names.
    */
-  | { type: 'action'; label: string; detail?: string }
+  | { type: 'action'; label: string; detail?: string; whole?: string; id?: string }
+  /**
+   * What a tool call gave back once it was over: `id` is its `action`'s, `text` is what it printed,
+   * cut to a size limit (`cutOutput`). `failed` says the call failed; `exitCode` is the command's
+   * exit code, for a CLI that reports one. A call that gave nothing back has no `output`.
+   */
+  | { type: 'output'; id: string; text: string; failed?: true; exitCode?: number }
   /** What the agent thought before it acted, as its CLI summarizes it. */
   | { type: 'thought'; text: string }
   /**

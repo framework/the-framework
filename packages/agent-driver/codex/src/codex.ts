@@ -2,7 +2,7 @@ import { execFile, spawn as nodeSpawn } from 'node:child_process'
 import { copyFile, lstat, mkdir, readlink, readdir, realpath, rename, rm, stat, symlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, oneLine, checkCliReady, type AgentCliParser, type CliIo, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverModel, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
+import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, oneLine, cutOutput, callArgument, checkCliReady, type AgentCliParser, type CliIo, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverModel, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /**
  * Codex's sandbox policy for the shell commands the model writes.
@@ -311,15 +311,20 @@ function gitCommonDir(cwd: string): Promise<string | undefined> {
  * it, the files a change touches, the MCP tool, or the web search.
  */
 export function codexDetail(item: Record<string, unknown>): string | undefined {
+  return callArgument(codexArgument(item)).detail
+}
+
+/** What a Codex tool item was given, as it was given: see {@link codexDetail}. */
+function codexArgument(item: Record<string, unknown>): string | undefined {
   const command = item['command']
-  if (typeof command === 'string') return oneLine(command.replace(/^\S*sh -lc (['"])([\s\S]*)\1$/, '$2'))
+  if (typeof command === 'string') return command.replace(/^\S*sh -lc (['"])([\s\S]*)\1$/, '$2')
   const changes = item['changes']
   if (Array.isArray(changes)) {
     const paths = changes.map(c => (typeof c === 'object' && c !== null ? (c as Record<string, unknown>)['path'] : undefined)).filter(p => typeof p === 'string')
-    return paths.length > 0 ? oneLine(paths.join(', ')) : undefined
+    return paths.length > 0 ? paths.join(', ') : undefined
   }
-  if (typeof item['server'] === 'string' && typeof item['tool'] === 'string') return oneLine(`${item['server']}.${item['tool']}`)
-  if (typeof item['query'] === 'string') return oneLine(item['query'])
+  if (typeof item['server'] === 'string' && typeof item['tool'] === 'string') return `${item['server']}.${item['tool']}`
+  if (typeof item['query'] === 'string') return item['query']
   return undefined
 }
 
@@ -509,9 +514,17 @@ export class CodexAppServerParser implements AgentCliParser {
       return completed && text !== '' ? [{ type: 'thought', text }] : []
     }
     // Any other item is the agent using a tool: its kind, and what it did.
-    if (completed || NOT_TOOLS.has(type)) return []
-    const detail = codexDetail(item)
-    return [{ type: 'action', label: type, ...(detail !== undefined ? { detail } : {}) }]
+    if (NOT_TOOLS.has(type)) return []
+    const id = item['id']
+    if (!completed) return [{ type: 'action', label: type, ...callArgument(codexArgument(item)), ...(typeof id === 'string' ? { id } : {}) }]
+    // A command that finished reports all it printed, and its exit code. Other tools report neither.
+    const printed = item['aggregatedOutput']
+    const exitCode = item['exitCode']
+    if (typeof id !== 'string' || typeof printed !== 'string') return []
+    const text = cutOutput(printed)
+    const failed = typeof exitCode === 'number' && exitCode !== 0
+    if (text === '' && !failed) return []
+    return [{ type: 'output', id, text, ...(failed ? { failed: true as const } : {}), ...(typeof exitCode === 'number' ? { exitCode } : {}) }]
   }
 
   private onResponse(id: number, msg: Record<string, unknown>): DriverEvent[] {

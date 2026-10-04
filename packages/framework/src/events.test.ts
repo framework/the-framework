@@ -27,6 +27,8 @@ test('formatFrameworkEvent renders a multi-select choice as a checklist (#332)',
 test('formatFrameworkEvent shows what a tool call did beside its name, and a thought as its own line', () => {
   assert.equal(formatFrameworkEvent({ kind: 'driver', event: { type: 'action', label: 'Bash', detail: 'git status --short' } }), '    · Bash  git status --short')
   assert.equal(formatFrameworkEvent({ kind: 'driver', event: { type: 'action', label: 'Bash' } }), '    · Bash')
+  assert.equal(formatFrameworkEvent({ kind: 'driver', event: { type: 'output', id: 't1', text: '12 passed\nall good' } }), '      → 12 passed all good')
+  assert.equal(formatFrameworkEvent({ kind: 'driver', event: { type: 'output', id: 't1', text: 'boom', failed: true } }), '      ✗ boom')
   assert.equal(formatFrameworkEvent({ kind: 'driver', event: { type: 'thought', text: 'The test\nfails first.' } }), '    💭 The test fails first.')
 })
 

@@ -208,6 +208,30 @@ describe('EventList tool calls', () => {
     expect(screen.getByText('plan it')).toBeTruthy()
   })
 
+  test('what a call printed is no row: it is inside its call, by the call\'s id, also across a message', () => {
+    const run = (id: string, detail: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'action', label: 'Bash', detail, id } })
+    const printed = (id: string, text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'output', id, text } })
+    // Two calls at once: their outputs come after both, the second one first, one after a message.
+    render(<EventList events={[prompt, run('t1', 'ls'), run('t2', 'pwd'), printed('t2', '/repo'), said('Looking.'), printed('t1', 'a.ts'), printed('gone', 'lost')]} stick={false} />)
+    expect(ids()).toEqual(['0', '1', '4'])
+    expect(screen.queryByText(/a\.ts|\/repo|lost/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Ran 2 commands' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ran ls' }))
+    expect(screen.getByLabelText('Output').textContent).toBe('a.ts')
+    fireEvent.click(screen.getByRole('button', { name: 'Ran ls' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ran pwd' }))
+    expect(screen.getByLabelText('Output').textContent).toBe('/repo')
+  })
+
+  test('once a call has printed, it is over: it joins its run and the last line reads "Working…"', () => {
+    const run: FrameworkEvent = { kind: 'driver', event: { type: 'action', label: 'Bash', detail: 'ls', id: 't1' } }
+    const { rerender } = render(<EventList events={[prompt, run]} working stick={false} />)
+    expect(screen.getByRole('status').textContent).toBe('Runningls')
+    rerender(<EventList events={[prompt, run, { kind: 'driver', event: { type: 'output', id: 't1', text: 'a.ts' } }]} working stick={false} />)
+    expect(screen.getByRole('button', { name: 'Ran ls' })).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('Working…')
+  })
+
   test('while only a thought has come since the prompt, the spinner reads "Working…", not "Starting…"', () => {
     render(<EventList events={[prompt, thought('hm')]} working stick={false} />)
     expect(screen.getByText('Working…')).toBeTruthy()

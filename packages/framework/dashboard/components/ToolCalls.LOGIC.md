@@ -2,22 +2,23 @@ Draws what the coding agent [3] did between two of its messages in an agent's [1
 
 ## Context
 
-**User story**: the user reads the agent's messages and, between them, one short grey line saying what the coding agent did ("Ran 2 commands"), as Claude Code on the web draws it. The user opens the line to see each tool call [2], and opens a call to see its command or its file's whole path.
+**User story**: the user reads the agent's messages and, between them, one short grey line saying what the coding agent did ("Ran 2 commands"), as Claude Code on the web draws it. The user opens the line to see each tool call [2], and opens a call to see its command or its file's whole path and what the call printed.
 
 **Problem**: the transcript showed one row per tool call and one "Thinking" row per thought. A turn of fifty calls was fifty rows between the user's question and the agent's answer.
 
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[2] tool call: one use of a tool by the coding agent (running a command, reading a file, editing a file, searching), reported as a label and, when the call has one, a detail: the one argument that says what it did (the command, the file, the address), on one line and cut short.
+[2] tool call: one use of a tool by the coding agent (running a command, reading a file, editing a file, searching), reported as a label and, when the call has one, a detail: the one argument that says what it did (the command, the file, the address), on one line and cut short. A call may also carry that argument whole, and what it gave back: its output [5].
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [4] step: a tool call, or a thought of the coding agent as its CLI summarizes it.
+[5] output: what a tool call printed, cut to a size limit by the tool that runs the coding agent, with whether the call failed and, for a command whose CLI reports one, its exit code.
 
 ## Business logic — TL;DR
 
 - **A run of steps is one line** - the calls counted by kind, folded; opened, a bordered box with one line per step, in order.
 - **A lone call is its own line** - the verb in grey and what it was done to in dark, with no count.
-- **A call opens to its detail** - a call with a detail opens to the detail whole; one with none does not open.
+- **A call opens to its detail and its output** - a call opens to its detail whole, a command with "$" in front, and under it what it printed, in a box that scrolls; a failed call says so; a call with neither does not open.
 - **A thought is inside the box** - no line of the transcript; in the opened box it reads "Thought" and opens to the thought.
 - **Thoughts alone draw nothing** - a run with no call in it has no line.
 - **The line going on now** - while the agent works, one moving line: the call going on now in the present ("Running pnpm test 9s"), or a word given by the transcript, with moving dots, shimmering text and the seconds counting.
@@ -44,15 +45,21 @@ The component is given the steps [4] of one run, in order (which steps make a ru
 
 A run that is exactly one tool call [2], with no thought, is drawn as that call's line, with no count and no box: the verb in grey, then the target in the dark text color, cut with an ellipsis when it does not fit the row (the verb and the target are `lib/tool-calls.ts`'s: "Read AGENTS.md"). The same line is how each call reads inside an opened box.
 
-### A call opens to its detail
+### A call opens to its detail and its output
 
 #### Context
 
-See `## Context`.
+**User story**: the user opens a command the coding agent ran and reads the command and what it printed, as Claude Code on the web shows it, without opening a terminal or the agent's diary.
 
 #### Business logic
 
-A call's line with a detail ends with a chevron pointing right and is a button whose accessible name is the verb and the target. A click opens, under the line, the detail whole (the command, the file's whole path) in a grey box in a monospace font, wrapping instead of being cut, and turns the chevron to point down; a click again folds it. A call with no detail is plain text: no chevron, nothing to open.
+A call's line with a detail or an output [5] ends with a chevron pointing right and is a button whose accessible name is the verb and the target. A click turns the chevron to point down and opens, under the line, in order:
+
+- the detail in a grey box in a monospace font, wrapping instead of being cut: the argument whole when the call carries it (a command of several lines keeps its lines), else the detail. A command (Claude Code's `Bash`, Codex's `commandExecution`) has "$" in grey in front of it; any other call has none.
+- the output, when the call has one whose text is not empty: a box with a border, in the same font, wrapping.
+- when the output says the call failed: one red line, "Failed: exit code 1" when it carries an exit code, else "Failed".
+
+Each box is at most 16rem tall and scrolls inside itself past that. A click on the line again folds it all. A call with no detail and no output is plain text: no chevron, nothing to open. A call still going on has no output yet.
 
 ### A thought is inside the box
 
@@ -87,7 +94,7 @@ A run with no tool call in it (the coding agent thought, then wrote its message)
 A second component draws the transcript's last line while the agent works (when it is shown, and which call or word it is given, is the transcript's rule, `EventList.tsx`). The line is announced to assistive technology as a status. It holds, in order:
 
 - three small dots rising one after the other, over and over;
-- when it is given a call: the call's line as in "A lone call is its own line", except that the verb is in its form for a call still going on ("Running", "Reading"; `lib/tool-calls.ts`), and the verb and the target are grey with a band of light crossing them, over and over. It opens to its detail on a click like any call;
+- when it is given a call: the call's line as in "A lone call is its own line", except that the verb is in its form for a call still going on ("Running", "Reading"; `lib/tool-calls.ts`), and the verb and the target are grey with a band of light crossing them, over and over. It opens on a click like any call;
 - when it is given no call: the word the transcript gave ("Starting…", "Working…"), with the same band of light;
 - when it is given the moment the line's subject began: the time since then, counted up every second, as "9s" below one minute and "1m 5s" from then on. Without that moment there is no count.
 

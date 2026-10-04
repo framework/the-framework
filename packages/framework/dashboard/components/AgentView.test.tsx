@@ -197,6 +197,18 @@ describe('AgentView: the bar above the message box', () => {
     expect(onAgentWorktree).toHaveBeenCalledWith('p1', 'run-1')
   })
 
+  test('the checkout is read again the moment a turn ends, not at the next poll', async () => {
+    const going = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a page' } }] as FrameworkEvent[]
+    onAgentWorktree.mockResolvedValue({ branch: 'agent-x', checkout: { path: '/w', dirty: false } })
+    const { rerender } = render(view({ events: going, live: true }))
+    await waitFor(() => expect(screen.getByTestId('work-checkout').textContent).toContain('"dirty":false'))
+    expect(onAgentWorktree).toHaveBeenCalledTimes(1)
+    onAgentWorktree.mockResolvedValue({ branch: 'agent-x', checkout: { path: '/w', dirty: true } })
+    rerender(view({ events: [...going, { kind: 'end', ok: true }] as FrameworkEvent[], live: true }))
+    await waitFor(() => expect(screen.getByTestId('work-checkout').textContent).toContain('"dirty":true'))
+    expect(onAgentWorktree).toHaveBeenCalledTimes(2)
+  })
+
   test('the next step is in the bar above the message box, which sits under the feed', async () => {
     onAgent.mockResolvedValue(ARCHIVED)
     onAgentHandoff.mockResolvedValue(PUSHED)

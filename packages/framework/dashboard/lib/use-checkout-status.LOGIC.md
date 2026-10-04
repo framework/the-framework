@@ -15,6 +15,7 @@ Reads the git facts of the checkout [1] in play and keeps them current: for an a
 
 - **Whose checkout** - with an agent named, the daemon is asked about that agent's checkout; with none, about the project's own.
 - **Kept current** - read again every 10 seconds, or every 0.3 seconds while the daemon's pull request lookup is still out.
+- **Read again when a turn starts or ends** - the caller says whether the agent's turn is going; when that changes, the checkout is read at once, not at the next poll.
 - **Remembered per checkout** - going back to a checkout seen before gives what was read last time at once, while it is read again; a checkout never seen gives no answer until its own is in.
 - **Switched off** - a caller that already has the answer asks for nothing to be read.
 
@@ -59,3 +60,13 @@ See the problem in `## Context`.
 #### Business logic
 
 The caller can switch the read off. Nothing is asked of the daemon then, and the answer is "no answer". The line of git facts does this when its caller hands it the checkout already read (`components/GitStatusBar.tsx`).
+
+### Read again when a turn starts or ends
+
+#### Context
+
+**Problem**: an agent's turn ends and its checkout is clean or dirty from that moment. Read only on the 10 second poll, the page said so up to 10 seconds late: "dirty" came after the agent had long said it was done.
+
+#### Business logic
+
+The caller can say whether the agent's turn is going (the agent's page does, from the events it shows). When that changes, from going to ended or from ended to going, the checkout is read again at once. Nothing more is read on the first render or when the page turns to another checkout: the poll reads then already.

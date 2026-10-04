@@ -9,3 +9,4 @@ What the tests cover:
 - **One project's questions** - given a project, the section shows and counts only that project's questions, and is absent when that project has none while another has.
 - **No answering** - the list has one button per row and nothing else: no option, no "Submit", no "Skip"; a click sends no pick and no message.
 - **A row holds still** - when the next read brings another question from the same agent, the row is the same row with the new question's title.
+- **A narrow row** - the title and the question are the parts that can be cut; "Needs input", the project and the time keep their width; the list does not scroll sideways.

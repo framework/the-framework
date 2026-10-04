@@ -62,6 +62,21 @@ describe('OpenQuestions', () => {
     expect(rows()[0]!.querySelector('button')!.lastElementChild!.tagName.toLowerCase()).toBe('svg')
   })
 
+  test('in a narrow column the title and the question give up width; the rest keeps its width, and nothing scrolls sideways', async () => {
+    onOpenQuestions.mockResolvedValue([question()])
+    render(<OpenQuestions onOpenAgent={vi.fn()} />)
+    await waitFor(() => expect(rows()).toHaveLength(1))
+    // No layout in the test DOM, so the rule is read off the classes.
+    const [needs, title, asked, project, ago] = [...rows()[0]!.querySelectorAll('button > span')].map(part => part.className)
+    for (const cut of [title!, asked!]) {
+      expect(cut).toContain('min-w-0')
+      expect(cut).toContain('truncate')
+      expect(cut).not.toContain('shrink-0')
+    }
+    for (const kept of [needs!, project!, ago!]) expect(kept).toContain('shrink-0')
+    expect(screen.getByRole('list').className).toContain('overflow-x-hidden')
+  })
+
   test('a row is named for all it says: the agent by the first line of its intent, else by its id, then its question', async () => {
     const { intent: _intent, ...unnamed } = second()
     onOpenQuestions.mockResolvedValue([question({ intent: 'fix the flaky test\nmore detail' }), unnamed])

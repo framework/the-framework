@@ -33,7 +33,7 @@ export function OpenQuestions({
         Waiting on you · {questions.length}
       </h2>
       {/* A long list scrolls in place, so the rest of the Overview stays in reach. */}
-      <ul className="max-h-[70vh] overflow-y-auto">
+      <ul className="max-h-[70vh] overflow-x-hidden overflow-y-auto">
         {questions.map(question => {
           const label = agentLabel(question)
           const waiting = formatRelative(question.updatedAt, '')
@@ -44,14 +44,16 @@ export function OpenQuestions({
                 type="button"
                 aria-label={`Open ${label}: needs input, ${question.choice.title}`}
                 onClick={() => onOpenAgent(question.projectId, question.agentId)}
-                className="flex w-full items-center gap-3 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent/40"
+                className="flex w-full items-center gap-3 overflow-hidden whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent/40"
               >
                 <span className="flex shrink-0 items-center gap-1.5 text-xs text-warning">
                   <span className="h-2 w-2 rounded-full bg-warning" aria-hidden />
                   Needs input
                 </span>
-                <span className="max-w-[50%] shrink-0 truncate text-foreground">{label}</span>
-                <span className="min-w-0 flex-1 truncate text-muted-foreground">{question.choice.title}</span>
+                {/* The title and the question are the two parts that give up width, each cut with an
+                    ellipsis: in a narrow column the row still fits, and nothing scrolls sideways. */}
+                <span className="min-w-0 max-w-[50%] shrink truncate text-foreground">{label}</span>
+                <span className="min-w-0 flex-auto truncate text-muted-foreground">{question.choice.title}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">{question.projectName}</span>
                 {waiting && <span className="shrink-0 text-xs text-muted-foreground">{waiting}</span>}
                 <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />

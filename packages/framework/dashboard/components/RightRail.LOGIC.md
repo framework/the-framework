@@ -40,7 +40,7 @@ The dashboard's right rail: a column beside the main pane, half the page wide on
 
 #### Business logic
 
-The rail is open or closed, and it is closed until the user opens it (`lib/side-panel.ts` keeps which, in this browser).
+The rail is open or closed, and it is closed until the user opens it. Each agent's page has its own answer, and the "New agent" page has one of its own: opening the rail on one agent's page leaves it closed on every other page, and coming back to a page shows the rail as it was left there (`lib/side-panel.ts` keeps on which pages it is open, in this browser).
 
 - Closed: in the rail's place there is a narrow strip with one button at its top, at the top right of the page, named "Open the side panel"; its hover text names the tabs it would show ("Open the side panel: Changes, Files"). No tab and no panel is drawn, so a module's tab reads nothing while the rail is closed. A click opens the rail.
 - Open: the rail is drawn as the sections below say, and the same button sits at the end of the row of tabs, named "Close the side panel". A click closes the rail. The open rail is half the page wide, and never narrower than 22rem; its width is the same whatever tab is open. The row of tabs is at its top, and the open tab's panel fills the height left under it and scrolls inside itself.

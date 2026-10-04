@@ -4,7 +4,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { AgentExitError, appendInbox, FakeDriver, type Driver, type DriverSession, type DriverStartOptions, type FakeDriverSession } from 'agent-driver'
 import { worktreePath } from '@gemstack/skill-branches'
-import { findRun, readDiary } from '@gemstack/skill-logs'
+import { findRun, patchRun, readDiary } from '@gemstack/skill-logs'
 import { inboxPath, readLiveCard } from './live-card.js'
 import { acquireRunLock, lockHolder, releaseRunLock } from './run-lock.js'
 import { agentPrompt, HOLD_MERGE_LINE, PUBLISH_LINES, resumeRun, runCommand, STOPPED_DETAIL } from './run.js'
@@ -670,6 +670,41 @@ test("a run from origin's default branch writes down the commit its branch was m
     const again = await findRun(repo, first.id)
     assert.equal(runnerMark(again!)?.baseCommit, mainNow, 'made again from the default branch as it is now: its own work begins there')
     assert.equal(again!.caller?.['baseCommit'], mainNow)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a run whose work was landed, continued: its branch is made again from the default branch, and its record no longer says landed', async () => {
+  const repo = await testRepo()
+  try {
+    await git(['remote', 'remove', 'origin'], repo)
+    const working = (file: string): Driver => ({
+      id: 'fake',
+      start: async opts =>
+        wrap(await new FakeDriver({ turns: [{ text: 'Done.' }], sessionId: 's-1' }).start(opts), async () => {
+          await writeFile(join(opts.cwd, file), 'done\n')
+          await git(['add', file], opts.cwd)
+          await git(['-c', 'user.email=agent@example.com', '-c', 'user.name=agent', 'commit', '-q', '-m', `Add ${file}`], opts.cwd)
+        }),
+    })
+    const first = await runCommand(repo, { prompt: 'Do task one', driver: working('one.txt'), now: () => NOW, gitHost: noGitHost })
+    const branch = `agent-${first.id}`
+    // A person merges it on this machine: the default branch has the work, the branch goes, the record keeps its last commit.
+    const tip = (await git(['rev-parse', branch], repo)).trim()
+    await git(['merge', '-q', '--ff-only', branch], repo)
+    await git(['branch', '-q', '-D', branch], repo)
+    assert.equal(await patchRun(repo, first.id, { landed: { commit: tip, from: (await git(['rev-parse', `${tip}^`], repo)).trim() } }), true)
+    const landed = await findRun(repo, first.id)
+    assert.deepEqual([landed?.branch, landed?.caller?.['landed']], [undefined, tip])
+
+    const continued = await resumeRun(repo, { id: first.id, text: 'Now task two.', driver: working('two.txt'), now: () => new Date(NOW.getTime() + 60_000), gitHost: noGitHost })
+    assert.equal(continued.status, 'done')
+    const again = await findRun(repo, first.id)
+    assert.equal(again?.branch, branch, 'on its branch, made again')
+    assert.equal(again?.caller?.['landed'], undefined, 'what it did since is not landed')
+    assert.equal(again?.caller?.['baseCommit'], tip, 'and begins where the default branch was: at the work that was merged')
+    assert.match(await git(['show', `refs/heads/${branch}:two.txt`], repo), /done/)
   } finally {
     await removeRepo(repo)
   }

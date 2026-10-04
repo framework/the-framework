@@ -12,6 +12,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
 import { usePolled } from '../lib/use-async.js'
 import { onDocs } from '../rpc/reads.js'
+import { setSidePanelOpen, useSidePanelOpen } from '../lib/side-panel.js'
+import { PanelRightClose, PanelRightOpen } from 'lucide-react'
 
 /** The rail's own tabs, and a module's tab by its package and id. */
 type Tab = 'views' | 'docs' | `module:${string}`
@@ -31,6 +33,10 @@ const TABS: Record<'views' | 'docs', { label: string; help: string }> = {
 // first of all), the ad-hoc markdown views the agent pushes (#441) and the surfaced docs (PLAN/TODO). Views come from the live event stream, passed down from the
 // shell; docs are an RPC read of the selected project. The rail jumps to a fresh first view; choice gates live inline in the
 // transcript now (#1455 items 6/7), so nothing here pulls focus for them.
+//
+// The rail is closed until the person opens it (`lib/side-panel.ts` remembers which): closed, it is
+// a narrow strip holding one button at the top right of the page; open, the same button, at the
+// end of the tabs, closes it. A closed rail renders no panel, so nothing in it reads anything.
 export function RightRail({
   projectId,
   agentId: agentId,
@@ -90,6 +96,7 @@ export function RightRail({
   // 2), the tab is withheld outright.
   const hasDocs = !docsInMain && (docsLoaded ? docs.length > 0 : panels.length === 0 && views.length === 0)
 
+  const open = useSidePanelOpen()
   const [tab, setTab] = useState<Tab>('docs')
   // Once the user picks a tab, stop auto-defaulting (#695/U22) — only a genuinely new choice
   // gate or the first view may still pull focus after that.
@@ -125,6 +132,15 @@ export function RightRail({
     ...(hasDocs ? ['docs' as const] : []),
   ]
   if (tabs.length === 0) return null
+  const toggle = (
+    <Tooltip>
+      <TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="h-7 w-7 shrink-0" aria-label={open ? 'Close the side panel' : 'Open the side panel'} aria-expanded={open} onClick={() => setSidePanelOpen(!open)} />}>
+        {open ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+      </TooltipTrigger>
+      <TooltipContent>{open ? 'Close the side panel' : `Open the side panel: ${tabs.map(t => panels.find(panel => panelTab(panel) === t)?.label ?? TABS[t as 'views' | 'docs'].label).join(', ')}`}</TooltipContent>
+    </Tooltip>
+  )
+  if (!open) return <aside className="flex shrink-0 flex-col p-2">{toggle}</aside>
   // The remembered tab may have just lost its content (the last doc deleted, a gate resolved), so
   // fall back to the first one that still exists rather than rendering an empty panel.
   const active: Tab = tabs.includes(tab) ? tab : tabs[0]!
@@ -147,7 +163,8 @@ export function RightRail({
     >
       {/* flex-wrap: up to 7 tabs share a w-80 rail, and without it the tail clipped (#948).
           Announced as the tabset it visually is. */}
-      <div role="tablist" aria-label="Rail panels" className="flex flex-wrap gap-1 p-2">
+      <div className="flex items-start gap-1 p-2">
+      <div role="tablist" aria-label="Rail panels" className="flex min-w-0 flex-1 flex-wrap gap-1">
         {tabs.map(t => (
           <Tooltip key={t}>
             <TooltipTrigger
@@ -168,6 +185,8 @@ export function RightRail({
             <TooltipContent className="max-w-64">{help(t)}</TooltipContent>
           </Tooltip>
         ))}
+      </div>
+      {toggle}
       </div>
       {/* The panel is as tall as it needs to be, and no taller than the rail allows: it sizes to its
           own content (so a short file list does not stretch to the floor), and shrinks with its own

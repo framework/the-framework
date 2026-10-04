@@ -42,6 +42,8 @@ function render(ui: ReactElement, panels: MountedPanel[] = [FILES]) {
 }
 
 beforeEach(() => {
+  // Open, as the person left it: the tests below are about what an open rail shows.
+  localStorage.setItem('fw.side-panel', 'open')
   forgetRemembered()
   onDocs.mockReset().mockResolvedValue([{ name: 'PLAN.md', content: '# plan' }])
 })
@@ -227,5 +229,43 @@ describe('RightRail module tabs (#492)', () => {
     render(<RightRail {...baseProps} />, [broken])
     expect(screen.getByRole('alert').textContent).toContain('boom')
     expect(await screen.findByRole('tab', { name: /docs/i })).toBeTruthy()
+  })
+})
+
+describe('RightRail open and closed', () => {
+  test('it is closed until opened: one button, no tab and no panel; the button opens it and the browser remembers', async () => {
+    localStorage.removeItem('fw.side-panel')
+    shown.mockClear()
+    const { unmount } = render(<RightRail {...baseProps} />)
+    const opener = screen.getByRole('button', { name: 'Open the side panel' })
+    expect(opener.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.queryByText('files')).toBeNull()
+    // A closed rail renders no panel, so nothing in it reads anything.
+    expect(shown).not.toHaveBeenCalled()
+    fireEvent.click(opener)
+    expect(screen.getByRole('tab', { name: /Files/ })).toBeTruthy()
+    expect(screen.getByText('files')).toBeTruthy()
+    expect(localStorage.getItem('fw.side-panel')).toBe('open')
+    // Another page, later: open from the first frame.
+    unmount()
+    render(<RightRail {...baseProps} />)
+    expect(screen.getByRole('tab', { name: /Files/ })).toBeTruthy()
+  })
+
+  test('open, the same button closes it, and that is remembered too', () => {
+    render(<RightRail {...baseProps} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Close the side panel' }))
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Open the side panel' })).toBeTruthy()
+    expect(localStorage.getItem('fw.side-panel')).toBeNull()
+  })
+
+  test('with no tab to show there is no button either', async () => {
+    localStorage.removeItem('fw.side-panel')
+    onDocs.mockResolvedValue([])
+    const { container } = render(<RightRail {...baseProps} />, [])
+    await waitFor(() => expect(onDocs).toHaveBeenCalled())
+    await waitFor(() => expect(container.querySelector('aside')).toBeNull())
   })
 })

@@ -17,6 +17,7 @@ The dashboard's right rail: a narrow column beside the main pane holding the tab
 
 ## Business logic — TL;DR
 
+- **Closed until the user opens it** - the rail starts closed: a narrow strip with one button at the top right of the page; the button opens the rail, the same button at the end of the tabs closes it, and the browser remembers which.
 - **The modules' tabs first, then the rail's own two** - every tab an installed module [10] adds for the project comes first, in package order, always offered; then "Views" and "Docs", each only when there is something in it; a rail with no tab left disappears.
 - **What a module's tab is given** - the project, the selected agent [2] when there is one, and the Context's [9] files with a way to add or remove one; a tab that throws shows its own error line and leaves the rest of the rail standing.
 - **No project, no rail** - with no project selected the rail is not drawn, and it is absent beside a full-width module page.
@@ -26,6 +27,24 @@ The dashboard's right rail: a narrow column beside the main pane holding the tab
 - **Counts on the tabs** - "Views" carries the number of views [1], and a module's tab the count it asks for (the Files tab: the Context's files); "Docs" carries none.
 
 ## Business logic
+
+### Closed until the user opens it
+
+#### Context
+
+**User story**: the user reads the conversation in the whole width of the page, as on Claude Code on the web. The files and the changes are one click away, at the top right, and the page is as the user left it the next time.
+
+**Problem**: a rail that is always open takes a quarter of the page from the conversation, also for a user who never looks at it.
+
+#### Business logic
+
+The rail is open or closed, and it is closed until the user opens it (`lib/side-panel.ts` keeps which, in this browser).
+
+- Closed: in the rail's place there is a narrow strip with one button at its top, at the top right of the page, named "Open the side panel"; its hover text names the tabs it would show ("Open the side panel: Files, Changes"). No tab and no panel is drawn, so a module's tab reads nothing while the rail is closed. A click opens the rail.
+- Open: the rail is drawn as the sections below say, and the same button sits at the end of the row of tabs, named "Close the side panel". A click closes the rail.
+- A rail with no tab to show has no button either: nothing is drawn, as before.
+
+Nothing opens the rail but the button: the first view [1] an agent pushes picks the tab the rail will show (see "Which panel opens by itself"), and does not open a closed rail.
 
 ### The modules' tabs first, then the rail's own two
 

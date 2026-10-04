@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { openMenu } from '../test-utils.js'
 
 const onAgentHandoff = vi.fn(async () => null as unknown)
 const sendOpenPullRequest = vi.fn(async () => ({ ok: true }) as unknown)
@@ -233,14 +234,14 @@ describe('run handoff (#799)', () => {
   test('Create draft PR, under the arrow, opens the pull request as a draft, pushed or not', async () => {
     onAgentHandoff.mockResolvedValue(worked)
     const { unmount } = render(<Harness />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Other choices' }))
+    await openMenu(await screen.findByRole('button', { name: 'Other choices' }))
     fireEvent.click(await screen.findByText('Create draft PR'))
     await waitFor(() => expect(sendOpenPullRequest).toHaveBeenCalledWith('p1', 'run-1', { draft: true }))
     expect(sendPush).not.toHaveBeenCalled()
     unmount()
     onAgentHandoff.mockResolvedValue({ ...worked, pushed: true })
     render(<Harness />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Other choices' }))
+    await openMenu(await screen.findByRole('button', { name: 'Other choices' }))
     expect(await screen.findByText('Create draft PR')).toBeTruthy()
     // The branch is on the remote already: the push alone is no choice any more.
     expect(screen.queryByText('Publish branch')).toBeNull()
@@ -249,7 +250,7 @@ describe('run handoff (#799)', () => {
   test('Publish branch, in the menu, pushes the branch and opens no pull request', async () => {
     onAgentHandoff.mockResolvedValue(worked)
     render(<Harness />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Other choices' }))
+    await openMenu(await screen.findByRole('button', { name: 'Other choices' }))
     fireEvent.click(await screen.findByText('Publish branch'))
     await waitFor(() => expect(sendPush).toHaveBeenCalledWith('p1', 'run-1'))
     expect(sendOpenPullRequest).not.toHaveBeenCalled()

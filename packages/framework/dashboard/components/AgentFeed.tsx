@@ -22,7 +22,6 @@ export function AgentFeed({
   projectId,
   subagents,
   doing,
-  going,
   setup,
   onOpenAgent,
 }: {
@@ -48,8 +47,6 @@ export function AgentFeed({
   /** The run's subagents, what each is doing now, and how a click on one's row opens it. */
   subagents?: readonly AgentMeta[] | undefined
   doing?: Record<string, string> | undefined
-  /** The run's job is not over: its subagents still work. */
-  going?: boolean | undefined
   /** What was set up for the agent before it began: the chat's "Session set up" line. */
   setup?: SessionSetup | undefined
   onOpenAgent?: ((agentId: string) => void) | undefined
@@ -82,7 +79,6 @@ export function AgentFeed({
         projectId={projectId}
         {...(subagents ? { subagents } : {})}
         {...(doing ? { doing } : {})}
-        {...(going ? { going } : {})}
         setup={setup}
         onOpenAgent={onOpenAgent}
       />

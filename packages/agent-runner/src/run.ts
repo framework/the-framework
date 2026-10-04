@@ -244,7 +244,9 @@ export interface ResumeOptions {
  * holding nothing, starts again from the base the record names, or origin's default branch. The session resumes by the id the
  * record carries; the diary goes on from where it stopped. The prompt is the user's text, or the
  * continuation of the question the run ended on with the given answer. The sentence of the publish
- * level the record keeps is said again after it. A follow-up the record names is still owed: the
+ * level the record keeps is said again after it. A run whose work was landed, its branch gone
+ * with that, is no longer recorded as landed once it is on a branch made again: what it does from
+ * here is not. A follow-up the record names is still owed: the
  * agent is told again not to arm the merge, and the follow-up runs once this ends done.
  */
 export async function resumeRun(repo: string, opts: ResumeOptions): Promise<RunOutcome> {
@@ -301,6 +303,9 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
     const mark: RunnerMark = { host, pid, ...lasting(previous), ...restarted }
     const runningCard: RunCard = { ...card, status: 'running', caller: { ...card.caller, runner: mark, pid, host, ...forReaders(mark), workspace: checkout.path } }
     delete runningCard.endedAt
+    // A record that says its work was landed lost its branch to that. On a branch made again the
+    // work is new and not landed: left on the record, every reader would go on saying it is.
+    if (checkout.again) delete runningCard.caller?.['landed']
     const reopened = await recordRun(repo, runningCard, diary, logs)
     if (!reopened.ok && !reopened.committed) log(`[agent-runner] the run's record could not be written: ${reopened.error}`)
 

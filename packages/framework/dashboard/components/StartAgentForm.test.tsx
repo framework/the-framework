@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { openMenu } from '../test-utils.js'
 
 // Everything the form reads goes through a lib module, so the mocks stop at the `rpc/` stubs: an
 // unmocked one reaches for `/_rpc/<name>`, and there is no daemon behind jsdom to answer.
@@ -34,6 +35,7 @@ vi.mock('./Composer.js', async () => {
     return (
       <>
         {props.launcherControls}
+        {props.belowControls}
         <button type="button" disabled={!props.canSubmit} onClick={() => props.onSubmit('do the thing')}>
           submit-typed
         </button>
@@ -62,6 +64,11 @@ afterEach(() => {
 
 const COMMANDS = [{ name: 'work-queue', description: 'Work the agent queue' }]
 const noop = () => {}
+
+/** The launcher's "Auto" menu button; its text says the publish pick and the cleanup. */
+const autoMenu = () => screen.getByRole('button', { name: 'Auto' })
+/** The labels of the publish options the open "Auto" menu lists. */
+const publishOptions = () => screen.getAllByRole('menuitem').map(item => item.querySelector('span > span')!.textContent)
 const props = { projectId: 'p1', files: [], context: new Set<string>(), addContext: noop, removeContext: noop, toggleContext: noop }
 
 describe('StartAgentForm (#1774)', () => {
@@ -84,24 +91,24 @@ describe('StartAgentForm (#1774)', () => {
     expect(start).toHaveBeenCalledWith('p1', 'do the thing', { driver: 'codex', model: 'gpt-5' })
   })
 
-  test('the publish menu: Nothing until the person picks, and then no level is handed to the start hook; a saved pick is shown and handed over; a change writes the saved setting', async () => {
+  test('the publish options: Nothing until the person picks, and then no level is handed to the start hook; a saved pick is shown and handed over; a change writes the saved setting', async () => {
     onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} />)
-    const menu = (await screen.findByRole('combobox', { name: 'Publish' })) as HTMLSelectElement
-    expect(menu.value).toBe('nothing')
-    expect(Array.from(menu.options).map(o => o.textContent)).toEqual(['Nothing', 'Publish branch', 'Open PR', 'Merge on green'])
+    expect(autoMenu().textContent).toBe('Auto: Nothing')
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
 
-    fireEvent.change(menu, { target: { value: 'pr' } })
+    await openMenu(autoMenu())
+    expect(publishOptions()).toEqual(['Nothing', 'Publish branch', 'Open PR', 'Merge on green'])
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Open PR/ }))
     expect(updatePreferences).toHaveBeenCalledWith({ publish: 'pr' })
 
     cleanup()
     start.mockClear()
     prefs.current = { publish: 'merge' }
     render(<StartAgentForm {...props} />)
-    expect(((await screen.findByRole('combobox', { name: 'Publish' })) as HTMLSelectElement).value).toBe('merge')
+    expect(autoMenu().textContent).toBe('Auto: Merge on green')
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', { publish: 'merge' }))
 
@@ -118,29 +125,41 @@ describe('StartAgentForm (#1774)', () => {
     prefs.current = { publish: 'merge' }
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} />)
-    const menu = (await screen.findByRole('combobox', { name: 'Publish' })) as HTMLSelectElement
-    await waitFor(() => expect(Array.from(menu.options).map(o => o.textContent)).toEqual(['Nothing', 'Publish branch']))
-    expect(menu.value).toBe('branch')
+    await waitFor(() => expect(autoMenu().textContent).toBe('Auto: Publish branch'))
+    await openMenu(autoMenu())
+    expect(publishOptions()).toEqual(['Nothing', 'Publish branch'])
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', { publish: 'branch' }))
   })
 
-  test('a project with no remote is offered no publish menu, and a saved pick starts it publishing nothing', async () => {
+  test('a project with no remote and no cleanup command has no Auto menu, and a saved pick starts it publishing nothing', async () => {
     onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: false, remote: false })
     prefs.current = { publish: 'merge' }
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} />)
-    await waitFor(() => expect(screen.queryByRole('combobox', { name: 'Publish' })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Auto' })).toBeNull())
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
   })
 
-  test('a project with the post-merge-cleanup command shows the box; ticked, the start carries the command as the follow-up', async () => {
+  test('a project with no remote but the cleanup command: the Auto menu holds the cleanup alone', async () => {
+    onCommands.mockResolvedValue({ commands: [{ name: 'post-merge-cleanup' }], startHook: true, gitHost: false, remote: false })
+    prefs.current = { publish: 'merge', postMergeCleanup: true }
+    render(<StartAgentForm {...props} />)
+    await waitFor(() => expect(autoMenu().textContent).toBe('Auto · cleanup'))
+    await openMenu(autoMenu())
+    expect(screen.queryByRole('menuitem')).toBeNull()
+    expect(screen.getByRole('menuitemcheckbox', { name: /^Post-merge cleanup/ })).toBeTruthy()
+  })
+
+  test('a project with the post-merge-cleanup command has the box in the Auto menu; ticked, the start carries the command as the follow-up', async () => {
     onCommands.mockResolvedValue({ commands: [...COMMANDS, { name: 'post-merge-cleanup' }], startHook: true, gitHost: true })
     prefs.current = { postMergeCleanup: true }
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} />)
-    const box = await screen.findByRole('checkbox', { name: 'Post-merge cleanup' })
+    await waitFor(() => expect(autoMenu().textContent).toBe('Auto: Nothing · cleanup'))
+    await openMenu(autoMenu())
+    const box = screen.getByRole('menuitemcheckbox', { name: /^Post-merge cleanup/ })
     expect(box.getAttribute('aria-checked')).toBe('true')
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', { then: '/post-merge-cleanup' }))
@@ -156,7 +175,9 @@ describe('StartAgentForm (#1774)', () => {
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onCommands).toHaveBeenCalled())
-    expect(screen.queryByRole('checkbox', { name: 'Post-merge cleanup' })).toBeNull()
+    expect(autoMenu().textContent).toBe('Auto: Nothing')
+    await openMenu(autoMenu())
+    expect(screen.queryByRole('menuitemcheckbox')).toBeNull()
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
     cleanup()
@@ -165,8 +186,10 @@ describe('StartAgentForm (#1774)', () => {
     onCommands.mockResolvedValue({ commands: [{ name: 'post-merge-cleanup' }], startHook: true, gitHost: true })
     prefs.current = {}
     render(<StartAgentForm {...props} />)
-    const box = await screen.findByRole('checkbox', { name: 'Post-merge cleanup' })
+    await openMenu(autoMenu())
+    const box = await screen.findByRole('menuitemcheckbox', { name: /^Post-merge cleanup/ })
     expect(box.getAttribute('aria-checked')).toBe('false')
+    expect(autoMenu().textContent).toBe('Auto: Nothing')
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
   })

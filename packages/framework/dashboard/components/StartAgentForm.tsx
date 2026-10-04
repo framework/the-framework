@@ -2,17 +2,16 @@ import { useRef, useState } from 'react'
 import { onProjects, onStartCheck } from '../rpc/projects.js'
 import type { ProjectSummary } from '../../src/index.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
-import { PUBLISH_LABELS, isPublishPick, offeredPublishPicks, publishPickIn } from '../../src/client.js'
+import { offeredPublishPicks, publishPickIn } from '../../src/client.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId } from '../lib/remote-target.js'
 import { cleanupPick, offersPostMergeCleanup, startPicks, useStartAgent } from '../lib/use-start-agent.js'
 import { useProjectLauncher } from '../lib/use-project-launcher.js'
 import { useLoaded } from '../lib/use-async.js'
 import { promptWithContext } from '../lib/use-context-set.js'
+import { AutoMenu } from './AutoMenu.js'
 import { ContextMenu } from './ContextMenu.js'
 import { Composer, type ComposerHandle } from './Composer.js'
-import { Checkbox } from './ui/checkbox.js'
-import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // Start a run in the selected project (#405, #1774): a free-text box, where `/` lists the project's
 // commands, and Start, which is the project's own start hook (posted over `sendStart`). The editor +
@@ -23,13 +22,15 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 // from the project's check hook.
 // The Context picker (#439/#314) narrows the run's focus to other projects and to files: the
 // picked paths ride the prompt as one `Context:` line at its end.
-// The "Post-merge cleanup" box, where the project has that command: ticked, the run is followed
-// by a fresh agent running the command on its branch before its pull request merges. The box
-// writes the same saved setting as Settings → Agent, so its state is every next run's default.
-// The publish menu: how far the run publishes its work when the agent finishes: Nothing, Publish
-// branch, Open PR, Merge on green. The level is handed to the start hook as `PUBLISH`; Nothing, the
-// pick until the person makes one, hands it none. Saved, so the pick holds for every next run. A
-// project with no git host package is offered Nothing and Publish branch only.
+// The "Auto" menu, under the box at the left (the model menu is at the right): what the agent
+// does by itself when it finishes. Its button reads the picks, so nothing is hidden.
+// In it, how far the run publishes its work: Nothing, Publish branch, Open PR, Merge on green. The
+// level is handed to the start hook as `PUBLISH`; Nothing, the pick until the person makes one,
+// hands it none. Saved, so the pick holds for every next run. A project with no git host package
+// is offered Nothing and Publish branch only, and one with no remote none at all.
+// In it too, the "Post-merge cleanup" box, where the project has that command: ticked, the run is
+// followed by a fresh agent running the command on its branch before its pull request merges. The
+// box writes the same saved setting as Settings → Agent, so its state is every next run's default.
 export function StartAgentForm({
   projectId,
   onAgentStarted,
@@ -73,7 +74,7 @@ export function StartAgentForm({
   // own project is not read at all, so both are offered every pick; the daemon that starts the run
   // holds a pull request pick to the branch where its project has no git host.
   const gitHost = remoteDevice ? true : (launcher?.gitHost ?? true)
-  // A project with no remote can publish nothing: the menu would hold one pick, so it is not shown.
+  // A project with no remote can publish nothing: the menu would hold one pick, so it lists none.
   const remote = remoteDevice ? true : (launcher?.remote ?? true)
   const publishPick = publishPickIn(preferences.publish, gitHost, remote)
 
@@ -129,62 +130,24 @@ export function StartAgentForm({
         addContext={addContext}
         removeContext={removeContext}
         launcherControls={
-          <>
-            <ContextMenu
-              otherProjects={otherProjects}
-              context={context}
-              contextFiles={contextFiles}
-              summary={contextSummary}
-              busy={busy}
-              onToggle={toggleContext}
-            />
-            {remote && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <select
-                      value={publishPick}
-                      disabled={busy}
-                      onChange={e => {
-                        if (isPublishPick(e.target.value)) updatePreferences({ publish: e.target.value })
-                      }}
-                      aria-label="Publish"
-                      className="rounded-md border border-border bg-background px-1.5 py-0.5 text-xs text-muted-foreground"
-                    >
-                      {offeredPublishPicks(gitHost, remote).map(pick => (
-                        <option key={pick} value={pick}>
-                          {PUBLISH_LABELS[pick]}
-                        </option>
-                      ))}
-                    </select>
-                  }
-                />
-                <TooltipContent>
-                  What the agent publishes when it finishes: nothing, its branch, its pull request, or its pull request set to merge once its checks pass.
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {offersCleanup && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <label className="flex cursor-pointer items-center gap-1.5 px-1.5 text-xs text-muted-foreground">
-                      <Checkbox
-                        checked={preferences.postMergeCleanup ?? false}
-                        disabled={busy}
-                        onCheckedChange={next => updatePreferences({ postMergeCleanup: next === true })}
-                        aria-label="Post-merge cleanup"
-                      />
-                      Post-merge cleanup
-                    </label>
-                  }
-                />
-                <TooltipContent>
-                  Once the run ends done with a pull request, a fresh agent runs /post-merge-cleanup on its branch; the merge waits for it.
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </>
+          <ContextMenu
+            otherProjects={otherProjects}
+            context={context}
+            contextFiles={contextFiles}
+            summary={contextSummary}
+            busy={busy}
+            onToggle={toggleContext}
+          />
+        }
+        belowControls={
+          <AutoMenu
+            publish={publishPick}
+            picks={remote ? offeredPublishPicks(gitHost, remote) : []}
+            onPublish={pick => updatePreferences({ publish: pick })}
+            cleanup={offersCleanup ? (preferences.postMergeCleanup ?? false) : undefined}
+            onCleanup={next => updatePreferences({ postMergeCleanup: next })}
+            busy={busy}
+          />
         }
         onSubmit={submit}
         onPromptChange={value => {

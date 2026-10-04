@@ -10,7 +10,7 @@ Fixes how far a run [1] publishes its work when its agent finishes: the three pu
 
 [1] run: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it.
 [2] publish level: how far a run publishes its work when its agent finishes: `branch` (push the branch and open no pull request), `pr` (push the branch and open its pull request) or `merge` (push the branch and open its pull request, set to merge on its own once its checks pass). A run given none publishes only what its prompt asks.
-[3] the publish menu: the launcher's menu labelled "Publish", with the options "Nothing", "Publish branch", "Open PR" and "Merge on green" (`../dashboard/components/StartAgentForm.tsx`). The option the user picked is saved in the preferences as `publish`.
+[3] the publish menu: the part of the launcher's "Auto" menu that lists the options "Nothing", "Publish branch", "Open PR" and "Merge on green" (`../dashboard/components/StartAgentForm.tsx`, `../dashboard/components/AutoMenu.tsx`). The option the user picked is saved in the preferences as `publish`.
 [4] git host provider: the package of the project that declares it provides the git host; The Framework opens and lands pull requests through the command that package declares (`store/git-host.ts`). A project with none has no git host: no pull request can be opened for it.
 
 ## Business logic — TL;DR

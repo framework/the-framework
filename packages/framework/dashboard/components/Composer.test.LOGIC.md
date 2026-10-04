@@ -6,6 +6,7 @@ What the tests cover:
 - **A surface that cannot submit** - when the embedding surface says nothing can be submitted, the button stays disabled with text in the box, and neither the click nor the editor shortcut submits.
 - **A carried draft** - a draft carried from another device [2] is seeded into the launcher's box, visible in the editor itself and not only in what a start would send, and taken from its holding place once; a composer inside an agent [3] leaves the carried draft untouched.
 - **An offline "Run on" device** - with the selected device reported offline, the note "Studio is offline" appears, "Send" is disabled, and neither the button nor the editor shortcut submits; with the device reported online there is no note, the button is enabled, and the submit goes out.
+- **The row under the box** - given content for a row under the box, the composer puts that content and, after it, the coding-agent-and-model select in one row right under the box, the select is not inside the box, the "Run on" pick stays inside it, and the row has a fixed height, does not wrap, and keeps the select from shrinking; given empty content the row still carries the select; given none there is no row and the select is inside the box.
 - **Inside an agent** - there is no "Run on" pick: an agent already runs where it was started.
 
 ## Glossary

@@ -1,0 +1,15 @@
+{
+  "id": "2026-10-04T15-35-08-118Z",
+  "startedAt": "2026-10-04T15:35:08.213Z",
+  "status": "running",
+  "intent": "ask my about my favorite color with choices",
+  "driver": "claude-code",
+  "model": "opus",
+  "caller": {
+    "runner": {
+      "host": "Suleimans-MacBook-Pro.local",
+      "pid": 33398
+    },
+    "host": "Suleimans-MacBook-Pro.local"
+  }
+}

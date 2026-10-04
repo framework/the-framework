@@ -188,7 +188,19 @@ export function AgentView({
   // but its events are already streaming. The feed's own verdict drives the scroll contract and
   // the composer slot, so the continuation renders (and Stop takes over from Resume) the moment
   // the first event lands rather than when the poll does.
-  const feedLive = working || (feedAhead && isAgentActive(events))
+  //
+  // Once the feed has shown the run going again, it keeps saying so until the log shows that turn
+  // end: the archive re-read above catches up with the channel within milliseconds, the channel
+  // then knows no more than it, and without this the page said "ended" again until the poll
+  // landed, the note and the spinner row flashing in between. Only a turn seen starting past an
+  // archive that was read counts: before the first read the channel is ahead of nothing.
+  const [resumedFor, setResumedFor] = useState<string | null>(null)
+  const active = isAgentActive(shown)
+  const feedLive = working || (active && (feedAhead || resumedFor === agentId))
+  useEffect(() => {
+    if (active && feedAhead && archived !== null) setResumedFor(agentId)
+    else if (!active) setResumedFor(null)
+  }, [active, feedAhead, archived, agentId])
   // The message just sent to an ended run, shown at the end of the feed until its own prompt line
   // arrives: the continuation writes that line only once its checkout is back, seconds later.
   const [sending, setSending] = useState<{ text: string; prompts: number } | null>(null)

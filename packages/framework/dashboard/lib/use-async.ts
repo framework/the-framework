@@ -29,9 +29,10 @@ function remember(key: string, value: unknown): void {
   if (remembered.size > REMEMBERED_MAX) remembered.delete(remembered.keys().next().value!)
 }
 
-/** Forget every remembered answer. For tests. */
-export function forgetRemembered(): void {
-  remembered.clear()
+/** Forget the answer remembered under a key, for a target known to have changed since; with no key, every answer (for tests). */
+export function forgetRemembered(key?: string): void {
+  if (key === undefined) remembered.clear()
+  else remembered.delete(key)
 }
 
 /**
@@ -45,7 +46,7 @@ function useAsyncValue<T>(
   everyMs: number | null,
   deps: DependencyList,
   keep?: Keep,
-): { value: T; reload: () => void; loaded: boolean } {
+): { value: T; reload: () => Promise<void>; loaded: boolean } {
   const [value, setValue] = useState<T>(initial)
   // Whether `value` is an answer rather than the initial. Only a successful read sets it, so a
   // caller that reads absence as a fact ("is this session gone, or just not fetched yet?", #784)
@@ -62,8 +63,8 @@ function useAsyncValue<T>(
   // the render below answers for the new deps itself in that frame.
   const shownFor = useRef<DependencyList>(deps)
 
-  const apply = useCallback((token: { live: boolean; key?: string }, agent: () => Promise<T>) => {
-    void agent()
+  const apply = useCallback((token: { live: boolean; key?: string }, agent: () => Promise<T>): Promise<void> => {
+    return agent()
       .then(next => {
         if (!token.live) return
         if (token.key !== undefined) remember(token.key, next)
@@ -91,7 +92,7 @@ function useAsyncValue<T>(
     }
     shownFor.current = deps
     if (!load) return () => void (token.live = false)
-    const agent = (): void => apply(token, load)
+    const agent = (): void => void apply(token, load)
     agent()
     if (everyMs === null) return () => void (token.live = false)
     const timer = setInterval(agent, everyMs)
@@ -103,9 +104,9 @@ function useAsyncValue<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
 
-  const reload = useCallback(() => {
-    if (!load) return
-    apply(liveRef.current, load)
+  const reload = useCallback((): Promise<void> => {
+    if (!load) return Promise.resolve()
+    return apply(liveRef.current, load)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
 
@@ -139,7 +140,7 @@ export function useLoaded<T>(
 /**
  * Read now, again every `everyMs`, and again whenever `deps` change. Polling stops on
  * unmount. `reload` reads immediately, for when a local action means the next tick is
- * too late to wait for.
+ * too late to wait for, and settles once that read has answered.
  *
  * Pass `null` for `load` when there is nothing to read yet. `load` must close over
  * exactly `deps`. `loaded` is false until the first successful read, and again after
@@ -151,6 +152,6 @@ export function usePolled<T>(
   everyMs: number,
   deps: DependencyList,
   keep?: Keep,
-): { value: T; reload: () => void; loaded: boolean } {
+): { value: T; reload: () => Promise<void>; loaded: boolean } {
   return useAsyncValue(load, initial, everyMs, deps, keep)
 }

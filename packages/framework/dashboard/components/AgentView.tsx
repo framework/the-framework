@@ -141,15 +141,6 @@ export function AgentView({
   // nothing is read for it and the bar waits.
   const working = live === true
 
-  // What the branch holds (#1023), read once for both the bar and the detail it opens. Read once
-  // the agent stops rather than once the process does: while it is still writing to the branch
-  // there is nothing to hand off yet, but a parked session's branch is finished work. While the
-  // card says saving, the checkout is being cleaned up, and an empty branch is deleted with it, so
-  // a publish offered then turned into "Branch gone" moments later: the answer is only shown then
-  // for a branch with commits of its own, which the clean-up keeps.
-  const read = useAgentHandoff(projectId, agentId, live === false, card?.saving === true)
-  const kept = read.handoff !== null && read.handoff.exists && !read.handoff.empty
-  const handoff = card?.saving && !kept ? { ...read, handoff: null, loaded: false } : read
   // A run started for another run: it opens no pull request, its main agent lands its work.
   const subagent = card?.parent !== undefined
   const [open, setOpen] = useState(false)
@@ -212,10 +203,27 @@ export function AgentView({
   const onSending = useCallback((text: string | null) => setSending(text === null ? null : { text, prompts }), [prompts])
   // A run just started writes its prompt line only once its record is saved and its checkout made.
   const shownSending = sending?.text ?? (startedWith && prompts === 0 ? startedWith : undefined)
+  // The agent works, or is about to: on a message just sent, or as its feed shows before the
+  // agents poll does.
+  const going = feedLive || shownSending !== undefined
+  // What the branch holds (#1023), read once for both the bar and the detail it opens. Read once
+  // the agent stops rather than once the process does: while it is still writing to the branch
+  // there is nothing to hand off yet, but a parked session's branch is finished work. "Stops" is
+  // as the feed knows it: read off the agents poll alone, the last step stayed in the bar, its
+  // button with it, for the seconds an agent sent a new message already worked. While the
+  // card says saving, the checkout is being cleaned up, and an empty branch is deleted with it, so
+  // a publish offered then turned into "Branch gone" moments later: the answer is only shown then
+  // for a branch with commits of its own, which the clean-up keeps.
+  const read = useAgentHandoff(projectId, agentId, live === false && !going, card?.saving === true, going)
+  const kept = read.handoff !== null && read.handoff.exists && !read.handoff.empty
+  const handoff = card?.saving && !kept ? { ...read, handoff: null, loaded: false } : read
   // The agent is doing what the Commit button asked: said where the button was, from the ask going
-  // out until the agent's turn ends. Read off the last prompt, so a refresh says the same.
+  // out until the next step is known, so the place is never empty in between: the agent's turn
+  // ends, its checkout is cleaned up, and only then is its branch read. Read off the last prompt,
+  // so a refresh says the same.
   const lastPrompt = shownSending ?? [...shown].reverse().find(e => e.kind === 'driver' && e.event.type === 'start')
-  const committing = (feedLive || shownSending !== undefined) && isCommitAsk(typeof lastPrompt === 'string' ? lastPrompt : lastPrompt?.kind === 'driver' && lastPrompt.event.type === 'start' ? lastPrompt.event.prompt : undefined)
+  const commitAsked = isCommitAsk(typeof lastPrompt === 'string' ? lastPrompt : lastPrompt?.kind === 'driver' && lastPrompt.event.type === 'start' ? lastPrompt.event.prompt : undefined)
+  const committing = commitAsked && (going || (live === false && !handoff.loaded))
   // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
   const outcome = working ? undefined : agentOutcome(shown)
   // Until the handoff has actually loaded, a just-stopped agent keeps showing the modules' summaries
@@ -286,7 +294,7 @@ export function AgentView({
         actions={
           // A run that is working is still writing its branch; the next step is offered once it has ended,
           // and a run whose subagents still work has not: it goes on as each of them ends.
-          committing ? <Committing /> : live === false && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} subagent={subagent} onAsked={onSending} /> : undefined
+          committing ? <Committing /> : live === false && !going && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} subagent={subagent} onAsked={onSending} /> : undefined
         }
       />
       {/* The always-available session-details strip: agent + spend (#322). Sits above the changes/

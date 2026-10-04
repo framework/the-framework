@@ -337,6 +337,7 @@ describe('what the modules add to a run’s page (#817)', () => {
   })
 
   test('once an ended run’s branch is read, the handoff replaces the summary; the details stay, told the run is not working', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
     onAgentHandoff.mockResolvedValue({ branch: 'agent-x', exists: true, commits: [], files: [], insertions: 0, deletions: 0, pushed: false })
     render(withSlots(view({ live: false })))
     await waitFor(() => expect(screen.queryByText(/^summary/)).toBeNull())
@@ -408,5 +409,54 @@ describe('AgentView: while the agent commits', () => {
     rerender(view({ events: over, live: false }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Commit' })).toBeTruthy())
     expect(screen.queryByText('Committing…')).toBeNull()
+  })
+  test('the agent ended and its checkout is being cleaned up: "Committing…" stays until the branch is read, then the next step takes its place', async () => {
+    const asked = [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Commit your work.' } }] as FrameworkEvent[]
+    const over = [...asked, { kind: 'end', ok: true }] as FrameworkEvent[]
+    onAgent.mockResolvedValue(ended)
+    onAgentHandoff.mockResolvedValue(LEFT)
+    // The answer read before the ask is remembered: it is not what the branch holds after it.
+    const { rerender } = render(view({ events: ended }))
+    await screen.findByRole('button', { name: 'Commit' })
+    rerender(view({ events: asked, live: true }))
+    expect(screen.getByText('Committing…')).toBeTruthy()
+    let answer: (handoff: unknown) => void = () => {}
+    onAgentHandoff.mockReturnValue(new Promise(resolve => (answer = resolve)) as never)
+    onAgent.mockResolvedValue(over)
+    rerender(view({ events: over, live: false, card: { status: 'done', saving: true } }))
+    expect(screen.getByText('Committing…')).toBeTruthy()
+    rerender(view({ events: over, live: false, card: { status: 'done' } }))
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(screen.getByText('Committing…')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull()
+    answer({ ...LEFT, empty: false, commits: [{ sha: 'abc1234', subject: 'Add a page' }], pendingFiles: [] })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Merge' })).toBeTruthy())
+    expect(screen.queryByText('Committing…')).toBeNull()
+  })
+})
+
+describe('AgentView: the next step while the agent works again', () => {
+  const MERGED = { ...PUSHED, hasRemote: false, gitHost: false, pushed: false, landed: true }
+  const ended = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a page' } }, { kind: 'end', ok: true }] as FrameworkEvent[]
+
+  test('a message sent to an ended agent takes the last step out of the bar at once, before the agents poll says it works', async () => {
+    onAgent.mockResolvedValue(ended)
+    onAgentHandoff.mockResolvedValue(MERGED)
+    const { rerender } = render(view({ events: ended }))
+    await waitFor(() => expect(screen.getByText('Merged into the main branch.')).toBeTruthy())
+    // The feed shows the new turn; the poll still says ended.
+    const again = [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a footer' } }] as FrameworkEvent[]
+    rerender(view({ events: again, live: false }))
+    await waitFor(() => expect(screen.queryByText('Merged into the main branch.')).toBeNull())
+    // It ends with a file left: the bar goes from empty to the new step, the old one never back.
+    const over = [...again, { kind: 'end', ok: true }] as FrameworkEvent[]
+    let answer: (handoff: unknown) => void = () => {}
+    onAgentHandoff.mockReturnValue(new Promise(resolve => (answer = resolve)) as never)
+    onAgent.mockResolvedValue(over)
+    rerender(view({ events: over, live: false }))
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(screen.queryByText('Merged into the main branch.')).toBeNull()
+    answer({ ...MERGED, landed: false, empty: true, commits: [], pendingFiles: ['index.html'] })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Commit' })).toBeTruthy())
   })
 })

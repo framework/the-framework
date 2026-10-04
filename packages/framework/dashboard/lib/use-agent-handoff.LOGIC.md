@@ -19,7 +19,7 @@ Reads what an agent's [1] branch holds once its work has stopped — the commits
 - **Polled, because the branch changes behind the dashboard's back** - every 15 seconds at rest, every 0.3 seconds while the pull request lookup has not answered.
 - **The last answer stays on screen** - a failed read, and the change of polling cadence, never blank the summary; each agent's last answer is remembered, so going back to an agent shows it at once while it is read again.
 - **One step at a time, and it says which one** - the step in flight is named, so the button reads as opening or merging rather than silently greying out.
-- **A step that succeeds re-reads the branch at once** - the offer becomes the next step without waiting for the next poll.
+- **A step that succeeds re-reads the branch at once** - the offer becomes the next step without waiting for the next poll, and the button keeps naming the step until that read has answered.
 - **A step that fails reports why** - the reason from the daemon, or the wording the button supplies.
 - **"Not read yet" is distinguishable from "nothing there"** - an empty branch state is never flashed before the first answer lands.
 
@@ -53,7 +53,7 @@ The branch state is re-read every 15 seconds. While the answer says the pull req
 
 #### Business logic
 
-A read that fails leaves the last answer in place; the next read usually succeeds. Changing the polling cadence likewise keeps the last answer rather than starting from nothing. Switching to another agent [1] or another project [4] never shows the previous agent's answer, so one agent's branch is never shown under another's. Each agent's last answer is remembered for as long as the page is open: going back to an agent seen before shows its answer from the first frame, counted as read, and the branch is read again at once, the fresh answer replacing it when it lands. An agent never seen shows no answer until its own read lands.
+A read that fails leaves the last answer in place; the next read usually succeeds. Changing the polling cadence likewise keeps the last answer rather than starting from nothing. Switching to another agent [1] or another project [4] never shows the previous agent's answer, so one agent's branch is never shown under another's. Each agent's last answer is remembered for as long as the page is open: going back to an agent seen before shows its answer from the first frame, counted as read, and the branch is read again at once, the fresh answer replacing it when it lands. An agent never seen shows no answer until its own read lands. The caller says when the agent works again: its remembered answer is dropped then, since its branch is being written to, and the next read starts from no answer.
 
 ### One step at a time, and it says which one
 
@@ -63,7 +63,7 @@ A read that fails leaves the last answer in place; the next read usually succeed
 
 #### Business logic
 
-Three steps can be carried out from here: opening the pull request (which pushes the branch on the way), merging it, and pushing the branch alone. While one is in flight, that specific step is named, so the button reads "Opening PR…", "Merging…" or "Publishing…", and every step's button is unavailable until it finishes. Only one step is ever in flight.
+Three steps can be carried out from here: opening the pull request (which pushes the branch on the way), merging it, and pushing the branch alone. While one is in flight, that specific step is named, so the button reads "Opening PR…", "Merging…" or "Publishing…", and every step's button is unavailable until it finishes. Only one step is ever in flight. After a step that succeeded, the button goes on naming it until the branch has been read again: let go as soon as the step returned, it read "Merge" again for the moment the read took, as if it had not been pressed.
 
 ### A step that succeeds re-reads the branch at once
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AgentHandoff } from '../../src/index.js'
 import { onAgentHandoff } from '../rpc/reads.js'
-import { usePolled } from './use-async.js'
+import { forgetRemembered, usePolled } from './use-async.js'
 import { useAction } from './use-action.js'
 
 /** What the agent view knows about the session's branch, and how it acts on it. */
@@ -28,14 +28,21 @@ export const PR_PENDING_MS = 300
 /**
  * `saving`: the run's clean-up is still going (its card says saving); the branch is read again the
  * moment it is done, since the clean-up may have deleted an empty branch or pushed one.
+ * `working`: the run works, so the answer read before it did is no longer what its branch holds.
  */
-export function useAgentHandoff(projectId: string, agentId: string | null | undefined, enabled = true, saving = false): AgentHandoffState {
+export function useAgentHandoff(projectId: string, agentId: string | null | undefined, enabled = true, saving = false, working = false): AgentHandoffState {
   // Polled rather than read once: a push or a PR opened from here (or from a terminal) changes
   // what to offer, and `reload` makes the bar's own actions land immediately. Not read while the
   // run is live (#1026): a branch still being written to has nothing to hand off yet.
   // Same as the bar above it (#1028): fifteen seconds at rest, but a PR lookup still in flight
   // holds the Open PR offer back, so that one is worth asking again for straight away.
   const [everyMs, setEveryMs] = useState(15_000)
+  // A run that works again writes to its branch: the answer remembered from before is not the
+  // one shown when the run ends, which would put the last step back for a moment.
+  const key = agentId ? `handoff:${projectId}:${agentId}` : undefined
+  useEffect(() => {
+    if (working && key !== undefined) forgetRemembered(key)
+  }, [working, key])
   const { value: handoff, reload, loaded } = usePolled<AgentHandoff | null>(
     enabled && agentId ? () => onAgentHandoff(projectId, agentId) : null,
     null,
@@ -44,7 +51,7 @@ export function useAgentHandoff(projectId: string, agentId: string | null | unde
     // Remembered per run: going back to a run shows its last answer at once while it is read
     // again, and a cadence flip (prPending 15s↔1s) keeps the answer rather than blanking the
     // summary for a beat. Another run's answer is never shown.
-    agentId ? { remember: `handoff:${projectId}:${agentId}` } : undefined,
+    key !== undefined ? { remember: key } : undefined,
   )
   useEffect(() => setEveryMs(handoff?.prPending ? PR_PENDING_MS : 15_000), [handoff?.prPending])
   const { busy, error, run } = useAction()
@@ -52,10 +59,11 @@ export function useAgentHandoff(projectId: string, agentId: string | null | unde
 
   const act = (which: 'pr' | 'merge' | 'push' | 'merge-branch' | 'commit', fn: () => Promise<unknown>, fallback: string): void => {
     setPending(which)
-    void run(fn, fallback).then(outcome => {
-      setPending(null)
-      if (outcome.ok) reload()
-    })
+    // The button says what it is doing until the branch is read again: let go before, it read
+    // as not pressed for the beat the read takes.
+    void run(fn, fallback)
+      .then(outcome => (outcome.ok ? reload() : undefined))
+      .then(() => setPending(null))
   }
 
   return { handoff, loaded, busy, error, pending, act }

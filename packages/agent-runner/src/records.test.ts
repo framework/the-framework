@@ -56,6 +56,13 @@ test('a run started for another run names its parent beside the host, where a re
   assert.equal(runnerMark(card)?.parent, 'p1', 'and in the mark, as before')
 })
 
+test('a run told where to start names that branch beside the host, and a run told none names none', () => {
+  const card = markerCard({ id: 'c3', startedAt: '2026-09-16T14:01:00.000Z', prompt: 'the task', driver: 'claude-code', mark: { ...mark, base: 'my-branch' } })
+  assert.equal(card.caller?.['base'], 'my-branch')
+  assert.equal(runnerMark(card)?.base, 'my-branch', 'and in the mark, as before')
+  assert.equal(markerCard({ id: 'c4', startedAt: '2026-09-16T14:01:00.000Z', prompt: 'the task', driver: 'claude-code', mark }).caller?.['base'], undefined)
+})
+
 test('the mark keeps the publish level a run was given, and drops a word that is no level', () => {
   const card = markerCard({ id: 'c2', startedAt: '2026-09-16T14:01:00.000Z', prompt: '/work-queue', driver: 'claude-code', mark: { ...mark, publish: 'merge' } })
   assert.equal(runnerMark(card)?.publish, 'merge')

@@ -37,6 +37,8 @@ Holds the browser's view of the user's preferences [1]: loads them from the daem
 
 The preferences [1] are fetched from the daemon the first time any screen asks for them, and that one answer is shared: every screen reads it, and every change notifies all of them at once. A second screen asking while the first fetch is still running waits for it rather than starting another.
 
+Until that first fetch has answered, a screen reads no preferences at all, every setting at its default. A screen can ask whether the fetch has answered: a control that shows a saved pick in words (the launcher's "start from" chip) is not drawn before, since it would show the default and change when the answer lands.
+
 A fetch the daemon does not answer resolves to no preferences at all, which means every setting takes its default; the dashboard stays usable rather than blocking on the daemon.
 
 Before the browser is running — while the page is being rendered ahead of time, with no daemon to ask — every setting reads as unset, and the real values arrive once the page is live.

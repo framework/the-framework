@@ -17,7 +17,7 @@ test('start a run through the project\'s start hook, watch it live, and read the
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    const agentId = await world.startAgent(project, 'Add a login page and commit it', { driver: 'codex', model: 'gpt-5', publish: 'merge' })
+    const agentId = await world.startAgent(project, 'Add a login page and commit it', { driver: 'codex', model: 'gpt-5', publish: 'merge', base: 'main' })
     const tail = await world.tailAgent(project, agentId)
 
     // The hook line got the prompt and the person's picks in its environment, and the id it
@@ -25,7 +25,7 @@ test('start a run through the project\'s start hook, watch it live, and read the
     // contract is observable. The project has no git host package, so no pull request can be
     // opened: the level picked, merge, is handed over as the furthest the project goes, the branch.
     const call = (await world.hookCalls())[0]!
-    assert.deepEqual(call, { hook: 'start', id: agentId, prompt: 'Add a login page and commit it', driver: 'codex', model: 'gpt-5', publish: 'branch' })
+    assert.deepEqual(call, { hook: 'start', id: agentId, prompt: 'Add a login page and commit it', driver: 'codex', model: 'gpt-5', publish: 'branch', base: 'main' })
 
     // The feed is the run's own diary, tailed from the moment of the Start, before the run's
     // checkout exists: the agent's reply, then the end.

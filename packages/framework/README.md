@@ -41,7 +41,7 @@ The Framework runs no coding agent and makes no model call. Starting an agent is
 `.the-framework/hooks.yml`:
 
 ```yaml
-start: agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"} ${PUBLISH:+--publish "$PUBLISH"}
+start: agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"} ${PUBLISH:+--publish "$PUBLISH"} ${BASE:+--base "$BASE"}
 resume: agent-runner run --detach --resume "$RUN_ID" ${TEXT:+"$TEXT"} ${ANSWER:+--answer "$ANSWER"}
 check: agent-runner check ${DRIVER:+--driver "$DRIVER"}
 ```
@@ -63,6 +63,13 @@ The launcher's **Post-merge cleanup** box, shown where the project has the
 with a pull request, agent-runner starts a fresh agent on its branch with that command and the
 first agent's id, and holds the pull request's merge until that one is done. Its default is
 Settings → Agent → Post-merge cleanup, which the box writes too.
+
+The launcher's chip above the box says which branch the agent starts from: the project's
+main branch, fetched first, or **My local branch**, the branch the project's folder is on,
+with its commits that are not pushed (edits that are not committed are not carried). The
+local pick puts the branch's name in `BASE`, and is saved per project. The chip is shown only
+when the `start` line mentions `$BASE`: a project whose line was written before the chip
+existed gets it by adding `${BASE:+--base "$BASE"}` to the line.
 
 The `check` line is what the launcher runs before a Start, with the picked coding agent in
 `DRIVER`: it answers one JSON document with `problems` (a coding agent not installed or logged

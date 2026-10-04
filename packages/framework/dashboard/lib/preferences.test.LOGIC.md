@@ -1,6 +1,7 @@
 What the tests cover:
 
 - **A change is in force before the daemon answers** - a toggle made while the first load is still running stays as the user set it when that load arrives carrying the older value; when nothing raced it, the loaded values are what the dashboard shows.
+- **Read or not read yet** - a screen is told the preferences are not read while the first load is running, and read once it has answered.
 - **A write sends only what changed** - the change carries just the keys the user touched, never the rest of what this tab happens to hold, so a tab open since before someone else's change cannot write the old values back.
 - **A write adopts what the daemon stores** - the merged answer replaces this tab's values, so a tab that was stale about another tab's change converges on it.
 - **Out-of-order answers** - the answer to an older write is ignored once a newer write has gone out, so the value the user last chose stands.

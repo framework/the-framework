@@ -32,7 +32,7 @@ export interface OnboardingSuggestion {
 
 /**
  * What a Start carries besides its prompt (#1774): the person's picks, handed to the project's
- * `start` hook line as `DRIVER`, `MODEL` and `PUBLISH`. Absent leaves each to the tool the line names.
+ * `start` hook line as `DRIVER`, `MODEL`, `PUBLISH` and `BASE`. Absent leaves each to the tool the line names.
  */
 export interface StartAgentOptions {
   /** The model to run on. */
@@ -41,6 +41,12 @@ export interface StartAgentOptions {
   driver?: string
   /** How far the run publishes its work when the agent finishes: push its branch, open its pull request, or open it set to merge once its checks pass. Absent, nothing unless the prompt asks. A project with no git host package starts a pull request level at `branch`. */
   publish?: PublishLevel
+  /**
+   * The branch the agent's own branch starts from, as this machine has it, commits that are not
+   * pushed included: the launcher's "My local branch" pick. Absent, origin's default branch. A
+   * word that is no branch name refuses the Start. Not sent to a device: its branches are its own.
+   */
+  base?: string
   /**
    * The follow-up's prompt: once the run ends done with a pull request, a fresh agent works its
    * branch from it before the request merges. The launcher's "Post-merge cleanup" box.

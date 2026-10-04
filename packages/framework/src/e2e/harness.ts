@@ -143,6 +143,7 @@ export interface HookCall {
   driver?: string
   model?: string
   publish?: string
+  base?: string
   text?: string
   answer?: string
 }

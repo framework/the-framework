@@ -39,18 +39,22 @@ export interface GitStatusDeps {
 }
 
 /**
+ * The branch `cwd` has checked out, by its short name; `HEAD` when it is on no branch. Undefined
+ * when `cwd` is not a git repo, or git failed.
+ */
+export async function currentBranch(cwd: string, git: GitRunner = nodeGitRunner()): Promise<string | undefined> {
+  return git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd).then(out => out.trim(), () => undefined)
+}
+
+/**
  * Read a project's git status: the current branch and dirty flag (from git), plus the linked
  * PR (best-effort). Returns undefined when the path is not a git repo. Forgiving — a failed
  * `git status` reads as clean, and a failed PR lookup simply omits the PR.
  */
 export async function readGitStatus(cwd: string, deps: GitStatusDeps = {}): Promise<GitStatus | undefined> {
   const git = deps.git ?? nodeGitRunner()
-  let branch: string
-  try {
-    branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd)).trim()
-  } catch {
-    return undefined // not a git repo (or git failed)
-  }
+  const branch = await currentBranch(cwd, git)
+  if (branch === undefined) return undefined // not a git repo (or git failed)
   const dirty = (await git(['status', '--porcelain'], cwd).catch(() => '')).trim().length > 0
   // The branch and the dirty flag are what this row is for, and they are ten milliseconds of git.
   // The PR is a git host read an order of magnitude slower, so it is read through the cache and is

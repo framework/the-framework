@@ -1,8 +1,10 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
 import { parse } from 'yaml'
 import { HOOK_LINES, initHooks, writeHookLines } from './init.js'
 
@@ -26,6 +28,24 @@ test('a project the dashboard knows, with no hooks file, gets every line', async
     assert.deepEqual(parse(await hooksOf(repo)), HOOK_LINES)
   } finally {
     await rm(repo, { recursive: true, force: true })
+  }
+})
+
+// The `start` line as a shell runs it, with a stand-in for the tool that prints what it was given.
+test('the start line names the branch to start from only when it is handed one', async () => {
+  const bin = await realpath(await mkdtemp(join(tmpdir(), 'agent-runner-init-bin-')))
+  try {
+    await writeFile(join(bin, 'agent-runner'), '#!/bin/sh\nprintf "%s\\n" "$@"\n')
+    await chmod(join(bin, 'agent-runner'), 0o755)
+    const given = async (vars: Record<string, string>): Promise<string[]> => {
+      const { stdout } = await promisify(execFile)('sh', ['-c', HOOK_LINES['start'] as string], { env: { PATH: `${bin}:${process.env['PATH']}`, PROMPT: 'fix it', ...vars } })
+      return stdout.trimEnd().split('\n')
+    }
+    assert.deepEqual(await given({ BASE: 'my branch' }), ['run', '--detach', 'fix it', '--base', 'my branch'], 'one argument, whatever the name holds')
+    assert.deepEqual(await given({}), ['run', '--detach', 'fix it'])
+    assert.deepEqual(await given({ BASE: '' }), ['run', '--detach', 'fix it'], 'an empty one is none')
+  } finally {
+    await rm(bin, { recursive: true, force: true })
   }
 })
 

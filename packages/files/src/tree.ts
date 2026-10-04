@@ -136,7 +136,7 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
   // Nothing known of the run yet: it is starting. A run writes its record, then makes its checkout
   // from origin's default branch, seconds after the page that started it opened: those are its files.
   const record = run?.record
-  if (!record) return reclaimed ? { source: 'pending' } : starting(ask, root, git)
+  if (!record) return reclaimed ? { source: 'pending' } : starting(ask, root, git, undefined)
   const branch = record.branch
 
   const lookup: MergeLookup | undefined = record.pr && branch !== undefined ? await host.mergeCommit(branch, record.pr.number).catch((): MergeLookup => ({ pending: false })) : undefined
@@ -176,17 +176,19 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
     if (ref) return { source: 'unchanged', ref }
   }
   // Recorded running, with no checkout and no branch here yet: still starting, not gone. Here, its
-  // checkout is being made from origin's default branch; elsewhere, its branch is not here yet.
-  if (record.status === 'running') return record.host === thisHost && !reclaimed ? starting(ask, root, git) : { source: 'pending' }
+  // checkout is being made from the branch its record names, or origin's default branch; elsewhere,
+  // its branch is not here yet.
+  if (record.status === 'running') return record.host === thisHost && !reclaimed ? starting(ask, root, git, record.base) : { source: 'pending' }
   return { source: 'gone' }
 }
 
 /**
- * A run starting here: origin's default branch, which its checkout is made from (the project's
- * HEAD in a repository with no remote); pending when there is none.
+ * A run starting here: the branch its record says it was told to start from, else origin's default
+ * branch, which its checkout is made from (the project's HEAD in a repository with no remote);
+ * pending when there is none, or when the branch named is not here.
  */
-async function starting(ask: (args: string[]) => Promise<string>, root: string, git: GitRunner): Promise<AgentFilesAt> {
-  const ref = await commitOf(ask, (await originDefaultBranch(root, git)) ?? 'HEAD')
+async function starting(ask: (args: string[]) => Promise<string>, root: string, git: GitRunner, base: string | undefined): Promise<AgentFilesAt> {
+  const ref = await commitOf(ask, base ?? (await originDefaultBranch(root, git)) ?? 'HEAD')
   return ref ? { source: 'starting', ref } : { source: 'pending' }
 }
 

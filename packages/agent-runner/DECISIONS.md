@@ -97,6 +97,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A run starts from the branch it is told, `run --base <ref>`, written on its record. With
   none, origin's default branch, as before. Picked over a run that always starts from the
   default branch: a run started for another run needs what that run has built so far.
+  The `start` line passes it on too (`BASE`), so a person can start a run from their own
+  local branch. The branch's name is on the record beside the host as well, so a reader
+  that does not know the runner's mark can say where the run started.
 - A run that makes its own branch records the commit the branch was made at: where its
   own work begins. Picked over the base's name: a branch is renamed, moves on, and is
   deleted once merged. Picked over recording it only for a run started with `--base`: once

@@ -61,6 +61,20 @@ describe('preferences', () => {
     expect(result.current).toEqual({ notifyBrowser: false, notifyNewActivity: true })
   })
 
+  test('a screen can tell the preferences not read yet from the preferences read', async () => {
+    let resolveLoad: (p: unknown) => void = () => {}
+    onPreferences.mockReturnValue(new Promise(r => (resolveLoad = r)))
+    const { usePreferences, usePreferencesLoaded } = await import('./preferences.js')
+
+    const { result } = renderHook(() => ({ preferences: usePreferences(), loaded: usePreferencesLoaded() }))
+    expect(result.current.loaded).toBe(false)
+    await act(async () => {
+      resolveLoad({ startFrom: { p1: 'local' } })
+      await Promise.resolve()
+    })
+    expect(result.current).toEqual({ preferences: { startFrom: { p1: 'local' } }, loaded: true })
+  })
+
   // A stale tab reverting settings it never touched (#1148).
 
   test('a write sends only the keys it changed, so it cannot replay the rest', async () => {

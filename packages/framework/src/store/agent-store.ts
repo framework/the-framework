@@ -48,6 +48,12 @@ export interface AgentMeta {
    */
   parent?: string
   /**
+   * The branch the run was told to start from, by its name: a person's local branch picked in the
+   * launcher, or, for a subagent, its main agent's branch. Written on the card by the tool that
+   * started it; absent on a run that started from origin's default branch.
+   */
+  base?: string
+  /**
    * The commit the run's own work begins at: where its branch was made, for a run started from a
    * branch other than the default one (a subagent starts from its main agent's). Its changes are
    * measured from it; absent, from the default branch. Written on the card by the tool that

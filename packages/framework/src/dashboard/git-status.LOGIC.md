@@ -26,7 +26,7 @@ Reads the git status bar of a project or of an agent's [1] checkout [2]: the cur
 
 #### Business logic
 
-The branch is the one the checkout is currently on. When git cannot answer that (the directory is not a git repository, or git failed), there is no status at all. The tree is dirty when git's status lists anything at all; a status read that fails reads as clean.
+The branch is the one the checkout is currently on, `HEAD` for a checkout on no branch. When git cannot answer that (the directory is not a git repository, or git failed), there is no status at all. The branch read is also offered on its own, without the dirty flag and the pull request: the launcher's read asks it for the branch an agent can start from (`../dashboard-rpc/projects.ts`). The tree is dirty when git's status lists anything at all; a status read that fails reads as clean.
 
 ### The linked pull request, best effort
 

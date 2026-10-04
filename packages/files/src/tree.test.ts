@@ -26,7 +26,7 @@ type Pr = { number: number; mergeCommit?: string } & Record<string, unknown>
  * branch. "Changed nothing" is the core's rule, as the core's host answers it: it ended `done` or
  * `failed` on this machine, with no pull request, and was not landed.
  */
-function deps(agent: { status?: string; host?: string; branch?: string; pr?: { number: number }; baseCommit?: string; landed?: string }, prs: { value?: Pr[]; pending?: boolean } = {}): ModuleServerHost {
+function deps(agent: { status?: string; host?: string; branch?: string; pr?: { number: number }; base?: string; baseCommit?: string; landed?: string }, prs: { value?: Pr[]; pending?: boolean } = {}): ModuleServerHost {
   return {
     root,
     run: async () => ({
@@ -213,6 +213,26 @@ test('a run starting here, in a project with a remote, reads origin’s default 
   commit(project, 'unpushed', { 'secret.txt': 's\n' })
   const host: ModuleServerHost = { root: project, run: async () => undefined, mergeCommit: async () => ({ pending: false }) }
   assert.deepEqual(await resolveAgentFiles(host, 'run-x', undefined, 'this-machine'), { source: 'starting', ref: shared })
+})
+
+test('a run starting here whose record names the branch it starts from reads that branch, commits that are not pushed included; a branch that is not here is pending', async () => {
+  const project = join(dir, 'with-origin-and-base')
+  execFileSync('git', ['init', '-q', '-b', 'main', project])
+  git(project, 'config', 'user.email', 't@t')
+  git(project, 'config', 'user.name', 't')
+  const shared = commit(project, 'base', { 'a.txt': 'a\n' })
+  execFileSync('git', ['init', '-q', '--bare', join(dir, 'with-origin-and-base.git')])
+  git(project, 'remote', 'add', 'origin', join(dir, 'with-origin-and-base.git'))
+  git(project, 'push', '-q', 'origin', 'main')
+  git(project, 'checkout', '-q', '-b', 'my-feature')
+  const unpushed = commit(project, 'unpushed', { 'mine.txt': 'm\n' })
+  const recorded = (record: { status: string; host: string; base?: string }): ModuleServerHost => ({ root: project, run: async () => ({ record, changedNothing: false }), mergeCommit: async () => ({ pending: false }) })
+  const from = (host: ModuleServerHost) => resolveAgentFiles(host, 'run-x', undefined, 'this-machine')
+  assert.deepEqual(await from(recorded({ status: 'running', host: 'this-machine', base: 'my-feature' })), { source: 'starting', ref: unpushed })
+  assert.deepEqual((await readAgentTree(project, { source: 'starting', ref: unpushed })), { source: 'starting', files: ['a.txt', 'mine.txt'], changes: {} })
+  assert.deepEqual(await from(recorded({ status: 'running', host: 'this-machine' })), { source: 'starting', ref: shared }, 'no branch named: origin’s default branch, as before')
+  assert.deepEqual(await from(recorded({ status: 'running', host: 'this-machine', base: 'deleted-branch' })), { source: 'pending' }, 'the run will fail on it: a later read says so')
+  assert.deepEqual(await from(recorded({ status: 'running', host: 'other-machine', base: 'my-feature' })), { source: 'pending' }, 'starting elsewhere: that machine’s branch, not this one’s')
 })
 
 test('a checkout reclaimed since it was listed is no source: its branch is read, else pending, never an empty tree or a start', async () => {

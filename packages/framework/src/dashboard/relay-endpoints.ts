@@ -75,7 +75,8 @@ async function handleStart(req: IncomingMessage, res: ServerResponse, handlers: 
   const prompt = typeof body.prompt === 'string' ? body.prompt : ''
   const options = (body.options && typeof body.options === 'object' ? body.options : {}) as StartAgentOptions
   // Never relay onward from a relayed agent: strip any nested target before starting it here.
-  const { remote: _drop, ...local } = options
+  // And a start relayed to a device never names a branch: the caller's branches are not this machine's.
+  const { remote: _drop, base: _callers, ...local } = options
   let result: StartAgentResult
   try {
     result = await handlers.start(prompt, local, undefined)

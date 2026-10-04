@@ -32,6 +32,23 @@ describe('SessionLine', () => {
     expect(container.querySelector('.border')).toBeNull()
   })
 
+  test('an agent started from a branch other than the main one says so, in one sentence under its branch', () => {
+    const { container } = render(<SessionLine setup={{ ...setup, base: 'my/work' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
+    expect(Array.from(container.querySelectorAll('.border > div')).map(n => n.textContent)).toEqual([
+      'Checkout made/repo/.branches/agent-1',
+      'Branchagent-1',
+      'Started from the branch my/work, not from the main branch.',
+      'Coding agent startedClaude Code · Opus 5.5',
+    ])
+  })
+
+  test('an agent started from the main branch has no such sentence', () => {
+    render(<SessionLine setup={setup} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
+    expect(screen.queryByText(/Started from the branch/)).toBeNull()
+  })
+
   test('a fact the card does not say is no line, and a coding agent with no model is named alone', () => {
     const { container } = render(<SessionLine setup={{ driver: 'codex' }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))

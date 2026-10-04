@@ -18,7 +18,7 @@ The device's [1] side of the relay [2]: the endpoints a daemon exposes under `/_
 
 - **The ping** - answers 200 with an empty body, starts nothing, and works even on a daemon that enabled no relay: reaching it proves this daemon is reachable and the caller's token valid.
 - **A daemon that enabled no relay** - answers 404 "relay not enabled" to every other relay route.
-- **The start** - takes a prompt and start options as JSON, strips any further device from the options, starts an ordinary local agent in this device's own home checkout, and answers with the start's result.
+- **The start** - takes a prompt and start options as JSON, strips any further device and any branch to start from out of the options, starts an ordinary local agent in this device's own home checkout, and answers with the start's result.
 - **The events** - streams one agent's events as newline-delimited JSON until the agent ends or the caller goes away.
 - **The agent-scoped call** - runs one whitelisted read, diff, steer, pull-request or merge call against this device's own checkout and answers with its result.
 
@@ -52,7 +52,7 @@ See `## Context`.
 
 #### Business logic
 
-Only a POST is accepted; another method is 405 "method not allowed". The body is JSON of at most 256 KB; a body that cannot be read or parsed is 400 "invalid request body". The prompt is taken when it is a string and is empty otherwise. The start options are taken when they are an object and are empty otherwise; whatever further device [1] they name is removed before the start, so a relayed agent [3] never relays onward. The agent is then started exactly as a local start would start it, through the daemon's own start closure, with no project named: this device's own home project's start hook runs, whatever the caller says. The start's result is answered as JSON; a start that fails outright is answered as a failed result carrying the failure's message rather than as an HTTP error.
+Only a POST is accepted; another method is 405 "method not allowed". The body is JSON of at most 256 KB; a body that cannot be read or parsed is 400 "invalid request body". The prompt is taken when it is a string and is empty otherwise. The start options are taken when they are an object and are empty otherwise; whatever further device [1] they name is removed before the start, so a relayed agent [3] never relays onward. Whatever branch to start from they name is removed too: a start relayed to a device never names a branch, since the caller's branches are not this machine's, so the agent starts where this device's start hook starts it. The daemon that sends the start removes it as well (`../daemon-runtime.ts`); it is removed here again because the caller is another machine. The agent is then started exactly as a local start would start it, through the daemon's own start closure, with no project named: this device's own home project's start hook runs, whatever the caller says. The start's result is answered as JSON; a start that fails outright is answered as a failed result carrying the failure's message rather than as an HTTP error.
 
 ### The events
 

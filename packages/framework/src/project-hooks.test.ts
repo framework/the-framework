@@ -4,7 +4,7 @@ import { chmod, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:f
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
-import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runCheckHook, runProjectHooks, runResumeHook, runStartHook } from './project-hooks.js'
+import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runCheckHook, runProjectHooks, runResumeHook, runStartHook, startLineTakesBase } from './project-hooks.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { initHooks } from 'agent-runner'
 
@@ -102,14 +102,22 @@ test('no file runs nothing and logs nothing; a broken file logs why it was ignor
 })
 
 test('the start line gets the prompt and the picks in its environment, and the id it answers on stdout comes back', async () => {
-  const cwd = await project(`start: 'printf "%s|%s|%s|%s|%s\\n" "$PROMPT" "$DRIVER" "\${MODEL-unset}" "\${THEN-unset}" "\${PUBLISH-unset}" >> started.txt; echo "{\\"ok\\":true,\\"id\\":\\"run-1\\"}"'\n`)
+  const cwd = await project(`start: 'printf "%s|%s|%s|%s|%s|%s\\n" "$PROMPT" "$DRIVER" "\${MODEL-unset}" "\${THEN-unset}" "\${PUBLISH-unset}" "\${BASE-unset}" >> started.txt; echo "{\\"ok\\":true,\\"id\\":\\"run-1\\"}"'\n`)
   try {
     assert.deepEqual(await runStartHook(cwd, { prompt: '/work-queue "now"', driver: 'codex' }), { ok: true, id: 'run-1' })
-    assert.deepEqual(await runStartHook(cwd, { prompt: 'Fix it', then: '/post-merge-cleanup', publish: 'merge' }), { ok: true, id: 'run-1' })
-    assert.equal(await readFile(join(cwd, 'started.txt'), 'utf8'), '/work-queue "now"|codex|unset|unset|unset\nFix it||unset|/post-merge-cleanup|merge\n')
+    assert.deepEqual(await runStartHook(cwd, { prompt: 'Fix it', then: '/post-merge-cleanup', publish: 'merge', base: 'my-branch' }), { ok: true, id: 'run-1' })
+    assert.equal(await readFile(join(cwd, 'started.txt'), 'utf8'), '/work-queue "now"|codex|unset|unset|unset|unset\nFix it||unset|/post-merge-cleanup|merge|my-branch\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
+})
+
+test('a start line takes the branch to start from when it mentions BASE, in either spelling, and no other variable counts', () => {
+  assert.equal(startLineTakesBase('agent-runner run --detach "$PROMPT" ${BASE:+--base "$BASE"}'), true)
+  assert.equal(startLineTakesBase('./start.sh "$PROMPT" "$BASE"'), true)
+  assert.equal(startLineTakesBase('./start.sh "$PROMPT" "${BASE}"'), true)
+  assert.equal(startLineTakesBase('agent-runner run --detach "$PROMPT" ${PUBLISH:+--publish "$PUBLISH"}'), false)
+  assert.equal(startLineTakesBase('./start.sh "$BASELINE" "${BASE_DIR}" --base main'), false)
 })
 
 test('the resume line gets the run and the text or the answer', async () => {

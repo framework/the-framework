@@ -24,12 +24,14 @@ The launcher on a project home [1]: the box where the user says what an agent [3
 [14] git host provider: the package of the project that declares it provides the git host; The Framework opens and lands pull requests through the command that package declares. A project with none has no git host: no pull request can be opened for it.
 [15] publish menu: the part of the launcher's "Auto" menu that lists the publish options: "Nothing", then one option per publish level [13].
 [16] chip: a small, bordered, rounded label in muted text: an icon and a few words that say one thing. A chip is either plain or the button of a menu.
+[17] local branch: the branch the project's folder has checked out, as this machine has it: its commits that are not pushed are included, and edits that are not committed are not.
 
 ## Business logic — TL;DR
 
 - **Commands load, never start** - the commands [2] are in the editor's `/` list and the Commands menu, not buttons; picking one loads `/<name> ` into the editor for review, and the form leaves a note saying so.
 - **The Context picker** - a "Context" menu on the control row lists the other registered projects to tick and the picked files to remove; `@`/`#` mentions and the right rail's file tree feed the same Context [11].
-- **The row of chips** - above the box, under the "Start an agent" heading: the "Run on" chip [16], which reads "This machine" or the picked device's [6] label and opens the "Run on" menu, then a plain chip with a folder icon and the project's name; the project's chip is absent until the name is known.
+- **The row of chips** - above the box, under the "Start an agent" heading: the "Run on" chip [16], which reads "This machine" or the picked device's [6] label and opens the "Run on" menu, then a plain chip with a folder icon and the project's name, then the "start from" chip, which reads the branch the agent starts from and opens a menu to pick it; the project's chip is absent until the name is known, and the "start from" chip is absent wherever the pick would not be obeyed.
+- **Where the agent starts** - the project's main branch, or the user's local branch [17], picked on the "start from" chip and saved per project; the local pick sends the branch's name with the Start, the main pick sends none; no chip, and no branch sent, when the project's start line does not pass the branch on, when the repository has no remote, when the folder is on no branch, and when a device [6] is picked.
 - **The "Auto" menu** - under the box at the left, with the coding-agent-and-model select at the right: what the agent does by itself when it finishes; it holds the publish menu [15] and the "Post-merge cleanup" box, its button reads what is picked ("Auto: Open PR · cleanup"), and a project offered neither has no "Auto" menu.
 - **The publish menu** - in the "Auto" menu: "Nothing", "Publish branch", "Open PR", "Merge on green"; the check is on the user's saved setting, "Nothing" when none is saved, and a pick writes that setting; a project with no git host provider [14] is offered "Nothing" and "Publish branch" only, and a saved pull request option is shown and started there as "Publish branch"; a project whose repository has no remote is offered no option, and a Start sends no publish level.
 - **The "Post-merge cleanup" box** - in the "Auto" menu, under the publish menu, only when the project has the `post-merge-cleanup` command [2] and no device is picked; ticked from the user's saved setting, and a click writes that setting.
@@ -71,7 +73,7 @@ Mentioning a project with `@` in the editor adds that project's path to the Cont
 
 #### Context
 
-**User story**: before typing a task, the user reads above the box where the agent [3] will start: on which machine, and in which project.
+**User story**: before typing a task, the user reads above the box where the agent [3] will start: on which machine, in which project, and from which branch.
 
 **Problem**: where an agent runs was an icon inside the box, which said nothing in words, and the project was named only at the top of the page. The row is also where more of the Start's facts go later, so it must take one more chip without moving anything.
 
@@ -83,6 +85,24 @@ The form shows the heading "Start an agent", then the row of chips [16], then th
 - The project's chip is plain, not a button and not a menu: a folder icon and the name of the project the agent starts in. The name is the one the shell read for the open project and hands down (`ProjectHome.tsx`). Until the shell knows it, the form hands no project chip: no other name, and no project id, is shown in its place. The row is asked for all the same, so the "Run on" chip is there from the start, and since the row's height is fixed the project's chip appearing moves nothing.
 
 The project's chip is the same whether the agent runs on this machine or on a device.
+
+- The "start from" chip is the row's last: a branch icon, the branch the agent starts from, and a menu to pick it (`StartFromMenu.tsx`); see "Where the agent starts" below. Being the last chip, it has nothing beside it to push when it appears or when its words change. It is drawn only once the project's chip is (the name landing after it would push it) and once the user's preferences [9] have been read (drawn before, it would read the main branch and then change to the saved pick).
+
+### Where the agent starts
+
+#### Context
+
+**User story**: the user has commits on a branch of their own that are not pushed, and wants the agent to continue from them. They pick "My local branch" on the chip above the box; the launcher remembers it for this project.
+
+**Problem**: the pick is carried out by the project's start line, which is written once into the project's hooks file and kept. A line written before the pick existed, or a person's own, may not pass the branch on, and a branch of this machine names nothing on another machine. A chip shown in either case would be a pick that silently does nothing.
+
+#### Business logic
+
+The launcher's read of the project (`lib/use-project-launcher.ts`) names the two branches an agent can start from: the project's main branch (the default branch of its remote) and the user's local branch [17]. The daemon names them only when the project's start line passes the branch on, the repository has a remote, and the project's folder is on a branch (`dashboard-rpc/projects.ts`). The chip is drawn when the read names them and no device [6] is picked in "Run on"; otherwise there is no chip.
+
+The pick in force is the one saved for this project in the user's preferences [9] (`startFrom`, which names the projects set to the local branch): the local branch for a project in it, the main branch for any other. Picking "My local branch" adds the project to it and picking the main branch takes it out; another project's pick is left as it is.
+
+A Start sends the local branch's name, as the launcher read it and as the chip shows it, when the chip is drawn and the local branch is the pick; the daemon hands it to the start hook [4] as `BASE`, and the agent's own branch starts from that branch as this machine has it. In every other case the Start names no branch, and the agent starts from the project's main branch, fetched first: the main branch is the pick, or there is no chip (a saved local pick then sends nothing, and stays saved). The agent's page says which branch it was started from, in its "Session set up" line (`SessionLine.tsx`).
 
 ### The "Auto" menu
 
@@ -140,6 +160,7 @@ A Start sends the project, the text, and:
 
 - the coding agent [5] the user picked and the model they picked, read off their preferences [9]. One that was never picked is not sent, so the project's start hook [4] applies its own default;
 - the publish level [13] of the option in force in the publish menu [15]: `branch`, `pr` or `merge`. "Nothing" sends no level, and so does a project offered no option, so the start hook is handed none and the agent publishes only what the prompt asks;
+- the name of the user's local branch [17], when the "start from" chip is drawn and the local branch is the pick; nothing otherwise, so the agent starts from the project's main branch;
 - `/post-merge-cleanup` as the follow-up [12], when the box is offered (the project has the command and no device is picked) and the preference is on. A preference left on sends nothing in a project without the command, or with a device picked;
 - when a device [6] is picked in "Run on": that device's URL, token and label, so the local daemon relays [7] the start to it. The token travels with this one start and is never stored by the daemon.
 

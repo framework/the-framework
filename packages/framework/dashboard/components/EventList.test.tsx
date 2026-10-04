@@ -21,8 +21,8 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-// The conversation view: the user's prompt is a grey box on the right with no label, the agent's
-// reply is AGENT and renders as Markdown, and a long prompt is cut short behind "Show more".
+// The conversation view: the user's prompt is a grey box on the right, the agent's reply renders
+// as Markdown, no row wears a label saying its kind, and a long prompt is cut short behind "Show more".
 describe('EventList conversation rows', () => {
   test('a quota reading is a row only when the quota is running low or used up', () => {
     const quota = (status: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'rate-limit', limit: { status, window: 'five_hour', resetsAt: Date.UTC(2026, 8, 30, 11, 30) } } })
@@ -54,7 +54,7 @@ describe('EventList conversation rows', () => {
     expect(boxes[1]!.textContent).toBe('second')
   })
 
-  test('a prompt is a grey box on the right with no label, and a reply reads AGENT', () => {
+  test('a prompt is a grey box on the right, and neither it nor the reply wears a label', () => {
     const events: FrameworkEvent[] = [
       { kind: 'driver', event: { type: 'start', prompt: 'what is your name?' } },
       { kind: 'driver', event: { type: 'text', text: 'I am **Claude**.' } },
@@ -66,7 +66,23 @@ describe('EventList conversation rows', () => {
     expect(box.parentElement!.className).toContain('items-end')
     expect(box.closest('.font-sans')).toBeTruthy()
     expect(screen.queryByText('you')).toBeNull()
-    expect(screen.getAllByText('agent')).toHaveLength(1)
+    expect(screen.queryByText('agent')).toBeNull()
+  })
+
+  test('no row wears a label saying its kind, and the rows sit in one centered column', () => {
+    const events: FrameworkEvent[] = [
+      { kind: 'driver', event: { type: 'start', prompt: 'go' } },
+      { kind: 'driver', event: { type: 'text', text: 'On it.' } },
+      { kind: 'view', id: 'v1', title: 'Plan', markdown: '# p' },
+      { kind: 'choice', id: 'g1', title: 'Proceed?', options: [{ id: 'a', label: 'Yes' }] },
+      { kind: 'end', ok: true },
+    ]
+    render(<EventList events={events} stick={false} />)
+    for (const label of ['agent', 'view', 'choice', 'end']) expect(screen.queryByText(label)).toBeNull()
+    expect(screen.getByText(/✓ finished/)).toBeTruthy()
+    const column = screen.getByText(/✓ finished/).closest('[data-slot="message-scroller-content"]')!
+    expect(column.className).toContain('mx-auto')
+    expect(column.className).toContain('max-w-3xl')
   })
 
   test("a prompt's time sits under its box, shown while the pointer is on the message, and is no column beside it", () => {
@@ -87,7 +103,7 @@ describe('EventList conversation rows', () => {
     expect(time.className).toContain('h-4')
   })
 
-  test('a row shows the time its line was written, and a line with no time shows none', () => {
+  test('the first of a run of rows holds the time its line was written, shown while the pointer is on the row; a line with no time holds none', () => {
     const at = '2026-09-25T10:04:05.000Z'
     const events: FrameworkEvent[] = [
       { kind: 'driver', event: { type: 'start', prompt: 'hello' }, at },
@@ -95,6 +111,13 @@ describe('EventList conversation rows', () => {
     ]
     render(<EventList events={events} stick={false} />)
     expect(screen.getAllByText(new Date(at).toLocaleTimeString())).toHaveLength(1)
+    cleanup()
+    render(<EventList events={[{ kind: 'driver', event: { type: 'text', text: 'hi' }, at }, { kind: 'driver', event: { type: 'text', text: 'there' }, at }]} stick={false} />)
+    const times = screen.getAllByText(new Date(at).toLocaleTimeString())
+    expect(times).toHaveLength(1)
+    expect(times[0]!.className).toContain('opacity-0')
+    expect(times[0]!.className).toContain('group-hover/row:opacity-100')
+    expect(times[0]!.closest('[data-message-id]')!.className).toContain('group/row')
   })
 
   test('a prompt renders its text inline', () => {
@@ -195,11 +218,6 @@ describe('EventList tool calls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ran 1 command' }))
     fireEvent.click(screen.getByRole('button', { name: 'Thought' }))
     expect(screen.getByText('plan it')).toBeTruthy()
-  })
-
-  test('the reply after a thought that is no row still opens under the AGENT badge', () => {
-    render(<EventList events={[prompt, thought('hm'), said('Hello.')]} stick={false} />)
-    expect(screen.getAllByText('agent')).toHaveLength(1)
   })
 
   test('while only a thought has come since the prompt, the spinner reads "Working…", not "Starting…"', () => {
@@ -310,36 +328,6 @@ describe('EventList row colour', () => {
   test('a finished run is not red (#1199)', () => {
     render(<EventList events={[{ kind: 'end', ok: true }]} stick={false} />)
     expect(screen.getByText(/finished/).className).not.toContain('text-danger')
-  })
-})
-
-// The kind badge is tinted for scanning (#1455 follow-up): decisions amber, milestones green,
-// pushed surfaces primary — the marker is coloured, not the body text.
-describe('EventList badge tones', () => {
-  const gate: FrameworkEvent = { kind: 'choice', id: 'g1', title: 'Proceed?', options: [{ id: 'a', label: 'Yes' }] }
-
-  test('a choice badge is amber, and its body is not recoloured', () => {
-    render(<EventList events={[gate]} stick={false} />)
-    expect(screen.getByText('choice').className).toContain('text-warning')
-    expect(screen.getByText(/Proceed\?/).className).not.toContain('text-warning')
-  })
-
-  test('a clean end badge is green; a stopped one stays muted', () => {
-    render(<EventList events={[{ kind: 'end', ok: true }]} stick={false} />)
-    expect(screen.getByText('end').className).toContain('text-success')
-    cleanup()
-    render(<EventList events={[{ kind: 'end', ok: false, stopped: true }]} stick={false} />)
-    expect(screen.getByText('end').className).not.toContain('text-success')
-  })
-
-  test('a failed end keeps the failure red — semantics beat the kind map', () => {
-    render(<EventList events={[{ kind: 'end', ok: false, detail: 'exited 1' }]} stick={false} />)
-    expect(screen.getByText('end').className).toContain('text-danger')
-  })
-
-  test('a pushed view badge is primary', () => {
-    render(<EventList events={[{ kind: 'view', id: 'v1', title: 'Plan', markdown: '# p' }]} stick={false} />)
-    expect(screen.getByText('view').className).toContain('text-primary')
   })
 })
 
@@ -563,7 +551,6 @@ describe('EventList subagent rows', () => {
 
   test('a working subagent has a row where it was started, saying its task and what it is doing now', () => {
     const { container } = render(<EventList events={events} subagents={[sub()]} doing={{ '2026-10-01T10-01-00-000Z': 'Edit login.ts' }} stick={false} />)
-    expect(screen.getByText('subagent')).toBeTruthy()
     expect(screen.getByText(/Validate the form/)).toBeTruthy()
     expect(screen.getByText('running')).toBeTruthy()
     expect(screen.getByText('Edit login.ts')).toBeTruthy()
@@ -572,8 +559,8 @@ describe('EventList subagent rows', () => {
     const text = container.textContent ?? ''
     expect(text.indexOf('npx orchestration start')).toBeLessThan(text.indexOf('Validate the form'))
     expect(text.indexOf('Validate the form')).toBeLessThan(text.indexOf('I started one subagent.'))
-    // The agent's reply after the row shows its badge again: the row broke the agent's run of rows.
-    expect(screen.getAllByText('agent')).toHaveLength(2)
+    // The agent's reply after the row holds its time again: the row broke the agent's run of rows.
+    expect(screen.getByText(new Date('2026-10-01T10:01:05.000Z').toLocaleTimeString())).toBeTruthy()
   })
 
   test('the row of an ended subagent says how it ended and how long it took, and a click opens the subagent', () => {
@@ -586,7 +573,7 @@ describe('EventList subagent rows', () => {
     expect(opened).toEqual(['2026-10-01T10-01-00-000Z'])
   })
 
-  test('the prompt that told the run its subagent ended is a SUBAGENT row saying how it ended, not a message the reader wrote', () => {
+  test('the prompt that told the run its subagent ended is a row about the subagent saying how it ended, not a message the reader wrote', () => {
     const told: FrameworkEvent = {
       kind: 'driver',
       event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.\nIts work is on the branch agent-form.' },
@@ -594,48 +581,35 @@ describe('EventList subagent rows', () => {
     }
     render(<EventList events={[...events, told]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' })]} stick={false} />)
     expect(screen.getAllByLabelText('Your message')).toHaveLength(1)
-    expect(screen.getAllByText('subagent')).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Open the subagent: Validate the form' })).toHaveLength(2)
     expect(screen.getByText('ended done')).toBeTruthy()
     expect(screen.getByText(/Its work is on the branch agent-form/)).toBeTruthy()
     expect(screen.queryByText(/started for this run/)).toBeNull()
   })
 
-  test("right after the reader's own prompt, the row of a subagent's end still shows its own badge", () => {
+  test("right after the reader's own prompt, a subagent's end is still a row of its own, not a second message of the reader's", () => {
     const typed: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'and then?' }, at: '2026-10-01T10:03:30.000Z' }
     const told: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' }, at: '2026-10-01T10:04:00.000Z' }
     render(<EventList events={[...events, typed, told]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' })]} stick={false} />)
     expect(screen.getAllByLabelText('Your message')).toHaveLength(2)
-    expect(screen.getAllByText('subagent')).toHaveLength(2)
+    expect(screen.getByText('ended done')).toBeTruthy()
+    // It opens its own run of rows: it holds its time.
+    expect(screen.getByText(new Date('2026-10-01T10:04:00.000Z').toLocaleTimeString())).toBeTruthy()
   })
 
-  test('a subagent started right after another one ended goes on under the same SUBAGENT badge', () => {
-    const told: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' }, at: '2026-10-01T10:04:00.000Z' }
-    const next = sub({ id: '2026-10-01T10-04-01-000Z', startedAt: '2026-10-01T10:04:01.000Z', intent: 'Second task' })
-    const after: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'Started the second.' }, at: '2026-10-01T10:04:05.000Z' }
-    render(<EventList events={[...events, told, after]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' }), next]} stick={false} />)
-    // The first subagent's row, then its end and the second's row as one run of rows.
-    expect(screen.getAllByText('subagent')).toHaveLength(2)
-    expect(screen.getByText(/Second task/)).toBeTruthy()
-  })
-
-  test("a subagent's end right under the row of a subagent just started goes on under that row's badge", () => {
+  test("a subagent's end right under the row of a subagent just started goes on that run of rows: it holds no time of its own", () => {
     const told: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' }, at: '2026-10-01T10:04:00.000Z' }
     const second = sub({ id: '2026-10-01T10-03-59-000Z', startedAt: '2026-10-01T10:03:59.000Z', intent: 'Second task' })
     render(<EventList events={[...events, told]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' }), second]} stick={false} />)
-    expect(screen.getAllByText('subagent')).toHaveLength(2)
     expect(screen.getByText('ended done')).toBeTruthy()
-  })
-
-  test('the message being written under a subagent row at the end of the log shows the AGENT badge', () => {
-    render(<EventList events={events} subagents={[sub({ id: '2026-10-01T10-09-00-000Z', startedAt: '2026-10-01T10:09:00.000Z', intent: 'Late task' })]} writing="Now I wait" stick={false} />)
-    expect(screen.getAllByText('agent')).toHaveLength(2)
+    expect(screen.queryByText(new Date('2026-10-01T10:04:00.000Z').toLocaleTimeString())).toBeNull()
   })
 
   test('the same words about a run that is not a subagent of this one stay a message the reader wrote', () => {
     const typed: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' } }
     render(<EventList events={[...events, typed]} stick={false} />)
     expect(screen.getAllByLabelText('Your message')).toHaveLength(2)
-    expect(screen.queryByText('subagent')).toBeNull()
+    expect(screen.queryByText('ended done')).toBeNull()
   })
 
   test('a subagent started after the last line is the last row', () => {

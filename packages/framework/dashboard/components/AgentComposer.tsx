@@ -163,7 +163,7 @@ export function AgentComposer({
   const surfacedError = error ?? stopError
 
   return (
-    <div className="p-2">
+    <div className="mx-auto w-full max-w-3xl p-2">
       <Note live={live} outcome={outcome} waitingOnSubagents={subagentsRunning > 0} queued={queued} muted={Boolean(surfacedError)} />
       {surfacedError && <p role="alert" className="mb-1 px-2 text-xs text-danger">{surfacedError}</p>}
       <Composer

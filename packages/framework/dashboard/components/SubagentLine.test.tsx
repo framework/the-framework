@@ -20,6 +20,8 @@ describe('SubagentsBar', () => {
   test('while a subagent works it says how many of them are, and opens to one line per subagent', () => {
     const opened: string[] = []
     render(<SubagentsBar subagents={[sub('c1'), sub('c2', { status: 'done', endedAt: '2026-10-01T10:01:40.000Z' }), sub('c3')]} doing={{ c1: 'Edit login.ts' }} onOpen={id => opened.push(id)} />)
+    // Centered at the transcript's column width.
+    expect(screen.getByText(/Subagents · 2 of 3 running/).closest('.max-w-3xl')!.className).toContain('mx-auto')
     const toggle = screen.getByRole('button', { name: 'Subagents · 2 of 3 running' })
     expect(screen.queryByText(/task c1/)).toBeNull()
     fireEvent.click(toggle)

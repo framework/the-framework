@@ -65,17 +65,19 @@ export function SubagentsBar({
   const working = subagents.filter(agent => agent.status === 'running').length
   if (working === 0) return null
   return (
-    <div className="border-t border-border px-4 py-1.5">
-      <DisclosureToggle open={open} onToggle={() => setOpen(o => !o)}>
-        Subagents · {working} of {subagents.length} running
-      </DisclosureToggle>
-      {open && (
-        <div className="mt-1 flex flex-col gap-0.5 pl-4 font-mono text-xs">
-          {subagents.map(agent => (
-            <SubagentLine key={agent.id} agent={agent} doing={doing[agent.id]} onOpen={onOpen} />
-          ))}
-        </div>
-      )}
+    <div className="border-t border-border py-1.5">
+      <div className="mx-auto w-full max-w-3xl px-4">
+        <DisclosureToggle open={open} onToggle={() => setOpen(o => !o)}>
+          Subagents · {working} of {subagents.length} running
+        </DisclosureToggle>
+        {open && (
+          <div className="mt-1 flex flex-col gap-0.5 pl-4 font-mono text-xs">
+            {subagents.map(agent => (
+              <SubagentLine key={agent.id} agent={agent} doing={doing[agent.id]} onOpen={onOpen} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

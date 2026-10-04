@@ -1,7 +1,6 @@
 import type { AgentMeta, ChoiceRequest, FrameworkEvent } from '../../src/index.js'
 import { formatFrameworkEvent } from '../../src/client.js'
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
-import { eventKindLabel } from '../lib/event-labels.js'
 import { pendingChoices } from '../lib/live-state.js'
 import { startedBefore, subagentEnd, subagentStartedAt, type SubagentEnd } from '../lib/subagents.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
@@ -11,7 +10,6 @@ import { Markdown } from './Markdown.js'
 import { SessionLine, type SessionSetup } from './SessionLine.js'
 import { SubagentLine } from './SubagentLine.js'
 import { LiveLine, ToolCalls, type ToolStep } from './ToolCalls.js'
-import { Badge } from './ui/badge.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
   MessageScroller,
@@ -38,15 +36,16 @@ import {
 //   - A turn's end and the spend so far are not rows, and neither is a clean end the run went on
 //     after: the run's details count turns and spend, and "finished" between turns is not so.
 //   - The reply a question follows is shown whole: it is what the question asks about.
-//   - Subagents, when the log is given the run's: each has a SUBAGENT row where it was started,
-//     read off its card, so the row of a working one says what it is doing now; and the prompt
-//     that told the run a subagent ended is a SUBAGENT row too, not a YOU one.
-// The kind badge shows once per agent of same-group rows — a 200-line driver turn used to be 200
-// identical badges (#948). A driver `start` breaks out of the AGENT group: the user's turn has no
-// badge, its box says whose it is. A row at a group boundary shows the time its diary line was written, the same
-// live, reloaded or replayed; a line written with no time shows none. Scrolling rides shadcn's Base UI message-scroller (#712): live
-// follows the edge (`autoScroll`) but yields the moment the reader scrolls up, replay renders static
-// from the top, and the "Jump to latest" chip is the scroller's own inert-when-not-scrollable button.
+//   - Subagents, when the log is given the run's: each has a row where it was started, read off
+//     its card, so the row of a working one says what it is doing now; and the prompt that told
+//     the run a subagent ended is a subagent's row too, not a message of the user's.
+// The rows sit in one centered column, as a chat's do, with no label saying each row's kind: the
+// user's turn is a box on the right, and every other row says what it is. The first of a run of
+// same-kind rows carries the time its diary line was written, shown while the pointer is on the
+// row, the same live, reloaded or replayed; a line written with no time shows none. Scrolling
+// rides shadcn's Base UI message-scroller (#712): live follows the edge (`autoScroll`) but yields
+// the moment the reader scrolls up, replay renders static from the top, and the "Jump to latest"
+// chip is the scroller's own inert-when-not-scrollable button.
 
 // The conversation text — the user's prompt and the agent's reply (AGENT). Both are rendered
 // as Markdown: the agent writes in Markdown, and a prompt may too.
@@ -63,7 +62,7 @@ function isLong(text: string): boolean {
   return text.replace(/\s+/g, ' ').trim().length > 100
 }
 
-/** Grouping key for the once-per-agent badge: the user's prompt stands apart from the agent's work. */
+/** Grouping key for a run of same-kind rows: the user's prompt stands apart from the agent's work. */
 function rowGroup(e: FrameworkEvent): string {
   if (e.kind === 'driver') return e.event.type === 'start' ? 'you' : 'agent'
   return e.kind
@@ -95,28 +94,8 @@ function rowTone(e: FrameworkEvent): string {
 }
 
 /**
- * The BADGE's colour: a navigation aid for scanning the log by kind (#1455 follow-up), on top of
- * {@link rowTone}'s semantics (failure red, which wins). Only the
- * high-signal kinds get a colour; the bulk of the log stays muted, or every row shouting means
- * none do. The body keeps rowTone: colour the *marker*, not the text.
- *
- *   - your decisions (`choice`/`choice-resolved`) — amber, the rows the log most wants found
- *   - milestones (a CLEAN `end`) — green, how far the agent got; a stopped or failed end is not
- *     a milestone (failure is already red, stopped stays neutral)
- *   - pushed surfaces (`view`, `screen`) — primary, the agent showing you something
- */
-function badgeTone(e: FrameworkEvent): string {
-  const semantic = rowTone(e)
-  if (semantic) return semantic
-  if (e.kind === 'choice' || e.kind === 'choice-resolved') return 'text-warning'
-  if (e.kind === 'end' && e.ok) return 'text-success'
-  if (e.kind === 'view' || e.kind === 'screen') return 'text-primary'
-  return ''
-}
-
-/**
- * The row's BACKGROUND wash (#1508), the layer above {@link badgeTone}'s markers: a tint across
- * the whole line, findable from the scrollbar's distance where a coloured badge word is not.
+ * The row's BACKGROUND wash (#1508): a tint across the whole line, findable from the scrollbar's
+ * distance.
  * Only the rows the eye actually hunts for get one — failures, and the agent landing cleanly (the
  * reader's own turns are boxes already) — and at a whisper of alpha, so the
  * text keeps the contrast and the bulk of the log stays plain canvas.
@@ -390,7 +369,12 @@ export function foldSteps(
   return { rows, steps }
 }
 
-/** The badge word, and the grouping key, of a row about one of the run's subagents. */
+// A row's time: small, at the row's right edge, shown while the pointer is on the row. Its place
+// is always there, so nothing moves when it shows.
+const TIME = 'ml-auto shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100'
+
+/** The grouping key of a row about one of the run's subagents. */
+
 const SUBAGENT = 'subagent'
 const NO_SUBAGENTS: readonly AgentMeta[] = []
 const NOTHING_DOING: Record<string, string> = {}
@@ -513,15 +497,12 @@ export function EventList({
   const placeOf = (e: FrameworkEvent): ReactNode => <MessageScrollerItem key={`passed-${idOf(e)}`} messageId={idOf(e)} hidden />
   const groupOf = (e: FrameworkEvent): string => (ends.has(e) ? SUBAGENT : rowGroup(e))
   const started = startedBefore(shown, subagents)
-  // One badge for a run of SUBAGENT rows: a started row right under the row of a subagent's end shows none.
-  const afterEnd = (at: number): boolean => at > 0 && ends.has(shown[at - 1]!)
   const startedRows = (at: number): ReactNode =>
-    started.get(at)?.map((agent, n) => (
-      <MessageScrollerItem key={`subagent-${agent.id}`} messageId={`subagent-${agent.id}`} className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
-        <span className="w-28 shrink-0">{n === 0 && !afterEnd(at) && <Badge className="mt-0.5 text-[10px] uppercase text-muted-foreground">{SUBAGENT}</Badge>}</span>
+    started.get(at)?.map(agent => (
+      <MessageScrollerItem key={`subagent-${agent.id}`} messageId={`subagent-${agent.id}`} className="group/row -mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
         <SubagentLine agent={agent} doing={doing[agent.id]} onOpen={onOpenAgent} />
         <Tooltip>
-          <TooltipTrigger render={<span className="ml-auto shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground" />}>{formatTime(subagentStartedAt(agent))}</TooltipTrigger>
+          <TooltipTrigger render={<span className={TIME} />}>{formatTime(subagentStartedAt(agent))}</TooltipTrigger>
           <TooltipContent>{new Date(subagentStartedAt(agent)).toLocaleString()}</TooltipContent>
         </Tooltip>
       </MessageScrollerItem>
@@ -539,14 +520,14 @@ export function EventList({
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>
       <MessageScroller className="flex-1">
         <MessageScrollerViewport aria-label="Agent output">
-          <MessageScrollerContent className="gap-1 p-4 font-mono text-xs">
+          <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-2 p-4 font-mono text-xs">
             {shown.map((e, i, rows) => {
               const message = textOf(e)
               const choiceRow = choiceRows?.rows.get(e)
               const prev = i > 0 ? rows[i - 1] : undefined
               const end = ends.get(e)
-              // A subagent's row above this one breaks the run of same-kind rows, so the badge shows
-              // again; the row of a subagent's end goes on that run of SUBAGENT rows instead.
+              // The first of a run of same-kind rows carries the run's time. A subagent's row above
+              // this one breaks the run; the row of a subagent's end goes on that run of subagent rows.
               const chunkHead = !prev || (started.has(i) ? !end : groupOf(prev) !== groupOf(e))
               const at = e.at
               // The user's own message: a prompt that is not a subagent's end.
@@ -558,15 +539,7 @@ export function EventList({
                 {startedRows(i)}
                 {/* Every row carries the same -mx/px pair so a washed row's band and a plain row's
                     text share the exact same columns; only the background differs. */}
-                <MessageScrollerItem messageId={idOf(e)} scrollAnchor={e === anchor} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${end ? '' : rowWash(e)}`}>
-                  {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("choice resolved") to sit on one line. The user's own message has none: its box takes the row. */}
-                  {!own && (
-                    <span className="w-28 shrink-0">
-                      {chunkHead && (
-                        <Badge className={`mt-0.5 text-[10px] uppercase ${(end ? '' : badgeTone(e)) || 'text-muted-foreground'}`}>{end ? SUBAGENT : eventKindLabel(e.kind)}</Badge>
-                      )}
-                    </span>
-                  )}
+                <MessageScrollerItem messageId={idOf(e)} scrollAnchor={e === anchor} className={`group/row -mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${end ? '' : rowWash(e)}`}>
                   {own && message !== null ? (
                     <Prompt text={message} at={at} />
                   ) : end ? (
@@ -576,7 +549,7 @@ export function EventList({
                       {end.rest && <Message text={end.rest} />}
                     </div>
                   ) : message !== null ? (
-                    // A reply (AGENT), shown whole.
+                    // The agent's reply, shown whole.
                     <Reply text={message} />
                   ) : steps.has(e) ? (
                     <ToolCalls steps={steps.get(e)!} />
@@ -609,7 +582,7 @@ export function EventList({
                   {!own && chunkHead && at !== undefined && (
                     <Tooltip>
                       <TooltipTrigger
-                        render={<span className="ml-auto shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground" />}
+                        render={<span className={TIME} />}
                       >
                         {formatTime(at)}
                       </TooltipTrigger>
@@ -625,17 +598,11 @@ export function EventList({
             {startedRows(shown.length)}
             {written && (
               <MessageScrollerItem messageId="writing" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
-                <span className="w-28 shrink-0">
-                  {shown.length === 0 || started.has(shown.length) || groupOf(shown[shown.length - 1]!) !== 'agent' ? (
-                    <Badge className="mt-0.5 text-[10px] uppercase text-muted-foreground">{eventKindLabel('driver')}</Badge>
-                  ) : null}
-                </span>
                 <Reply text={written} />
               </MessageScrollerItem>
             )}
             {working && !written && (
               <MessageScrollerItem messageId="working" className="-mx-1.5 flex items-center gap-2 rounded-sm px-1.5">
-                <span className="w-28 shrink-0" />
                 <LiveLine call={current} word={starting ? 'Starting…' : 'Working…'} since={unfolded[unfolded.length - 1]?.at} />
               </MessageScrollerItem>
             )}

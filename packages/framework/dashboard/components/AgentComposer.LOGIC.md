@@ -1,4 +1,4 @@
-The box at the bottom of an agent view [1]: where the user says something to that agent [2], whether it is working or has ended, and where they stop it or resume it. A send is always the same thing — the user's words, the next prompt of the same conversation — and what becomes of them is the daemon's side: an agent that is working takes them when its turn ends, an ended agent is resumed with them through the project's resume hook [3].
+The box at the bottom of an agent view [1]: where the user says something to that agent [2], whether it is working or has ended, and where they stop it or resume it. A send is always the same thing — the user's words, the next prompt of the same conversation — and what becomes of them is the daemon's side: an agent that is working takes them when its turn ends, an ended agent is resumed with them through the project's resume hook [3]. The box is centered under the transcript, at the transcript's column width (48rem at most), so its edges line up with the messages above it.
 
 ## Context
 

@@ -89,7 +89,7 @@ describe('run handoff (#799)', () => {
     onAgentHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true })
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('no changes')).toBeTruthy())
-    expect(handoffExpandable({ ...worked, empty: true } as never)).toBe(false)
+    expect(handoffExpandable({ ...worked, commits: [], files: [], empty: true } as never)).toBe(false)
     // Nothing to hand off and nothing to do: no button and no sentence, since a run with work always
     // shows its button.
     expect(screen.queryByText('Open PR')).toBeNull()
@@ -176,6 +176,30 @@ describe('run handoff (#799)', () => {
     render(<Harness open={false} />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Merge' })).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull()
+  })
+
+  test('commits that cancel out are still counted and listed, and the bar says there is nothing to take', async () => {
+    const cancelled = { ...worked, hasRemote: false, base: 'main', commits: [{ sha: 'a'.repeat(40), short: 'aaaaaaa', subject: 'Change to welcome' }, { sha: 'b'.repeat(40), short: 'bbbbbbb', subject: 'Change back to hello' }], files: [], insertions: 0, deletions: 0, empty: true }
+    onAgentHandoff.mockResolvedValue(cancelled)
+    render(<Harness />)
+    await waitFor(() => expect(screen.getByText('2 commits · no change left')).toBeTruthy())
+    expect(screen.getByText('Nothing to merge: the commits cancel out.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Merge' })).toBeNull()
+    // The disclosure still lists what the agent did.
+    expect(screen.getByText('Change to welcome')).toBeTruthy()
+    expect(screen.getByText('Change back to hello')).toBeTruthy()
+    cleanup()
+
+    onAgentHandoff.mockResolvedValue({ ...cancelled, hasRemote: true })
+    render(<Harness open={false} />)
+    await waitFor(() => expect(screen.getByText('Nothing to publish: the commits cancel out.')).toBeTruthy())
+    cleanup()
+
+    // No commits at all is still "no changes", with nothing said where the button would be.
+    onAgentHandoff.mockResolvedValue({ ...cancelled, commits: [] })
+    render(<Harness open={false} />)
+    await waitFor(() => expect(screen.getByText('no changes')).toBeTruthy())
+    expect(screen.queryByText(/cancel out/)).toBeNull()
   })
 
   test('past two uncommitted files the rest are counted, and the hover carries them all (#1173)', async () => {

@@ -25,7 +25,7 @@ const MAX_FILES = 10
 
 /** True when there is a commit list, a file list, or uncommitted work worth expanding the bar for. */
 export function handoffExpandable(handoff: AgentHandoff | null): boolean {
-  return Boolean(handoff && handoff.exists && (!handoff.empty || handoff.pendingFiles?.length))
+  return Boolean(handoff && handoff.exists && (!handoff.empty || handoff.commits.length > 0 || handoff.pendingFiles?.length))
 }
 
 /**
@@ -45,8 +45,11 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
   if (!handoff.exists) return <span className="text-muted-foreground">{handoff.unchanged ? 'no changes' : 'branch gone'}</span>
   // A merged branch reads as empty too — its commits are all on the base, so `base..branch` lists
   // nothing — but "merged" and "no changes" are opposite verdicts, and only one of them is true.
-  if (handoff.empty) return <span className="text-muted-foreground">{handoff.merged ? 'merged' : 'no changes'}</span>
   const commits = `${handoff.commits.length} commit${handoff.commits.length === 1 ? '' : 's'}`
+  // Commits that undo each other leave the files as the base has them. The commits are still what
+  // the agent did, so they are counted, and that nothing is left of them is said beside the count.
+  if (handoff.empty && handoff.commits.length > 0) return <span className="text-muted-foreground">{commits} · no change left</span>
+  if (handoff.empty) return <span className="text-muted-foreground">{handoff.merged ? 'merged' : 'no changes'}</span>
   const files = `${handoff.files.length} file${handoff.files.length === 1 ? '' : 's'}`
   return (
     <span className="flex items-center gap-x-2 whitespace-nowrap text-muted-foreground">
@@ -139,6 +142,9 @@ export function HandoffActions({
   // while the checkout is unclean, and would leave the newest work behind, so Commit comes first.
   const paths = handoff.pendingFiles ?? []
   if (handoff.empty || paths.length > 0) {
+    // Commits that undo each other: there is work, and none of it is left to take. Said, so the
+    // missing button does not read as a fault.
+    if (paths.length === 0 && handoff.commits.length > 0) return <Reason>Nothing to {handoff.hasRemote ? 'publish' : 'merge'}: the commits cancel out.</Reason>
     if (paths.length === 0) return null
     return (
       <>

@@ -26,7 +26,7 @@ import {
 // "· Read  src/app.ts" rather than raw JSON). Some things get special rows:
 //   - The message text: the user's prompt (`driver` `start`) and the agent's reply (`driver` `text`)
 //     render their raw text inline, truncated to one line when long and expanding in place on click
-//     (#476/#520). The prompt carries its own YOU badge so the log reads like a conversation.
+//     (#476/#520). The user's own prompt is a grey box on the right, as in a chat.
 //   - The agent's thinking (`driver` `thought`): one muted "Thinking" line that opens in place.
 //   - Choice gates, when the log knows its project (#1455 item 6): an open gate renders the same
 //     interactive ChoicePanel the rail used to hold, so the question is answered from the flow;
@@ -40,13 +40,13 @@ import {
 //     read off its card, so the row of a working one says what it is doing now; and the prompt
 //     that told the run a subagent ended is a SUBAGENT row too, not a YOU one.
 // The kind badge shows once per agent of same-group rows — a 200-line driver turn used to be 200
-// identical badges (#948). A driver `start` breaks out of the AGENT group so the user's turn gets
-// its own YOU badge. A row at a group boundary shows the time its diary line was written, the same
+// identical badges (#948). A driver `start` breaks out of the AGENT group: the user's turn has no
+// badge, its box says whose it is. A row at a group boundary shows the time its diary line was written, the same
 // live, reloaded or replayed; a line written with no time shows none. Scrolling rides shadcn's Base UI message-scroller (#712): live
 // follows the edge (`autoScroll`) but yields the moment the reader scrolls up, replay renders static
 // from the top, and the "Jump to latest" chip is the scroller's own inert-when-not-scrollable button.
 
-// The conversation text — the user's prompt (YOU) and the agent's reply (AGENT). Both are rendered
+// The conversation text — the user's prompt and the agent's reply (AGENT). Both are rendered
 // as Markdown: the agent writes in Markdown, and a prompt may too.
 function messageText(e: FrameworkEvent): string | null {
   if (e.kind !== 'driver') return null
@@ -65,12 +65,6 @@ function isLong(text: string): boolean {
 function rowGroup(e: FrameworkEvent): string {
   if (e.kind === 'driver') return e.event.type === 'start' ? 'you' : 'agent'
   return e.kind
-}
-
-/** The badge word for a row: the user's prompt reads YOU, everything else its kind label. */
-function rowLabel(e: FrameworkEvent): string {
-  if (e.kind === 'driver' && e.event.type === 'start') return 'you'
-  return eventKindLabel(e.kind)
 }
 
 // A driver `start` opens a fresh prompt turn — the natural anchor the scroller keeps in view.
@@ -93,19 +87,14 @@ function isFailure(e: FrameworkEvent): boolean {
   return e.kind === 'end' && !e.ok && !e.stopped && !e.waiting
 }
 
-/**
- * The row's colour. The user's own turn is blue so it stands out from the agent's work (#1170), a
- * failure is red (#1199), and everything else keeps the muted log tone.
- */
+/** The row's colour: a failure is red (#1199), and everything else keeps the muted log tone. */
 function rowTone(e: FrameworkEvent): string {
-  if (isFailure(e)) return 'text-danger'
-  if (e.kind === 'driver' && e.event.type === 'start') return 'text-info'
-  return ''
+  return isFailure(e) ? 'text-danger' : ''
 }
 
 /**
  * The BADGE's colour: a navigation aid for scanning the log by kind (#1455 follow-up), on top of
- * {@link rowTone}'s semantics (failure red, the reader's own turn blue — those win). Only the
+ * {@link rowTone}'s semantics (failure red, which wins). Only the
  * high-signal kinds get a colour; the bulk of the log stays muted, or every row shouting means
  * none do. The body keeps rowTone: colour the *marker*, not the text.
  *
@@ -126,13 +115,12 @@ function badgeTone(e: FrameworkEvent): string {
 /**
  * The row's BACKGROUND wash (#1508), the layer above {@link badgeTone}'s markers: a tint across
  * the whole line, findable from the scrollbar's distance where a coloured badge word is not.
- * Only the rows the eye actually hunts for get one — the reader's own turns (the log's natural
- * chapter marks), failures, and the agent landing cleanly — and at a whisper of alpha, so the
+ * Only the rows the eye actually hunts for get one — failures, and the agent landing cleanly (the
+ * reader's own turns are boxes already) — and at a whisper of alpha, so the
  * text keeps the contrast and the bulk of the log stays plain canvas.
  */
 function rowWash(e: FrameworkEvent): string {
   if (isFailure(e)) return 'bg-danger/10'
-  if (e.kind === 'driver' && e.event.type === 'start') return 'bg-info/10'
   if (e.kind === 'end' && e.ok) return 'bg-success/10'
   return ''
 }
@@ -286,7 +274,46 @@ function Reply({ text }: { text: string }) {
   )
 }
 
-// A prompt, rendered as compact Markdown. A short one renders as-is. A long one clamps to its
+// More than this many lines, or this many characters, and the user's own message is cut short
+// behind "Show more".
+const PROMPT_LINES = 8
+const PROMPT_CHARS = 600
+
+function isTall(text: string): boolean {
+  return text.length > PROMPT_CHARS || text.trim().split('\n').length > PROMPT_LINES
+}
+
+// The user's own message: a grey box on the right, as Markdown in the page's font. No label says
+// whose it is; the place and the box do. A long one is cut short with "Show more" under it. The
+// time it was sent sits under the box and shows while the pointer is on the message; its line is
+// always there, so nothing moves when it shows.
+function Prompt({ text, at }: { text: string; at: string | undefined }) {
+  const [open, setOpen] = useState(false)
+  const tall = isTall(text)
+  return (
+    <div className="group/prompt flex min-w-0 flex-1 flex-col items-end font-sans text-foreground">
+      <div role="group" aria-label="Your message" className="max-w-[85%] min-w-0 rounded-xl bg-muted px-3.5 py-2">
+        <div className={tall && !open ? 'max-h-40 overflow-hidden' : ''}>
+          <Markdown text={text} />
+        </div>
+        {tall && (
+          <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="mt-1 text-xs text-muted-foreground hover:text-foreground">
+            {open ? 'Show less' : 'Show more'}
+          </button>
+        )}
+      </div>
+      <time
+        dateTime={at}
+        title={at === undefined ? undefined : new Date(at).toLocaleString()}
+        className="h-4 pr-1 text-[10px] tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover/prompt:opacity-100"
+      >
+        {at === undefined ? '' : formatTime(at)}
+      </time>
+    </div>
+  )
+}
+
+// What a run was told about a subagent's end, rendered as compact Markdown. A short one renders as-is. A long one clamps to its
 // first line with a chevron beside it and expands in place on click — the chevron stays on that
 // first line (never a lone chevron on its own row), and the same rendered Markdown just unclamps,
 // so the opening is never shown twice.
@@ -479,6 +506,8 @@ export function EventList({
               // again; the row of a subagent's end goes on that run of SUBAGENT rows instead.
               const chunkHead = !prev || (started.has(i) ? !end : groupOf(prev) !== groupOf(e))
               const at = e.at
+              // The user's own message: a prompt that is not a subagent's end.
+              const own = isTurnBoundary(e) && !end
               return (
                 <Fragment key={idOf(e)}>
                 {passedAbove.get(e)?.map(placeOf)}
@@ -486,21 +515,25 @@ export function EventList({
                 {/* Every row carries the same -mx/px pair so a washed row's band and a plain row's
                     text share the exact same columns; only the background differs. */}
                 <MessageScrollerItem messageId={idOf(e)} scrollAnchor={e === anchor} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${end ? '' : rowWash(e)}`}>
-                  {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("choice resolved") to sit on one line. */}
-                  <span className="w-28 shrink-0">
-                    {chunkHead && (
-                      <Badge className={`mt-0.5 text-[10px] uppercase ${(end ? '' : badgeTone(e)) || 'text-muted-foreground'}`}>{end ? SUBAGENT : rowLabel(e)}</Badge>
-                    )}
-                  </span>
-                  {end ? (
+                  {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("choice resolved") to sit on one line. The user's own message has none: its box takes the row. */}
+                  {!own && (
+                    <span className="w-28 shrink-0">
+                      {chunkHead && (
+                        <Badge className={`mt-0.5 text-[10px] uppercase ${(end ? '' : badgeTone(e)) || 'text-muted-foreground'}`}>{end ? SUBAGENT : eventKindLabel(e.kind)}</Badge>
+                      )}
+                    </span>
+                  )}
+                  {own && message !== null ? (
+                    <Prompt text={message} at={at} />
+                  ) : end ? (
                     // A subagent ended: which one and how, then what the run was told about it.
                     <div className="flex min-w-0 flex-1 flex-col">
                       <SubagentLine agent={end.agent} end={end} onOpen={onOpenAgent} />
                       {end.rest && <Message text={end.rest} />}
                     </div>
                   ) : message !== null ? (
-                    // A reply (AGENT) is shown whole; a prompt (YOU) is collapsed to its first line when long.
-                    e.kind === 'driver' && e.event.type === 'text' ? <Reply text={message} /> : <Message text={message} />
+                    // A reply (AGENT), shown whole.
+                    <Reply text={message} />
                   ) : e.kind === 'driver' && e.event.type === 'thought' ? (
                     <Thought text={e.event.text} />
                   ) : choiceRow && projectId ? (
@@ -529,7 +562,7 @@ export function EventList({
                       {(formatFrameworkEvent(e) ?? '').trim()}
                     </span>
                   )}
-                  {chunkHead && at !== undefined && (
+                  {!own && chunkHead && at !== undefined && (
                     <Tooltip>
                       <TooltipTrigger
                         render={<span className="ml-auto shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground" />}

@@ -19,8 +19,8 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-// The conversation view: the user's prompt is its own YOU row, the agent's reply is AGENT and
-// renders as Markdown, and a long message collapses to its first line (#1035 follow-up).
+// The conversation view: the user's prompt is a grey box on the right with no label, the agent's
+// reply is AGENT and renders as Markdown, and a long prompt is cut short behind "Show more".
 describe('EventList conversation rows', () => {
   test('a quota reading is a row only when the quota is running low or used up', () => {
     const quota = (status: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'rate-limit', limit: { status, window: 'five_hour', resetsAt: Date.UTC(2026, 8, 30, 11, 30) } } })
@@ -41,24 +41,48 @@ describe('EventList conversation rows', () => {
     expect(screen.queryByText('resume')).toBeNull()
   })
 
-  test('a message just sent shows at once as the last prompt, a YOU row of its own', () => {
+  test('a message just sent shows at once as the last prompt, a box of its own', () => {
     const events: FrameworkEvent[] = [
       { kind: 'driver', event: { type: 'start', prompt: 'first' } },
       { kind: 'driver', event: { type: 'text', text: 'done' } },
     ]
     render(<EventList events={events} sending="second" stick={false} />)
-    expect(screen.getByText('second')).toBeTruthy()
-    expect(screen.getAllByText('you')).toHaveLength(2)
+    const boxes = screen.getAllByLabelText('Your message')
+    expect(boxes).toHaveLength(2)
+    expect(boxes[1]!.textContent).toBe('second')
   })
 
-  test('a prompt reads YOU and a reply reads AGENT', () => {
+  test('a prompt is a grey box on the right with no label, and a reply reads AGENT', () => {
     const events: FrameworkEvent[] = [
       { kind: 'driver', event: { type: 'start', prompt: 'what is your name?' } },
       { kind: 'driver', event: { type: 'text', text: 'I am **Claude**.' } },
     ]
     render(<EventList events={events} stick={false} />)
-    expect(screen.getByText('you')).toBeTruthy()
-    expect(screen.getByText('agent')).toBeTruthy()
+    const box = screen.getByLabelText('Your message')
+    expect(box.textContent).toBe('what is your name?')
+    expect(box.className).toContain('bg-muted')
+    expect(box.parentElement!.className).toContain('items-end')
+    expect(box.closest('.font-sans')).toBeTruthy()
+    expect(screen.queryByText('you')).toBeNull()
+    expect(screen.getAllByText('agent')).toHaveLength(1)
+  })
+
+  test("a prompt's time sits under its box, shown while the pointer is on the message, and is no column beside it", () => {
+    const at = '2026-09-25T10:04:05.000Z'
+    render(<EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'hello' }, at }]} stick={false} />)
+    const time = screen.getByText(new Date(at).toLocaleTimeString())
+    expect(time.tagName).toBe('TIME')
+    expect(time.className).toContain('opacity-0')
+    expect(time.className).toContain('group-hover/prompt:opacity-100')
+    expect(time.getAttribute('title')).toBe(new Date(at).toLocaleString())
+    expect(screen.getByLabelText('Your message').parentElement!.contains(time)).toBe(true)
+  })
+
+  test('a message with no time keeps the empty line under its box, so nothing moves when its time comes', () => {
+    render(<EventList events={[]} sending="hello" stick={false} />)
+    const time = screen.getByLabelText('Your message').parentElement!.querySelector('time')!
+    expect(time.textContent).toBe('')
+    expect(time.className).toContain('h-4')
   })
 
   test('a row shows the time its line was written, and a line with no time shows none', () => {
@@ -82,15 +106,25 @@ describe('EventList conversation rows', () => {
     expect(strong?.textContent).toBe('Claude')
   })
 
-  test('a long prompt collapses to its first line and offers to expand', () => {
-    render(<EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'word '.repeat(40) } }]} stick={false} />)
-    expect(screen.getByLabelText('Expand message')).toBeTruthy()
+  test('a long prompt is cut short and offers "Show more", which opens it and turns to "Show less"', () => {
+    render(<EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'word '.repeat(150) + 'end' } }]} stick={false} />)
+    const cut = () => screen.getByText(/end$/).closest('[class*="max-h"]')
+    expect(cut()).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Show more' }))
+    expect(cut()).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Show less' }))
+    expect(cut()).toBeTruthy()
   })
 
-  test('a short prompt renders inline without a collapse control', () => {
-    render(<EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'do it' } }]} stick={false} />)
-    expect(screen.queryByLabelText('Expand message')).toBeNull()
-    expect(screen.getByText('do it')).toBeTruthy()
+  test('a prompt of many short lines is cut short too', () => {
+    render(<EventList events={[{ kind: 'driver', event: { type: 'start', prompt: Array.from({ length: 9 }, (_, n) => `line ${n}`).join('\n') } }]} stick={false} />)
+    expect(screen.getByRole('button', { name: 'Show more' })).toBeTruthy()
+  })
+
+  test('a prompt of a few lines renders whole, with no "Show more"', () => {
+    render(<EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'word '.repeat(40) + 'do it' } }]} stick={false} />)
+    expect(screen.queryByRole('button', { name: /Show more|Show less/ })).toBeNull()
+    expect(screen.getByText(/do it$/).closest('[class*="max-h"]')).toBeNull()
   })
 
   test('a reply is shown whole however long, with no collapse control, in the page\'s font', () => {
@@ -128,8 +162,8 @@ describe('EventList conversation rows', () => {
   })
 })
 
-// Colour carries meaning in the log (#1199/#1170): a failure is red, the reader's own turn is
-// blue, and a stopped agent is neither, since stopping was asked for.
+// Colour carries meaning in the log (#1199): a failure is red, and a stopped agent is not, since
+// stopping was asked for.
 describe('EventList row colour', () => {
   test('an agent error renders in red (#1199)', () => {
     render(<EventList events={[{ kind: 'driver', event: { type: 'error', message: 'rate limited' } }]} stick={false} />)
@@ -162,11 +196,6 @@ describe('EventList row colour', () => {
   test('a finished run is not red (#1199)', () => {
     render(<EventList events={[{ kind: 'end', ok: true }]} stick={false} />)
     expect(screen.getByText(/finished/).className).not.toContain('text-danger')
-  })
-
-  test("the reader's own turn is blue (#1170)", () => {
-    render(<EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'add a search box' } }]} stick={false} />)
-    expect(screen.getByText('you').className).toContain('text-info')
   })
 })
 
@@ -310,13 +339,13 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
 })
 
 // The background wash (#1508): a tint across the whole line for the rows the eye hunts for —
-// the reader's own turns, failures, the clean landing — while the bulk of the log stays plain.
+// failures, the clean landing — while the bulk of the log stays plain.
 describe('EventList row wash (#1508)', () => {
-  test("the reader's own turn gets the blue wash", () => {
+  test("the reader's own turn gets no wash and no blue: its grey box marks it", () => {
     const { container } = render(
       <EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'add a search box' } }]} stick={false} />,
     )
-    expect(container.querySelector('[class*="bg-info/10"]')).toBeTruthy()
+    expect(container.querySelector('[class*="bg-info"], [class*="text-info"]')).toBeNull()
   })
 
   test('an agent-reported error gets the red wash too (#1500)', () => {
@@ -443,14 +472,14 @@ describe('EventList subagent rows', () => {
     expect(opened).toEqual(['2026-10-01T10-01-00-000Z'])
   })
 
-  test('the prompt that told the run its subagent ended is a SUBAGENT row saying how it ended, not a YOU row', () => {
+  test('the prompt that told the run its subagent ended is a SUBAGENT row saying how it ended, not a message the reader wrote', () => {
     const told: FrameworkEvent = {
       kind: 'driver',
       event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.\nIts work is on the branch agent-form.' },
       at: '2026-10-01T10:04:00.000Z',
     }
     render(<EventList events={[...events, told]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' })]} stick={false} />)
-    expect(screen.getAllByText('you')).toHaveLength(1)
+    expect(screen.getAllByLabelText('Your message')).toHaveLength(1)
     expect(screen.getAllByText('subagent')).toHaveLength(2)
     expect(screen.getByText('ended done')).toBeTruthy()
     expect(screen.getByText(/Its work is on the branch agent-form/)).toBeTruthy()
@@ -461,7 +490,7 @@ describe('EventList subagent rows', () => {
     const typed: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'and then?' }, at: '2026-10-01T10:03:30.000Z' }
     const told: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' }, at: '2026-10-01T10:04:00.000Z' }
     render(<EventList events={[...events, typed, told]} subagents={[sub({ status: 'done', endedAt: '2026-10-01T10:03:10.000Z' })]} stick={false} />)
-    expect(screen.getAllByText('you')).toHaveLength(2)
+    expect(screen.getAllByLabelText('Your message')).toHaveLength(2)
     expect(screen.getAllByText('subagent')).toHaveLength(2)
   })
 
@@ -488,10 +517,10 @@ describe('EventList subagent rows', () => {
     expect(screen.getAllByText('agent')).toHaveLength(2)
   })
 
-  test('the same words about a run that is not a subagent of this one stay a YOU row', () => {
+  test('the same words about a run that is not a subagent of this one stay a message the reader wrote', () => {
     const typed: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'The run 2026-10-01T10-01-00-000Z, started for this run, ended done.' } }
     render(<EventList events={[...events, typed]} stick={false} />)
-    expect(screen.getAllByText('you')).toHaveLength(2)
+    expect(screen.getAllByLabelText('Your message')).toHaveLength(2)
     expect(screen.queryByText('subagent')).toBeNull()
   })
 

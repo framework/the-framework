@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentMeta, AgentWorktree, FrameworkEvent } from '../../src/index.js'
 import { onAgent, onAgentsDoing, onRetainedWorktrees } from '../rpc/reads.js'
 import { useLoaded, usePolled } from '../lib/use-async.js'
@@ -15,7 +15,7 @@ import { CloudMirrorRow, CloudAgentNotice } from './CloudAgentNotice.js'
 import { RemoteAgentNotice } from './RemoteAgentNotice.js'
 import { ModuleSlot } from './ModulePageView.js'
 import { useMountedModules } from '../lib/use-modules.js'
-import { Committing, HandoffActions, HandoffSummary, AgentHandoffDetails, isCommitAsk } from './AgentHandoff.js'
+import { Committing, HandoffActions, HandoffSummary, AgentHandoffDetails, handoffSays, isCommitAsk } from './AgentHandoff.js'
 import { AgentDetails, type AgentDetailsCard } from './AgentDetails.js'
 import { QuestionPanel } from './QuestionPanel.js'
 import { SubagentsBar } from './SubagentLine.js'
@@ -268,6 +268,21 @@ export function AgentView({
     if (feedSettled) setSettledFor(agentId)
   }, [feedSettled, agentId])
 
+  // The agent has ended, its subagents too: the next step is offered from here on.
+  const ended = ready && live === false && !going && subagentsRunning === 0
+  // Whether the bar above the message box has something to say: a pull request, a commit going
+  // on, uncommitted changes while the agent works, or, once it has ended and its branch is read,
+  // what the branch holds. An agent that changed nothing has no bar. A bar that is there stays
+  // while the agent works (it committed: its checkout is clean again) and while an ended agent's
+  // branch is still being read, so it never goes and comes back.
+  const lastSay = useRef<{ agentId: string | null; say: boolean }>({ agentId: null, say: false })
+  const held = lastSay.current.agentId === agentId && lastSay.current.say
+  const say =
+    committing ||
+    checkout?.pr !== undefined ||
+    (live === false ? (handoff.loaded ? handoffSays(handoff.handoff) : held) : checkout?.checkout?.dirty === true || held)
+  lastSay.current = { agentId, say }
+
   return (
     <>
       <AgentActionBar
@@ -369,8 +384,9 @@ export function AgentView({
         actions={
           // A run that is working is still writing its branch; the next step is offered once it has ended,
           // and a run whose subagents still work has not: it goes on as each of them ends.
-          committing ? <Committing /> : ready && live === false && !going && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} subagent={subagent} onAsked={onSending} /> : undefined
+          committing ? <Committing /> : ended ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} subagent={subagent} onAsked={onSending} /> : undefined
         }
+        show={say}
       />
       <AgentComposer
         projectId={projectId}

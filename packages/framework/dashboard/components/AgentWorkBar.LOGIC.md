@@ -1,12 +1,12 @@
-The bar above the message box of an agent's [1] page: one row saying where the agent's work is (the project, the agent's branch), what the branch holds, the branch's pull request, and, at the end, the next step [2] as a button, or the words that stand in its place.
+The bar above the message box of an agent's [1] page: one row saying where the agent's work is (the project, the agent's branch), what the branch holds, the branch's pull request, and, at the end, the next step [2] as a button, or the words that stand in its place. The bar is there while there is something to say about the agent's work.
 
 ## Context
 
 **User story**: the user finished reading the agent's last message and is about to type. Right above the box they type in, as Claude Code on the web has it, one row says which project and which branch the work is on, how much the branch holds ("2 commits · 3 files +40 −2"), and offers the one thing to do with it: "Commit", "Open PR", "Publish branch", "Merge" or "Merge PR". The user does not scroll back to the top of the page to find the button.
 
-**Problem**: a row that appears only when there is a button pushes the message box down the moment the agent ends, which is the moment the user is most likely typing in it.
+**User story**: an agent that changed nothing has no bar: a row with nothing to say about the work is in the way of the message box. The bar comes when there is something to say, and the message box moves by the bar's height then; that is accepted.
 
-**Business logic story**: the bar reads nothing itself. The agent's page reads the agent's checkout [3] once and hands it to this bar and to the action bar at the top of the page (`AgentView.tsx`); the page also decides what the summary and the next step are, and hands them in as the bar's two slots.
+**Business logic story**: the bar reads nothing itself. The agent's page reads the agent's checkout [3] once and hands it to this bar and to the action bar at the top of the page (`AgentView.tsx`); the page also decides what the summary and the next step are, hands them in as the bar's two slots, and says whether there is something to say.
 
 ## Glossary
 
@@ -16,8 +16,8 @@ The bar above the message box of an agent's [1] page: one row saying where the a
 
 ## Business logic — TL;DR
 
-- **When the bar is there** - from the moment the agent's branch is known, and from then on in every state; before that, nothing is drawn.
-- **One row, one height** - the row never wraps and never changes height, with a next step or without one, so the message box under it never moves.
+- **When the bar is there** - only while the agent's branch is known and the page says there is something to say: the agent has changes, a pull request or a next step [2]; otherwise nothing is drawn.
+- **One row, one height** - the row never wraps and never changes height, with a next step or without one.
 - **What the row says** - the project's name, the branch, what the branch holds, the pull request link, and at the far end the next step [2] or the words in its place.
 - **What gives up width** - the branch alone is cut with an ellipsis; the project's name is capped; the rest keeps its width.
 
@@ -27,17 +27,22 @@ The bar above the message box of an agent's [1] page: one row saying where the a
 
 #### Context
 
-See the problem in `## Context`.
+See the second user story in `## Context`.
 
 #### Business logic
 
-The bar is drawn once the agent's checkout [3], as the page read it, names a branch. Until that read has answered, and for an agent whose answer names no branch, nothing is drawn: no empty row. Once drawn, the bar stays for the agent's whole life, working or ended. Only what the row says changes.
+The bar is drawn only while both hold:
+
+- the agent's checkout [3], as the page read it, names a branch. Until that read has answered, and for an agent whose answer names no branch, nothing is drawn;
+- the page says there is something to say. The page decides this (`AgentView.tsx`: the agent has changes, a pull request, or a next step [2]); the bar does not look into its slots.
+
+With nothing to say nothing is drawn: no empty row, and neither the summary nor the next step the page handed in is shown.
 
 ### One row, one height
 
 #### Context
 
-See the problem in `## Context`.
+See the first user story in `## Context`.
 
 #### Business logic
 
@@ -47,7 +52,7 @@ The bar is one bordered row with round corners, 2.25rem high, centered at the tr
 
 #### Context
 
-See the user story in `## Context`.
+See the first user story in `## Context`.
 
 #### Business logic
 

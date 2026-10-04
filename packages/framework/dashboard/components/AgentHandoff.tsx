@@ -100,6 +100,17 @@ export function Committing() {
   return <Reason>Committing…</Reason>
 }
 
+/**
+ * Whether an ended agent's branch gives the bar above the message box something to say: work it
+ * holds (commits, changed files, files left uncommitted), work that was landed, or a branch that
+ * is gone with work on it. An agent that changed nothing has nothing said, and so no bar.
+ */
+export function handoffSays(handoff: AgentHandoff | null): boolean {
+  if (!handoff) return false
+  if (handoff.landed) return true
+  return handoff.exists ? handoffExpandable(handoff) : !handoff.unchanged
+}
+
 export function HandoffActions({
   projectId,
   agentId: agentId,

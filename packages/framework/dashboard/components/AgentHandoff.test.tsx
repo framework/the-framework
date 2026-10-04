@@ -10,7 +10,7 @@ const sendMessage = vi.fn(async () => ({ ok: true }) as unknown)
 vi.mock('../rpc/reads.js', () => ({ onAgentHandoff }))
 vi.mock('../rpc/control.js', () => ({ sendOpenPullRequest, sendMerge, sendPush, sendMergeBranch, sendMessage }))
 
-const { HandoffActions, HandoffSummary, AgentHandoffDetails, handoffExpandable } = await import('./AgentHandoff.js')
+const { HandoffActions, HandoffSummary, AgentHandoffDetails, handoffExpandable, handoffSays } = await import('./AgentHandoff.js')
 const { useAgentHandoff } = await import('../lib/use-agent-handoff.js')
 
 /** A handoff for a session that did real work, on a repo with a remote and no PR yet. */
@@ -436,6 +436,19 @@ describe('run handoff (#799)', () => {
     render(<Harness subagent />)
     await waitFor(() => expect(screen.getByText('branch gone')).toBeTruthy())
     expect(screen.queryByText(/nothing to open a PR from/)).toBeNull()
+  })
+
+  test('the bar has something to say for work, landed work and a lost branch, and nothing for an agent that changed nothing', () => {
+    expect(handoffSays(null)).toBe(false)
+    expect(handoffSays(worked as never)).toBe(true)
+    // Nothing committed, nothing left on disk: nothing to say, merged into the base or not.
+    expect(handoffSays({ ...worked, commits: [], files: [], empty: true, merged: true } as never)).toBe(false)
+    expect(handoffSays({ ...worked, commits: [], files: [], empty: true, pendingFiles: ['index.html'] } as never)).toBe(true)
+    // Commits that cancel out are still what the agent did.
+    expect(handoffSays({ ...worked, files: [], empty: true } as never)).toBe(true)
+    expect(handoffSays({ ...worked, exists: false, unchanged: true } as never)).toBe(false)
+    expect(handoffSays({ ...worked, exists: false } as never)).toBe(true)
+    expect(handoffSays({ ...worked, exists: false, landed: true } as never)).toBe(true)
   })
 
   test('nothing is rendered before the first read, so no wrong empty state flashes', () => {

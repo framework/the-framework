@@ -345,5 +345,5 @@ export { SettingsSection, SettingsRow, SettingsSelectRow, type SettingsOption } 
 export { useCodingAgents, type CodingAgent } from '../lib/models.js'
 export { MAX_SPEND_OFFSET } from '../../src/preference-defaults.js'
 export { formatRelative, formatDateTime, formatDuration, formatAge } from '../lib/format-date.js'
-export { usePolled, useLoaded } from '../lib/use-async.js'
+export { usePolled, useLoaded, forgetRemembered } from '../lib/use-async.js'
 export { useAction } from '../lib/use-action.js'

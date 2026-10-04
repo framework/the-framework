@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { cn, formatRelative, useModuleHost, usePolled, type ModulePanelProps } from 'framework/module'
 import type { ProjectTree } from '../src/server.js'
 import type { AgentCommit, AgentTree, FileMark } from '../src/tree.js'
+import { commitKey, commitsKey, projectKey, treeKey } from './keys.js'
 import { readCommit, readCommits, readProject, readTree } from './reads.js'
 import { FilePreviewCard } from './FilePreview.js'
 
@@ -71,14 +72,14 @@ function Line({ children }: { children: string }) {
 
 export function ChangesPanel({ projectId, agentId, activity }: ModulePanelProps) {
   const host = useModuleHost()
-  const { value: projectTree, loaded: projectLoaded } = usePolled<ProjectTree>(agentId ? null : () => readProject(host, projectId), EMPTY_PROJECT, 8_000, [projectId, agentId])
-  const { value: answer, loaded: treeLoaded, reload } = usePolled<AgentTree | null>(agentId ? () => readTree(host, projectId, agentId) : null, null, 8_000, [projectId, agentId])
+  const { value: projectTree, loaded: projectLoaded } = usePolled<ProjectTree>(agentId ? null : () => readProject(host, projectId), EMPTY_PROJECT, 8_000, [projectId, agentId], { remember: projectKey(projectId) })
+  const { value: answer, loaded: treeLoaded, reload } = usePolled<AgentTree | null>(agentId ? () => readTree(host, projectId, agentId) : null, null, 8_000, [projectId, agentId], agentId ? { remember: treeKey(projectId, agentId) } : undefined)
   // A run whose files move as it ends answers pending for a moment: the list it last showed stays.
   const lastTree = useRef<{ agentId: string; tree: AgentTree } | null>(null)
   if (agentId && answer && 'files' in answer) lastTree.current = { agentId, tree: answer }
   const last = lastTree.current
   const runTree = answer?.source === 'pending' && last !== null && last.agentId === agentId ? last.tree : answer
-  const { value: commitsRead, loaded: commitsLoaded, reload: reloadCommits } = usePolled<AgentCommit[]>(agentId ? () => readCommits(host, projectId, agentId) : null, NO_COMMITS, 8_000, [projectId, agentId])
+  const { value: commitsRead, loaded: commitsLoaded, reload: reloadCommits } = usePolled<AgentCommit[]>(agentId ? () => readCommits(host, projectId, agentId) : null, NO_COMMITS, 8_000, [projectId, agentId], agentId ? { remember: commitsKey(projectId, agentId) } : undefined)
   // As with the list of files: while the run's files move as it ends, the commits last read stay.
   const lastCommits = useRef<{ agentId: string; commits: AgentCommit[] } | null>(null)
   if (agentId && commitsLoaded && answer?.source !== 'pending') lastCommits.current = { agentId, commits: commitsRead }
@@ -88,7 +89,7 @@ export function ChangesPanel({ projectId, agentId, activity }: ModulePanelProps)
   const [commitClick, setCommitClick] = useState<{ agentId: string; sha: string } | null>(null)
   const commit = commitClick !== null && commitClick.agentId === agentId ? commits.find(c => c.sha === commitClick.sha) : undefined
   const sha = commit?.sha
-  const { value: commitChanges, loaded: commitLoaded } = usePolled<Record<string, FileMark> | null>(agentId && sha ? () => readCommit(host, projectId, agentId, sha) : null, null, 60_000, [projectId, agentId, sha])
+  const { value: commitChanges, loaded: commitLoaded } = usePolled<Record<string, FileMark> | null>(agentId && sha ? () => readCommit(host, projectId, agentId, sha) : null, null, 60_000, [projectId, agentId, sha], agentId && sha ? { remember: commitKey(projectId, agentId, sha) } : undefined)
   // The agent did something: read again now rather than on the next poll, once per burst.
   useEffect(() => {
     if (activity === undefined) return

@@ -15,4 +15,5 @@ The Files module's browser part: what it adds to the dashboard and the component
 - **A file in a card** (`DiffView.tsx`) - a diff as colored lines and a file as numbered lines.
 - **A working agent's changes** (`AgentChanges.tsx`) - the count in the bar above the message box.
 - **The reads** (`reads.ts`) - the module's server reads, typed, a failed one kept from blanking what is shown.
+- **The names the reads are remembered under** (`keys.ts`) - shared by the two tabs, so a tab shows at once what was read last.
 - **The tests' fake dashboard** (`test-host.tsx`) - every service of the dashboard a spy.

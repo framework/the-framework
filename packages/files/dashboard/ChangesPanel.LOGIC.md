@@ -41,6 +41,7 @@ With an agent [1] selected, the tab reads the agent's tree from the module's ser
 - A caption above the list reads "What this run changed. Merged." when the answer says the agent's work is merged, and "What this run changed. Not merged yet." otherwise.
 - When the answer names no changed file and the agent has no commit, the tab reads "This run changed no files." When it names none but the agent has commits (they undo each other), the tab is drawn with an empty list and the commits, and the place of the diff reads "No change is left: the commits cancel out."
 - Until the first answer arrives, and while the answer is pending, the tab reads "Looking for this run’s changes…". When an agent whose list the tab showed answers pending (its checkout reclaimed as it ends, its branch not read yet), the tab keeps showing the list it had.
+- What the tab last read is remembered under names it shares with the Files tab (`keys.ts`): opened again for the same agent, or after the Files tab read the same agent, it shows that at once while it reads again, with no "Looking for this run’s changes…" in between. An agent never read still shows the line until its own answer.
 - When none of the agent's sources is left on this machine, the tab reads "This run’s changes are gone from this machine: its checkout was reclaimed and it left no branch or merged pull request here."
 
 The project's own files are not read for an agent.

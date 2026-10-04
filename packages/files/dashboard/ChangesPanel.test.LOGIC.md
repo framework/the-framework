@@ -22,3 +22,4 @@ And the agent's commits:
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout".
 - **The commits stay as the run ends** - while the tree read answers pending and the commits read answers none, the three rows and the picked commit's name stay.
 - **Nothing said before the commits are read** - with no changed file and the commits read still out, the panel says "Looking for this run’s changes…", never "This run changed no files."; once the read answers one commit, it says the commits cancel out.
+- **Remembered** - opened again for the same agent with the reads still out, the tab shows the list read last and no "Looking…" line, and reads again; opened for another agent, it shows the "Looking…" line and none of the first agent's files.

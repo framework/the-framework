@@ -4,7 +4,6 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { pendingChoices } from '../lib/live-state.js'
 import { startedBefore, subagentEnd, subagentStartedAt, type SubagentEnd } from '../lib/subagents.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
-import { ChoicePanel } from './ChoicePanel.js'
 import { InlineScreen, isLoopbackScreen } from './InlineScreen.js'
 import { Markdown } from './Markdown.js'
 import { SessionLine, type SessionSetup } from './SessionLine.js'
@@ -28,9 +27,9 @@ import {
 //     (#476/#520). The user's own prompt is a grey box on the right, as in a chat.
 //   - The agent's steps between two messages (`driver` `action` and `thought`): one folded line
 //     for the whole run of them (ToolCalls), opening to one line per step.
-//   - Choice gates, when the log knows its project (#1455 item 6): an open gate renders the same
-//     interactive ChoicePanel the rail used to hold, so the question is answered from the flow;
-//     a resolved one collapses to the AnsweredChoice ✓ card and hides its "✓ chose" line.
+//   - Choice gates, when the log knows its project: an open gate is no row (the agent's page asks
+//     it above the message box); a resolved one collapses to the AnsweredChoice ✓ card and hides
+//     its "✓ chose" line.
 //   - Screens: the newest open `screen` line at an address, before the run's end, is the live
 //     screen itself (InlineScreen); an earlier one stays its one line, and an `ended` one is hidden.
 //   - A turn's end and the spend so far are not rows, and neither is a clean end the run went on
@@ -126,21 +125,17 @@ function formatTime(at: string): string {
   return new Date(at).toLocaleTimeString()
 }
 
-/** How a special `choice` row renders (#1455 item 6): the still-open gate is the interactive
- *  panel, a resolved one the collapsed ✓ card. Rows not in the map keep the formatter's text. */
-type ChoiceRow =
-  | { render: 'open'; choice: ChoiceRequest; active: boolean }
-  | { render: 'answered'; choice: ChoiceRequest; pick: string | readonly string[] }
+/** An answered gate's row: the collapsed ✓ card of the question and what was picked. */
+type ChoiceRow = { choice: ChoiceRequest; pick: string | readonly string[] }
 
 /**
- * A transcript entry that represents an interaction should BE the interaction (#1455 item 6):
- * fold the log's choice traffic into per-row render states.
+ * Fold the log's choice traffic: which gates are a ✓ card, and which lines are no row.
  *
  * Only the LAST firing of a gate id is special — `pendingChoices` replaces a re-fired gate in
  * place, so an earlier firing is history and keeps its text. An open gate (no resolution, no
- * `end` after it) renders the same ChoicePanel the rail rendered; a resolved one collapses to
- * the ✓ card, and the `choice-resolved` line that told its story is hidden — the card says it
- * better. A gate closed by `end` without an answer (#1359: its audience is gone) stays text —
+ * `end` after it) is no row: the question is asked above the message box (QuestionPanel), not
+ * in the flow. A resolved one collapses to the ✓ card, and the `choice-resolved` line that told
+ * its story is hidden — the card says it better. A gate closed by `end` without an answer (#1359: its audience is gone) stays text —
  * a control nobody reads must not look answerable. Earlier firings' "✓ chose" lines stay put:
  * they are the only record of a superseded decision.
  */
@@ -157,17 +152,15 @@ function foldChoiceRows(events: FrameworkEvent[]): {
     else if (e.kind === 'choice-resolved') lastResolved.set(e.id, { e, at })
   })
   const open = new Set(pendingChoices(events).map(c => c.id))
-  let newestOpen: FrameworkEvent | undefined
-  for (const [id, firing] of lastFiring) if (open.has(id)) newestOpen = firing.e
   for (const [id, firing] of lastFiring) {
     const { kind: _kind, ...choice } = firing.e as { kind: 'choice' } & ChoiceRequest
     const resolved = lastResolved.get(id)
     if (open.has(id)) {
-      rows.set(firing.e, { render: 'open', choice, active: firing.e === newestOpen })
+      hidden.add(firing.e)
     } else if (resolved && resolved.at > firing.at) {
       // A resolution from BEFORE this firing answered an earlier gate, not this one — a gate
       // re-fired and then closed by `end` must not wear a pick it never received.
-      rows.set(firing.e, { render: 'answered', choice, pick: resolved.e.picked })
+      rows.set(firing.e, { choice, pick: resolved.e.picked })
       hidden.add(resolved.e)
     }
   }
@@ -402,7 +395,6 @@ export function EventList({
   openAt,
   tail,
   projectId,
-  agentId: agentId,
   subagents = NO_SUBAGENTS,
   doing = NOTHING_DOING,
   going = false,
@@ -426,12 +418,10 @@ export function EventList({
   /** Pinned after the last row, inside the scroller (#1265): the log's "and then…" — a web agent's
    *  live mirror box — that must scroll (and stick) with the log rather than float over it. */
   tail?: ReactNode
-  /** The log's own project (#1455 item 6): with it, a `choice` row IS the interaction — an open
-   *  gate renders the inline ChoicePanel, a resolved one the collapsed ✓ card. Without it, every
-   *  row keeps the formatter's text. */
+  /** The log's own project: with it, an open gate is no row (its page asks the question above
+   *  the message box) and a resolved one is the collapsed ✓ card. Without it, every `choice` row
+   *  keeps the formatter's text. */
   projectId?: string | undefined
-  /** Which run an inline pick resolves (#749), forwarded to the panel with projectId. */
-  agentId?: string | null | undefined
   /** The runs started for this run, oldest first: each gets a row where it was started. */
   subagents?: readonly AgentMeta[]
   /** What each working subagent is doing now, by id. */
@@ -553,22 +543,10 @@ export function EventList({
                     <Reply text={message} />
                   ) : steps.has(e) ? (
                     <ToolCalls steps={steps.get(e)!} />
-                  ) : choiceRow && projectId ? (
-                    // The interaction itself, in the flow (#1455 item 6). font-sans: these are
-                    // controls, not log text, so they drop the log's mono.
+                  ) : choiceRow ? (
+                    // What was asked and what was picked. font-sans: a card, not log text.
                     <div className="min-w-0 flex-1 font-sans">
-                      {choiceRow.render === 'open' ? (
-                        <ChoicePanel
-                          key={choiceRow.choice.id}
-                          inline
-                          projectId={projectId}
-                          agentId={agentId}
-                          choice={choiceRow.choice}
-                          active={choiceRow.active}
-                        />
-                      ) : (
-                        <AnsweredChoice choice={choiceRow.choice} pick={choiceRow.pick} />
-                      )}
+                      <AnsweredChoice choice={choiceRow.choice} pick={choiceRow.pick} />
                     </div>
                   ) : e.kind === 'screen' && screenRows.live.has(e) ? (
                     <div className="min-w-0 flex-1 font-sans">

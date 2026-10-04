@@ -31,13 +31,13 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 - **The message being written grows in place** - while the agent writes a message, it is one more agent row after the last, drawn as a finished reply is; when the whole message arrives, its own row replaces it and nothing moves.
 - **A turn's end and the spend are not rows** - the end of each turn [7] and the spend so far are left out: the agent's details strip counts the turns and totals the spend.
 - **An end the agent went on after is not a row** - a clean end, or an end waiting on an answer, that a later prompt follows is left out, and so is the last clean end while the caller says the agent's job is still going; a failed or stopped end stays where it happened.
-- **The question's block is not shown** - the JSON block an agent writes to ask is left out of the reply a gate [4] follows, and out of the message being written: the gate's card is the question.
+- **The question's block is not shown** - the JSON block an agent writes to ask is left out of the reply a gate [4] follows, and out of the message being written: the panel above the message box is the question.
 - **The session id is not a row** - the coding agent's session id update is plumbing, not conversation: it is left out of the list, and the run's menu reads it from the events.
 - **The quota only when it matters** - the coding agent reports the account's quota after every turn; a reading that is `allowed` is left out of the list, and one running low or used up is a row.
 - **The agent's steps are one folded line** - a run of tool calls and thoughts with no other row between them is one row, a folded line counting the calls; a thought is no row, and thoughts with no call among them show nowhere.
 - **The session line under the first prompt** - when the caller says what was set up for the agent, a folded "Session set up" line sits right under the first prompt, or first when the transcript has no prompt.
 - **The first prompt opens the transcript** - the first prompt is hoisted above the rows emitted before it, so the transcript starts with what the user asked.
-- **A gate is answered where it happened** - when the transcript knows its project, an open gate [4] renders as the interactive gate panel inline, an answered one as a collapsed card that replaces its "✓ chose" line, and a gate whose agent ended unanswered stays text.
+- **A gate is a card once answered** - when the transcript knows its project, an open gate [4] is no row (the agent's page asks it above the message box), an answered one is a collapsed card that replaces its "✓ chose" line, and a gate whose agent ended unanswered stays text.
 - **A screen is live where the agent used it** - the newest `screen` line at an address, on this machine's loopback and with neither an `ended` line for that address nor the agent's end after it (an end waiting on an answer does not count), is the live page itself, framed in the transcript; an earlier or ended one stays its one line, and every `ended` line is hidden.
 - **A subagent has a row where it was started** - when the transcript is given the agent's subagents [16], each has a row before the first row written after it started: its task, then what it is doing now or how it ended, read off the subagent's card so the row changes in place.
 - **A subagent's end is not the user's prompt** - the prompt that told the agent one of its subagents ended is a row about the subagent saying `ended <status>`, with the rest of the message folded under it, not a grey box of the user's.
@@ -107,14 +107,14 @@ A failed or stopped end is always a row, where it happened: it says why the next
 
 #### Context
 
-**User story**: the agent asks "What color do you prefer?" with four options. The user reads the question once, as a card with four buttons.
+**User story**: the agent asks "What color do you prefer?" with four options. The user reads the question once, in the panel above the message box.
 
-**Problem**: an agent asks by ending its reply with a fenced block tagged `await-choices` that holds the question as JSON. The transcript shows replies as written, so the user saw the raw JSON and then the card saying the same thing.
+**Problem**: an agent asks by ending its reply with a fenced block tagged `await-choices` that holds the question as JSON. The transcript shows replies as written, so the user saw the raw JSON and then the question saying the same thing.
 
 #### Business logic
 
 - The reply a gate [4] follows is shown without its `await-choices` blocks. In each turn [7], that is the agent's last reply before the gate: a gate in a later turn is not about a reply of the turn before, and a reply earlier in the same turn than the last one is not it either. What the agent wrote around the block stays.
-- When nothing is left, the reply was only the block, and it is no row at all: the gate's card stands alone.
+- When nothing is left, the reply was only the block, and it is no row at all: the question's panel stands alone.
 - A reply no gate follows keeps its block as written. A block that did not parse makes no gate, and the raw block is how the user sees that the agent tried to ask.
 - The message being written is shown without the block too, from the block's opening fence on while its closing fence has not arrived. While nothing else is written, the "working" line shows instead.
 
@@ -156,21 +156,21 @@ The caller may hand the transcript what was set up for the agent (the agent view
 
 The first prompt row is moved to the top of the transcript, above the rows emitted before it; those rows keep their order after it. Only the first prompt moves: a later prompt is part of the conversation and stays where it happened. When the first prompt is already the first row, or there is no prompt, nothing moves.
 
-### A gate is answered where it happened
+### A gate is a card once answered
 
 #### Context
 
-**User story**: the agent's turn ends on a gate [4] and the agent ends waiting on it; the user reads the question in the flow of the transcript, answers it there, and later sees what was chosen in place of the question.
+**User story**: the agent's turn ends on a gate [4] and the agent ends waiting on it. The user answers the question in the panel above the message box (`QuestionPanel.tsx`), as on Claude Code on the web, and later sees in the transcript what was asked and what was chosen, at the place it was asked.
 
-**Problem**: a pick [10] can only be resolved when the transcript knows which project and agent the gate belongs to; a transcript rendered without that knowledge must not show a control that answers nothing.
+**Problem**: a transcript rendered without knowing its project has no page asking the question for it; there the question must stay readable as text.
 
 #### Business logic
 
 Gate rows get special treatment only when the transcript knows its project. For every gate id, only its last firing is special: an earlier firing of the same id is history and keeps its text (the terminal's "? <title>" line followed by the options), and the "✓ chose …" line that answered it stays, as the only record of a superseded decision. The last firing renders as follows:
 
-- The gate is open (the rule in `lib/live-state.ts`): the agent has not gone on since it asked, and it has not ended for good — an agent that ended WAITING on the gate keeps it open, since the answer resumes it: the row is the same interactive gate panel the right rail shows (`ChoicePanel.tsx`), inline, and the newest open gate is the active one.
+- The gate is open (the rule in `lib/live-state.ts`): the agent has not gone on since it asked, and it has not ended for good — an agent that ended WAITING on the gate keeps it open, since the answer resumes it: the gate is no row at all. The agent's page asks the question in the panel above the message box (`AgentView.tsx`), so the transcript does not say it a second time.
 - A pick answered the gate after this firing: the row collapses to the answered card (`AnsweredChoice.tsx`) showing the pick, and the "✓ chose …" line that reported the pick is hidden because the card says it.
-- The agent ended for good (done, stopped, failed) without the gate being answered, or went on past it with no recorded pick: the row stays plain text, so nobody sees an answerable control whose agent is gone. A pick recorded before this firing belongs to an earlier firing and does not count as this one's answer.
+- The agent ended for good (done, stopped, failed) without the gate being answered, or went on past it with no recorded pick (the user answered in their own words, or skipped): the row is plain text, the question and its options, and the user's message that followed it is the next row. A pick recorded before this firing belongs to an earlier firing and does not count as this one's answer.
 
 Without a project, every gate row keeps its text.
 

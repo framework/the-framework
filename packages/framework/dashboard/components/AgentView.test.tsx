@@ -350,6 +350,43 @@ describe('what the modules add to a run’s page (#817)', () => {
   })
 })
 
+// The question an agent stopped on is asked above the message box, not in the chat.
+describe('a question the agent stopped on', () => {
+  const asked = [
+    { kind: 'driver', event: { type: 'start', prompt: 'Pick a database' } },
+    { kind: 'driver', event: { type: 'text', text: 'Two would do.' } },
+    { kind: 'choice', id: 'await-choices', title: 'Which database?', options: [{ id: 'pg', label: 'Postgres' }, { id: 'lite', label: 'SQLite' }], recommended: 'pg' },
+    { kind: 'end', ok: false, waiting: true },
+  ] as FrameworkEvent[]
+
+  test('it is a panel above the message box, and the chat holds no question row', async () => {
+    onAgent.mockResolvedValue(asked)
+    render(view({ events: asked }))
+    const panel = await screen.findByRole('region', { name: 'Which database?' })
+    expect(panel.compareDocumentPosition(screen.getByTestId('composer-live')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByLabelText('Agent output').contains(panel)).toBe(false)
+    expect(screen.getByLabelText('Agent output').textContent).not.toContain('Which database?')
+  })
+
+  test('an answer in one\'s own words shows in the chat at once, as the message it is', async () => {
+    onAgent.mockResolvedValue(asked)
+    render(view({ events: asked }))
+    fireEvent.change(await screen.findByLabelText('Other'), { target: { value: 'MySQL' } })
+    fireEvent.focus(screen.getByLabelText('Other'))
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith('p1', 'MySQL', 'run-1'))
+    await waitFor(() => expect(screen.getAllByLabelText('Your message').at(-1)!.textContent).toBe('MySQL'))
+  })
+
+  test('once the agent has gone on, the panel is gone', async () => {
+    const on = [...asked, { kind: 'driver', event: { type: 'start', prompt: 'MySQL' } }] as FrameworkEvent[]
+    onAgent.mockResolvedValue(on)
+    render(view({ events: on, live: true }))
+    await waitFor(() => expect(screen.getAllByLabelText('Your message')).toHaveLength(2))
+    expect(screen.queryByRole('region', { name: 'Which database?' })).toBeNull()
+  })
+})
+
 // A run just started writes its prompt line seconds later: the page shows it at once, and says it is starting.
 describe('a run just started', () => {
   test('its prompt shows before any event, with "Starting…" under it, until its own prompt line arrives', () => {

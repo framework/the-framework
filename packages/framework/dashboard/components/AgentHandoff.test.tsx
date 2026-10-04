@@ -153,6 +153,31 @@ describe('run handoff (#799)', () => {
     expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull()
   })
 
+  test('uncommitted work on top of commits gets Commit first: no merge, no publish, until the checkout is clean', async () => {
+    // The agent committed, was asked for more, and left that uncommitted.
+    onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false, base: 'main', pendingFiles: ['index.html'] })
+    render(<Harness open={false} />)
+    await waitFor(() => expect(screen.getByText('index.html left uncommitted.')).toBeTruthy())
+    expect(screen.queryByText(/Nothing committed/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Merge' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }))
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledWith('p1', 'Commit your work.', 'run-1'))
+    cleanup()
+
+    // With a remote and a git host too: Commit, not Open PR.
+    onAgentHandoff.mockResolvedValue({ ...worked, pendingFiles: ['index.html'] })
+    render(<Harness open={false} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Commit' })).toBeTruthy())
+    expect(screen.queryByText('Open PR')).toBeNull()
+    cleanup()
+
+    // Clean again: the next step is back.
+    onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false, base: 'main' })
+    render(<Harness open={false} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Merge' })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull()
+  })
+
   test('past two uncommitted files the rest are counted, and the hover carries them all (#1173)', async () => {
     const pendingFiles = ['a.ts', 'b.ts', 'c.ts', 'd.ts']
     onAgentHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true, pendingFiles })

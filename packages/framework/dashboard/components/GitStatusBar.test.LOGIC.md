@@ -18,3 +18,4 @@ What the tests cover, for the line of git facts about the checkout [1] in play:
 [1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout".
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 - **The chevron comes first** - with a disclosure, the chevron is drawn before the name while the facts are still out; without one, no chevron is drawn.
+- **The state does not wait for the checkout** - an agent's line with no checkout answer yet shows the name and the state; clean or dirty joins them when the answer is in; while the caller says not ready, the name alone. The project's own line shows nothing until its read answers.

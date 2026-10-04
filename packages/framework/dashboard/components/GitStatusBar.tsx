@@ -100,7 +100,10 @@ export function GitStatusBar({
       />
     )
 
-  if (!status || !ready) {
+  // An agent's line waits only for `ready`, not for its checkout's answer: its status word is known
+  // before its checkout is read, and a new agent's checkout is read up to ten seconds after it
+  // starts. Until that answer the line says the name and the word, and nothing of the checkout.
+  if (!ready || (!status && !agentId)) {
     if (!title) return null
     // Laid out as the disclosure below is (chevron, then name, same gap), so the facts landing
     // beside the name is the only change.
@@ -119,9 +122,9 @@ export function GitStatusBar({
 
   // A session's facts are its own checkout's while it has one; once that is gone, only its
   // recorded branch and PR, and no tree to be clean or dirty.
-  const checkout = agentId ? (status as AgentWorktree).checkout : undefined
+  const checkout = agentId ? (status as AgentWorktree | null)?.checkout : undefined
   const dirty = agentId ? checkout?.dirty : (status as GitStatus).dirty
-  const branch = status.branch
+  const branch = status?.branch
   const size = formatBytes(checkout?.sizeBytes, '')
   // A session's checkout is the agent's tree, so uncommitted work there is the agent's; on the
   // project's own checkout it is the user's. Same dot, honest wording.
@@ -193,7 +196,7 @@ export function GitStatusBar({
       ) : (
         facts
       )}
-      {!label && !agentId && status.pr && (
+      {!label && !agentId && status?.pr && (
         <Tooltip>
           <TooltipTrigger
             render={

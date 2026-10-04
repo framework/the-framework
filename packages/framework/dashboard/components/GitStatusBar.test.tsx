@@ -153,6 +153,22 @@ describe('GitStatusBar (#809)', () => {
     expect(screen.queryByText('dirty')).toBeNull()
   })
 
+  test("an agent's status word does not wait for its checkout to be read: the name and the word show, and clean or dirty comes after", () => {
+    const { container, rerender } = render(<GitStatusBar projectId="p1" agentId="run-1" inline label="Dark mode" checkout={null} agentState={<span>building…</span>} />)
+    expect(container.textContent).toBe('Dark modebuilding…')
+    rerender(<GitStatusBar projectId="p1" agentId="run-1" inline label="Dark mode" checkout={{ checkout: { path: '/w', dirty: true }, branch: 'b' }} agentState={<span>building…</span>} />)
+    expect(container.textContent).toBe('Dark modebuilding…dirty')
+    // Not ready: the name alone, as before.
+    rerender(<GitStatusBar projectId="p1" agentId="run-1" inline label="Dark mode" checkout={null} ready={false} agentState={<span>building…</span>} />)
+    expect(container.textContent).toBe('Dark mode')
+  })
+
+  test("the project's line still waits for its own read", () => {
+    onGitStatus.mockReturnValue(new Promise(() => {}) as never)
+    const { container } = render(<GitStatusBar projectId="p1" />)
+    expect(container.textContent).toBe('')
+  })
+
   test('nothing renders when there is no checkout to report', async () => {
     onAgentWorktree.mockResolvedValue(null)
     const { container } = render(<GitStatusBar projectId="p1" agentId="gone" inline />)

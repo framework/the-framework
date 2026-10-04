@@ -48,6 +48,8 @@ A caller that already read the checkout hands it to the line, or says that its r
 
 The caller can also hold the facts back while its own facts about the agent are still being read (the agent's page does, see `AgentView.tsx`): until it says they are ready, the name and breadcrumb show alone, so the whole line of facts appears together rather than in pieces.
 
+An agent's [2] line does not wait for its checkout's answer once the caller says the facts are ready: it shows the name and the agent's state at once, and clean or dirty, and the size, when the checkout has answered. A new agent's checkout is read up to ten seconds after it starts, and its state ("building…") is known long before; waiting for the checkout left the line with the name alone for those seconds. The project's own line still shows nothing until its read has answered.
+
 ### The agent's name, or the branch
 
 #### Context

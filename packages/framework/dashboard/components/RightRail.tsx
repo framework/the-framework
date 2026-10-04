@@ -12,7 +12,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
 import { usePolled } from '../lib/use-async.js'
 import { onDocs } from '../rpc/reads.js'
-import { setSidePanelOpen, useSidePanelOpen } from '../lib/side-panel.js'
+import { setSidePanelOpen, sidePanelName, useSidePanelOpen } from '../lib/side-panel.js'
 import { PanelRightClose, PanelRightOpen } from 'lucide-react'
 
 /** The rail's own tabs, and a module's tab by its package and id. */
@@ -34,7 +34,8 @@ const TABS: Record<'views' | 'docs', { label: string; help: string }> = {
 // shell; docs are an RPC read of the selected project. The rail jumps to a fresh first view; choice gates live inline in the
 // transcript now (#1455 items 6/7), so nothing here pulls focus for them.
 //
-// The rail is closed until the person opens it (`lib/side-panel.ts` remembers which): closed, it is
+// The rail is closed until the person opens it, on each agent's page and on the "New agent" page
+// apart (`lib/side-panel.ts` remembers which are open): closed, it is
 // a narrow strip holding one button at the top right of the page; open, it is half the page wide,
 // and the same button, at the end of the tabs, closes it. A closed rail renders no panel, so nothing in it reads anything.
 export function RightRail({
@@ -96,7 +97,8 @@ export function RightRail({
   // 2), the tab is withheld outright.
   const hasDocs = !docsInMain && (docsLoaded ? docs.length > 0 : panels.length === 0 && views.length === 0)
 
-  const open = useSidePanelOpen()
+  const panelName = sidePanelName(projectId ?? '', agentId)
+  const open = useSidePanelOpen(panelName)
   const [tab, setTab] = useState<Tab>('docs')
   // Once the user picks a tab, stop auto-defaulting (#695/U22) — only a genuinely new choice
   // gate or the first view may still pull focus after that.
@@ -134,7 +136,7 @@ export function RightRail({
   if (tabs.length === 0) return null
   const toggle = (
     <Tooltip>
-      <TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="h-7 w-7 shrink-0" aria-label={open ? 'Close the side panel' : 'Open the side panel'} aria-expanded={open} onClick={() => setSidePanelOpen(!open)} />}>
+      <TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="h-7 w-7 shrink-0" aria-label={open ? 'Close the side panel' : 'Open the side panel'} aria-expanded={open} onClick={() => setSidePanelOpen(panelName, !open)} />}>
         {open ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
       </TooltipTrigger>
       <TooltipContent>{open ? 'Close the side panel' : `Open the side panel: ${tabs.map(t => panels.find(panel => panelTab(panel) === t)?.label ?? TABS[t as 'views' | 'docs'].label).join(', ')}`}</TooltipContent>

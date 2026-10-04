@@ -42,8 +42,9 @@ function render(ui: ReactElement, panels: MountedPanel[] = [FILES]) {
 }
 
 beforeEach(() => {
-  // Open, as the person left it: the tests below are about what an open rail shows.
-  localStorage.setItem('fw.side-panel', 'open')
+  // Open, as the person left it, on the agent's page and on the "New agent" page: the tests below
+  // are about what an open rail shows.
+  localStorage.setItem('fw.side-panel', JSON.stringify(['p1/r1', 'new']))
   forgetRemembered()
   onDocs.mockReset().mockResolvedValue([{ name: 'PLAN.md', content: '# plan' }])
 })
@@ -233,7 +234,7 @@ describe('RightRail module tabs (#492)', () => {
 })
 
 describe('RightRail open and closed', () => {
-  test('it is closed until opened: one button, no tab and no panel; the button opens it and the browser remembers', async () => {
+  test('it is closed until opened: one button, no tab and no panel; the button opens it and the browser remembers it for this agent', async () => {
     localStorage.removeItem('fw.side-panel')
     shown.mockClear()
     const { unmount } = render(<RightRail {...baseProps} />)
@@ -246,11 +247,38 @@ describe('RightRail open and closed', () => {
     fireEvent.click(opener)
     expect(screen.getByRole('tab', { name: /Files/ })).toBeTruthy()
     expect(screen.getByText('files')).toBeTruthy()
-    expect(localStorage.getItem('fw.side-panel')).toBe('open')
-    // Another page, later: open from the first frame.
+    expect(localStorage.getItem('fw.side-panel')).toBe('["p1/r1"]')
+    // The same agent's page, later: open from the first frame.
     unmount()
     render(<RightRail {...baseProps} />)
     expect(screen.getByRole('tab', { name: /Files/ })).toBeTruthy()
+  })
+
+  test('another agent starts closed, and coming back the first is as it was left', () => {
+    localStorage.removeItem('fw.side-panel')
+    const { rerender } = render(<RightRail {...baseProps} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open the side panel' }))
+    rerender(<RightRail {...baseProps} agentId="r2" />)
+    expect(screen.getByRole('button', { name: 'Open the side panel' })).toBeTruthy()
+    expect(screen.queryByRole('tab')).toBeNull()
+    rerender(<RightRail {...baseProps} />)
+    expect(screen.getByRole('button', { name: 'Close the side panel' })).toBeTruthy()
+    // Closing it on the other agent's page leaves this one open.
+    rerender(<RightRail {...baseProps} agentId="r2" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open the side panel' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close the side panel' }))
+    expect(localStorage.getItem('fw.side-panel')).toBe('["p1/r1"]')
+  })
+
+  test('the "New agent" page has its own, whatever the project', () => {
+    localStorage.removeItem('fw.side-panel')
+    const { rerender } = render(<RightRail {...baseProps} agentId={null} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open the side panel' }))
+    expect(localStorage.getItem('fw.side-panel')).toBe('["new"]')
+    rerender(<RightRail {...baseProps} />)
+    expect(screen.getByRole('button', { name: 'Open the side panel' })).toBeTruthy()
+    rerender(<RightRail {...baseProps} agentId={null} />)
+    expect(screen.getByRole('button', { name: 'Close the side panel' })).toBeTruthy()
   })
 
   test('open, the same button closes it, and that is remembered too', () => {
@@ -258,7 +286,7 @@ describe('RightRail open and closed', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close the side panel' }))
     expect(screen.queryByRole('tab')).toBeNull()
     expect(screen.getByRole('button', { name: 'Open the side panel' })).toBeTruthy()
-    expect(localStorage.getItem('fw.side-panel')).toBeNull()
+    expect(localStorage.getItem('fw.side-panel')).toBe('["new"]')
   })
 
   test('with no tab to show there is no button either', async () => {

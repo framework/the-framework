@@ -9,7 +9,7 @@ What the tests cover, for the dashboard's right rail, with a stand-in for the Fi
 - **A panel that loses its content hands over** - when the tab the user picked by hand stops existing, the rail selects the first tab that still has content (the module's "Files" tab) instead of showing an empty panel.
 
 - **A module's tab** - comes first and is open by default; it is given the project, the agent [2] whose page this is, and the Context's files only, without a project path the launcher put in the Context, and its label counts those files; a project that does not have the module shows no tab of it; a tab that throws shows its own error line while the rest of the rail stays.
-- **Open and closed** - with nothing remembered the rail is one button, with no tab and no panel, and its module's tab is not drawn at all; the button opens the rail and the browser remembers it, so the next page shows it open from the start; open, the same button closes it and that is remembered too; with no tab to show there is no button. The other tests run on an open rail.
+- **Open and closed** - with nothing remembered the rail is one button, with no tab and no panel, and its module's tab is not drawn at all; the button opens the rail and the browser remembers it for that agent, so that agent's page shows it open from the start the next time; another agent's page starts closed, and closing the rail there leaves the first agent's open; the "New agent" page has its own answer, apart from every agent's; open, the same button closes it and that is remembered too; with no tab to show there is no button. The other tests run on an open rail.
 
 ## Glossary
 

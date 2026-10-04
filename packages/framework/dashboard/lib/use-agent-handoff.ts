@@ -16,9 +16,9 @@ export type AgentHandoffState = {
   act: (which: 'pr' | 'merge' | 'push' | 'merge-branch' | 'commit', fn: () => Promise<unknown>, fallback: string) => void
 }
 
-// The handoff read lifted out of its panel: the same answer now feeds two places — the summary and
-// the actions in the agent's action bar, and the commits/files detail the bar expands. Reading it
-// once keeps them from disagreeing and halves the polling.
+// The handoff read lifted out of its panel: the same answer feeds two places in the bar above the
+// message box, the summary and the actions. Reading it once keeps them from disagreeing and halves
+// the polling.
 /**
  * How soon to ask again while the daemon's pull request lookup is still out: the answer lands in
  * well under a second, and the bar says nothing about the branch until it has.

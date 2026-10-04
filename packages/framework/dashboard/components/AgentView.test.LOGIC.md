@@ -37,9 +37,13 @@ And when the feed fills in, on a first visit:
 
 And what the installed modules add to an agent's page:
 
-- **A working agent** - shows each module's summary in the bar above the message box and its details, both told the agent and that it is working, the summary also that the action bar is closed.
-- **An ended agent** - once the read of what its branch holds has answered, the modules' summary is gone from the bar above the message box, and the details stay, told the agent is not working.
-- **A project without the module** - gets neither.
+- **A working agent** - shows each module's summary in the bar above the message box, told the agent and that it is working.
+- **An ended agent** - once the read of what its branch holds has answered, the modules' summary is gone from the bar above the message box.
+- **A project without the module** - gets no summary.
+
+And what the action bar's disclosure opens:
+
+- **The details strip alone** - for an ended agent whose branch holds a commit, the opened disclosure shows the details strip, which is not there while closed, and no "Commits" or "Changed files" list.
 
 - **A continued agent reads as going** - an ended agent's feed gets a new segment: the composer is told the agent is live; the archive is read again and holds the same lines, the list still saying ended: still live; the segment's end arrives: not live. An ended agent whose archive holds a segment with no end, shown from the first read, is not live.
 - **While the agent commits** - an ended agent that left a file uncommitted: "Commit" pressed shows "Commit your work." in the feed and "Committing…" in the button's place, with no button, while the send is out; a refused send brings the button back and the line goes. A working agent whose last prompt is the ask, alone or with a publish sentence after it, says "Committing…"; one whose last prompt only begins with the same words says nothing; once the turn ends the button is back. While the ended agent's checkout is cleaned up and until its branch is read again, "Committing…" stays, the old "Commit" button never returns, and the new next step takes the line's place.

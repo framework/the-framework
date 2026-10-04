@@ -36,8 +36,9 @@ vi.mock('../lib/preferences.js', () => ({
 // The `actions` and `summary` slots of the bar above the message box ARE rendered, so the handoff
 // cluster and the modules' summaries stay reachable.
 vi.mock('./AgentActionBar.js', () => ({
-  AgentActionBar: ({ ready, checkout }: { ready?: boolean; checkout: unknown }) => (
+  AgentActionBar: ({ ready, checkout, onToggle }: { ready?: boolean; checkout: unknown; onToggle?: () => void }) => (
     <>
+      <button type="button" onClick={onToggle}>details</button>
       <span data-testid="bar-ready">{String(ready)}</span>
       <span data-testid="bar-checkout">{JSON.stringify(checkout)}</span>
     </>
@@ -406,30 +407,42 @@ describe('the feed fills in one step (first visit)', () => {
 })
 
 describe('what the modules add to a run’s page (#817)', () => {
-  const Summary = ({ agentId, working, expanded }: ModuleRunProps) => <span>summary {agentId} {String(working)} {String(expanded)}</span>
-  const Details = ({ agentId, working }: ModuleRunProps) => <span>details {agentId} {String(working)}</span>
+  const Summary = ({ agentId, working }: ModuleRunProps) => <span>summary {agentId} {String(working)}</span>
   const withSlots = (ui: ReactNode, projects = ['p1']) => {
-    const modules: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [{ summary: Summary, details: Details, package: '@gemstack/files', projects }], settings: [], loaded: true }
+    const modules: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [{ summary: Summary, package: '@gemstack/files', projects }], settings: [], loaded: true }
     return <ModulesContext.Provider value={modules}>{ui}</ModulesContext.Provider>
   }
 
-  test('a working run shows the modules’ summary in its bar and their details under it', async () => {
+  test('a working run shows the modules’ summary in the bar above the message box', async () => {
     render(withSlots(view({ live: true })))
-    expect(screen.getByText('summary run-1 true false')).toBeTruthy()
-    expect(screen.getByText('details run-1 true')).toBeTruthy()
+    expect(screen.getByTestId('work-bar').contains(screen.getByText('summary run-1 true'))).toBe(true)
   })
 
-  test('once an ended run’s branch is read, the handoff replaces the summary; the details stay, told the run is not working', async () => {
+  test('once an ended run’s branch is read, the handoff replaces the summary', async () => {
     onAgent.mockResolvedValue(ARCHIVED)
     onAgentHandoff.mockResolvedValue({ branch: 'agent-x', exists: true, commits: [], files: [], insertions: 0, deletions: 0, pushed: false })
     render(withSlots(view({ live: false })))
     await waitFor(() => expect(screen.queryByText(/^summary/)).toBeNull())
-    expect(screen.getByText('details run-1 false')).toBeTruthy()
   })
 
   test('a project without the module gets none of it', () => {
     render(withSlots(view({ live: true }), ['p2']))
-    expect(screen.queryByText(/summary|details/)).toBeNull()
+    expect(screen.queryByText(/^summary/)).toBeNull()
+  })
+})
+
+describe('AgentView: what the top bar opens to', () => {
+  test('an ended agent with commits: the agent, model and spend strip, and no list of commits or files', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValue(PUSHED)
+    render(view())
+    await screen.findByRole('button', { name: 'Open PR' })
+    expect(screen.queryByText('No spend reported yet')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'details' }))
+    expect(screen.getByText('No spend reported yet')).toBeTruthy()
+    expect(screen.queryByText('Commits')).toBeNull()
+    expect(screen.queryByText('Changed files')).toBeNull()
+    expect(screen.queryByLabelText('Agent handoff')).toBeNull()
   })
 })
 

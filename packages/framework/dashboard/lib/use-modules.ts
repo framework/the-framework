@@ -146,7 +146,7 @@ export function useModules(): MountedModules {
         }
         if (definition?.usageLimit) usageLimit ??= { ...definition.usageLimit, package: module.package, projects: module.projects }
         const run = definition?.run
-        if (run && (run.summary || run.details)) runSlots.push({ ...run, package: module.package, projects: module.projects })
+        if (run?.summary) runSlots.push({ ...run, package: module.package, projects: module.projects })
       }
       // Numbers, not a list the shell keeps: a third package sits between two others without the shell knowing it exists.
       cards.sort(byMountOrder)

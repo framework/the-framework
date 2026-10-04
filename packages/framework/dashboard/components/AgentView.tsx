@@ -15,7 +15,7 @@ import { CloudMirrorRow, CloudAgentNotice } from './CloudAgentNotice.js'
 import { RemoteAgentNotice } from './RemoteAgentNotice.js'
 import { ModuleSlot } from './ModulePageView.js'
 import { useMountedModules } from '../lib/use-modules.js'
-import { Committing, HandoffActions, HandoffSummary, AgentHandoffDetails, handoffSays, isCommitAsk } from './AgentHandoff.js'
+import { Committing, HandoffActions, HandoffSummary, handoffSays, isCommitAsk } from './AgentHandoff.js'
 import { AgentDetails, type AgentDetailsCard } from './AgentDetails.js'
 import { QuestionPanel } from './QuestionPanel.js'
 import { SubagentsBar } from './SubagentLine.js'
@@ -150,7 +150,7 @@ export function AgentView({
   const { workspace, branch, driver, model } = card ?? {}
   const setup = useMemo(() => ({ workspace, branch, driver, model }), [workspace, branch, driver, model])
   const [open, setOpen] = useState(false)
-  // What the installed modules add to this run's page: a summary in the bar, details under it.
+  // What the installed modules add to this run's page: a summary in the bar above the message box.
   const { runSlots: mountedSlots } = useMountedModules()
   const runSlots = mountedSlots.filter(slots => slots.projects.includes(projectId))
   const toggle = useCallback(() => setOpen(o => !o), [])
@@ -212,7 +212,7 @@ export function AgentView({
   // The agent works, or is about to: on a message just sent, or as its feed shows before the
   // agents poll does.
   const going = feedLive || shownSending !== undefined
-  // What the branch holds (#1023), read once for both the bar and the detail it opens. Read once
+  // What the branch holds (#1023), read once for the bar above the message box. Read once
   // the agent stops rather than once the process does: while it is still writing to the branch
   // there is nothing to hand off yet, but a parked session's branch is finished work. "Stops" is
   // as the feed knows it: read off the agents poll alone, the last step stayed in the bar, its
@@ -301,21 +301,9 @@ export function AgentView({
         ready={ready}
         checkout={checkout}
       />
-      {/* The always-available session-details strip: agent + spend (#322). Sits above the changes/
-          handoff detail, so the disclosure holds the "about this run" facts plus what it touched. */}
+      {/* The always-available session-details strip: agent + spend (#322). What the run changed is
+          in the side panel's Changes tab, not here. */}
       {open && <AgentDetails events={shown} card={card} />}
-      {/* What the modules add under the bar: the Files module's changed files while the run works.
-          Once it ends, the handoff below says what its branch holds. A remote run's reads relay to
-          its device (#1067 slice 2), so it is shown like a local run's, not suppressed. */}
-      {runSlots.map(slots => {
-        const Details = slots.details
-        return Details ? (
-          <ModuleSlot key={slots.package} package={slots.package} label="run details">
-            <Details projectId={projectId} agentId={agentId} working={working} expanded={open} />
-          </ModuleSlot>
-        ) : null
-      })}
-      {live === false && open && <AgentHandoffDetails handoff={handoff.handoff} />}
       {/* A GitHub Actions run replays in a burst at the end (#1053), so the live feed looks stalled:
           say the wait is expected and link through to the live Actions run. */}
       <ActionsRunNotice target={target} events={shown} live={working} />
@@ -375,7 +363,7 @@ export function AgentView({
               const Summary = slots.summary
               return Summary ? (
                 <ModuleSlot key={slots.package} package={slots.package} label="run summary">
-                  <Summary projectId={projectId} agentId={agentId} working={working} expanded={open} />
+                  <Summary projectId={projectId} agentId={agentId} working={working} />
                 </ModuleSlot>
               ) : null
             })

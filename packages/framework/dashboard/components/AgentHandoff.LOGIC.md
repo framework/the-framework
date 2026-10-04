@@ -1,4 +1,4 @@
-What an agent [2] left behind, as the user meets it on the agent's page: a one-line verdict of what the agent's branch holds, the next step offered as a button once the agent has ended (or the reason there is nothing to press), and the commits and files the branch holds. The verdict and the next step ride in the bar above the message box (`AgentWorkBar.tsx`), beside the branch they are about; the lists are behind the disclosure of the action bar at the top of the page. A subagent [5] is offered no next step: where the button would be, the bar above the message box says "landed" or "not landed". The bar is drawn for an ended agent only when its branch gives it something to say; an agent that changed nothing has no bar. Below, "the bar" is the bar above the message box.
+What an agent [2] left behind, as the user meets it on the agent's page: a one-line verdict of what the agent's branch holds, and the next step offered as a button once the agent has ended (or the reason there is nothing to press). The verdict and the next step ride in the bar above the message box (`AgentWorkBar.tsx`), beside the branch they are about. The commits and the files themselves are not listed here: the Changes tab of the side rail shows them. A subagent [5] is offered no next step: where the button would be, the bar above the message box says "landed" or "not landed". The bar is drawn for an ended agent only when its branch gives it something to say; an agent that changed nothing has no bar. Below, "the bar" is the bar above the message box.
 
 ## Context
 
@@ -24,7 +24,6 @@ What an agent [2] left behind, as the user meets it on the agent's page: a one-l
 - **A subagent: landed or not landed** - a subagent is offered no "Open PR", no "Merge PR" and no "Publish branch"; where the button would be, the bar says "landed" once its main agent landed its work and "not landed" while its branch holds commits that are not landed; work it left uncommitted is still named.
 - **The next step, or why there is none** - once the agent has stopped: "Open PR" with "Create draft PR" and "Publish branch" in the menu beside it, or "Merge PR" for an open pull request, or "Publish branch" alone where the project has no git host package, or "Merge" where the repository has no remote, or "Commit" where the agent left its work uncommitted, or one sentence saying why nothing can be pressed; never a button the git host would refuse, and nothing at all while the pull request lookup is still out.
 - **Whether the bar has something to say** - yes for an ended agent whose branch holds work (commits, changed files, or files left uncommitted), whose work landed, or whose branch is gone with work on it; no before the read has answered and for an agent that changed nothing.
-- **The lists behind the disclosure** - behind the action bar's disclosure, the commits (up to 6), the changed files (up to 10) and the uncommitted files (up to 10), the rest counted as "and N more"; shown only when there is something to list.
 
 ## Business logic
 
@@ -76,7 +75,7 @@ Shown once the agent has ended (the caller's decision, in `AgentView.tsx`); an a
 
 - The branch has a pull request: when it is open and the branch is not merged, a "Merge PR" button, reading "Merging…" while the merge is in flight; a merged or closed pull request, or a merged branch, offers nothing, because landed is an answer, not an action. An open pull request takes one click to land.
 - The branch is gone: "Branch gone — nothing to open a PR from.", or nothing when the daemon marks it as belonging to an agent that changed nothing.
-- The branch carries commits that undo each other, so its files are as the base has them, and the checkout [3] is clean: "Nothing to merge: the commits cancel out." for a repository with no remote, "Nothing to publish: the commits cancel out." otherwise, and no button. The one-line verdict counts the commits and reads "<N> commits · no change left", and the disclosure lists them.
+- The branch carries commits that undo each other, so its files are as the base has them, and the checkout [3] is clean: "Nothing to merge: the commits cancel out." for a repository with no remote, "Nothing to publish: the commits cancel out." otherwise, and no button. The one-line verdict counts the commits and reads "<N> commits · no change left".
 - The branch carries no commit beyond the base: nothing when the checkout [3] holds no uncommitted files; otherwise "Nothing committed — <files> left uncommitted.", where <files> names the first two paths, joined by a comma, followed by "and <N> more" for the rest; hovering the sentence shows every path, one per line. Beside the sentence, a "Commit" button ("Asking…" while in flight) sends the agent the message "Commit your work.": the agent commits, the dashboard commits nothing, and a refusal shows in words.
 - The branch carries commits and the checkout [3] still holds uncommitted files (an agent that committed, was asked for more, and left that uncommitted): "<files> left uncommitted.", named the same way, and the same "Commit" button. No merge and no publish is offered until the checkout is clean: each would be refused over the uncommitted work, and would leave the newest work behind.
 - The "Commit" button tells its caller that its ask is on its way, with the ask's words, before it is sent, and tells it again that it did not go through when the daemon refuses it or the send fails; the caller shows the ask in the feed and says "Committing…" where the button was (see `AgentView.tsx`). A prompt is the button's ask when it is "Commit your work." alone, or that followed by a line break and more: the sentence a run's publish level adds.
@@ -105,22 +104,6 @@ The first rule that applies:
 - The read of the branch has not answered: nothing to say.
 - The daemon's read says the agent's work landed: something to say.
 - The branch is gone: something to say, unless the daemon marks it as belonging to an agent that changed nothing.
-- The branch exists: something to say exactly when there is something to list behind the disclosure (below): the branch holds commits beyond the base, commits that cancel out among them, or the checkout [3] holds uncommitted files. A branch with no commit and nothing left uncommitted, merged into the base or not, has nothing to say.
+- The branch exists: something to say exactly when the branch holds commits beyond the base, commits that cancel out among them, or the checkout [3] holds uncommitted files. A branch with no commit and nothing left uncommitted, merged into the base or not, has nothing to say.
 
 The answer is the same for a subagent [5] as for any other agent. It does not look at the pull request: the page draws the bar for a branch with a pull request on its own.
-
-### The lists behind the disclosure
-
-#### Context
-
-**User story**: the user opens the action bar's disclosure to see what the agent [2] actually committed and changed, and what it left uncommitted.
-
-#### Business logic
-
-The lists show behind the disclosure of the action bar at the top of the agent's page (`AgentActionBar.tsx`). There is something to show only when the branch exists and either holds commits beyond the base or has uncommitted files in the checkout [3]; otherwise the disclosure shows nothing here. When shown, up to three lists sit side by side on a wide screen and stack on a narrow one, and a list with no rows is omitted rather than shown as a heading over nothing:
-
-- "Commits": the first 6 commits, each as its short hash and subject, the rest as "and <N> more".
-- "Changed files": the first 10 files changed against the base, each with its path and its lines added and removed, or "binary" for a binary file, the rest as "and <N> more".
-- "Uncommitted files": the first 10 paths the agent changed and never committed, the rest as "and <N> more".
-
-A truncated subject or path shows its full text on hover. The branch name is not repeated: the bar above the message box says it.

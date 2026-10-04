@@ -31,7 +31,7 @@ One agent's [1] action bar, the bar at the top of the agent's page, one row that
 
 #### Business logic
 
-The row is always one line. Its start is the line of git facts (`GitStatusBar.tsx`), rendered inline and given: the agent's [1] label as the leading identity, its project name as a "<project> ›" breadcrumb, the status word described below, and, when the caller renders a detail under the bar, the toggle that makes the facts a disclosure with an expanded and collapsed state. Given a label, that line says whether the agent's checkout [4] is clean or dirty and its size, and neither its branch nor its pull request. A spacer between facts and controls grows but never shrinks, so on a tight row the facts truncate and the controls keep their width.
+The row is always one line. Its start is the line of git facts (`GitStatusBar.tsx`), rendered inline and given: the agent's [1] label as the leading identity, its project name as a "<project> ›" breadcrumb, the status word described below, and, when the caller renders a detail under the bar (the agent's page renders the details strip, `AgentDetails.tsx`), the toggle that makes the facts a disclosure with an expanded and collapsed state. Given a label, that line says whether the agent's checkout [4] is clean or dirty and its size, and neither its branch nor its pull request. A spacer between facts and controls grows but never shrinks, so on a tight row the facts truncate and the controls keep their width.
 
 ### One read of the checkout
 

@@ -58,3 +58,13 @@ npx branches push
 ```
 
 It pushes your branch to origin and prints it in `branch`. `clean` false is refused as `dirty`: commit or delete first.
+
+## Merge
+
+Only when the person asks you to merge your work into the project's main branch, and once clean:
+
+```
+npx branches merge <your branch>
+```
+
+It merges your branch into the main branch, in the project's own folder. A conflict changes nothing and names the files in `files`: say so and stop. Your checkout and your branch stay.

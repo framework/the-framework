@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@gemstack/agent-data'
@@ -34,7 +34,7 @@ async function commit(path: string, file: string, text: string, message: string)
 const has = (repo: string, ref: string): Promise<boolean> => git(['rev-parse', '--verify', '--quiet', ref], repo).then(out => out.trim() !== '', () => false)
 const head = async (repo: string): Promise<string> => (await git(['rev-parse', 'HEAD'], repo)).trim()
 
-test("an agent's branch is merged into the default branch in the project's folder, then deleted with its checkout", async () => {
+test("an agent's branch that still has its checkout is merged into the default branch and kept: the checkout is not removed under an agent working in it", async () => {
   const repo = await localRepo()
   try {
     const start = await head(repo)
@@ -43,13 +43,20 @@ test("an agent's branch is merged into the default branch in the project's folde
     const tip = await head(path)
     // The default branch moved on meanwhile, in another file: a real merge, not a fast-forward.
     await commit(repo, 'other.txt', 'other\n', 'mine')
+    // Something the agent keeps in its checkout and never commits (its diary) must survive the merge.
+    await mkdir(join(path, '.the-framework'), { recursive: true })
+    await writeFile(join(path, '.the-framework', 'run1.jsonl'), '{"kind":"said"}\n')
+    await appendFile(join(repo, '.git', 'info', 'exclude'), '.the-framework/\n')
 
-    assert.deepEqual(await mergeBranch(repo, branch, git), { ok: true, branch, into: 'main', commit: tip, from: start, deleted: true })
+    assert.deepEqual(await mergeBranch(repo, branch, git), { ok: true, branch, into: 'main', commit: tip, from: start, deleted: false })
     assert.equal(await readFile(join(repo, 'hello.txt'), 'utf8'), 'hi\n', "the work is in the project's folder")
     assert.equal(await readFile(join(repo, 'other.txt'), 'utf8'), 'other\n')
-    assert.equal(await has(repo, `refs/heads/${branch}`), false, 'the branch went')
-    assert.equal(await stat(path).then(() => true, () => false), false, 'its checkout went with it')
+    assert.equal(await has(repo, `refs/heads/${branch}`), true, 'the branch stays with its checkout')
+    assert.equal(await readFile(join(path, '.the-framework', 'run1.jsonl'), 'utf8'), '{"kind":"said"}\n', 'the checkout and what it holds are untouched')
     await git(['merge-base', '--is-ancestor', tip, 'HEAD'], repo)
+    // Run by the agent itself, from inside its checkout: the same outcome, and its directory is still there.
+    assert.deepEqual(await mergeBranch(repo, branch, git), { ok: true, branch, into: 'main', commit: tip, from: tip, deleted: false })
+    assert.equal(await stat(path).then(s => s.isDirectory(), () => false), true)
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

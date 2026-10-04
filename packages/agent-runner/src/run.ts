@@ -49,9 +49,13 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
  * declares; a project with no git host package records none.
  *
  * A run may be started for another run, its parent (`run --parent <id>`), and from a branch other
- * than origin's default (`run --base <ref>`); both are on its record for its whole life, and so is
- * the commit that branch was at when the run's own was made from it: the run's own work is what
- * came after it. When it ends, however it ends, its parent is told (`parent.ts`).
+ * than origin's default (`run --base <ref>`); both are on its record for its whole life. When it
+ * ends, however it ends, its parent is told (`parent.ts`).
+ *
+ * A run that makes its own branch writes down the commit the branch was made at, on its record
+ * for its whole life: the run's own work is what came after it, which is how it is still told
+ * apart once it is merged. A run given a branch that exists (a follow-up's) writes none: that
+ * branch's work began with another run.
  */
 
 /** The detail a stopped run's record carries. */
@@ -183,7 +187,8 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
       if (opts.parent !== undefined) await tellParent(repo, opts.parent, childEndedLine({ id, status: 'failed', detail }), telling)
       return { id, status: 'failed', checkout: { reclaimed: false, reason: 'no checkout' }, detail }
     }
-    if (opts.base !== undefined) mark = { ...mark, ...(await startCommit(checkout.path, git)) }
+    // Only a branch this run made: one it was given holds another run's work, begun elsewhere.
+    if (opts.branch === undefined) mark = { ...mark, ...(await startCommit(checkout.path, git)) }
     // Awaited here, not returned: the lock is let go in `finally`, and a bare `return` of the
     // promise would run that before the session ends, leaving the run to the sweep.
     return await session(repo, {
@@ -236,7 +241,7 @@ export interface ResumeOptions {
 /**
  * Continue an ended run: the same id, the same record, the same branch. The checkout is the one
  * the run kept, or a new one attached to its branch; a branch that went with the checkout, for
- * holding nothing, starts again from the base the record names. The session resumes by the id the
+ * holding nothing, starts again from the base the record names, or origin's default branch. The session resumes by the id the
  * record carries; the diary goes on from where it stopped. The prompt is the user's text, or the
  * continuation of the question the run ended on with the given answer. The sentence of the publish
  * level the record keeps is said again after it. A follow-up the record names is still owed: the
@@ -288,9 +293,9 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
     const path = worktreePath(repo, opts.id)
     const kept = await stat(path).then(s => s.isDirectory(), () => false)
     const checkout: { path: string; branch: string; again?: true } = kept ? { path, branch } : await attachCheckout(repo, { agentId: opts.id, branch, ...(previous.base !== undefined ? { base: previous.base } : {}) }, git)
-    // A branch that was gone everywhere was just made again from the base, as the base is now:
+    // A branch that was gone everywhere was just made again, from where it starts as that is now:
     // that is where the run's own work begins. One still on origin came back with its work.
-    const restarted = checkout.again && previous.base !== undefined ? await startCommit(checkout.path, git) : {}
+    const restarted = checkout.again ? await startCommit(checkout.path, git) : {}
 
     // The record is written running again over the ended one, so every reader sees the run in flight.
     const mark: RunnerMark = { host, pid, ...lasting(previous), ...restarted }

@@ -10,7 +10,7 @@ A run in flight is a run record [1]: the `logs` skill's card on the project's `a
 
 [1] run record: the `logs` skill's record of a run on the `agent-data` branch: a card (`<id>.json`) and a diary (`<id>.jsonl`). Written over the same file: as a marker before the agent exists, with how it went when the run ends, and once more without its branch when the reclaim deleted that branch.
 [2] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[3] the tool's mark: `caller.runner` on a card: `host`, the machine that started it; `pid`, the run's process on that machine while it runs, when known; `then`, the follow-up's prompt, when the run names one (`run --then`: once the run ends done with a pull request, a fresh run on its branch gets that prompt and the run's id, `run.ts`); `publish`, the run's publish level [6], when it was given one (`run --publish`: the agent is told, in one sentence after its prompt, how far to publish when it finishes, `run.ts`); `parent`, the id of the run this one was started for, when it has one (`run --parent`: that run is told when this one ends, `parent.ts`); `base`, the branch this run's own branch started from, when one was named (`run --base`; origin's default branch otherwise); `baseCommit`, the commit that branch was at when the run's own branch was made from it, for a run that names a base: the run's own work is what came after that commit, and its changes are measured from it (`run.ts`).
+[3] the tool's mark: `caller.runner` on a card: `host`, the machine that started it; `pid`, the run's process on that machine while it runs, when known; `then`, the follow-up's prompt, when the run names one (`run --then`: once the run ends done with a pull request, a fresh run on its branch gets that prompt and the run's id, `run.ts`); `publish`, the run's publish level [6], when it was given one (`run --publish`: the agent is told, in one sentence after its prompt, how far to publish when it finishes, `run.ts`); `parent`, the id of the run this one was started for, when it has one (`run --parent`: that run is told when this one ends, `parent.ts`); `base`, the branch this run's own branch started from, when one was named (`run --base`; origin's default branch otherwise); `baseCommit`, the commit the run's own branch was made at, for every run that makes its own branch, with a base named or not: the run's own work is what came after that commit (`run.ts`). A run given a branch that already exists has none.
 [4] cap: how many runs of one scheduled command may be in flight at once, across every machine that shares the repository.
 [5] marker: a run record written before the agent exists: `status: running`, the tool's mark, an empty diary.
 [6] publish level: how far a run's agent publishes its work when it finishes. There are three, each going further than the one before: `branch` (push the branch and open no pull request), `pr` (push the branch and open its pull request) and `merge` (push the branch and open its pull request, set to merge on its own once its checks pass). Any other word is no level. A run given none publishes only what its prompt asks.
@@ -20,7 +20,7 @@ A run in flight is a run record [1]: the `logs` skill's card on the project's `a
 - **The marker** - a card with the run's id, its start time, `status: running`, the prompt as the intent, the driver, the model when the run has one and the tool's mark, written to the branch with an empty diary; the mark's machine is also on the card as `caller.host`, and the mark's parent, when it names one, as `caller.parent`; the write says whether it reached origin.
 - **What a reader finds beside the host** - the mark's parent and the mark's `baseCommit`, each when the mark has one, are on the card a second time, as `caller.parent` and `caller.baseCommit`, outside the mark, for a reader that does not know the mark.
 - **Reading the mark** - a card carries the tool's mark when `caller.runner` is an object with a `host` string; `pid` is kept only when it is a number, `then`, `parent`, `base` and `baseCommit` each only when it is a string, and `publish` only when it is one of the three publish levels [6]; a card without it is somebody else's run.
-- **What the reclaim is told** - the mark's `baseCommit`, when the mark has one, as the commit the run's branch started from.
+- **What the reclaim is told** - the mark's `baseCommit`, when the mark has one, as the commit the run's branch was made at.
 - **Withdrawing** - a marker whose scheduler lost the cap is deleted from the branch, so no record says running for a run that never was.
 - **The record at the end** - the card and the diary written over the marker, same id, same file; the mark stays on the card.
 - **A branch that is gone** - when the reclaim deleted the branch the card names, the record is written again without the branch.
@@ -45,7 +45,7 @@ Before a run's process exists, or as the first thing a person's run does, its ca
 
 #### Business logic
 
-Two of the mark's facts are written on the card a second time, beside `caller.host` and outside the mark, each only when the mark has it: the parent's id as `caller.parent`, and `baseCommit` as `caller.baseCommit`, the commit the run's changes are measured from. The marker [5] carries the parent so. It carries no `baseCommit`: a marker is written before the run's checkout exists, so the commit is not known yet. The card a run starts with, and the card a resume writes, carry both (`run.ts`).
+Two of the mark's facts are written on the card a second time, beside `caller.host` and outside the mark, each only when the mark has it: the parent's id as `caller.parent`, and `baseCommit` as `caller.baseCommit`, the commit the run's own work begins at. The marker [5] carries the parent so. It carries no `baseCommit`: a marker is written before the run's checkout exists, so the commit is not known yet. The card a run starts with, and the card a resume writes, carry both (`run.ts`).
 
 ### Reading the mark
 
@@ -61,11 +61,11 @@ A card carries the tool's mark when `caller.runner` is an object whose `host` is
 
 #### Context
 
-**Problem**: the `branches` package deletes a branch with its checkout only when the branch has no commit past where it started, and it takes origin's default branch as that start unless told otherwise. A run started from another branch (`run --base`) started somewhere else, and only its record says where.
+**Problem**: the `branches` package deletes a branch with its checkout only when the branch holds nothing of its own. Without being told where the branch started, it can only ask whether origin's default branch already has everything on the branch. A run started from another branch (`run --base`) started somewhere else, and a project with no remote has no origin to ask: only the run's record says where its branch started.
 
 #### Business logic
 
-For a card whose mark names a `baseCommit`, the reclaim is told that commit as where the run's branch started. A card with no mark, or a mark with none, names nothing: the branch is measured from origin's default branch.
+For a card whose mark names a `baseCommit`, the reclaim is told that commit as where the run's branch was made. A card with no mark, or a mark with none (a run given a branch that already existed), names nothing: the reclaim then only asks whether origin's default branch has everything on the branch.
 
 ### Withdrawing
 

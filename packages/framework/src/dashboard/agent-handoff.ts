@@ -61,7 +61,7 @@ export interface AgentHandoff {
    * and what is read here is what it held, by the last commit its record kept.
    */
   landed?: boolean
-  /** What the branch is measured against: the commit the run's own work begins at, else the repo's default branch, when one was found. */
+  /** What the branch is measured against: the repo's default branch, or the commit the run's own work begins at (a run started from another branch, or one already merged), when one was found. */
   base?: string
   commits: HandoffCommit[]
   files: HandoffFile[]
@@ -418,6 +418,8 @@ export async function openAgentPullRequest(
   if (handoff && !handoff.exists) return { ok: false, error: `branch ${branch} no longer exists` }
   // Refuse rather than open an empty PR: a session that changed nothing has nothing to hand off.
   if (handoff?.empty) return { ok: false, error: 'this session produced no commits to open a PR for' }
+  // Its commits are still counted once the default branch has them, from where its work began: nothing is left to open one for.
+  if (handoff?.merged) return { ok: false, error: 'this session’s work is already merged' }
   return publishBranch(cwd, branch, { title: agentPrTitle(agent, handoff?.name), body: agentPrBody(agent), ...(options.draft ? { draft: true } : {}) }, branches, gitHost)
 }
 

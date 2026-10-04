@@ -338,6 +338,14 @@ describe('run handoff (#799)', () => {
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('Merged into main.')).toBeTruthy())
     expect(screen.queryByRole('button', { name: /Merge/ })).toBeNull()
+    cleanup()
+
+    // With a remote too: work the main branch already has keeps its count and is offered no publish step.
+    onAgentHandoff.mockResolvedValue({ ...worked, base: 'a'.repeat(40), merged: true })
+    render(<Harness />)
+    await waitFor(() => expect(screen.getByText('Merged into the main branch.')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: /Open PR|Publish branch|Merge/ })).toBeNull()
+    expect(screen.queryByText('not published')).toBeNull()
   })
 
   test('work still only on this machine says not published beside its button; once pushed it says pushed; with no remote it says neither', async () => {

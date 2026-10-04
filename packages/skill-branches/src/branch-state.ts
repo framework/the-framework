@@ -12,11 +12,13 @@ import { repoHasRemote, worktreeBranch, worktreeDirEntries } from './worktree.js
  * the uncommitted paths of the checkout that is on the branch, when one is. The pull request is
  * the caller's own question, asked of the git host, never here.
  *
- * A caller that knows the commit a branch started from names it (`from`): the commits and the
- * files are then measured from that commit, since a branch started from another branch holds, beyond
- * the default branch, that branch's work as well as its own. A full commit id asked in place of a
- * branch is read as a branch whose tip it is: what a branch held, for a caller that kept its last
- * commit after the branch went.
+ * A caller that knows the commit a branch was made at names it (`from`), and the commits and the
+ * files are measured so that they are the branch's own ({@link measuredFrom}): from that commit
+ * for a branch made from another branch, which holds, beyond the default branch, that branch's
+ * work as well as its own, and for a branch the default branch already contains, which holds
+ * nothing beyond it and still did its work. A full commit id asked in place of a branch is read as
+ * a branch whose tip it is: what a branch held, for a caller that kept its last commit after the
+ * branch went.
  *
  * Forgiving throughout: a branch that is gone answers `exists: false` with empty lists, a
  * project without a remote answers `hasRemote: false`, and a git read that fails reads as empty.
@@ -43,7 +45,7 @@ export interface BranchState {
   name?: string
   /** The branch exists in the repository. Gone: every list below is empty. */
   exists: boolean
-  /** What it is measured against: the commit the caller named, else the remote's default branch, else a local `main` or `master`. Absent when none was found. */
+  /** What it is measured against: the commit the caller named or the default branch (the remote's, else a local `main` or `master`), whichever tells the branch's own work. Absent when none was found. */
   base?: string
   /** The branch's own commits beyond the base, newest first. */
   commits: BranchCommit[]
@@ -64,7 +66,7 @@ const SEP = String.fromCharCode(31)
 
 /**
  * The state of each branch named, in that order. One read of the checkouts serves them all.
- * `from` is the commit they started from, when the caller knows it; one this machine does not
+ * `from` is the commit they were made at, when the caller knows it; one this machine does not
  * have is no base, and the default branch is.
  */
 export async function readBranchStates(repo: string, branches: readonly string[], git: GitRunner = nodeGitRunner(), from?: string): Promise<BranchState[]> {
@@ -97,14 +99,14 @@ async function commitOf(ask: (args: string[]) => Promise<string>, rev: string): 
 async function readOne(repo: string, branch: string, reads: Reads): Promise<BranchState> {
   const { ask, hasRemote, base } = reads
   const tip = (await commitOf(ask, `refs/heads/${branch}`)) ?? (COMMIT_ID.test(branch) ? await commitOf(ask, branch) : undefined)
-  // The commits and the files are measured from where the caller says the branch started; whether
-  // it is merged is always the default branch's answer.
-  const from = reads.from ?? base
+  // Whether it is merged is always the default branch's answer; what its own commits and files
+  // are measured from is decided below, once the tip is known.
   const checkout = reads.checkouts.get(branch)
   const pending = checkout ? await pendingFiles(reads.git, checkout) : {}
   const name = sessionNameOf(branch, checkout ? agentIdFromWorktreeDir(basename(checkout)) : undefined)
   const named = name ? { name } : {}
   if (!tip) return { branch, ...named, exists: false, commits: [], files: [], hasRemote, pushed: false, merged: false, ...pending }
+  const from = await measuredFrom(ask, tip, reads.from, base)
   // `base..branch` is the branch's own commits; `base...branch` is the change since it left the
   // base, whatever the base did since. Each spelling answers its own question.
   const [commitsOut, numstatOut, remoteTip, mergedOut] = await Promise.all([
@@ -125,6 +127,22 @@ async function readOne(repo: string, branch: string, reads: Reads): Promise<Bran
     merged: mergedOut.trim().length > 0,
     ...pending,
   }
+}
+
+/**
+ * What a branch's own commits and files are measured from. With no commit named, the default
+ * branch. With one, the default branch still, while the branch left it at or after that commit
+ * and is not in it yet: what the branch took in from the default branch since, by a merge or a
+ * rebase, is then not counted as its own. The named commit otherwise: for a branch the default
+ * branch already contains, where nothing would be left to count, and for a branch that left the
+ * default branch before that commit, which is one made from another branch.
+ */
+async function measuredFrom(ask: (args: string[]) => Promise<string>, tip: string, from: string | undefined, base: string | undefined): Promise<string | undefined> {
+  if (!from || !base) return from ?? base
+  const forkBase = (await ask(['merge-base', base, tip])).trim()
+  if (!forkBase || forkBase === tip) return from
+  const forkFrom = (await ask(['merge-base', from, tip])).trim()
+  return forkFrom && (await ask(['merge-base', forkFrom, forkBase])).trim() === forkFrom ? base : from
 }
 
 /** `git` that resolves to '' instead of rejecting, for reads where "no answer" is a fine answer. */

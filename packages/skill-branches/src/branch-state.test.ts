@@ -165,6 +165,39 @@ test('show: the name the agent gave its work is the branch minus the prefix; non
   }
 })
 
+test('show --from: a branch made from the default branch counts only its own work, also once it took the default branch in, and still once the default branch has it', async () => {
+  const repo = await repoWithOrigin()
+  try {
+    const start = (await git(['rev-parse', 'origin/main'], repo)).trim()
+    const { path } = await createCheckout(repo, { agentId: 'a1' })
+    await commit(path, 'notes.md', 'notes\n', 'notes')
+
+    // The default branch moves on, and the branch takes it in: that is not the branch's own work.
+    await commit(repo, 'other.md', 'other\n', 'somebody else')
+    await git(['push', '-q', 'origin', 'main'], repo)
+    await git(['merge', '-q', '--no-ff', '-m', 'take main in', 'origin/main'], path)
+    const [state] = await readBranchStates(repo, ['agent-a1'], git, start)
+    assert.equal(state!.base, 'origin/main', 'measured from the default branch while it lacks the work')
+    assert.deepEqual(state!.commits.map(c => c.subject), ['take main in', 'notes'])
+    assert.deepEqual(state!.files.map(f => f.path), ['notes.md'])
+    assert.equal(state!.merged, false)
+
+    // Merged: the default branch has it all, and what the branch did is still read, from its start.
+    await git(['merge', '-q', '--ff-only', 'agent-a1'], repo)
+    await git(['push', '-q', 'origin', 'main'], repo)
+    const [merged] = await readBranchStates(repo, ['agent-a1'], git, start)
+    assert.equal(merged!.merged, true)
+    assert.equal(merged!.base, start)
+    assert.ok(merged!.commits.some(c => c.subject === 'notes'))
+    assert.ok(merged!.files.some(f => f.path === 'notes.md'))
+    // With no start named there is nothing to measure it from once it is merged.
+    const [unnamed] = await readBranchStates(repo, ['agent-a1'], git)
+    assert.deepEqual(unnamed!.commits, [])
+  } finally {
+    await rm(join(repo, '..'), { recursive: true, force: true, maxRetries: 10 })
+  }
+})
+
 test('show --from: a branch started from another branch is measured from the commit it started at, not from the default branch', async () => {
   const repo = await repoWithOrigin()
   try {

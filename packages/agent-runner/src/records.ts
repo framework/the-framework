@@ -35,7 +35,7 @@ export interface RunnerMark {
   parent?: string
   /** The branch this run's own branch started from (`run --base`); origin's default branch when absent. */
   base?: string
-  /** The commit that branch was at when this run's own branch was made from it: where the run's own work begins. */
+  /** The commit this run's own branch was made at: where the run's own work begins. Absent for a run given a branch that existed. */
   baseCommit?: string
 }
 
@@ -81,7 +81,7 @@ export function forReaders(mark: Pick<RunnerMark, 'parent' | 'baseCommit'>): { p
   return { ...(mark.parent !== undefined ? { parent: mark.parent } : {}), ...(mark.baseCommit !== undefined ? { baseCommit: mark.baseCommit } : {}) }
 }
 
-/** What the reclaim of a run's checkout is told: the commit its branch started from, when its mark names one. */
+/** What the reclaim of a run's checkout is told: the commit its branch was made at, when its mark names one. */
 export function startOf(card: RunCard): { from?: string } {
   const from = runnerMark(card)?.baseCommit
   return from !== undefined ? { from } : {}

@@ -64,11 +64,15 @@ export function RightRail({
   // know whether they have anything before it can decide which tabs to offer, and whether to be
   // there at all (#1146). One read each, passed down; the panels render what they are given.
   // Tickets used to be a third one (#697) — now its own full page (#1144), not a rail read.
-  const { value: docs, loaded: docsLoaded } = usePolled<WorkspaceDoc[]>(projectId && !docsInMain ? () => onDocs(projectId) : null, [], 4000, [projectId, docsInMain])
-  // Hidden only once we KNOW it is empty: while the first read is out, the tab stays, so switching
-  // projects does not blink the rail out and back in. While the launcher owns this panel
-  // (#1455 item 2), the tab is withheld outright.
-  const hasDocs = !docsInMain && (!docsLoaded || docs.length > 0)
+  // Remembered per project: a project seen before says whether it has documents from the first
+  // frame, so its tab neither comes late nor shows and goes.
+  const { value: docs, loaded: docsLoaded } = usePolled<WorkspaceDoc[]>(
+    projectId && !docsInMain ? () => onDocs(projectId) : null,
+    [],
+    4000,
+    [projectId, docsInMain],
+    projectId ? { remember: `docs:${projectId}` } : undefined,
+  )
 
   // The modules' tabs for this project: every one is offered, since the rail cannot tell a
   // module's tab is empty without rendering it; an empty one says so inside.
@@ -78,6 +82,13 @@ export function RightRail({
   // launcher's project checkboxes also put in it (#661).
   const contextFiles = useMemo(() => new Set(files.filter(f => context.has(f))), [files, context])
   const moduleContext = useMemo<ModuleContext>(() => ({ files: contextFiles, toggle: toggleContext }), [contextFiles, toggleContext])
+
+  // While the first read is out, the tab stands in only for a rail that would otherwise have no
+  // tab at all, so switching projects does not blink the rail out and back in. Beside other tabs
+  // it waits for the answer: held there, it showed on every agent's page and went again a moment
+  // later, for every project with no documents. While the launcher owns this panel (#1455 item
+  // 2), the tab is withheld outright.
+  const hasDocs = !docsInMain && (docsLoaded ? docs.length > 0 : panels.length === 0 && views.length === 0)
 
   const [tab, setTab] = useState<Tab>('docs')
   // Once the user picks a tab, stop auto-defaulting (#695/U22) — only a genuinely new choice

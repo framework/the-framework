@@ -16,6 +16,7 @@ vi.mock('../rpc/reads.js', () => ({ onDocs }))
 vi.mock('./DocsPanel.js', () => ({ DocsPanel: () => <div>docs</div> }))
 
 const { RightRail } = await import('./RightRail.js')
+const { forgetRemembered } = await import('../lib/use-async.js')
 
 // An installed module's tab, as the Files module brings one: it shows what it was given.
 const shown = vi.fn()
@@ -41,6 +42,7 @@ function render(ui: ReactElement, panels: MountedPanel[] = [FILES]) {
 }
 
 beforeEach(() => {
+  forgetRemembered()
   onDocs.mockReset().mockResolvedValue([{ name: 'PLAN.md', content: '# plan' }])
 })
 
@@ -73,9 +75,9 @@ describe('RightRail width', () => {
     expect(rail(container).className).toContain('w-[22rem]')
   })
 
-  test('the width is unchanged after switching away from a view', () => {
+  test('the width is unchanged after switching away from a view', async () => {
     const { container } = render(<RightRail {...baseProps} views={[view]} />)
-    fireEvent.click(screen.getByRole('tab', { name: /docs/i }))
+    fireEvent.click(await screen.findByRole('tab', { name: /docs/i }))
     expect(rail(container).className).toContain('w-[22rem]')
   })
 
@@ -90,7 +92,7 @@ describe('RightRail width', () => {
 describe('RightRail tab labels (#1145)', () => {
   test('a tab says what it holds when hovered', async () => {
     render(<RightRail {...baseProps} />)
-    const tab = screen.getByRole('tab', { name: /docs/i })
+    const tab = await screen.findByRole('tab', { name: /docs/i })
     fireEvent.mouseEnter(tab)
     fireEvent.pointerEnter(tab, { pointerType: 'mouse' })
     await waitFor(() => expect(screen.getByRole('tooltip').textContent).toContain('PLAN/TODO'))
@@ -150,10 +152,31 @@ describe('RightRail empty panels (#1146)', () => {
     expect(screen.getByRole('tab', { name: /views/i })).toBeTruthy()
   })
 
-  test('the tabs hold while the first read is still out, so switching projects does not blink', () => {
+  test('with no other tab, Docs holds the rail while the first read is still out, so switching projects does not blink it out', () => {
+    onDocs.mockReturnValue(new Promise(() => {}))
+    const { container } = render(<RightRail {...baseProps} />, [])
+    // Not yet known to be empty is not the same as known to be empty.
+    expect(container.querySelector('aside')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /docs/i })).toBeTruthy()
+  })
+
+  test('beside other tabs, Docs waits for its first read: it never shows and then goes', async () => {
+    let answer: (docs: unknown[]) => void = () => {}
+    onDocs.mockReturnValue(new Promise(resolve => (answer = resolve)))
+    render(<RightRail {...baseProps} />)
+    expect(screen.getByRole('tab', { name: /files/i })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: /docs/i })).toBeNull()
+    await act(async () => answer([]))
+    expect(screen.queryByRole('tab', { name: /docs/i })).toBeNull()
+  })
+
+  test('a project seen before shows its Docs tab from the first frame', async () => {
+    const first = render(<RightRail {...baseProps} />)
+    await settle()
+    expect(screen.getByRole('tab', { name: /docs/i })).toBeTruthy()
+    first.unmount()
     onDocs.mockReturnValue(new Promise(() => {}))
     render(<RightRail {...baseProps} />)
-    // Not yet known to be empty is not the same as known to be empty.
     expect(screen.getByRole('tab', { name: /docs/i })).toBeTruthy()
   })
 
@@ -203,6 +226,6 @@ describe('RightRail module tabs (#492)', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     render(<RightRail {...baseProps} />, [broken])
     expect(screen.getByRole('alert').textContent).toContain('boom')
-    expect(screen.getByRole('tab', { name: /docs/i })).toBeTruthy()
+    expect(await screen.findByRole('tab', { name: /docs/i })).toBeTruthy()
   })
 })

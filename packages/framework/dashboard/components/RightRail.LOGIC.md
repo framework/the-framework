@@ -95,7 +95,7 @@ When the panel the rail is on no longer has a tab, the rail shows the first tab 
 
 The project's `PLAN`/`TODO` documents are re-read from the daemon every four seconds while the tab may be shown. While the project home [8] renders them in its main column, the tab is withheld and the documents are not read at all.
 
-The "Docs" tab is hidden only once the rail knows there is nothing to show: while the very first read is still out, the tab stays, so changing project does not blink the rail out and back in.
+While the very first read of a project's documents is still out, the "Docs" tab is shown only when the rail has no other tab: it holds the rail in place, so changing project does not blink the rail out and back in. Beside other tabs it waits for the answer and is shown only when there are documents: shown before the answer, it appeared on every agent's page and went again a moment later, for every project with no documents. The answer is remembered per project for as long as the page is open (`lib/use-async.ts`), so a project seen before shows or withholds the tab from the first frame.
 
 ### Counts on the tabs
 

@@ -25,13 +25,12 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 ## Business logic — TL;DR
 
 - **One row per event, as the terminal's line** - every event [2] is one row: a kind badge, the terminal's one-line text for that event, and, on a row that opens a group, the time its diary line was written.
-- **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown, clamped to one line beyond 100 characters and expanding in place on click.
+- **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown; the reply whole, in the page's own font; a prompt clamped to one line beyond 100 characters and expanding in place on click.
 - **The message just sent** - a message sent to an ended agent is one more "YOU" row after the last, a prompt like any other, so the scroller brings it into view; the prompt line of the continuation takes the same row when it arrives.
 - **A spinner while the agent works** - while the agent works and writes nothing, the last row is a spinner reading "Starting…" when the row above it is a prompt, "Working…" otherwise; it gives way to the message being written, and goes when the agent ends.
-- **The message being written grows in place** - while the agent writes a message, it is one more agent row after the last, whole rather than clamped so the words can be seen arriving, badged "AGENT" unless the row above is already the agent's; when the whole message arrives, its own row replaces it and clamps as usual.
+- **The message being written grows in place** - while the agent writes a message, it is one more agent row after the last, drawn as a finished reply is, badged "AGENT" unless the row above is already the agent's; when the whole message arrives, its own row replaces it and nothing moves.
 - **A turn's end and the spend are not rows** - the end of each turn [7] and the spend so far are left out: the agent's details strip counts the turns and totals the spend.
 - **An end the agent went on after is not a row** - a clean end, or an end waiting on an answer, that a later prompt follows is left out, and so is the last clean end while the caller says the agent's job is still going; a failed or stopped end stays where it happened.
-- **The reply a question follows is shown whole** - the agent's last reply before a gate [4] in the same turn is not clamped: it is what the question is about.
 - **The question's block is not shown** - the JSON block an agent writes to ask is left out of the reply a gate [4] follows, and out of the message being written: the gate's card is the question.
 - **The session id is not a row** - the coding agent's session id update is plumbing, not conversation: it is left out of the list, and the run's menu reads it from the events.
 - **The quota only when it matters** - the coding agent reports the account's quota after every turn; a reading that is `allowed` is left out of the list, and one running low or used up is a row.
@@ -67,7 +66,11 @@ Each event [2] is one row with three columns: a fixed-width badge column, the ro
 
 #### Business logic
 
-Two events carry conversation text: the prompt that opens a turn [7] (the user's prompt, or a live chat [9] message) and the agent's reply. Both render as compact Markdown (the rendering rules in `Markdown.tsx`) instead of the terminal's truncated line. A message whose text, with runs of whitespace collapsed to one space, is at most 100 characters renders whole. A longer message is clamped to its first line (unless it is the reply a question follows, see that section) with a chevron ("›") in front of it; clicking either the chevron or the clamped text expands the same rendered Markdown in place, so the opening is never shown twice, and the chevron turns to point down and folds it back on click. The chevron's accessible name is "Expand message" while folded and "Collapse message" while expanded.
+Two events carry conversation text: the prompt that opens a turn [7] (the user's prompt, or a live chat [9] message) and the agent's reply. Both render as Markdown (the rendering rules in `Markdown.tsx`) instead of the terminal's truncated line.
+
+The agent's reply renders whole, however long, at the page's reading size and in the page's own font rather than the transcript's monospace: it is what the user came to read. The message being written is drawn exactly the same way, so when the finished reply takes its place nothing moves; a reply used to grow tall while written and fold to one line the moment it was done, and everything under it jumped up.
+
+A prompt renders as compact Markdown in the transcript's font. A prompt whose text, with runs of whitespace collapsed to one space, is at most 100 characters renders whole. A longer prompt is clamped to its first line with a chevron ("›") in front of it; clicking either the chevron or the clamped text expands the same rendered Markdown in place, so the opening is never shown twice, and the chevron turns to point down and folds it back on click. The chevron's accessible name is "Expand message" while folded and "Collapse message" while expanded.
 
 ### A turn's end and the spend are not rows
 
@@ -95,18 +98,6 @@ Reading the events in order, an end is not a row when:
 
 A failed or stopped end is always a row, where it happened: it says why the next prompt was needed. What is written after the last end without a new prompt (a line recorded after the agent ended) leaves that end the agent's end, and a row. So an agent's transcript says "✓ finished" at most once per stretch of clean legs, at the end, and only once nothing more is coming.
 
-### The reply a question follows is shown whole
-
-#### Context
-
-**User story**: the agent writes a plan and then asks the user to approve it. The plan is the reply just above the question, and the user must read it to answer.
-
-**Problem**: a long reply is clamped to its first line, so the user was asked to approve a plan folded to one line.
-
-#### Business logic
-
-In each turn [7], the agent's last reply before a gate [4] is the reply that question follows; a gate in a later turn is not about a reply of the turn before, and a reply earlier in the same turn than the last one is not it either. That reply starts expanded instead of clamped, whether or not the transcript knows its project. The chevron still folds it and opens it again, and the user's click wins from then on. Every other long message is clamped as described in "The conversation reads as messages".
-
 ### The question's block is not shown
 
 #### Context
@@ -117,7 +108,7 @@ In each turn [7], the agent's last reply before a gate [4] is the reply that que
 
 #### Business logic
 
-- The reply a gate [4] follows (the rule of "The reply a question follows is shown whole") is shown without its `await-choices` blocks. What the agent wrote around the block stays.
+- The reply a gate [4] follows is shown without its `await-choices` blocks. In each turn [7], that is the agent's last reply before the gate: a gate in a later turn is not about a reply of the turn before, and a reply earlier in the same turn than the last one is not it either. What the agent wrote around the block stays.
 - When nothing is left, the reply was only the block, and it is no row at all: the gate's card stands alone.
 - A reply no gate follows keeps its block as written. A block that did not parse makes no gate, and the raw block is how the user sees that the agent tried to ask.
 - The message being written is shown without the block too, from the block's opening fence on while its closing fence has not arrived. While nothing else is written, the "working" line shows instead.
@@ -205,7 +196,7 @@ A prompt that is the end of one of the agent's subagents (the rule in `lib/subag
 - its badge is "SUBAGENT", muted, and it forms a group apart from the user's prompts: a subagent's end right after a prompt of the user's shows its own badge, and consecutive ends, or an end right under the row of a subagent just started, share one;
 - it has no blue text and no blue wash;
 - its body is the subagent's line for an end (`SubagentLine.tsx`): the subagent's task, which opens the subagent's page on a click, then `ended <status>` and the reason when the message gives one. It says how the subagent ended at that moment and never changes, whatever the subagent does afterwards;
-- under it, the rest of the message (where the subagent's work is, its last words) renders as any message does: whole when short, clamped to its first line with the chevron when long. The line the tool sent is not shown as text.
+- under it, the rest of the message (where the subagent's work is, its last words) renders as a prompt does: whole when short, clamped to its first line with the chevron when long. The line the tool sent is not shown as text.
 
 The same words in a prompt about an agent that is not one of these subagents, or with other words before them, stay the user's "YOU" row. The row is still a prompt for everything else: while it is the newest prompt it is the anchor the scroller brings into view, and a spinner under it reads "Starting…".
 

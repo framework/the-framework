@@ -275,14 +275,23 @@ export function withoutQuestionBlock(text: string): string {
   return text.replace(/```await-choices\b[\s\S]*?(```|$)/g, '').trim()
 }
 
-// A conversation message (a prompt or a reply), rendered as compact Markdown. A short one renders
-// as-is. A long one clamps to its first line with a chevron beside it and expands in place on click —
-// the chevron stays on that first line (never a lone chevron on its own row), and the same rendered
-// Markdown just unclamps, so the opening is never shown twice.
-function Message({ text, startOpen = false }: { text: string; startOpen?: boolean }) {
-  // The reader's own click wins; until then a message is folded, unless it starts open.
-  const [toggled, setOpen] = useState<boolean | null>(null)
-  const open = toggled ?? startOpen
+// The agent's reply: whole, as Markdown, in the page's own font rather than the log's. The message
+// being written is drawn the same way, so the finished message takes its place without a jump: a
+// reply used to grow tall as it was written and fold to one line the moment it was done.
+function Reply({ text }: { text: string }) {
+  return (
+    <div className="min-w-0 flex-1 font-sans text-foreground">
+      <Markdown text={text} />
+    </div>
+  )
+}
+
+// A prompt, rendered as compact Markdown. A short one renders as-is. A long one clamps to its
+// first line with a chevron beside it and expands in place on click — the chevron stays on that
+// first line (never a lone chevron on its own row), and the same rendered Markdown just unclamps,
+// so the opening is never shown twice.
+function Message({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
   if (!isLong(text)) {
     return (
       <div className="min-w-0 flex-1">
@@ -364,9 +373,8 @@ export function EventList({
   onOpenAgent,
 }: {
   events: FrameworkEvent[]
-  /** The message the agent is writing, as far as it has got: an AGENT row after the last, shown
-   *  whole as it grows (a finished long message clamps to its first line; one being written would
-   *  hide what is coming in). Never an event: its whole message's row replaces it. */
+  /** The message the agent is writing, as far as it has got: an AGENT row after the last, drawn
+   *  as a finished reply is. Never an event: its whole message's row replaces it. */
   writing?: string
   /** A message just sent to an ended agent: the last prompt row, until the prompt's own line
    *  arrives and takes the same row. Being a prompt, the scroller brings it into view. */
@@ -491,8 +499,8 @@ export function EventList({
                       {end.rest && <Message text={end.rest} />}
                     </div>
                   ) : message !== null ? (
-                    // A prompt (YOU) or a reply (AGENT): compact Markdown, collapsed to its first line when long.
-                    <Message text={message} startOpen={asked.has(e)} />
+                    // A reply (AGENT) is shown whole; a prompt (YOU) is collapsed to its first line when long.
+                    e.kind === 'driver' && e.event.type === 'text' ? <Reply text={message} /> : <Message text={message} />
                   ) : e.kind === 'driver' && e.event.type === 'thought' ? (
                     <Thought text={e.event.text} />
                   ) : choiceRow && projectId ? (
@@ -544,9 +552,7 @@ export function EventList({
                     <Badge className="mt-0.5 text-[10px] uppercase text-muted-foreground">{eventKindLabel('driver')}</Badge>
                   ) : null}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <Markdown text={written} compact />
-                </div>
+                <Reply text={written} />
               </MessageScrollerItem>
             )}
             {working && !written && (

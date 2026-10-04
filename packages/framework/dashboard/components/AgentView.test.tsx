@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import type { FrameworkEvent } from '../../src/index.js'
 import { ModulesContext, type MountedModules } from '../lib/use-modules.js'
@@ -13,7 +13,9 @@ const onBridgeQuestion = vi.fn(async () => null as unknown)
 const onBridgeEvents = vi.fn(async () => [] as unknown)
 const onBridgeAnswer = vi.fn(async () => null as unknown)
 vi.mock('../rpc/reads.js', () => ({ onAgent, onRetainedWorktrees, onAgentHandoff, onAgentsDoing, onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
+const sendMessage = vi.fn(async () => ({ ok: true }) as unknown)
 vi.mock('../rpc/control.js', () => ({
+  sendMessage,
   sendOpenPullRequest: vi.fn(async () => null),
   sendSetHandoff: vi.fn(async () => null),
   sendBridgeAnswer: vi.fn(async () => null),
@@ -365,5 +367,46 @@ describe('a run just started', () => {
     expect(screen.queryByRole('status')).toBeNull()
     rerender(view({ live: false, events: [...events, { kind: 'end', ok: true }] as FrameworkEvent[] }))
     expect(screen.queryByText(/Starting…|Working…/)).toBeNull()
+  })
+})
+
+describe('AgentView: while the agent commits', () => {
+  /** An ended run that left a file uncommitted: what the Commit button is offered for. */
+  const LEFT = { ...PUSHED, empty: true, pushed: false, hasRemote: false, gitHost: false, commits: [], pendingFiles: ['index.html'] }
+  const ended = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a page' } }, { kind: 'end', ok: true }] as FrameworkEvent[]
+
+  test('Commit pressed: the ask shows in the feed at once and "Committing…" takes the button\'s place; an ask that did not go through gives the button back', async () => {
+    onAgent.mockResolvedValue(ended)
+    onAgentHandoff.mockResolvedValue(LEFT)
+    let answer: (sent: { ok: boolean; error?: string }) => void = () => {}
+    sendMessage.mockReturnValue(new Promise(resolve => (answer = resolve)))
+    render(view({ events: ended }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit' }))
+    await waitFor(() => expect(screen.getByText('Committing…')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: /Commit|Asking/ })).toBeNull()
+    expect(screen.getByText('Commit your work.')).toBeTruthy()
+    expect(sendMessage).toHaveBeenCalledWith('p1', 'Commit your work.', 'run-1')
+
+    answer({ ok: false, error: 'this project has no resume hook' })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Commit' })).toBeTruthy())
+    expect(screen.queryByText('Committing…')).toBeNull()
+  })
+
+  test('a working agent whose last prompt is the Commit ask says "Committing…", also with a publish sentence after it; any other prompt says nothing, and so does an agent that ended', async () => {
+    onAgent.mockResolvedValue(ended)
+    onAgentHandoff.mockResolvedValue(LEFT)
+    const asked = (prompt: string) => [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt } }] as FrameworkEvent[]
+    const { rerender } = render(view({ events: asked('Commit your work.'), live: true }))
+    await waitFor(() => expect(screen.getByText('Committing…')).toBeTruthy())
+    rerender(view({ events: asked('Commit your work.\n\nWhen you finish, if you committed anything, push your branch and open no pull request.'), live: true }))
+    expect(screen.getByText('Committing…')).toBeTruthy()
+    rerender(view({ events: asked('Commit your work. Then add a footer.'), live: true }))
+    expect(screen.queryByText('Committing…')).toBeNull()
+    // Ended: the next step is back, whatever the last prompt was.
+    const over = [...asked('Commit your work.'), { kind: 'end', ok: true }] as FrameworkEvent[]
+    onAgent.mockResolvedValue(over)
+    rerender(view({ events: over, live: false }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Commit' })).toBeTruthy())
+    expect(screen.queryByText('Committing…')).toBeNull()
   })
 })

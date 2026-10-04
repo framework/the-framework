@@ -36,7 +36,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   the files it left. The button asks the agent to commit: it sends it "Commit your work."
   The dashboard commits nothing itself, since the agent knows what it changed and writes the
   message. Picked over a message that only names the files and leaves the person to type
-  the ask.
+  the ask. From the press until the agent's turn ends, the ask shows in the chat and the
+  button's place reads "Committing…". Picked over a button that only greys out: the page
+  said nothing of what the agent was doing for the seconds it takes to start again.
 - A project with no remote is offered one step on a finished agent's page: "Merge",
   which merges the agent's branch into the project's default branch on this machine,
   through the branches provider. A conflict changes nothing and is said. The merged branch

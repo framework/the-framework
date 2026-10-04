@@ -90,16 +90,29 @@ function mainBranchName(base: string | undefined): string {
   return base !== undefined && !/^[0-9a-f]{40}$/.test(base) ? base.replace(/^origin\//, '') : 'the main branch'
 }
 
+/** Whether a prompt is the Commit button's ask: as sent, or with the run's publish sentence after it. */
+export function isCommitAsk(prompt: string | undefined): boolean {
+  return prompt !== undefined && (prompt === COMMIT_MESSAGE || prompt.startsWith(`${COMMIT_MESSAGE}\n`))
+}
+
+/** Where the next step would be, while the agent does what the Commit button asked of it. */
+export function Committing() {
+  return <Reason>Committing…</Reason>
+}
+
 export function HandoffActions({
   projectId,
   agentId: agentId,
   state,
   subagent = false,
+  onAsked,
 }: {
   projectId: string
   agentId: string
   state: AgentHandoffState
   subagent?: boolean
+  /** The Commit button's ask is on its way to the agent (`null`: it did not go through), so the page shows it at once. */
+  onAsked?: ((text: string | null) => void) | undefined
 }) {
   const { handoff, busy, pending, act } = state
   if (!handoff) return null
@@ -150,7 +163,25 @@ export function HandoffActions({
     return (
       <>
         <Uncommitted paths={paths} committed={!handoff.empty} />
-        <Button size="xs" disabled={busy} onClick={() => act('commit', () => sendMessage(projectId, COMMIT_MESSAGE, agentId), 'Could not ask the agent to commit.')}>
+        <Button
+          size="xs"
+          disabled={busy}
+          onClick={() => {
+            onAsked?.(COMMIT_MESSAGE)
+            const ask = () =>
+              sendMessage(projectId, COMMIT_MESSAGE, agentId).then(
+                sent => {
+                  if (!sent.ok) onAsked?.(null)
+                  return sent
+                },
+                err => {
+                  onAsked?.(null)
+                  throw err
+                },
+              )
+            act('commit', ask, 'Could not ask the agent to commit.')
+          }}
+        >
           <GitCommitHorizontal className="h-3.5 w-3.5" />
           {pending === 'commit' ? 'Asking…' : 'Commit'}
         </Button>

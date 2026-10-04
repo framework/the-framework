@@ -1,8 +1,9 @@
-import { Check, Laptop, MonitorSmartphone, Plus, X } from 'lucide-react'
+import { Check, ChevronDown, Laptop, MonitorSmartphone, Plus, X } from 'lucide-react'
 import type { ConnectionProfile } from '../lib/profiles.js'
 import type { DeviceStatus } from '../lib/use-device-status.js'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
+import { chipClass } from './ui/chip.js'
 import { OptionLabel } from './ui/option-label.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu.js'
@@ -43,7 +44,9 @@ function StatusDot({ status }: { status: DeviceStatus | undefined }) {
 // One flat "Run on" list (#1066/#1067): this machine, then the saved devices and "Add a device",
 // with a single checkmark. When genuinely on a remote daemon (a manual connection), that device
 // carries the mark, and "This machine" goes home.
-export function RunOnMenu({ connection, busy }: { connection: ConnectionControl; busy: boolean }) {
+// Two looks for the one menu: an icon button for a box's control row, and a chip that also says
+// the target in words, for the launcher's row above the box.
+export function RunOnMenu({ connection, busy, chip = false }: { connection: ConnectionControl; busy: boolean; chip?: boolean | undefined }) {
   // The selected device (#1067), meaningful only on the local daemon; on a remote daemon the
   // connected device is the target instead. An id pointing at a removed device reads as none.
   const selectedDevice =
@@ -54,6 +57,7 @@ export function RunOnMenu({ connection, busy }: { connection: ConnectionControl;
     ? (connection.profiles.find(p => p.url === connection.currentUrl)?.label ?? 'A device')
     : (selectedDevice?.label ?? 'This machine')
   const onThisMachine = connection.isLocal && !selectedDevice
+  const Icon = onThisMachine ? Laptop : MonitorSmartphone
   return (
     <DropdownMenu>
       <Tooltip>
@@ -63,16 +67,37 @@ export function RunOnMenu({ connection, busy }: { connection: ConnectionControl;
               type="button"
               disabled={busy}
               aria-label="Run on"
-              className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'relative h-8 w-8')}
+              className={
+                chip
+                  ? cn(
+                      chipClass,
+                      'transition-colors hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:pointer-events-none disabled:opacity-50',
+                    )
+                  : cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'relative h-8 w-8')
+              }
             />
           }
         >
-          {onThisMachine ? <Laptop className="h-4 w-4" /> : <MonitorSmartphone className="h-4 w-4" />}
-          {!onThisMachine && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--color-primary)]" />}
+          {chip ? (
+            <>
+              <span className="relative flex shrink-0">
+                <Icon className="h-3.5 w-3.5" aria-hidden />
+                {!onThisMachine && <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-[var(--color-primary)]" />}
+              </span>
+              <span className="truncate">{summary}</span>
+              <ChevronDown className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+            </>
+          ) : (
+            <>
+              <Icon className="h-4 w-4" />
+              {!onThisMachine && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--color-primary)]" />}
+            </>
+          )}
         </TooltipTrigger>
         <TooltipContent>{`Run on — ${summary}`}</TooltipContent>
       </Tooltip>
-      <DropdownMenuContent align="end" className="min-w-[19rem] max-w-[22rem]">
+      {/* The chip is at the row's left, the icon button at a box's right: the menu opens inward. */}
+      <DropdownMenuContent align={chip ? 'start' : 'end'} className="min-w-[19rem] max-w-[22rem]">
         <DropdownMenuItem
           className="items-start"
           onClick={() => (connection.isLocal ? connection.onSelectLocal() : connection.onConnectLocal())}

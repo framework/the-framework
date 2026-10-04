@@ -25,15 +25,18 @@ vi.mock('../lib/use-start-agent.js', async () => ({
 
 // The Composer is exercised by its own tests; here it hands back a typed submit, shows whether
 // the form lets it submit at all, and renders the launcher's controls.
+const composerProps = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))
 vi.mock('./Composer.js', async () => {
   const { forwardRef, useImperativeHandle } = await import('react')
   const Composer = forwardRef((props: any, ref: any) => {
+    composerProps.current = props
     useImperativeHandle(ref, () => ({
       clear: () => {},
       focus: () => {},
     }))
     return (
       <>
+        <div data-testid="above">{props.aboveControls}</div>
         {props.launcherControls}
         {props.belowControls}
         <button type="button" disabled={!props.canSubmit} onClick={() => props.onSubmit('do the thing')}>
@@ -245,6 +248,29 @@ describe('StartAgentForm (#1774)', () => {
     expect(problem!.className).toContain('text-danger')
     expect(warning!.className).toContain('text-warning')
     expect((screen.getByText('submit-typed') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  test('the chip above the box reads the project\'s name, and is a plain chip, not a button', () => {
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
+    render(<StartAgentForm {...props} projectName="gemstack" />)
+    const above = screen.getByTestId('above')
+    expect(above.textContent).toBe('gemstack')
+    expect(above.querySelector('svg')).not.toBeNull()
+    expect(above.querySelector('button')).toBeNull()
+    // Cut short with an ellipsis where the row is too narrow for it.
+    expect(screen.getByText('gemstack').className).toContain('truncate')
+    // The heading stays, above the chips.
+    const heading = screen.getByText('Start an agent')
+    expect(heading.compareDocumentPosition(above) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('until the project\'s name is known there is no project chip, and the row of chips is asked for all the same', () => {
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
+    const { rerender } = render(<StartAgentForm {...props} />)
+    expect(screen.getByTestId('above').textContent).toBe('')
+    expect(composerProps.current.aboveControls).toBeNull()
+    rerender(<StartAgentForm {...props} projectName="gemstack" />)
+    expect(screen.getByTestId('above').textContent).toBe('gemstack')
   })
 
   test('the picked Context rides the prompt as one line at its end, after the command\'s own words', async () => {

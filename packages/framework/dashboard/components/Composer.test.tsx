@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { Preferences } from '../../src/index.js'
 import { addProfile } from '../lib/profiles.js'
 import { selectRemoteDevice } from '../lib/remote-target.js'
-import { hoverTooltip } from '../test-utils.js'
+import { hoverTooltip, openMenu } from '../test-utils.js'
 
 // Preferences are the shared daemon store; stub them so the composer reads a fixed value.
 const updatePreferences = vi.hoisted(() => vi.fn())
@@ -300,10 +300,77 @@ describe('the row under the box', () => {
   })
 })
 
+const runOn = () => screen.getByRole('button', { name: 'Run on' })
+
+describe('the row of chips above the box', () => {
+  test('with aboveControls, the "Run on" chip and then its content are in one row above the box, and "Run on" is not in the box', () => {
+    renderComposer({ aboveControls: <span>a-chip</span> })
+    const row = box().previousElementSibling!
+    const chip = screen.getByText('a-chip')
+    expect(row.contains(runOn())).toBe(true)
+    expect(row.contains(chip)).toBe(true)
+    expect(runOn().compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(box().contains(runOn())).toBe(false)
+    expect(screen.getAllByRole('button', { name: 'Run on' })).toHaveLength(1)
+    // Drawn as a chip: it says the target in words.
+    expect(runOn().textContent).toBe('This machine')
+    // One line of a fixed height, and the chips after "Run on" are the first to give way.
+    expect(row.className).toContain('h-6')
+    expect(row.className).not.toContain('flex-wrap')
+    expect(chip.parentElement!.className).toContain('min-w-0')
+    expect(chip.parentElement!.className).toContain('shrink-[100]')
+  })
+
+  test('with aboveControls holding nothing, the row still carries the "Run on" chip', () => {
+    renderComposer({ aboveControls: null })
+    expect(box().previousElementSibling!.contains(runOn())).toBe(true)
+    expect(box().contains(runOn())).toBe(false)
+  })
+
+  test('the chip reads the picked device, and its menu picks a device and this machine again', async () => {
+    addProfile({ url: STUDIO, token: 'aaa', label: 'Studio' })
+    renderComposer({ aboveControls: null })
+    expect(runOn().textContent).toBe('This machine')
+    await openMenu(runOn())
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Studio/ }))
+    await waitFor(() => expect(runOn().textContent).toBe('Studio'))
+    await openMenu(runOn())
+    fireEvent.click(screen.getByRole('menuitem', { name: /^This machine/ }))
+    await waitFor(() => expect(runOn().textContent).toBe('This machine'))
+  })
+
+  test('an offline picked device still reads its label on the chip, with the note under the box', async () => {
+    checkDevices.mockResolvedValue({ [STUDIO]: false })
+    addProfile({ url: STUDIO, token: 'aaa', label: 'Studio' })
+    selectRemoteDevice(STUDIO)
+    renderComposer({ aboveControls: null })
+    await waitFor(() => expect(screen.getByText(/Studio is offline/)).toBeTruthy())
+    expect(runOn().textContent).toBe('Studio')
+  })
+
+  test('without aboveControls there is no row above the box: "Run on" is an icon button inside the box', () => {
+    renderComposer()
+    expect(box().previousElementSibling).toBeNull()
+    expect(box().contains(runOn())).toBe(true)
+    expect(runOn().textContent).toBe('')
+  })
+
+  test('the compact form has no row of chips: "Run on" stays an icon button in its one row', () => {
+    renderComposer({ compact: true, aboveControls: <span>a-chip</span> })
+    expect(screen.queryByText('a-chip')).toBeNull()
+    expect(runOn().textContent).toBe('')
+  })
+})
+
 describe('in a session', () => {
   test('there is no "Run on" pick: a session already runs where it was started', () => {
     renderComposer({ inAgent: true })
     expect(screen.queryByRole('button', { name: 'Run on' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Commands' })).toBeTruthy()
+  })
+
+  test('there is no row of chips: the box is the first thing the composer draws', () => {
+    renderComposer({ inAgent: true, showDriverModel: false })
+    expect(box().previousElementSibling).toBeNull()
   })
 })

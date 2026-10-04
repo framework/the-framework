@@ -1,4 +1,4 @@
-The "Run on" pick beside the composer [1]: one dropdown that says where the next agent [2] starts — this machine, or one of the devices [3] the user saved — and lets the user add or remove a device.
+The "Run on" pick of the composer [1]: one dropdown that says where the next agent [2] starts — this machine, or one of the devices [3] the user saved — and lets the user add or remove a device. Its button has two looks: a chip [5] that says the target in words, and an icon button.
 
 ## Context
 
@@ -12,14 +12,31 @@ The "Run on" pick beside the composer [1]: one dropdown that says where the next
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook.
 [3] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [4] relay: running an agent on a device: the local daemon forwards the start to the device, which runs its own project's start hook, and streams the events back, so the agent renders like a local one.
+[5] chip: a small, bordered, rounded label in muted text: an icon and a few words that say one thing. A chip is either plain or the button of a menu.
 
 ## Business logic — TL;DR
 
+- **The button: a chip or an icon** - as a chip [5] it reads the target in words ("This machine", or the device's label) between an icon and a down chevron; as an icon button it shows the icon alone; the menu is the same.
 - **One list, one checkmark** - "This machine", the saved devices [3], then "Add a device…"; the checkmark sits on the target of the next start.
 - **Picking** - a device is picked in place, with no navigation, and the start is relayed [4] to it; "This machine" clears the pick, or goes home when the dashboard itself is open on a device.
 - **Reachability and removal** - a dot per device says online or not; an offline device's row is dimmed and says "(offline)"; the `X` removes a saved device without picking it.
 
 ## Business logic
+
+### The button: a chip or an icon
+
+#### Context
+
+**User story**: at the launcher the user reads where the next agent [2] runs without opening anything: the first chip [5] above the box says "This machine" or the device's name.
+
+**Problem**: an icon alone does not say which device is picked. Where there is room for words (the launcher's row above the box) the button says them; where there is not (a box's own control row, the compact single row) it stays an icon. It is one menu with two looks, chosen by the embedding composer (`Composer.tsx`).
+
+#### Business logic
+
+The button is named "Run on" in both looks. The target it stands for is "This machine", the picked device's label, or, when the dashboard itself is open on a device's daemon, that device's label ("A device" when it is not among the saved ones). Its icon is a laptop while the target is this machine, and a device icon with a small dot on it while the target is a device; a picked device that is offline carries the same icon and dot as one that is online. Its tooltip reads "Run on — `<target>`".
+
+- As a chip: the icon, then the target in words, then a small down chevron. A target too long for the room the chip has is cut short, ending in an ellipsis; the icon and the chevron stay. The menu opens from the chip's left edge.
+- As an icon button: the icon alone, with no words. The menu opens from the button's right edge.
 
 ### One list, one checkmark
 
@@ -28,8 +45,6 @@ The "Run on" pick beside the composer [1]: one dropdown that says where the next
 See `## Context`.
 
 #### Business logic
-
-The button is named "Run on". It shows a laptop while the target is this machine, and a device icon with a small dot while the target is a device; its tooltip reads "Run on — `<target>`", where the target is "This machine", the picked device's label, or, when the dashboard itself is open on a device's daemon, that device's label ("A device" when it is not among the saved ones).
 
 The menu lists "This machine" ("Start the run here, through this project's start hook."), then every saved device by label with its URL underneath, then "Add a device…" ("Paste the URL a box prints on its network bind."). Exactly one row carries the checkmark: the picked device; else, when the dashboard is open on a device's daemon, that device; else "This machine". A pick that names a device the user has since removed counts as no pick.
 

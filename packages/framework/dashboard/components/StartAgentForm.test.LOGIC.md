@@ -11,6 +11,7 @@ What the tests cover, for the launcher on a project home [1]:
 - **The publish menu** - with nothing saved the "Auto" button reads "Auto: Nothing", the "Auto" menu lists "Nothing", "Publish branch", "Open PR" and "Merge on green" in that order, and a Start sends no publish level; picking "Open PR" writes the saved setting; a saved "Merge on green" reads "Auto: Merge on green" and the Start sends `merge`; a saved "Nothing" sends no level.
 - **A project with no git host provider** - the "Auto" menu lists "Nothing" and "Publish branch" only; a saved "Merge on green" reads "Auto: Publish branch", and the Start sends `branch`.
 - **No remote** - a project with no remote and no `post-merge-cleanup` command has no "Auto" menu, and a saved pick starts its agent with no publish level; with the command, the "Auto" button reads "Auto · cleanup" and the menu holds the "Post-merge cleanup" box and no publish option.
+- **The project's chip** - given the project's name, the form hands the composer one chip for the row above the box: it reads the name, carries an icon, is not a button, and cuts a long name short; the "Start an agent" heading is above it. Given no name yet, the form hands no chip and shows no name or id in its place, and still asks for the row; the chip shows once the name is given.
 - **The Context [7] rides the prompt** - with another project's path and a file picked, the Start sends the typed text followed by a blank line and `Context: <project path>, <file>` at its end.
 
 ## Glossary

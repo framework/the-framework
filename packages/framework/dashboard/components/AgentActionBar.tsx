@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react'
-import type { FrameworkEvent } from '../../src/index.js'
+import type { AgentWorktree, FrameworkEvent } from '../../src/index.js'
 import { GitStatusBar } from './GitStatusBar.js'
 import { AgentActionsMenu } from './AgentActionsMenu.js'
 import { AgentErrorCount } from './AgentErrorCount.js'
@@ -7,12 +6,11 @@ import { agentStatusPill, type AgentCardFacts } from '../lib/agent-status.js'
 import { cn } from '../lib/utils.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
-// One agent's action bar: what the session IS (its branch / PR / summary, as a disclosure) on the
-// left, and what you can DO to it on the right. The doing is a single ⋮ overflow menu
-// (AgentActionsMenu) instead of a row of icon buttons that came and went with the agent's state;
-// only the handoff's next step (Push / Open PR) stays out as a visible button, since it moves the
-// work forward. One bar for the session whether running or finished (AgentView), so the controls stay
-// put when an agent reaches Done.
+// One agent's top bar: its name (a disclosure for the detail under the bar), its tree's
+// clean/dirty and its status word on the left, and what you can DO to it on the right, a single ⋮
+// overflow menu (AgentActionsMenu). Its branch, what the branch holds and the next step are in the
+// bar above the message box (AgentWorkBar). One bar for the session whether running or finished
+// (AgentView), so the controls stay put when an agent reaches Done.
 export function AgentActionBar({
   projectId,
   agentId: agentId,
@@ -24,11 +22,10 @@ export function AgentActionBar({
   onDeleted,
   label,
   projectName,
-  summary,
   expanded = false,
   onToggle,
-  actions,
   ready = true,
+  checkout,
 }: {
   projectId: string
   /** Which run Stop addresses (#749). */
@@ -49,19 +46,17 @@ export function AgentActionBar({
   /** Told after this session is deleted, so the caller can leave it (#1032). Given only for a
    * finished run: absent, no delete is offered. */
   onDeleted?: (() => void) | undefined
-  /** What the session's branch holds, said beside the branch itself (#1023). */
-  summary?: ReactNode
   expanded?: boolean
   /** Given, the branch reads as a disclosure for the detail the caller renders under this bar. */
   onToggle?: (() => void) | undefined
-  /** The session's next step (push, open PR), kept in the bar rather than in the ⋮ menu. */
-  actions?: ReactNode
   /**
    * Whether this run's own reads have answered. Until they have, the bar names the run and shows
    * none of its facts: shown one by one as each read landed, the bar filled in over several steps,
    * and a fact still on screen from the run before read as this one's.
    */
   ready?: boolean
+  /** The agent's checkout as the page read it (`null`: not answered yet), read once for this bar and the one above the message box. */
+  checkout: AgentWorktree | null
 }) {
   // What state the session is in, said once, here: it used to be a banner over the feed, which
   // spent a full row on one word and pushed the output down. Ranked in agentStatusPill, so exactly
@@ -80,8 +75,8 @@ export function AgentActionBar({
         inline
         label={label}
         projectName={projectName}
-        summary={ready ? summary : undefined}
         ready={ready}
+        checkout={checkout}
         expanded={expanded}
         onToggle={onToggle}
         // Beside the tree's clean/dirty, not at the far end of the bar: "dirty · ready for merge"
@@ -108,9 +103,6 @@ export function AgentActionBar({
             with the controls rather than among the branch facts, which give up width as the row
             fills — a count is only useful if it is whole. */}
         {ready && <AgentErrorCount events={events} />}
-        {/* The handoff's next step stays visible — the one thing here that moves the session forward
-            rather than just opening it somewhere. Everything else is in the ⋮ menu. */}
-        {ready && actions}
         <AgentActionsMenu
           projectId={projectId}
           agentId={agentId}

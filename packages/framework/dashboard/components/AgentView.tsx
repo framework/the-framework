@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
+import type { AgentMeta, AgentWorktree, FrameworkEvent } from '../../src/index.js'
 import { onAgent, onAgentsDoing, onRetainedWorktrees } from '../rpc/reads.js'
 import { useLoaded, usePolled } from '../lib/use-async.js'
 import { useAgentHandoff } from '../lib/use-agent-handoff.js'
+import { useCheckoutStatus } from '../lib/use-checkout-status.js'
 import { isAgentActive, agentOutcome, pendingChoices } from '../lib/live-state.js'
 import type { AgentCardFacts } from '../lib/agent-status.js'
 import { AgentActionBar } from './AgentActionBar.js'
 import { AgentComposer } from './AgentComposer.js'
+import { AgentWorkBar } from './AgentWorkBar.js'
 import { AgentFeed } from './AgentFeed.js'
 import { ActionsRunNotice } from './ActionsRunNotice.js'
 import { CloudMirrorRow, CloudAgentNotice } from './CloudAgentNotice.js'
@@ -218,6 +220,9 @@ export function AgentView({
   // card says saving, the checkout is being cleaned up, and an empty branch is deleted with it, so
   // a publish offered then turned into "Branch gone" moments later: the answer is only shown then
   // for a branch with commits of its own, which the clean-up keeps.
+  // The agent's checkout (its branch, its pull request, clean or dirty), read once for the top bar
+  // and for the bar above the message box.
+  const checkout = useCheckoutStatus(projectId, agentId) as AgentWorktree | null
   const read = useAgentHandoff(projectId, agentId, live === false && !going, card?.saving === true, going)
   const kept = read.handoff !== null && read.handoff.exists && !read.handoff.empty
   const handoff = card?.saving && !kept ? { ...read, handoff: null, loaded: false } : read
@@ -276,31 +281,10 @@ export function AgentView({
         retainedWorktree={hasWorktree}
         onWorktreeRemoved={onWorktreeRemoved}
         onDeleted={onDeleted}
-        summary={
-          showHandoff ? (
-            <>
-              <HandoffSummary handoff={handoff.handoff} subagent={subagent} />
-              {handoff.error && <span className="text-danger">{handoff.error}</span>}
-            </>
-          ) : (
-            runSlots.map(slots => {
-              const Summary = slots.summary
-              return Summary ? (
-                <ModuleSlot key={slots.package} package={slots.package} label="run summary">
-                  <Summary projectId={projectId} agentId={agentId} working={working} expanded={open} />
-                </ModuleSlot>
-              ) : null
-            })
-          )
-        }
         expanded={open}
         onToggle={toggle}
         ready={ready}
-        actions={
-          // A run that is working is still writing its branch; the next step is offered once it has ended,
-          // and a run whose subagents still work has not: it goes on as each of them ends.
-          committing ? <Committing /> : live === false && !going && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} subagent={subagent} onAsked={onSending} /> : undefined
-        }
+        checkout={checkout}
       />
       {/* The always-available session-details strip: agent + spend (#322). Sits above the changes/
           handoff detail, so the disclosure holds the "about this run" facts plus what it touched. */}
@@ -361,6 +345,34 @@ export function AgentView({
       <SubagentsBar key={agentId} subagents={subagents} doing={doing} onOpen={onOpenAgent} />
       {/* The questions the agent stopped on, above the message box; the newest takes the keys. */}
       {agentId && questions.map((choice, at) => <QuestionPanel key={`${agentId}:${choice.id}`} projectId={projectId} agentId={agentId} choice={choice} active={at === questions.length - 1} onSaid={onSending} />)}
+      {/* Where the work is and the next step, right above the message box. */}
+      <AgentWorkBar
+        projectName={projectName}
+        checkout={checkout}
+        summary={
+          ready &&
+          (showHandoff ? (
+            <>
+              <HandoffSummary handoff={handoff.handoff} subagent={subagent} />
+              {handoff.error && <span className="text-danger">{handoff.error}</span>}
+            </>
+          ) : (
+            runSlots.map(slots => {
+              const Summary = slots.summary
+              return Summary ? (
+                <ModuleSlot key={slots.package} package={slots.package} label="run summary">
+                  <Summary projectId={projectId} agentId={agentId} working={working} expanded={open} />
+                </ModuleSlot>
+              ) : null
+            })
+          ))
+        }
+        actions={
+          // A run that is working is still writing its branch; the next step is offered once it has ended,
+          // and a run whose subagents still work has not: it goes on as each of them ends.
+          committing ? <Committing /> : ready && live === false && !going && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} subagent={subagent} onAsked={onSending} /> : undefined
+        }
+      />
       <AgentComposer
         projectId={projectId}
         agentId={agentId}

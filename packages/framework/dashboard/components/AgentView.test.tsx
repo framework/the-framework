@@ -12,7 +12,8 @@ const onAgentsDoing = vi.fn(async () => ({}) as unknown)
 const onBridgeQuestion = vi.fn(async () => null as unknown)
 const onBridgeEvents = vi.fn(async () => [] as unknown)
 const onBridgeAnswer = vi.fn(async () => null as unknown)
-vi.mock('../rpc/reads.js', () => ({ onAgent, onRetainedWorktrees, onAgentHandoff, onAgentsDoing, onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
+const onAgentWorktree = vi.fn(async () => ({ branch: 'agent-x' }) as unknown)
+vi.mock('../rpc/reads.js', () => ({ onAgent, onRetainedWorktrees, onAgentHandoff, onAgentsDoing, onBridgeQuestion, onBridgeEvents, onBridgeAnswer, onAgentWorktree, onGitStatus: vi.fn(async () => null) }))
 const sendMessage = vi.fn(async () => ({ ok: true }) as unknown)
 vi.mock('../rpc/control.js', () => ({
   sendMessage,
@@ -32,15 +33,23 @@ vi.mock('../lib/preferences.js', () => ({
 
 // The frame around the feed is not under test: the bar and composer reach for git and session
 // state of their own, and the swap decision this file cares about is visible in the feed alone.
-// The bar's `actions` and `summary` slots ARE rendered, so the handoff cluster and the modules'
-// summaries stay reachable.
+// The `actions` and `summary` slots of the bar above the message box ARE rendered, so the handoff
+// cluster and the modules' summaries stay reachable.
 vi.mock('./AgentActionBar.js', () => ({
-  AgentActionBar: ({ actions, summary, ready }: { actions?: ReactNode; summary?: ReactNode; ready?: boolean }) => (
+  AgentActionBar: ({ ready, checkout }: { ready?: boolean; checkout: unknown }) => (
     <>
       <span data-testid="bar-ready">{String(ready)}</span>
+      <span data-testid="bar-checkout">{JSON.stringify(checkout)}</span>
+    </>
+  ),
+}))
+vi.mock('./AgentWorkBar.js', () => ({
+  AgentWorkBar: ({ actions, summary, checkout }: { actions?: ReactNode; summary?: ReactNode; checkout: unknown }) => (
+    <div data-testid="work-bar">
+      <span data-testid="work-checkout">{JSON.stringify(checkout)}</span>
       {summary}
       {actions}
-    </>
+    </div>
   ),
 }))
 // The composer shows only what the view tells it about the run going: the one fact of it under test here.
@@ -59,6 +68,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   onRetainedWorktrees.mockResolvedValue([])
   onAgentHandoff.mockResolvedValue(null)
+  onAgentWorktree.mockResolvedValue({ branch: 'agent-x' })
 })
 afterEach(cleanup)
 
@@ -174,6 +184,29 @@ const PUSHED = {
   commits: [{ sha: 'abc1234', subject: 'Add hello2.txt' }],
   files: [],
 } as Record<string, unknown>
+
+describe('AgentView: the bar above the message box', () => {
+  test("the agent's checkout is read once, for the top bar and for the bar above the message box", async () => {
+    onAgentWorktree.mockResolvedValue({ branch: 'agent-add-hello2' })
+    render(view())
+    await waitFor(() => expect(screen.getByTestId('work-checkout').textContent).toBe('{"branch":"agent-add-hello2"}'))
+    expect(screen.getByTestId('bar-checkout').textContent).toBe('{"branch":"agent-add-hello2"}')
+    expect(onAgentWorktree).toHaveBeenCalledTimes(1)
+    expect(onAgentWorktree).toHaveBeenCalledWith('p1', 'run-1')
+  })
+
+  test('the next step is in the bar above the message box, which sits under the feed', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    onAgentHandoff.mockResolvedValue(PUSHED)
+    render(view())
+    const step = await screen.findByRole('button', { name: 'Open PR' })
+    expect(screen.getByTestId('work-bar').contains(step)).toBe(true)
+    // After the top bar and before the message box, in the page's order.
+    const order = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(order(screen.getByTestId('bar-ready'), screen.getByTestId('work-bar'))).toBe(true)
+    expect(order(screen.getByTestId('work-bar'), screen.getByTestId('composer-live'))).toBe(true)
+  })
+})
 
 describe('AgentView branch read', () => {
   test('while the card says saving, an empty branch is not offered, and the branch is read again once it stops', async () => {

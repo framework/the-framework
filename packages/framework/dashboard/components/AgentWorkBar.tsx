@@ -1,0 +1,58 @@
+import type { ReactNode } from 'react'
+import type { AgentWorktree } from '../../src/index.js'
+import { GitBranch } from 'lucide-react'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
+
+// The bar right above the message box, as Claude Code on the web has one: where the agent's work
+// is (the project, the branch), what the branch holds (commits, files, +N −N), its pull request,
+// and, at the end, the next step as a button. It is there from the moment the agent's branch is
+// known and stays, one row of one height, so the message box under it never moves; what changes
+// is what the row says.
+export function AgentWorkBar({
+  projectName,
+  checkout,
+  summary,
+  actions,
+}: {
+  projectName?: string | null | undefined
+  /** The agent's checkout as the page read it: its branch and its pull request. */
+  checkout: AgentWorktree | null
+  /** What the branch holds, in a phrase. */
+  summary?: ReactNode
+  /** The next step (Commit, Open PR, Merge), or the words that stand where it would be. */
+  actions?: ReactNode
+}) {
+  const branch = checkout?.branch
+  if (branch === undefined) return null
+  return (
+    <div className="mx-auto w-full max-w-3xl px-2 pt-2">
+      <div role="group" aria-label="This agent's work" className="flex h-9 items-center gap-2 overflow-hidden rounded-lg border border-border px-3 text-xs">
+        {projectName && (
+          <span className="max-w-32 shrink-0 truncate text-muted-foreground" title={projectName}>
+            {projectName}
+          </span>
+        )}
+        {/* The branch is the one part that gives up width: it truncates and still reads. */}
+        <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+          <GitBranch className="h-3.5 w-3.5 shrink-0" />
+          <Tooltip>
+            <TooltipTrigger render={<span className="truncate" />}>{branch.replace(/^the-framework\//, '')}</TooltipTrigger>
+            <TooltipContent className="whitespace-pre-line">{[branch, checkout?.checkout?.path].filter(Boolean).join('\n')}</TooltipContent>
+          </Tooltip>
+        </span>
+        <span className="shrink-0">{summary}</span>
+        {checkout?.pr && (
+          <Tooltip>
+            <TooltipTrigger render={<a href={checkout.pr.url} target="_blank" rel="noreferrer" className="flex shrink-0 items-center gap-1.5 text-primary hover:underline" />}>
+              <span>PR #{checkout.pr.number}</span>
+              <span className="rounded-full border border-border px-1.5 text-[10px] uppercase text-muted-foreground">{checkout.pr.state.toLowerCase()}</span>
+            </TooltipTrigger>
+            <TooltipContent>{checkout.pr.title}</TooltipContent>
+          </Tooltip>
+        )}
+        <div className="grow" />
+        <div className="flex shrink-0 items-center gap-2">{actions}</div>
+      </div>
+    </div>
+  )
+}

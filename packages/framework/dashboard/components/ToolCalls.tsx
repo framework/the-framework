@@ -90,7 +90,7 @@ function CallLine({ label, detail, whole, output, live }: Call & { live?: { sinc
               {output.text}
             </pre>
           )}
-          {output?.failed && <div className="text-xs text-destructive">{output.exitCode !== undefined ? `Failed: exit code ${output.exitCode}` : 'Failed'}</div>}
+          {output?.failed && <div className="text-xs text-danger">{output.exitCode !== undefined ? `Failed: exit code ${output.exitCode}` : 'Failed'}</div>}
         </div>
       )}
     </div>

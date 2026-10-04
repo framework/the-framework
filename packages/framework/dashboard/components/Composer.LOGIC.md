@@ -1,4 +1,4 @@
-The dashboard's prompt editor with the controls around it, shared by the launcher [1] (where a submit starts an agent [2]) and by an agent view [1] (where a submit says the text to that agent): a rich editor opened by `/` for the project's commands [3] and the saved prompts [4], `@` for projects and `#` for files, the Commands menu, the launcher's own controls (its Context [10] picker in the box and its "Auto" menu under the box), the coding agent [5] and model select, the "Run on" pick of this machine or a device [6], and the submit arrow.
+The dashboard's prompt editor with the controls around it, shared by the launcher [1] (where a submit starts an agent [2]) and by an agent view [1] (where a submit says the text to that agent): a rich editor opened by `/` for the project's commands [3] and the saved prompts [4], `@` for projects and `#` for files, the Commands menu, the launcher's own controls (its Context [10] picker in the box, its row of chips [11] above the box and its "Auto" menu under the box), the coding agent [5] and model select, the "Run on" pick of this machine or a device [6], and the submit arrow.
 
 ## Context
 
@@ -18,14 +18,15 @@ The dashboard's prompt editor with the controls around it, shared by the launche
 [8] relay: running an agent on a device: the local daemon forwards the start to the device, which runs its own project's start hook, and streams the events back, so the agent renders like a local one.
 [9] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id.
 [10] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
+[11] chip: a small, bordered, rounded label in muted text: an icon and a few words that say one thing. A chip is either plain or the button of a menu.
 
 ## Business logic — TL;DR
 
-- **What the composer shows** - one bordered box: the editor, and under it the Commands button and, at the launcher, its Context [10] picker, then the coding-agent-and-model select, the "Run on" pick and the submit arrow; at the launcher, a row under the box with the launcher's "Auto" menu at the left and the coding-agent-and-model select at the right, no longer in the box; everything is disabled while the embedding surface is busy.
+- **What the composer shows** - one bordered box: the editor, and under it the Commands button and, at the launcher, its Context [10] picker, then the coding-agent-and-model select, the "Run on" pick and the submit arrow; at the launcher, a row of chips [11] above the box, the "Run on" pick first and no longer in the box, and a row under the box with the launcher's "Auto" menu at the left and the coding-agent-and-model select at the right, no longer in the box; everything is disabled while the embedding surface is busy.
 - **Commands and saved prompts load into the editor** - the open project's commands [3] and the user's and the project's saved prompts [4], from the `/` list or the Commands menu, each replacing the box in one undoable step; "Save prompt…" saves the current text for "Just me" or "This project".
 - **Mentions feed the Context** - where the surface keeps a Context (the launcher), an `@` or `#` mention adds the project's path or the file to it and deleting the chip takes it out; elsewhere a mention is only text.
 - **Driver and model** - a tree of Claude Code and Codex with the models each one listed when the daemon asked it; picking a model sets both, and no model is pinned by default.
-- **"Run on": this machine or a device, and the offline rule** - this machine then the saved devices, one checkmark; a device selected in place is relayed [8] to; a device known to be offline blocks starting and says so.
+- **"Run on": this machine or a device, and the offline rule** - at the launcher a chip [11] that says the target in words, elsewhere an icon button; this machine then the saved devices, one checkmark; a device selected in place is relayed [8] to; a device known to be offline blocks starting and says so.
 - **Submitting** - the arrow exists only once there is text; refused while blank, busy, already submitting, targeting an offline device, or when the surface says nothing can be submitted; a double press starts one agent; an idle control (Stop, Resume) can take the arrow's slot while the box is empty.
 - **A carried draft** - at the launcher, a draft carried from another device or from a click elsewhere in the dashboard seeds the editor once.
 - **What an agent view hides** - inside an agent the coding-agent-and-model select and "Run on" are gone.
@@ -42,6 +43,8 @@ See `## Context`.
 #### Business logic
 
 The full composer is one bordered box. The editor is on top (`PromptEditor.tsx`). Under it is one row: the Commands button at the start, followed by whatever controls the surface hangs there (the launcher hangs its Context [10] picker, `ContextMenu.tsx`); the coding-agent-and-model select, the "Run on" pick and the submit slot clustered at the end.
+
+A surface may hand the composer chips [11] for a row above the box; the launcher hands the chip with the project's name (`StartAgentForm.tsx`), and an agent view hands nothing. With such content the composer draws one row right above the box: the "Run on" pick first, drawn as a chip that says the target in words (`RunOnMenu.tsx`), then the chips it was handed, in the order handed; the "Run on" pick is then not in the box's own row. The row is drawn even when no chip was handed (the project's name is not known yet), so the "Run on" chip keeps its place. The row has a fixed height and never wraps, so a chip that appears, or a name that changes, moves nothing below it. In a row too narrow for its chips, the handed chips are cut short first, each ending in an ellipsis, and the "Run on" chip is cut short only once they have no width left. Without such content there is no row above the box and the "Run on" pick stays in the box, as an icon button. The compact single row never draws the row of chips.
 
 A surface may also hand the composer content for a row under the box; the launcher hands its "Auto" menu (`AutoMenu.tsx`), and an agent view hands nothing. With such content the composer draws one row right under the box: the content at the left and the coding-agent-and-model select at the right, and the select is then not in the box's own row. The row is drawn even when the content turns out empty (a project with no "Auto" menu), so the select keeps its place. The row has a fixed height and never wraps: the select keeps its width, and content too long for the space left is cut short, so a longer or shorter label at the left moves neither the select nor what is below the row. Without such content there is no row and the select stays in the box.
 
@@ -98,9 +101,9 @@ The select is a tree: "Claude Code" and "Codex", each with the models its coding
 
 #### Business logic
 
-The "Run on" pick (`RunOnMenu.tsx`) lists "This machine", then the saved devices [6], then "Add a device…", with one checkmark. Picking a device makes it the target of the next start in place, with no navigation: the local daemon relays [8] the start to it, and the device runs its own project's start hook [9]. The pick is kept in this browser only, never in the preferences [7], because a device's token is this browser's secret. Removing a saved device that was the target clears the pick.
+The "Run on" pick (`RunOnMenu.tsx`) is a chip [11] in the row above the box where the composer has that row (the launcher), reading "This machine" or the picked device's label, and an icon button in the box's own row or in the compact single row otherwise. Either opens the same menu. It lists "This machine", then the saved devices [6], then "Add a device…", with one checkmark. Picking a device makes it the target of the next start in place, with no navigation: the local daemon relays [8] the start to it, and the device runs its own project's start hook [9]. The pick is kept in this browser only, never in the preferences [7], because a device's token is this browser's secret. Removing a saved device that was the target clears the pick.
 
-A device whose reachability check says offline blocks the submit, by click and by keyboard, and the composer says under the box, as an alert: "`<label>` is offline. Pick another target in "Run on" to start." A device whose status is still unknown does not block. Nothing falls back to this machine by itself.
+A device whose reachability check says offline blocks the submit, by click and by keyboard, and the composer says under the box, as an alert: "`<label>` is offline. Pick another place to run, then start." A device whose status is still unknown does not block. Nothing falls back to this machine by itself.
 
 ### Submitting
 
@@ -133,7 +136,7 @@ At the launcher, and never in the compact row nor inside an agent [2], a draft c
 
 #### Business logic
 
-Inside an agent the coding-agent-and-model select and the "Run on" pick are not shown, no carried draft is taken, and there is no Context [10] picker: a mention there is only text. The Commands button, the `/` list, the mentions and "Save prompt…" work as at the launcher.
+Inside an agent the coding-agent-and-model select and the "Run on" pick are not shown, there is no row of chips [11] above the box, no carried draft is taken, and there is no Context [10] picker: a mention there is only text. The Commands button, the `/` list, the mentions and "Save prompt…" work as at the launcher.
 
 ### The compact single row
 
@@ -143,4 +146,4 @@ Inside an agent the coding-agent-and-model select and the "Run on" pick are not 
 
 #### Business logic
 
-The compact variant is one row: the editor, then the coding-agent-and-model select, the "Run on" pick and the submit slot, with no Commands button, no "Save prompt…" entry in the `/` list, no save dialog and no carried draft. Its controls read and write the same preferences [7] and the same "Run on" pick as the full composer, so an agent started from it uses exactly what they show.
+The compact variant is one row: the editor, then the coding-agent-and-model select, the "Run on" pick as an icon button and the submit slot, with no row of chips [11], no Commands button, no "Save prompt…" entry in the `/` list, no save dialog and no carried draft. Its controls read and write the same preferences [7] and the same "Run on" pick as the full composer, so an agent started from it uses exactly what they show.

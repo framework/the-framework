@@ -35,7 +35,7 @@ export function ProjectHome({
   errors,
 }: {
   projectId: string
-  /** The project's name, for the bar at the top; absent until the projects are read. */
+  /** The project's name, for the bar at the top and the launcher's chip; absent until the projects are read. */
   projectName?: string | null | undefined
   /** The project picked in the sidebar (#1513), or null for all: the open questions shown are its only. */
   scope?: string | null
@@ -61,6 +61,7 @@ export function ProjectHome({
       <ProjectErrorBanner errors={errors} />
       <StartAgentForm
         projectId={projectId}
+        projectName={projectName}
         onAgentStarted={onAgentStarted}
         files={files}
         context={context}

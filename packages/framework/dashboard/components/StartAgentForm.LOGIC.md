@@ -2,7 +2,7 @@ The launcher on a project home [1]: the box where the user says what an agent [3
 
 ## Context
 
-**User story**: the user opens a project's project home [1], types a task into the editor or picks a command [2] from its `/` list or its Commands menu, reviews it, and presses "Start agent". The agent appears in the dashboard at once and the box is empty again, ready for the next one. The section is headed "Start an agent".
+**User story**: the user opens a project's project home [1], types a task into the editor or picks a command [2] from its `/` list or its Commands menu, reviews it, and presses "Start agent". The agent appears in the dashboard at once and the box is empty again, ready for the next one. The section is headed "Start an agent"; under the heading and above the box, a row of chips [16] says where the Start goes.
 
 **Problem**: The Framework ships no prompt text and runs no agent itself. What a project can be asked to do is what its own commands say, and what runs the agent is whatever tool the project's start hook names. So the launcher offers exactly what the project has, and when the project has no start hook it must say so before the user has typed a task into a box that cannot send it.
 
@@ -23,11 +23,13 @@ The launcher on a project home [1]: the box where the user says what an agent [3
 [13] publish level: how far an agent publishes its work when it finishes: `branch` (push the branch and open no pull request), `pr` (push the branch and open its pull request) or `merge` (push the branch and open its pull request, set to merge on its own once its checks pass). An agent given none publishes only what its prompt asks. Handed to the start hook as `PUBLISH`.
 [14] git host provider: the package of the project that declares it provides the git host; The Framework opens and lands pull requests through the command that package declares. A project with none has no git host: no pull request can be opened for it.
 [15] publish menu: the part of the launcher's "Auto" menu that lists the publish options: "Nothing", then one option per publish level [13].
+[16] chip: a small, bordered, rounded label in muted text: an icon and a few words that say one thing. A chip is either plain or the button of a menu.
 
 ## Business logic — TL;DR
 
 - **Commands load, never start** - the commands [2] are in the editor's `/` list and the Commands menu, not buttons; picking one loads `/<name> ` into the editor for review, and the form leaves a note saying so.
 - **The Context picker** - a "Context" menu on the control row lists the other registered projects to tick and the picked files to remove; `@`/`#` mentions and the right rail's file tree feed the same Context [11].
+- **The row of chips** - above the box, under the "Start an agent" heading: the "Run on" chip [16], which reads "This machine" or the picked device's [6] label and opens the "Run on" menu, then a plain chip with a folder icon and the project's name; the project's chip is absent until the name is known.
 - **The "Auto" menu** - under the box at the left, with the coding-agent-and-model select at the right: what the agent does by itself when it finishes; it holds the publish menu [15] and the "Post-merge cleanup" box, its button reads what is picked ("Auto: Open PR · cleanup"), and a project offered neither has no "Auto" menu.
 - **The publish menu** - in the "Auto" menu: "Nothing", "Publish branch", "Open PR", "Merge on green"; the check is on the user's saved setting, "Nothing" when none is saved, and a pick writes that setting; a project with no git host provider [14] is offered "Nothing" and "Publish branch" only, and a saved pull request option is shown and started there as "Publish branch"; a project whose repository has no remote is offered no option, and a Start sends no publish level.
 - **The "Post-merge cleanup" box** - in the "Auto" menu, under the publish menu, only when the project has the `post-merge-cleanup` command [2] and no device is picked; ticked from the user's saved setting, and a click writes that setting.
@@ -64,6 +66,23 @@ Picking a command loads `/<name> ` into the editor, replacing what was there, an
 The Context [11] belongs to the shell (`App.tsx`, `lib/use-context-set.ts`) and is handed to the form, so the right rail's file tree shows and changes the same set. The form hangs the "Context" menu (`ContextMenu.tsx`) at the start of the composer's control row, after the Commands button. It offers the registered projects other than this one, since this project is the agent's own checkout, and the picked files (every path in the Context that is not a registered project's path). Its trigger carries a summary of what is picked: "<n> project(s)" for the ticked other projects and "<n> file(s)" for the files, joined by " · ", nothing when nothing is picked.
 
 Mentioning a project with `@` in the editor adds that project's path to the Context, and mentioning a file with `#` adds the file's path; deleting the chip takes the path out again (`PromptEditor.tsx`).
+
+### The row of chips
+
+#### Context
+
+**User story**: before typing a task, the user reads above the box where the agent [3] will start: on which machine, and in which project.
+
+**Problem**: where an agent runs was an icon inside the box, which said nothing in words, and the project was named only at the top of the page. The row is also where more of the Start's facts go later, so it must take one more chip without moving anything.
+
+#### Business logic
+
+The form shows the heading "Start an agent", then the row of chips [16], then the box. The composer draws the row (`Composer.tsx`): the "Run on" chip first, then the chips this form hands it.
+
+- The "Run on" chip reads "This machine", or the label of the device [6] picked, and opens the "Run on" menu (`RunOnMenu.tsx`). At the launcher the "Run on" pick is this chip only: it is not inside the box.
+- The project's chip is plain, not a button and not a menu: a folder icon and the name of the project the agent starts in. The name is the one the shell read for the open project and hands down (`ProjectHome.tsx`). Until the shell knows it, the form hands no project chip: no other name, and no project id, is shown in its place. The row is asked for all the same, so the "Run on" chip is there from the start, and since the row's height is fixed the project's chip appearing moves nothing.
+
+The project's chip is the same whether the agent runs on this machine or on a device.
 
 ### The "Auto" menu
 

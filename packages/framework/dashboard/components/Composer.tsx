@@ -50,7 +50,8 @@ export interface ComposerHandle {
 
 // The shared agent composer (#721): the Tiptap editor (`/` `@` `#` triggers) plus the control
 // row — the commands menu, the agent/model select, the "Run on" pick, and the submit button.
-// The launcher adds a row under the box, which then holds the agent/model select.
+// The launcher adds a row under the box, which then holds the agent/model select, and a row of
+// chips above it, which then holds the "Run on" pick.
 // Factored out of the launcher (StartAgentForm) so the run-view chat (AgentComposer) gets the
 // same surface, wired to the same data (files, commands, saved prompts, prefs). The caller owns
 // what happens on submit: the launcher starts a run, the chat says the text to the run. The `@`
@@ -65,6 +66,9 @@ export const Composer = forwardRef<ComposerHandle, {
   removeContext?: ((path: string) => void) | undefined
   /** The control the launcher hangs at the start of the control row (#1046): the Context picker. */
   launcherControls?: ReactNode
+  /** A row of chips above the box, the launcher's: the "Run on" pick as its first chip instead of
+   *  inside the box, then these chips. Not in the compact form. */
+  aboveControls?: ReactNode
   /** A row under the box, the launcher's: this content at its left (the "Auto" menu), and the
    *  agent/model select at its right instead of inside the box. */
   belowControls?: ReactNode
@@ -97,7 +101,7 @@ export const Composer = forwardRef<ComposerHandle, {
    *  without one the slot keeps its collapse-when-empty behavior for the launcher. */
   idleControl?: ReactNode
 }>(function Composer(
-  { files, addContext, removeContext, launcherControls, belowControls, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, canSubmit = true, idleControl },
+  { files, addContext, removeContext, launcherControls, aboveControls, belowControls, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, canSubmit = true, idleControl },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
@@ -228,11 +232,13 @@ export const Composer = forwardRef<ComposerHandle, {
       onDeleteProject={id => saveProjectPresetList(projectPresets.filter(p => p.id !== id))}
     />
   )
+  const above = !compact && aboveControls !== undefined
   // Where the next run starts (#1052/#1067): this machine or a saved device. Launcher-only: a
   // session already runs where it was started.
   const runOnEl = inAgent ? null : (
     <RunOnMenu
       busy={busy}
+      chip={above}
       connection={{
         profiles,
         currentUrl,
@@ -297,10 +303,10 @@ export const Composer = forwardRef<ComposerHandle, {
   // and typing swaps in the send arrow — instead of the launcher's collapse-to-nothing.
   const slotEl = !hasPrompt && idleControl ? idleControl : submitButton
 
-  // #1073: an offline target blocks Start; say so and point back to the "Run on" pick. No auto-fallback.
+  // #1073: an offline target blocks Start; say so and point back to the pick of where it runs. No auto-fallback.
   const offlineNote = targetOffline && (
     <p role="alert" className="mt-2 text-xs text-danger">
-      {`${selectedDevice?.label ?? 'The selected device'} is offline. Pick another target in "Run on" to start.`}
+      {`${selectedDevice?.label ?? 'The selected device'} is offline. Pick another place to run, then start.`}
     </p>
   )
 
@@ -324,6 +330,17 @@ export const Composer = forwardRef<ComposerHandle, {
 
   return (
     <>
+      {/* The row of chips above the box. A fixed height and no wrap, so a name that lands late or
+          a chip added later moves nothing below. In a row too narrow for its chips the later ones
+          give way first, each cut short, and the "Run on" pick last. A next chip goes in
+          `aboveControls`. */}
+      {above && (
+        <div className="mb-1.5 flex h-6 items-center gap-1.5">
+          <div className="flex min-w-0 items-center">{runOnEl}</div>
+          <div className="flex min-w-0 shrink-[100] items-center gap-1.5">{aboveControls}</div>
+        </div>
+      )}
+
       {/* The composer box (#721): the editor and its run controls under one rounded border, so the
           prompt and the buttons that act on it read as a single input surface. The editor is
           borderless here (its border moved out to this box); controls sit tucked below it. */}
@@ -331,13 +348,14 @@ export const Composer = forwardRef<ComposerHandle, {
         {editorEl}
         {/* Run controls (#649/#650/#654/#668): the commands menu and the Context picker at the
             start, the agent+model select, the "Run on" pick and submit clustered at the end. With
-            a row under the box, the agent+model select is there instead. */}
+            a row under the box, the agent+model select is there instead; with a row of chips
+            above it, the "Run on" pick is there instead. */}
         <div className="flex flex-wrap items-center gap-1.5 px-2 pb-2">
           {commandsEl}
           {launcherControls}
           <div className="ml-auto flex items-center gap-1.5">
             {!below && driverModelEl}
-            {runOnEl}
+            {!above && runOnEl}
             {slotEl}
           </div>
         </div>

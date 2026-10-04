@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Folder } from 'lucide-react'
 import { onProjects, onStartCheck } from '../rpc/projects.js'
 import type { ProjectSummary } from '../../src/index.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
@@ -12,6 +13,7 @@ import { promptWithContext } from '../lib/use-context-set.js'
 import { AutoMenu } from './AutoMenu.js'
 import { ContextMenu } from './ContextMenu.js'
 import { Composer, type ComposerHandle } from './Composer.js'
+import { Chip } from './ui/chip.js'
 
 // Start a run in the selected project (#405, #1774): a free-text box, where `/` lists the project's
 // commands, and Start, which is the project's own start hook (posted over `sendStart`). The editor +
@@ -22,6 +24,8 @@ import { Composer, type ComposerHandle } from './Composer.js'
 // from the project's check hook.
 // The Context picker (#439/#314) narrows the run's focus to other projects and to files: the
 // picked paths ride the prompt as one `Context:` line at its end.
+// The row of chips above the box says where the Start goes: the "Run on" pick, which the Composer
+// draws first, then the project's name.
 // The "Auto" menu, under the box at the left (the model menu is at the right): what the agent
 // does by itself when it finishes. Its button reads the picks, so nothing is hidden.
 // In it, how far the run publishes its work: Nothing, Publish branch, Open PR, Merge on green. The
@@ -33,6 +37,7 @@ import { Composer, type ComposerHandle } from './Composer.js'
 // box writes the same saved setting as Settings → Agent, so its state is every next run's default.
 export function StartAgentForm({
   projectId,
+  projectName,
   onAgentStarted,
   files,
   context,
@@ -41,6 +46,8 @@ export function StartAgentForm({
   toggleContext,
 }: {
   projectId: string
+  /** The project's name, for its chip above the box; absent until the projects are read. */
+  projectName?: string | null | undefined
   /** `runsOn` names the device a remote agent executes on (#1067), for the "runs on <device>" marker. */
   onAgentStarted?: ((intent: string, agentId: string, runsOn?: string) => void) | undefined
   /** The project's files for the `#` picker (#504), owned by the shell. */
@@ -139,6 +146,9 @@ export function StartAgentForm({
             onToggle={toggleContext}
           />
         }
+        // No chip until the name is known, never a wrong one: the row is there all the same and
+        // its height is fixed, so the name landing moves nothing.
+        aboveControls={projectName ? <Chip icon={<Folder className="h-3.5 w-3.5 shrink-0" aria-hidden />}>{projectName}</Chip> : null}
         belowControls={
           <AutoMenu
             publish={publishPick}

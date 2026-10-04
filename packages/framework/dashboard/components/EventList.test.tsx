@@ -82,15 +82,33 @@ describe('EventList conversation rows', () => {
     expect(strong?.textContent).toBe('Claude')
   })
 
-  test('a long message collapses to its first line and offers to expand', () => {
-    render(<EventList events={[{ kind: 'driver', event: { type: 'text', text: 'word '.repeat(40) } }]} stick={false} />)
+  test('a long prompt collapses to its first line and offers to expand', () => {
+    render(<EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'word '.repeat(40) } }]} stick={false} />)
     expect(screen.getByLabelText('Expand message')).toBeTruthy()
   })
 
-  test('a short message renders inline without a collapse control', () => {
-    render(<EventList events={[{ kind: 'driver', event: { type: 'text', text: 'all done' } }]} stick={false} />)
+  test('a short prompt renders inline without a collapse control', () => {
+    render(<EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'do it' } }]} stick={false} />)
     expect(screen.queryByLabelText('Expand message')).toBeNull()
-    expect(screen.getByText('all done')).toBeTruthy()
+    expect(screen.getByText('do it')).toBeTruthy()
+  })
+
+  test('a reply is shown whole however long, with no collapse control, in the page\'s font', () => {
+    render(<EventList events={[{ kind: 'driver', event: { type: 'text', text: 'word '.repeat(40) + 'end' } }]} stick={false} />)
+    expect(screen.queryByLabelText(/Expand message|Collapse message/)).toBeNull()
+    const reply = screen.getByText(/end$/)
+    expect(reply.closest('.font-sans')).toBeTruthy()
+    expect(reply.closest('[class*="max-h"]')).toBeNull()
+  })
+
+  test('the message being written and the finished message are drawn the same, so one takes the other\'s place without a jump', () => {
+    const text = 'word '.repeat(40) + 'end'
+    const prompt: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'go' } }
+    const shape = () => screen.getByText(/end$/).closest('.font-sans')!.outerHTML
+    const { rerender } = render(<EventList events={[prompt]} writing={text} working stick={false} />)
+    const written = shape()
+    rerender(<EventList events={[prompt, { kind: 'driver', event: { type: 'text', text } }]} working stick={false} />)
+    expect(shape()).toBe(written)
   })
 
   test('the tail renders inside the scroller, after the last row (#1265)', () => {
@@ -549,15 +567,7 @@ describe('EventList replies a question follows', () => {
   const reply = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'text', text } })
   const choice = { kind: 'choice', id: 'await-choices', title: 'Start?', options: [{ id: 'a', label: 'Approve' }] } as FrameworkEvent
 
-  test('the reply a question follows is shown whole, and a click folds it', () => {
-    render(<EventList events={[prompt, reply(long), { kind: 'usage', costUsd: 0.1 }, choice]} stick={false} />)
-    const toggle = screen.getByRole('button', { name: 'Collapse message' })
-    expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    fireEvent.click(toggle)
-    expect(screen.getByRole('button', { name: 'Expand message' }).getAttribute('aria-expanded')).toBe('false')
-  })
-
-  test('any other long reply is folded: one before it in the turn, and one no question follows', () => {
+  test('the reply a question follows is the last reply before the question in its turn', () => {
     const early = reply(long + 'early')
     const asked = reply(long + 'asked')
     const later = reply(long + 'later')
@@ -565,9 +575,6 @@ describe('EventList replies a question follows', () => {
     expect([...askedReplies(events)]).toEqual([asked])
     // A question in a later turn is not about a reply of the turn before.
     expect(askedReplies([prompt, early, { kind: 'driver', event: { type: 'start', prompt: 'go on' } } as FrameworkEvent, choice]).size).toBe(0)
-    render(<EventList events={events} stick={false} />)
-    expect(screen.getAllByRole('button', { name: 'Expand message' })).toHaveLength(2)
-    expect(screen.getAllByRole('button', { name: 'Collapse message' })).toHaveLength(1)
   })
 })
 

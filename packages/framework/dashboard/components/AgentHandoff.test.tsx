@@ -434,4 +434,18 @@ describe('run handoff (#799)', () => {
     const { container } = render(<Harness />)
     expect(container.textContent).toBe('')
   })
+  test('Merge pressed: the button says "Merging…" until the branch is read again, never "Merge" in between', async () => {
+    onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false, gitHost: false })
+    render(<Harness />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Merge' }))
+    // The merge is done; the read made after it has not answered yet.
+    let answer: (handoff: unknown) => void = () => {}
+    onAgentHandoff.mockReturnValue(new Promise(resolve => (answer = resolve)) as never)
+    await waitFor(() => expect(sendMergeBranch).toHaveBeenCalled())
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(screen.getByRole('button', { name: 'Merging…' })).toBeTruthy()
+    answer({ ...worked, hasRemote: false, gitHost: false, landed: true })
+    await waitFor(() => expect(screen.getByText('Merged into the main branch.')).toBeTruthy())
+    expect(screen.queryByRole('button')).toBeNull()
+  })
 })

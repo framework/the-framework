@@ -88,7 +88,7 @@ export function OnboardingChecklist({
       setAddError(result.error)
       return
     }
-    reload()
+    void reload()
     reloadSuggestion()
   }
 
@@ -248,7 +248,7 @@ export function OnboardingChecklist({
       {addingProject && (
         <AddProjectPanel
           onAdded={() => {
-            reload()
+            void reload()
             reloadSuggestion()
           }}
           onClose={() => setAddingProject(false)}

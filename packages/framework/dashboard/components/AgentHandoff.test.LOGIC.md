@@ -3,7 +3,7 @@ What the tests cover, for what an agent left behind as shown on the agent's page
 - **The verdict, and no lists** - a finished agent with one commit and one file reads "1 commit" and "1 file" and is offered "Open PR"; neither the commit's subject nor the file's path is shown; the branch name is never repeated.
 - **Nothing changed** - a branch with no commits reads "no changes", offers no "Open PR", and says nothing about a pull request.
 - **Merged is not empty** - a branch whose commits all landed on the base reads "merged", never "no changes".
-- **Uncommitted work is named, never a button** - an empty branch with uncommitted files says "Nothing committed — index.html, src/app.ts left uncommitted." with no "Open PR"; past two files the rest are counted ("a.ts, b.ts and 2 more") and the hover carries every path.
+- **Uncommitted work is named, never a button** - an empty branch with uncommitted files says "Nothing committed — index.html, src/app.ts left uncommitted." with no "Open PR"; the verdict then says neither "no changes" nor "merged", also when git reports the branch merged; past two files the rest are counted ("a.ts, b.ts and 2 more") and the hover carries every path.
 - **A gone branch** - reads "branch gone", offers no "Open PR", and says "Branch gone — nothing to open a PR from.".
 - **A branch gone because the agent changed nothing** - reads "no changes", says nothing about a pull request, and never "Branch gone".
 - **A split button** - "Open PR" is offered with "Publish branch" out of sight until the menu is opened, never as a second button; pressing "Open PR" opens the pull request, not as a draft, and never pushes on its own. Opening the menu ("Other choices") and picking "Publish branch" pushes the branch and opens no pull request.

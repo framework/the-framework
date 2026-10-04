@@ -110,6 +110,15 @@ describe('run handoff (#799)', () => {
     // by name instead.
     await waitFor(() => expect(screen.getByText('Nothing committed — index.html, src/app.ts left uncommitted.')).toBeTruthy())
     expect(screen.queryByText('Open PR')).toBeNull()
+    // Nothing is committed, so nothing is merged; and files were changed, so "no changes" is wrong too.
+    expect(screen.queryByText('no changes')).toBeNull()
+    expect(screen.queryByText('merged')).toBeNull()
+    cleanup()
+    // The same branch as git reports it: its last commit is in the main branch, so it reads merged.
+    onAgentHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true, merged: true, pendingFiles: ['index.html'] })
+    render(<Harness />)
+    await waitFor(() => expect(screen.getByText('Nothing committed — index.html left uncommitted.')).toBeTruthy())
+    expect(screen.queryByText('merged')).toBeNull()
   })
 
   test('uncommitted work gets a Commit button that asks the agent to commit; a subagent, and a branch with nothing left behind, get none', async () => {

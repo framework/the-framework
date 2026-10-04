@@ -42,6 +42,9 @@ export function HandoffSummary({ handoff, subagent = false }: { handoff: AgentHa
   // Commits that undo each other leave the files as the base has them. The commits are still what
   // the agent did, so they are counted, and that nothing is left of them is said beside the count.
   if (handoff.empty && handoff.commits.length > 0) return <span className="text-muted-foreground">{commits} · no change left</span>
+  // Nothing committed and files left on disk: neither "merged" nor "no changes" is true of that,
+  // and the words beside the Commit button name the files. So the verdict says nothing.
+  if (handoff.empty && handoff.pendingFiles?.length) return null
   if (handoff.empty) return <span className="text-muted-foreground">{handoff.merged ? 'merged' : 'no changes'}</span>
   const files = `${handoff.files.length} file${handoff.files.length === 1 ? '' : 's'}`
   return (

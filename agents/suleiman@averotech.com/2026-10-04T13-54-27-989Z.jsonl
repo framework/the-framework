@@ -33,3 +33,11 @@
 {"kind":"result","text":"Removed `test.md`; the working tree is clean again.","sessionId":"95ecfde3-5a18-43a6-a5db-f81b7d20fcd0","at":"2026-10-04T13:56:14.494Z"}
 {"kind":"cost","usd":0.10536799999999999,"at":"2026-10-04T13:56:14.494Z"}
 {"kind":"ended","status":"done","at":"2026-10-04T13:56:15.032Z"}
+{"kind":"start","prompt":"ask me what color I prefer","at":"2026-10-04T13:58:48.671Z"}
+{"kind":"session","sessionId":"95ecfde3-5a18-43a6-a5db-f81b7d20fcd0","at":"2026-10-04T13:58:49.464Z"}
+{"kind":"said","text":"```await-choices\n{ \"title\": \"What color do you prefer?\", \"options\": [{ \"label\": \"Blue\" }, { \"label\": \"Green\" }, { \"label\": \"Red\" }, { \"label\": \"Purple\" }] }\n```","at":"2026-10-04T13:58:50.705Z"}
+{"kind":"rate-limit","limit":{"status":"allowed","window":"five_hour","resetsAt":1791136200000},"at":"2026-10-04T13:58:50.709Z"}
+{"kind":"result","text":"```await-choices\n{ \"title\": \"What color do you prefer?\", \"options\": [{ \"label\": \"Blue\" }, { \"label\": \"Green\" }, { \"label\": \"Red\" }, { \"label\": \"Purple\" }] }\n```","sessionId":"95ecfde3-5a18-43a6-a5db-f81b7d20fcd0","at":"2026-10-04T13:58:51.494Z"}
+{"kind":"cost","usd":0.11091259999999999,"at":"2026-10-04T13:58:51.494Z"}
+{"kind":"question","title":"What color do you prefer?","options":[{"id":"opt:0","label":"Blue"},{"id":"opt:1","label":"Green"},{"id":"opt:2","label":"Red"},{"id":"opt:3","label":"Purple"}],"at":"2026-10-04T13:58:51.495Z"}
+{"kind":"ended","status":"waiting","at":"2026-10-04T13:58:52.037Z"}

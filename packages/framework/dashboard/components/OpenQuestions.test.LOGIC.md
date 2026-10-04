@@ -1,12 +1,11 @@
 What the tests cover:
 
 - **Nothing to show, nothing rendered** - with no open question there is no section and no heading.
-- **A parked agent's question** - the card shows the question, the agent's label and its project under the heading "Waiting on you · 1"; picking an option posts that pick against the question's project, gate and agent, as the user.
-- **Several projects side by side** - questions from different projects render together, each answerable against its own agent.
-- **Into the agent** - the card header opens the agent the question belongs to, project and all.
-- **Labeling an agent** - an agent is labeled by the first line of its intent.
-- **Never a countdown** - no "Auto accept in …" runs here.
-- **The jump list** - absent with one question; with several, one row per question labeled by agent, and clicking a row scrolls its card into view.
-- **Answering collapses in place** - after a pick the live options are gone, the card is a single line with "Expand", the title stays visible and the heading count drops to 0; "Expand" shows the options with the pick marked and "Open session →" still opens the agent; "Collapse" hides them again.
-- **A failed post** - the failure's message is shown, the gate stays open and the heading still counts it.
+- **What a row says** - under the heading "Waiting on you · 1", a row reads, in this order: "Needs input", the agent's title, the question's title, the project's name, how long ago ("12m ago"), and ends on the arrow.
+- **Naming a row** - an agent is named by the first line of its intent, and by its id when it has no intent; the row's button is named "Open <that title>: needs input, <the question's title>".
+- **No time** - a question with no time shows nothing about when.
+- **Order** - rows come in the order the daemon gives.
+- **Into the agent** - a click on a row opens that row's agent in that row's project, and no other.
 - **One project's questions** - given a project, the section shows and counts only that project's questions, and is absent when that project has none while another has.
+- **No answering** - the list has one button per row and nothing else: no option, no "Submit", no "Skip"; a click sends no pick and no message.
+- **A row holds still** - when the next read brings another question from the same agent, the row is the same row with the new question's title.

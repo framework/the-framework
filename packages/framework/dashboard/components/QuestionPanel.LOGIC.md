@@ -1,4 +1,4 @@
-The question an agent's [1] turn ended on (a gate [2]), asked as a panel above the message box of the agent's page: the title, one row per option, a row to answer in one's own words, and Skip / Submit.
+The question an agent's [1] turn ended on (a gate [2]), asked as a panel above the message box of the agent's page: the title, one row per option, a row to answer in one's own words, and Skip / Submit. The same panel asks the question a cloud session is parked on, in the agent's cloud notice (`CloudAgentNotice.tsx`), where the pick goes the caller's own way [4] and only the options are offered.
 
 ## Context
 
@@ -11,6 +11,7 @@ The question an agent's [1] turn ended on (a gate [2]), asked as a panel above t
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [3] pick: the answer to a gate: the option or options the user chose.
+[4] the caller's own way: a way to send a pick that the place showing the panel gives it, used instead of the usual one. The cloud notice gives one, which hands the picked labels to the Claude web bridge.
 
 ## Business logic — TL;DR
 
@@ -21,6 +22,7 @@ The question an agent's [1] turn ended on (a gate [2]), asked as a panel above t
 - **Skip** - sends the user's message "I skip this question.".
 - **Keys** - on the active panel, 1 to 9 pick a row and Ctrl+Enter submits; keys typed into another text field are left alone.
 - **After sending** - the panel stays with its controls off, saying it waits for the agent; a refusal is shown in the daemon's words and the controls come back.
+- **A pick sent the caller's own way** - when the place showing the panel gives its own way [4], the picked option or the checked options go through it, and the panel has no "Other" row and no "Skip".
 
 ## Business logic
 
@@ -102,3 +104,21 @@ Only the panel the page marks active listens to the keyboard (the page marks the
 #### Business logic
 
 While a send is on its way the bottom line reads "Sending your answer…" and every control (rows, the field, Skip, Submit) is off. When the daemon accepts it, the line reads "Answer sent — waiting for the agent to pick it up…" and the controls stay off; the panel goes when the agent's page sees the agent go on. When the daemon refuses (the question is no longer open, the project has no resume hook), or the send fails, the reason is shown in red in the daemon's own words ("Could not send your answer — try again." when it gave none), nothing is reported as said, and the controls come back.
+
+### A pick sent the caller's own way
+
+#### Context
+
+**User story**: a cloud session's question is answered in the same panel as a local agent's, but the answer cannot reach that session as a pick or as a message to an agent here: the Claude web bridge has to type it into the session.
+
+**Problem**: the bridge types only the labels of the question a cloud session is parked on, never free text, so that nothing but what the session itself offered is ever typed into it. Words of the user's own and a skip would always be refused there, and a control that always fails must not be shown.
+
+#### Business logic
+
+The place that shows the panel may give it the caller's own way [4] to send a pick [3]. When it does:
+
+- the panel offers the question's options only: there is no "Other" row and no "Skip" button, and the digit after the last option does nothing. To answer in one's own words, the user goes where the caller points (the cloud notice's link "Answer it in the session");
+- one answer: "Submit" hands the picked option's id to the caller's own way, and no pick is sent the usual way;
+- several answers: "Submit" hands over the list of the checked options' ids, which may be empty.
+
+Everything else is unchanged: what starts picked, the option keys and Ctrl+Enter on an active panel, and what happens after sending, where a failure of the caller's own way is shown as the reason, in its own words.

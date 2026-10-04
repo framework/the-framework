@@ -1,8 +1,8 @@
-What the agent view [1] says about a hands-off [2] agent [3] whose location [4] is `web`: a notice row telling where the work went and how to reach the cloud session [5], the question that session is parked on rendered as the same "Your call" gate [6] card a local agent gets but answered through the Claude web bridge [7], the state of that answer (queued, typed, or failed), and, at the tail of the agent's log, a "Cloud session mirror" box streaming the session's turns as the extension reads them. Renders nothing for an agent of any other location.
+What the agent view [1] says about a hands-off [2] agent [3] whose location [4] is `web`: a notice row telling where the work went and how to reach the cloud session [5], the question that session is parked on asked in the same question panel (`QuestionPanel.tsx`) a local agent's gate [6] gets but answered through the Claude web bridge [7], the state of that answer (queued, typed, or failed), and, at the tail of the agent's log, a "Cloud session mirror" box streaming the session's turns as the extension reads them. Renders nothing for an agent of any other location.
 
 ## Context
 
-**User story**: the user starts an agent on "Claude web". Its page cannot show a streamed feed, because the work runs on claude.ai; instead it says "Running as a Claude Code cloud session…", offers the command to continue the session locally and a link to open it, mirrors what the session says, and, when the session asks a question, shows it as a card the user answers without leaving the dashboard.
+**User story**: the user starts an agent on "Claude web". Its page cannot show a streamed feed, because the work runs on claude.ai; instead it says "Running as a Claude Code cloud session…", offers the command to continue the session locally and a link to open it, mirrors what the session says, and, when the session asks a question, asks it in a panel the user answers without leaving the dashboard.
 
 **Problem**: there is no read-back API for a cloud session; everything the dashboard learns about it comes from the extension's Driver tab, over the bridge, so it is polled from the daemon rather than streamed, and it is best-effort: nothing arrives while the claude.ai tab is closed.
 
@@ -21,8 +21,8 @@ What the agent view [1] says about a hands-off [2] agent [3] whose location [4] 
 ## Business logic — TL;DR
 
 - **The notice row** - "Starting a Claude Code cloud session…" until the task has left this machine and the session is named, then "Running as a Claude Code cloud session…" with the `claude --teleport <session id>` command, a copy button and "Open the session".
-- **The parked question as a gate card** - the question the bridge reports is shown as the "Your call" card, with "Answer it in the session" as the manual path; the pick is queued for the extension to type.
-- **Where the answer stands** - a queued answer shows "Sending “…” through your Claude web tab…" with "Cancel"; a typed one "Answered “…”"; a failed one puts the card back with "Sending “…” failed…".
+- **The parked question as a question panel** - the question the bridge reports is asked in the question panel, with "Answer it in the session" as the manual path; the panel offers the question's options only, and the pick is queued for the extension to type.
+- **Where the answer stands** - a queued answer shows "Sending “…” through your Claude web tab…" with "Cancel"; a typed one "Answered “…”"; a failed one puts the panel back with "Sending “…” failed…".
 - **The cloud session mirror** - a labeled best-effort box of the session's turns, the user's side reduced to one line, claude.ai's own interface text scrubbed out, "Connecting to the cloud session…" while empty.
 - **Polling the bridge** - question, answer and mirror are each asked of the daemon every four seconds; a daemon with the bridge off answers nothing, and a failed poll shows no banner.
 
@@ -38,15 +38,21 @@ See `## Context`.
 
 For an agent [3] whose location [4] is `web`, a row with a cloud icon sits above the feed. Until the task has left this machine and named the cloud session [5] it reads "Starting a Claude Code cloud session…". Once the session is known it reads "Running as a Claude Code cloud session. It opens its own pull request over there; a question it parks on shows here once the bridge sees it." followed by the command `claude --teleport <session id>`, a copy button named "Copy the command that continues this session here", and the link "Open the session", which opens claude.ai in a new tab. The session's id and URL are read off the agent's event stream [9], from the driver's action that announces the cloud session; when the agent handed off more than once, the most recent session counts (the rule is in `lib/live-state.ts`).
 
-### The parked question as a gate card
+### The parked question as a question panel
 
 #### Context
 
-**User story**: the cloud session [5] stops at "Which approach?"; the user sees the same "Your call" card as for a local agent, picks an option, and the extension types the answer into the session.
+**User story**: the cloud session [5] stops at "Which approach?"; the user sees the same question panel as for a local agent, picks an option, presses "Submit", and the extension types the answer into the session.
+
+**Problem**: the notice sits at the top of the agent view [1], above the transcript, while the keyboard belongs to the message box and to the question panel right above it. A second panel listening to the number keys would pick an option the user did not mean.
 
 #### Business logic
 
-When the daemon reports a question the session is parked on, and no answer for it is queued or typed (or the last answer failed), the question is rendered as a gate [6] card inline under the notice row: the same card as a local agent's, with the question's labels standing in as the option ids, since claude.ai has no ids and a label is what the extension can type back (the projection is in `src/dashboard/bridge-question.ts`); no automatic countdown is offered on it. A pick [8] made on the card is queued on the daemon for the extension, one label or a multi-select's set of labels; when the daemon refuses to queue it, the card shows the daemon's reason (or "could not queue the answer"). Under the card, the link "Answer it in the session" opens the session in a new tab for whoever prefers to answer over there.
+When the daemon reports a question the session is parked on, and no answer for it is queued or typed (or the last answer failed), the question is asked under the notice row in the question panel a local agent's gate [6] gets (`QuestionPanel.tsx`), with the question's labels standing in as the option ids, since claude.ai has no ids and a label is what the extension can type back (the projection is in `src/dashboard/bridge-question.ts`). A question with another title starts the panel fresh.
+
+The panel offers the question's options and "Submit" only, with no "Other" row and no "Skip": the daemon queues only labels of the question it holds (`src/dashboard/bridge-store.ts`), so that the extension never types free text into a cloud session, and words of the user's own would always be refused. "Submit" hands the pick [8] to the daemon's queue for the extension, one label or a multi-select's set of labels, and sends nothing to the agent here. When the daemon refuses, the panel shows the daemon's reason (or "could not queue the answer") and stays answerable.
+
+The panel is never the active one: it does not listen to the number keys or to Ctrl+Enter, and shows no hint about them. Under the panel, the link "Answer it in the session" opens the session in a new tab for whoever prefers to answer over there, or wants to answer in their own words.
 
 ### Where the answer stands
 
@@ -58,8 +64,8 @@ When the daemon reports a question the session is parked on, and no answer for i
 
 - Queued: a spinner and "Sending “<labels>” through your Claude web tab… It goes out the next time the extension checks in.", with a "Cancel" button that withdraws the answer from the daemon's queue. The labels are the picked labels joined by commas.
 - Sent (typed into the session and submitted): a check and "Answered “<labels>”. The session continues over there and its transcript above follows along.", with an "Open the session" link.
-- Failed: the gate [6] card returns, headed by a red line "Sending “<labels>” failed: <the bridge's note>. Pick again, or answer in the session." (without the colon and note when the bridge gave none).
-- While an answer is queued or sent, the card is not shown.
+- Failed: the question panel returns, headed by a red line "Sending “<labels>” failed: <the bridge's note>. Pick again, or answer in the session." (without the colon and note when the bridge gave none).
+- While an answer is queued or sent, the question panel is not shown.
 
 ### The cloud session mirror
 

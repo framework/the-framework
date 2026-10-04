@@ -94,7 +94,7 @@ test('an unreadable project or log contributes nothing rather than failing the r
   assert.deepEqual(questions, [])
 })
 
-test('a web agent\'s question arrives from the bridge and is answerable by label (#1554)', async () => {
+test('a web agent\'s question arrives from the bridge and is listed under its agent (#1554)', async () => {
   const questions = await buildOpenQuestions(PROJECTS, {
     liveAgents: async () => [],
     events: async () => [],
@@ -131,7 +131,6 @@ test('a web agent\'s question arrives from the bridge and is answerable by label
       },
       // Parked since the bridge saw it: that is the wait the order sorts on, not the hand-off.
       updatedAt: '2026-08-23T09:30:00.000Z',
-      bridge: { sessionId: 'session_01Web', url: 'https://claude.ai/code/session_01Web' },
     },
   ])
 })

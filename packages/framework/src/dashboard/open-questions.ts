@@ -9,25 +9,20 @@ import type { ProjectSummary } from './projects.js'
 //
 // A run that asked has ended, `waiting`, its checkout kept for the answer (#1774); with several
 // of them the questions scattered across their run pages. The launcher's hub lists them all,
-// each with the full question (options, multi, recommended), read off the run's diary by the
-// same rule the run page uses ({@link pendingChoices}).
+// one row per run that opens it, each question read off the run's diary by the same rule the run
+// page uses ({@link pendingChoices}).
 
-/** One session's open question: the full gate, answerable from wherever it is rendered. */
+/** One session's open question, as the hub lists it: who waits, on what, since when. */
 export interface OpenQuestion {
   projectId: string
   projectName: string
   agentId: string
-  /** What the agent was asked to do: the card's label. */
+  /** What the agent was asked to do: the row's title. */
   intent?: string
   /** When the agent last spoke, ISO: what the longest-waiting-first order sorts on. */
   updatedAt?: string
+  /** The question; for one a Claude web session asked (#1237/#1554), built from what the browser bridge reported. */
   choice: ChoiceRequest
-  /**
-   * Asked by a Claude web session and carried here by the browser bridge (#1237/#1554): the pick
-   * goes back through `sendBridgeAnswer` on this session, not through the run's resume hook. The option
-   * ids of {@link choice} are the labels, which is what the extension types.
-   */
-  bridge?: { sessionId: string; url: string }
 }
 
 /** Injectable seams so {@link buildOpenQuestions} is unit-testable off disk. */
@@ -61,8 +56,8 @@ function unansweredBridgeQuestions(): BridgeQuestion[] {
  *
  * Forgiving throughout, like every cross-project rollup: an unreadable project, agent list or
  * event log contributes nothing rather than failing the read. A waiting run whose diary shows no
- * open question (log unreadable) is skipped — offering an answer the daemon would refuse is
- * worse than one card fewer.
+ * open question (log unreadable) is skipped — listing a question nobody can answer is worse than
+ * one row fewer.
  */
 export async function buildOpenQuestions(
   projects: ProjectSummary[],
@@ -76,20 +71,20 @@ export async function buildOpenQuestions(
   const bridged = (deps.bridged ?? unansweredBridgeQuestions)()
   const claimed = new Set<string>()
   const items: OpenQuestion[] = []
-  const card = (project: ProjectSummary, meta: AgentMeta, choice: ChoiceRequest, rest: Pick<OpenQuestion, 'bridge' | 'updatedAt'>): OpenQuestion => ({
+  const card = (project: ProjectSummary, meta: AgentMeta, choice: ChoiceRequest, updatedAt: string | undefined): OpenQuestion => ({
     projectId: project.id,
     projectName: project.name,
     agentId: meta.id,
     ...(meta.intent ? { intent: meta.intent } : {}),
+    ...(updatedAt ? { updatedAt } : {}),
     choice,
-    ...rest,
   })
   for (const project of projects) {
     for (const meta of await liveAgents(project.path).catch((): LiveAgent[] => [])) {
       if (meta.status !== 'waiting') continue
       const choice = pendingChoices((await events(project.path, meta.id).catch(() => undefined)) ?? []).at(-1)
       if (!choice) continue
-      items.push(card(project, meta, choice, meta.updatedAt ? { updatedAt: meta.updatedAt } : {}))
+      items.push(card(project, meta, choice, meta.updatedAt))
     }
     // A web agent's question lives in the bridge store, not its log (#1554): join it on the cloud
     // session id its meta carries. The archive is read only while there is something to join.
@@ -99,13 +94,8 @@ export async function buildOpenQuestions(
       const question = bridged.find(q => q.sessionId === meta.sessionId && !claimed.has(q.sessionId))
       if (!question) continue
       claimed.add(question.sessionId)
-      items.push(
-        card(project, meta, bridgeChoiceRequest(question), {
-          // Parked since the bridge saw it, which is the wait that matters here — not the hand-off.
-          updatedAt: question.receivedAt,
-          bridge: { sessionId: question.sessionId, url: `https://claude.ai/code/${question.sessionId}` },
-        }),
-      )
+      // Parked since the bridge saw it, which is the wait that matters here — not the hand-off.
+      items.push(card(project, meta, bridgeChoiceRequest(question), question.receivedAt))
     }
   }
   return items.sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? ''))

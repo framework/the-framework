@@ -24,14 +24,17 @@ function Key({ n }: { n: number }) {
 // the web asks: the title, one row per option (its label, its description, the number key that
 // picks it), an "Other" row to answer in one's own words, and Skip / Submit. An option's pick goes
 // over the control RPC, which hands the chosen labels to the agent; "Other" and Skip go as the
-// person's own message, which continues the agent like any message. Mount it with
-// `key={choice.id}` so a question asked again starts fresh. `active` binds the keys.
+// person's own message, which continues the agent like any message. A caller whose agent is not
+// reached that way (a cloud session) gives `send`: the pick goes through it, and the panel offers
+// the options only.
+// Mount it with `key={choice.id}` so a question asked again starts fresh. `active` binds the keys.
 export function QuestionPanel({
   projectId,
   agentId,
   choice,
   active = false,
   onSaid,
+  send,
 }: {
   projectId: string
   agentId: string
@@ -40,6 +43,12 @@ export function QuestionPanel({
   active?: boolean
   /** Told the message "Other" or Skip sent, so the chat can show it at once. */
   onSaid?: ((text: string) => void) | undefined
+  /**
+   * Where the pick goes instead of the usual call: the picked option, or the checked ones. With
+   * it the panel has no "Other" row and no Skip: the bridge types only a parked question's own
+   * labels into a cloud session, never free text, so it would refuse both.
+   */
+  send?: ((pick: string | string[]) => Promise<unknown>) | undefined
 }) {
   const { busy, error, run } = useAction()
   // Sent and accepted by the daemon: the panel stays, its controls off, until the agent going on
@@ -53,6 +62,7 @@ export function QuestionPanel({
   const words = other.trim()
 
   const deliver = (fn: () => Promise<unknown>) => void run(fn, 'Could not send your answer — try again.').then(outcome => outcome.ok && setSent(true))
+  const answer = (pick: string | string[]) => deliver(() => (send ? send(pick) : sendChoice(projectId, choice.id, pick, agentId)))
   const say = (text: string) =>
     deliver(async () => {
       const result = await sendMessage(projectId, text, agentId)
@@ -67,10 +77,10 @@ export function QuestionPanel({
     if (choice.multi) {
       // Words in "Other" go with the checked options' labels, as one message: the agent reads both.
       if (words !== '') return say([...choice.options.filter(o => checked.has(o.id)).map(o => o.label), words].join(', '))
-      return deliver(() => sendChoice(projectId, choice.id, [...checked], agentId))
+      return answer([...checked])
     }
     if (picked === OTHER) return say(words)
-    if (picked !== undefined) deliver(() => sendChoice(projectId, choice.id, picked, agentId))
+    if (picked !== undefined) answer(picked)
   }
   const pick = (id: string) => {
     if (parked) return
@@ -101,13 +111,13 @@ export function QuestionPanel({
       const n = Number(e.key)
       const option = choice.options[n - 1]
       if (option) keys.current.pick(option.id)
-      else if (n === choice.options.length + 1) otherInput.current?.focus()
+      else if (!send && n === choice.options.length + 1) otherInput.current?.focus()
       else return
       e.preventDefault()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [active, choice.options])
+  }, [active, choice.options, send])
 
   const row = (on: boolean) => cn('flex w-full items-start gap-3 rounded-lg border px-3 py-2 text-left', on ? 'border-primary bg-accent/60' : 'border-border hover:bg-accent/40')
   return (
@@ -137,24 +147,26 @@ export function QuestionPanel({
               </li>
             )
           })}
-          <li>
-            <label className={cn(row(choice.multi ? words !== '' : picked === OTHER), 'items-center')}>
-              <input
-                ref={otherInput}
-                value={other}
-                disabled={parked}
-                onFocus={() => !choice.multi && setPicked(OTHER)}
-                onChange={e => setOther(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) submit()
-                }}
-                placeholder="Other: say it in your own words"
-                aria-label="Other"
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              />
-              <Key n={choice.options.length + 1} />
-            </label>
-          </li>
+          {!send && (
+            <li>
+              <label className={cn(row(choice.multi ? words !== '' : picked === OTHER), 'items-center')}>
+                <input
+                  ref={otherInput}
+                  value={other}
+                  disabled={parked}
+                  onFocus={() => !choice.multi && setPicked(OTHER)}
+                  onChange={e => setOther(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) submit()
+                  }}
+                  placeholder="Other: say it in your own words"
+                  aria-label="Other"
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                />
+                <Key n={choice.options.length + 1} />
+              </label>
+            </li>
+          )}
         </ul>
         {error && (
           <p role="alert" className="mt-2 px-1 text-xs text-danger">
@@ -166,9 +178,11 @@ export function QuestionPanel({
           <span role={parked ? 'status' : undefined} className="min-w-0 flex-1 truncate px-1 text-xs text-muted-foreground">
             {busy ? 'Sending your answer…' : sent ? 'Answer sent — waiting for the agent to pick it up…' : active ? 'Number keys pick · Ctrl+Enter submits' : ''}
           </span>
-          <Button variant="ghost" size="sm" disabled={parked} onClick={() => say(SKIP_MESSAGE)}>
-            Skip
-          </Button>
+          {!send && (
+            <Button variant="ghost" size="sm" disabled={parked} onClick={() => say(SKIP_MESSAGE)}>
+              Skip
+            </Button>
+          )}
           <Button size="sm" disabled={parked || !ready} onClick={submit}>
             Submit
           </Button>

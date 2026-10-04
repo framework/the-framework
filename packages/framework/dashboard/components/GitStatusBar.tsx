@@ -127,7 +127,6 @@ export function GitStatusBar({
   // project's own checkout it is the user's. Same dot, honest wording.
   const dirtyLabel = agentId ? 'Uncommitted changes in this agent' : 'Uncommitted changes'
 
-  const branchTitle = agentId ? [branch ?? 'no branch', checkout?.path].filter(Boolean).join('\n') : `branch ${branch}`
 
   // One flat row so exactly one element gives up width: the label (or, with no label, the branch).
   // Everything else is shrink-0 and drops out at a container width instead of squeezing to mush.
@@ -140,17 +139,18 @@ export function GitStatusBar({
           change under you, unlike the branch, which the agent renames near the end (#736). It is
           the one element that shrinks, so it truncates last and the identity never disappears. */}
       {title}
-      {/* The branch is the identity where there is no agent's name (the project home). An agent's
-          branch is said in the bar above the message box. */}
-      {!label && (
+      {/* The branch is the identity on the project home. An agent's branch is said in the bar above
+          the message box, never here: not even for the moment its name is not known yet. */}
+      {!label && !agentId && (
         <span className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-hidden text-muted-foreground">
           <GitBranch className="h-3.5 w-3.5 shrink-0" />
           <Tooltip>
             <TooltipTrigger render={<span className="max-w-[16rem] truncate font-medium text-foreground" />}>{branch ?? 'no branch'}</TooltipTrigger>
-            <TooltipContent className="whitespace-pre-line">{branchTitle}</TooltipContent>
+            <TooltipContent>{`branch ${branch}`}</TooltipContent>
           </Tooltip>
         </span>
       )}
+      {agentState}
       {/* Clean is neutral, not green. Green means "added / new / done" everywhere else, so a
           green dot for "nothing changed" sat one pane away from the file tree's green dot for
           "this folder HAS changes": the same colour for opposite facts. A clean tree is the
@@ -165,7 +165,6 @@ export function GitStatusBar({
           <TooltipContent>{dirty ? dirtyLabel : 'Clean'}</TooltipContent>
         </Tooltip>
       )}
-      {agentState}
       {/* Only a worktree has a size worth showing, and only once nothing is writing to it (#798). */}
       {size && (
         <Tooltip>
@@ -194,7 +193,7 @@ export function GitStatusBar({
       ) : (
         facts
       )}
-      {!label && status.pr && (
+      {!label && !agentId && status.pr && (
         <Tooltip>
           <TooltipTrigger
             render={

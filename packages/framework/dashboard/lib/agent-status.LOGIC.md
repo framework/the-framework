@@ -1,10 +1,12 @@
-Picks the one word an agent's [1] status pill shows, out of its event stream [2], when the caller has it, its card [3], and how many of its subagents [6] are still running: "failed", "stopped", "waiting for an answer", "N subagents running", "saving…", "ready for merge", "building…" or "finished", together with the colored dot and the text tone drawn beside it. With no event and no card there is no pill at all. The words are exclusive and ranked, so one agent is in exactly one state everywhere it appears.
+Picks the one word an agent's [1] status pill shows, out of its event stream [2], when the caller has it, its card [3], how many of its subagents [6] are still running, and what the agent's own page knows first (a message just sent, a turn just seen ending): "failed", "stopped", "waiting for an answer", "N subagents running", "saving…", "ready for merge", "building…" or "finished", together with the colored dot and the text tone drawn beside it. With no event and no card there is no pill at all. The words are exclusive and ranked, so one agent is in exactly one state everywhere it appears.
 
 ## Context
 
 **User story**: the user scans a list of agents and each one shows a single word for where it stands, and opens an agent's own page to find the same word in its toolbar. A red "failed" tells a crash from an amber "stopped" the user asked for, and neither is dressed up as the green "ready for merge" of a pull request the agent opened on its way.
 
 **Problem**: an agent can hold several of these facts at the same time. It can open a pull request and then fail, or be stopped [4] on a later leg after opening one. Without a ranking, the pill would show whichever fact was checked first, and a green "ready for merge" would be a lie about an agent that then crashed.
+
+**Problem**: on the agent's own page the word went back to "finished" for a moment at both ends of a turn. After a message to an ended agent it read "finished", "building…", "finished", "saving…", "finished": the message was sent but its line was not in the event stream yet, and the turn had ended but the card, polled every 2 seconds, had not said yet that the agent was saving.
 
 **Business logic story**: the event stream says how the agent's current leg ended, and it arrives ahead of the card, which the dashboard polls every 2 seconds. The card says what the event stream cannot: the pull request the agent's work is on, and whether the tool that runs the agent is still saving after a clean end. So the ending is read off the event stream, and the pull request and the saving mark off the card.
 
@@ -25,6 +27,7 @@ Picks the one word an agent's [1] status pill shows, out of its event stream [2]
 - **"failed" says what failed** - a failure carries the reason the agent's ending gave, apart from the word, so each place decides how much of it to show.
 - **"saving…" outranks "ready for merge"** - after a clean end, while the card is marked saving, the pill says the agent's record is being saved, not that it is merely ready.
 - **A main agent whose subagents still work is not "finished"** - an agent that ended clean while N of its subagents [6] are running reads "N subagents running", pulsing, below "waiting for an answer" and above "saving…".
+- **What the agent's page knows first** - the page may say the agent is starting (a message was just sent): the word is "building…" at once, above every other word; and that it just watched a turn end: after a clean end the word is "saving…" as if the card were marked saving.
 - **"building…" only while the agent is going** - the pulsing amber word is for an agent that may still stream something; the moment it ends the pill settles.
 
 ## Business logic
@@ -57,13 +60,13 @@ See `## Context`.
 
 #### Business logic
 
-The first word that applies, top down, is the one shown:
+The first word that applies, top down, is the one shown. Above the ladder: when the agent's page says the agent is starting (see "What the agent's page knows first"), the word is "building…", whatever the ending.
 
 1. **"failed"** — the agent [1] ended without success, the user did not stop [4] it, and it does not wait for an answer. Red dot, red text.
 2. **"stopped"** — the agent's ending says the user stopped it. Amber dot, amber text.
 3. **"waiting for an answer"** — the agent ended on its question and waits for the user's answer. Amber dot, amber text.
 4. **"1 subagent running" / "<N> subagents running"** — the agent ended clean and the caller says N of its subagents [6], at least one, are still running. Pulsing dot in the primary color, muted text.
-5. **"saving…"** — the agent ended clean, none of its subagents is running, and its card [3] is marked saving [5]. Pulsing green dot, muted text.
+5. **"saving…"** — the agent ended clean, none of its subagents is running, and its card [3] is marked saving [5], or the agent's page says it just watched the turn end. Pulsing green dot, muted text.
 6. **"ready for merge"** — the agent ended clean and its card has a pull request. Green dot, muted text.
 7. **"building…"** — the event stream [2] shows the agent still going (the rule is in `live-state.ts`), or the agent has no ending and its card's status is `running`. Pulsing amber dot, muted text.
 8. **"finished"** — everything else: the agent is over with nothing more to say about it. Gray dot, muted text.
@@ -100,6 +103,19 @@ The saving [5] window sits above "ready for merge" on the ladder, so for as long
 
 The caller may say how many of the agent's [1] subagents [6] are still running. The agent's page counts every subagent that holds the agent's job: one that is `running`, one that is saving, and one that ended less than 10 seconds ago, since the agent is then about to be continued (`subagents.ts`); the word says "running" for all of them. Neither the agent's event stream [2] nor its card [3] knows it, the project's list of agents does. When the agent ended clean and that number is above zero, the pill says "1 subagent running" or "<N> subagents running" with a pulsing dot, pull request or not, saving or not. It sits below "waiting for an answer" and above "saving…": a failed or stopped agent and one waiting for an answer keep their own word, and an agent that is itself working has not ended and reads "building…". It outranks "saving…" because a main agent's record is saved after each of its turns, and the pill flashed "saving…" between them while its subagents worked. Once no subagent is running, or when the caller gives no number, the pill falls through to "saving…", "ready for merge" or "finished".
 
+### What the agent's page knows first
+
+#### Context
+
+See the second problem in `## Context`.
+
+#### Business logic
+
+The caller may hand over two facts only the agent's own page knows (`components/AgentView.tsx` decides them); a caller that hands none, such as a list of agents, gets the ladder as it is.
+
+- **Starting**: a message was just sent to the agent, or the agent was just started, and its prompt line is not in the event stream [2] yet. The word is "building…" at once, above the whole ladder: whatever the agent's last leg ended as (clean, stopped, failed, waiting), it is about to work. With no event and no card there is still no pill.
+- **Settling**: the page just watched a turn end, and the card [3] has not said yet whether the agent is saving [5]. After a clean end with no subagent [6] running, the word is "saving…", exactly as when the card is marked saving, so it does not read "finished", then "saving…", then "finished". An end that failed, was stopped, or waits for an answer says its own word at once, and "N subagents running" still outranks it.
+
 ### "building…" only while the agent is going
 
 #### Context
@@ -108,4 +124,4 @@ The caller may say how many of the agent's [1] subagents [6] are still running. 
 
 #### Business logic
 
-"building…" is shown only while the agent [1] is still going: its event stream's [2] current leg has not ended, or, with no ending known, its card [3] says `running`. As soon as its ending lands, the pill settles: on "failed", "stopped", "waiting for an answer", "N subagents running", "saving…", "ready for merge" or, when nothing else applies, "finished". A resumed agent, or one answered after it waited, starts a new leg and shows "building…" again.
+"building…" is shown only while the agent [1] is still going: its event stream's [2] current leg has not ended, or, with no ending known, its card [3] says `running`, or the agent's page says it is starting. As soon as its ending lands, the pill settles: on "failed", "stopped", "waiting for an answer", "N subagents running", "saving…", "ready for merge" or, when nothing else applies, "finished". A resumed agent, or one answered after it waited, starts a new leg and shows "building…" again.

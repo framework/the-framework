@@ -2,12 +2,12 @@ import type { AgentWorktree, FrameworkEvent } from '../../src/index.js'
 import { GitStatusBar } from './GitStatusBar.js'
 import { AgentActionsMenu } from './AgentActionsMenu.js'
 import { AgentErrorCount } from './AgentErrorCount.js'
-import { agentStatusPill, type AgentCardFacts } from '../lib/agent-status.js'
+import { agentStatusPill, type AgentCardFacts, type AgentPageFacts } from '../lib/agent-status.js'
 import { cn } from '../lib/utils.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
-// One agent's top bar: its name (a disclosure for the detail under the bar), its tree's
-// clean/dirty and its status word on the left, and what you can DO to it on the right, a single ⋮
+// One agent's top bar: its name (a disclosure for the detail under the bar), its status word and
+// its tree's clean/dirty on the left, and what you can DO to it on the right, a single ⋮
 // overflow menu (AgentActionsMenu). Its branch, what the branch holds and the next step are in the
 // bar above the message box (AgentWorkBar). One bar for the session whether running or finished
 // (AgentView), so the controls stay put when an agent reaches Done.
@@ -17,6 +17,7 @@ export function AgentActionBar({
   events,
   card,
   subagentsRunning = 0,
+  page,
   retainedWorktree = false,
   onWorktreeRemoved,
   onDeleted,
@@ -35,6 +36,8 @@ export function AgentActionBar({
   card?: AgentCardFacts | undefined
   /** How many of the run's subagents are still working, for the status pill. */
   subagentsRunning?: number
+  /** What the page knows before the feed and the card do: a message just sent, a turn just ended. */
+  page?: AgentPageFacts | undefined
   /** The session's name — leads the bar, so the branch is git context, not the identity (#1030). */
   label?: string | undefined
   /** The session's project, shown as a `project / session` breadcrumb before the name. */
@@ -62,7 +65,7 @@ export function AgentActionBar({
   // spent a full row on one word and pushed the output down. Ranked in agentStatusPill, so exactly
   // one of failed / stopped / waiting for an answer / saving… / ready for merge / building… /
   // finished is ever shown.
-  const status = agentStatusPill(events, card, subagentsRunning)
+  const status = agentStatusPill(events, card, subagentsRunning, page)
   return (
     // One row, always (#1026). The branch and its summary give up width as the row fills; the
     // controls never drop under them, because a bar that reflows moves everything below it.
@@ -79,14 +82,17 @@ export function AgentActionBar({
         checkout={checkout}
         expanded={expanded}
         onToggle={onToggle}
-        // Beside the tree's clean/dirty, not at the far end of the bar: "dirty · ready for merge"
-        // is one line of facts about the session, where the end of the row is where its controls
-        // live. A failure's reason is only the word's hover: cut to fit the row it said nothing,
+        // Right after the name, before the tree's clean/dirty, not at the far end of the bar:
+        // "finished · dirty" is one line of facts about the session, where the end of the row is
+        // where its controls live. The word comes first so it keeps its place: clean/dirty is
+        // there only while the agent has a checkout, and coming and going after the word it moves nothing. A failure's reason is only the word's hover: cut to fit the row it said nothing,
         // and the feed's end line below says it whole.
         agentState={
           ready && status && (
             <Tooltip>
-              <TooltipTrigger render={<span className="flex shrink-0 items-center gap-1.5" />}>
+              {/* A width the short words share (finished, building…, saving…, stopped, failed), so what
+                  follows the word keeps its place as the word changes. */}
+              <TooltipTrigger render={<span className="flex min-w-[4.75rem] shrink-0 items-center gap-1.5" />}>
                 <span className={cn('h-2 w-2 shrink-0 rounded-full', status.dot)} aria-hidden />
                 <span className={status.tone}>{status.label}</span>
               </TooltipTrigger>

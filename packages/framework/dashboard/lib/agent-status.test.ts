@@ -90,4 +90,22 @@ describe('agentStatusPill', () => {
     expect(agentStatusPill(answered)).toMatchObject({ label: 'building…' })
     expect(agentStatusPill([...answered, ended({ ok: true })])).toMatchObject({ label: 'finished' })
   })
+
+  test('a message just sent says building at once, whatever the last leg ended as', () => {
+    const done = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'end', ok: true }] as FrameworkEvent[]
+    expect(agentStatusPill(done, { status: 'done' })?.label).toBe('finished')
+    expect(agentStatusPill(done, { status: 'done' }, 0, { starting: true })?.label).toBe('building…')
+    expect(agentStatusPill([], { status: 'stopped' }, 0, { starting: true })?.label).toBe('building…')
+    expect(agentStatusPill([], { status: 'failed' }, 0, { starting: true })?.label).toBe('building…')
+  })
+
+  test('a turn just seen ending clean says saving until the card has answered; any other ending says itself at once', () => {
+    const done = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'end', ok: true }] as FrameworkEvent[]
+    expect(agentStatusPill(done, { status: 'done' }, 0, { settling: true })?.label).toBe('saving…')
+    expect(agentStatusPill(done, { status: 'done', saving: true }, 0, { settling: false })?.label).toBe('saving…')
+    expect(agentStatusPill(done, { status: 'done' }, 0, { settling: false })?.label).toBe('finished')
+    expect(agentStatusPill([], { status: 'stopped' }, 0, { settling: true })?.label).toBe('stopped')
+    expect(agentStatusPill([], { status: 'failed' }, 0, { settling: true })?.label).toBe('failed')
+    expect(agentStatusPill([], { status: 'waiting' }, 0, { settling: true })?.label).toBe('waiting for an answer')
+  })
 })

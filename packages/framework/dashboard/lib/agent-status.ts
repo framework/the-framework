@@ -8,6 +8,14 @@ import { isAgentActive, agentOutcome, type AgentOutcome } from './live-state.js'
  */
 export type AgentStatusPill = { dot: string; label: string; tone: string; detail?: string }
 
+/**
+ * What the agent's own page knows before the feed and the card do. `starting`: a message was just
+ * sent, and its line is not in the feed yet. `settling`: the page just watched a turn end, and the
+ * card has not said yet whether the run's process is saving. Without them the word went back to
+ * "finished" for a moment at both ends of a turn.
+ */
+export type AgentPageFacts = { starting?: boolean; settling?: boolean }
+
 /** What the pill reads off the run's card, as the daemon hands it over: its status, its pull request, and whether it is saving. */
 export type AgentCardFacts = Pick<AgentMeta, 'status' | 'pr' | 'saving'>
 
@@ -26,13 +34,17 @@ export type AgentCardFacts = Pick<AgentMeta, 'status' | 'pr' | 'saving'>
  * card also says what the feed cannot: the pull request the run's work is on, and whether the
  * run's process is still saving its record after a clean end. A card alone (a run whose first
  * line has not landed yet) is enough to say it builds. How many of the run's subagents are still
- * working comes from the runs list: neither the feed nor the card of this run knows it.
+ * working comes from the runs list: neither the feed nor the card of this run knows it. What the
+ * agent's page knows first ({@link AgentPageFacts}) keeps the word from going back to "finished"
+ * between two of those answers.
  *
  * Shared so the session toolbar and the overview cannot drift apart on what an agent is.
  */
-export function agentStatusPill(events: FrameworkEvent[], card?: AgentCardFacts, subagentsRunning = 0): AgentStatusPill | null {
+export function agentStatusPill(events: FrameworkEvent[], card?: AgentCardFacts, subagentsRunning = 0, page: AgentPageFacts = {}): AgentStatusPill | null {
   const outcome = agentOutcome(events) ?? cardOutcome(card)
   if (events.length === 0 && !card) return null
+  // A message was just sent: the agent is about to work, whatever its last leg ended as.
+  if (page.starting) return BUILDING
   const failed = outcome !== undefined && !outcome.ok && !outcome.stopped && !outcome.waiting
   if (failed) {
     return { dot: 'bg-danger', label: 'failed', tone: 'text-danger', ...(outcome?.detail ? { detail: outcome.detail } : {}) }
@@ -49,16 +61,18 @@ export function agentStatusPill(events: FrameworkEvent[], card?: AgentCardFacts,
   // Ended clean, and the run's process is still saving its record and cleaning up its checkout (#1431):
   // an ending-side state like failed/stopped, so it sits above "ready for merge" (#948) — during
   // this window the saving is what is actually happening.
-  if (endedClean && card?.saving) {
+  if (endedClean && (card?.saving || page.settling)) {
     return { dot: 'animate-pulse bg-success', label: 'saving…', tone: 'text-muted-foreground' }
   }
   if (endedClean && card?.pr) return { dot: 'bg-success', label: 'ready for merge', tone: 'text-muted-foreground' }
   // An agent only pulses "building…" while it is live (#695/U20): once its end lands the pill settles.
   if (isAgentActive(events) || (outcome === undefined && card?.status === 'running')) {
-    return { dot: 'animate-pulse bg-warning', label: 'building…', tone: 'text-muted-foreground' }
+    return BUILDING
   }
   return { dot: 'bg-muted-foreground', label: 'finished', tone: 'text-muted-foreground' }
 }
+
+const BUILDING: AgentStatusPill = { dot: 'animate-pulse bg-warning', label: 'building…', tone: 'text-muted-foreground' }
 
 /** How the card says the run ended, for a feed that says no ending; undefined while it is going. */
 function cardOutcome(card: AgentCardFacts | undefined): AgentOutcome | undefined {

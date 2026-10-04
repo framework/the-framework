@@ -14,6 +14,7 @@ It also covers when the view reads what the agent's branch holds:
 And the bar above the message box:
 
 - **One read of the checkout** - the agent's checkout is read once, for that project and agent, and the same answer (its branch) is handed to the action bar and to the bar above the message box.
+- **Read again as a turn ends** - when the events show the agent's turn ending, the checkout is asked for a second time at once, and its new answer (dirty) reaches the bar above the message box.
 - **Where the next step is** - an ended agent's "Open PR" is inside the bar above the message box, the bar is told to show, and that bar comes after the action bar and before the composer in the page's order.
 
 And when the bar above the message box is there:

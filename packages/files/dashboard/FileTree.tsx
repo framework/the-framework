@@ -3,6 +3,7 @@ import { Check, FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react'
 import { cn, useModuleHost, usePolled, type ModulePanelProps } from 'framework/module'
 import type { ProjectTree } from '../src/server.js'
 import type { AgentTree, FileMark } from '../src/tree.js'
+import { projectKey, treeKey } from './keys.js'
 import { readProject, readTree } from './reads.js'
 import { FilePreviewHover } from './FilePreview.js'
 
@@ -175,12 +176,14 @@ export function FileTree({ projectId, agentId, activity, context }: ModulePanelP
     EMPTY_PROJECT,
     8_000,
     [projectId, agentId],
+    { remember: projectKey(projectId) },
   )
   const { value: answer, loaded: treeLoaded, reload: reloadTree } = usePolled<AgentTree | null>(
     agentId ? () => readTree(host, projectId, agentId) : null,
     null,
     8_000,
     [projectId, agentId],
+    agentId ? { remember: treeKey(projectId, agentId) } : undefined,
   )
   // A run whose files move (its checkout reclaimed as it ends, its branch not read yet) answers
   // pending for a moment: the tree it last showed stays until the new place answers, never a blank.

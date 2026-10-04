@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { forgetRemembered } from 'framework/module'
 import { renderWithHost as render } from './test-host.js'
 
 const readProject = vi.fn(async () => ({ files: [], changes: {} }) as unknown)
@@ -20,6 +21,7 @@ const changes = {
 }
 
 beforeEach(() => {
+  forgetRemembered() // what one test read would show at once in the next
   vi.clearAllMocks()
   readProject.mockResolvedValue({ files, changes: {} })
   readTree.mockResolvedValue({ source: 'checkout', files, changes, merged: false })
@@ -104,6 +106,34 @@ describe('ChangesPanel', () => {
     readProject.mockResolvedValue({ files, changes: {} })
     render(<ChangesPanel projectId="p2" context={context} />)
     await waitFor(() => expect(screen.getByText('Nothing is changed in the project’s folder.')).toBeTruthy())
+  })
+})
+
+describe('ChangesPanel remembered', () => {
+  test('opened again for the same run, the tab shows what was read last at once, with no "Looking…" line, and reads again', async () => {
+    const first = render(<ChangesPanel projectId="p1" agentId="run-1" context={context} />)
+    await waitFor(() => expect(screen.getByText('What this run changed. Not merged yet.')).toBeTruthy())
+    first.unmount()
+    // The read is out and does not answer: the list is there all the same.
+    readTree.mockReturnValue(new Promise(() => {}) as never)
+    readCommits.mockReturnValue(new Promise(() => {}) as never)
+    render(<ChangesPanel projectId="p1" agentId="run-1" context={context} />)
+    expect(screen.queryByText('Looking for this run’s changes…')).toBeNull()
+    expect(screen.getByText('What this run changed. Not merged yet.')).toBeTruthy()
+    expect(readTree).toHaveBeenCalledTimes(2)
+  })
+
+  test('a run never seen shows the "Looking…" line until its own read answers: never another run’s list', async () => {
+    const first = render(<ChangesPanel projectId="p1" agentId="run-1" context={context} />)
+    await waitFor(() => expect(screen.getByText('What this run changed. Not merged yet.')).toBeTruthy())
+    first.unmount()
+    readTree.mockReturnValue(new Promise(() => {}) as never)
+    render(<ChangesPanel projectId="p1" agentId="run-2" context={context} />)
+    // Its commits have answered; its files have not.
+    await waitFor(() => expect(readCommits).toHaveBeenCalledWith(expect.anything(), 'p1', 'run-2'))
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(screen.getByText('Looking for this run’s changes…')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /app\.ts/ })).toBeNull()
   })
 })
 

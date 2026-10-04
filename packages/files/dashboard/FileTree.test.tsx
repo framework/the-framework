@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { forgetRemembered } from 'framework/module'
 import { renderWithHost as render } from './test-host.js'
 
 const readProject = vi.fn(async () => ({ files: [], changes: {} }) as unknown)
@@ -15,6 +16,7 @@ const folder = (name: string) => screen.getAllByText(name)[0]!.closest('summary'
 const files = ['src/app.ts', 'README.md']
 
 beforeEach(() => {
+  forgetRemembered() // what one test read would show at once in the next
   readProject.mockClear()
   readProject.mockResolvedValue({ files, changes: {} })
   readTree.mockClear()
@@ -38,6 +40,17 @@ describe('FileTree (#815)', () => {
     expect(readTree).toHaveBeenCalledWith(expect.anything(), 'p1', 'run-1')
     expect(readProject).not.toHaveBeenCalled()
     expect(screen.queryByText('README.md')).toBeNull()
+  })
+
+  test('opened again for the same run, the tree is there at once, with no "Looking…" line, while it is read again', async () => {
+    readTree.mockResolvedValue({ source: 'checkout', files: ['notes.md'], changes: {} })
+    const first = render(<FileTree projectId="p1" agentId="run-1" context={context()} />)
+    await waitFor(() => expect(screen.getByText('notes.md')).toBeTruthy())
+    first.unmount()
+    readTree.mockReturnValue(new Promise(() => {}) as never)
+    render(<FileTree projectId="p1" agentId="run-1" context={context()} />)
+    expect(screen.queryByText('Looking for this run’s changes…')).toBeNull()
+    expect(screen.getByText('notes.md')).toBeTruthy()
   })
 
   test('switching session re-reads, rather than keeping the previous one’s marks', async () => {

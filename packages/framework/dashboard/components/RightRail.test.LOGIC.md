@@ -1,6 +1,6 @@
 What the tests cover, for the dashboard's right rail, with a stand-in for the Files module's tab installed for one project unless a test installs none:
 
-- **One stable width** - the rail keeps the same width whatever panel is open, including when a view [1] the agent [2] pushed is on screen and after switching away from it.
+- **One stable width** - the open rail is half the page wide, and keeps the same width whatever panel is open, including when a view [1] the agent [2] pushed is on screen and after switching away from it.
 - **No project, no rail** - with no project selected the rail is not drawn.
 - **Tabs explain themselves** - hovering a tab shows what that panel holds, for example that "Docs" holds the `PLAN`/`TODO` files.
 - **The launcher's documents are not repeated** - while the project home [4] shows the `PLAN`/`TODO` documents in its main column, the "Docs" tab is withheld and the documents are not even read; every other tab is unaffected, and when documents were the only thing left to show, no rail is drawn at all. On an agent's page the tab is there as usual.

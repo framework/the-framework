@@ -1,8 +1,8 @@
-The Changes tab the Files module [4] adds to the side rail: only the files that changed, each opening to its diff. With an agent [1] selected, the list is what that agent changed, read from wherever its files are now, and kept once its work is merged. With no agent selected, the list is the files changed in the project's checkout [2] and not committed. With nothing changed, the tab says so in one line.
+The Changes tab the Files module [4] adds to the side rail: only the files that changed, as a list on the left, and on the right the diff of the one file picked in the list. With an agent [1] selected, the list is what that agent changed, read from wherever its files are now, and kept once its work is merged. With no agent selected, the list is the files changed in the project's checkout [2] and not committed. With nothing changed, the tab says so in one line.
 
 ## Context
 
-**User story**: the user opens an agent's page to see what the agent did, without walking the whole tree: the Changes tab lists the changed files alone, and a click on one shows its diff.
+**User story**: the user opens an agent's page to see what the agent did, without walking the whole tree: the Changes tab lists the changed files alone, on the left, and shows the first file's diff beside the list at once, as Claude Code on the web does; a click on another file shows that file's diff.
 
 **User story**: the user merged an agent's work last week. The Files tab's tree is plain now, since its marks say what is not merged yet. The Changes tab still lists what that agent changed, and says it is merged.
 
@@ -19,7 +19,8 @@ The Changes tab the Files module [4] adds to the side rail: only the files that 
 
 - **An agent's changes** - with an agent [1] selected, every file the agent changed, sorted by path, under a caption saying whether the work is merged; "This run changed no files." when there is none; "Looking for this run’s changes…" while that is not known yet, and one line saying the changes are gone when no source is left.
 - **The project folder's changes** - with no agent selected, every file changed in the project's checkout [2] and not committed, or "Nothing is changed in the project’s folder."
-- **One row per file** - the file's path, "new", "modified" or "deleted", and "not committed" for a change that is only on disk; a click opens the file's diff under the row, read only then.
+- **One row per file** - in a column on the left: the file's path and, under it, "new", "modified" or "deleted", with "· not committed" for a change that is only on disk; a click picks the file.
+- **The picked file's diff** - on the right of the list, the diff of one file: the file the user clicked, or the first of the list while none was clicked or once the clicked file has left the list; only that file's diff is read.
 
 ## Business logic
 
@@ -59,4 +60,23 @@ With no agent selected, the tab reads the project's files and the status of the 
 
 #### Business logic
 
-Each row is a button showing the file's path, its folders dimmed and its name struck through when the file was deleted, and on the right what happened to it: "new" in green for an added or untracked file, "modified" in amber, "deleted" in red. A change that is only on disk, not committed, also reads "not committed". Clicking the row opens it, and clicking again closes it: an open row shows the file's diff under it, in the preview card's body (`FilePreview.tsx`), read for the selected agent, or for the project's checkout when none is selected. The diff is read only while the row is open, so a list costs one read however many files it holds.
+The list, named "Changed files", is a column on the left of the tab, a third of the tab's width and never over 14rem or under 8rem, under the caption, and scrolls by itself. Each row is a button showing the file's path on one line, its folders dimmed and its name struck through when the file was deleted, cut with an ellipsis when it does not fit and shown whole on hover. Under the path, in small letters, is what happened to the file: "new" in green for an added or untracked file, "modified" in amber, "deleted" in red, in capitals. A change that is only on disk, not committed, reads "· not committed" after it. Clicking a row picks its file; the picked row is highlighted.
+
+### The picked file's diff
+
+#### Context
+
+**User story**: the user opens the Changes tab and reads a diff at once, without a click; the list stays in view beside it, so going from file to file is one click each.
+
+**Problem**: a diff is a git read. Reading every changed file's diff to draw the list would cost one read per file on every poll.
+
+#### Business logic
+
+Exactly one file of the list is picked:
+
+- while the user has clicked no row, the first file of the list;
+- once the user clicked a row, that file, for as long as it is in the list;
+- when the clicked file leaves the list (the agent undid its change), the first file of the list again;
+- a click counts for the page it was made on: on another agent's page the first file of that agent's list is picked, also when its list holds the same path.
+
+The rest of the tab's width, on the right of the list, shows the picked file's diff in the preview card's body (`FilePreview.tsx`): the path and the lines added and removed, then the diff, read for the selected agent, or for the project's checkout when none is selected, and read again every 5 seconds. This area scrolls by itself. Only the picked file's diff is read, so the tab costs one diff read however many files the list holds. When another file is picked, the area starts over with "Reading the diff…": a diff still being read is never shown under another file's name.

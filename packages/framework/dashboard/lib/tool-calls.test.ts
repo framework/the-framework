@@ -1,0 +1,46 @@
+import { describe, expect, test } from 'vitest'
+import { callsSummary, toolCall } from './tool-calls.js'
+
+describe('toolCall', () => {
+  test("Claude Code's tools read as a verb and what it was done to", () => {
+    expect(toolCall('Bash', 'pnpm test')).toEqual({ verb: 'Ran', target: 'pnpm test', detail: 'pnpm test', kind: 'command' })
+    expect(toolCall('Read', '/repo/AGENTS.md')).toEqual({ verb: 'Read', target: 'AGENTS.md', detail: '/repo/AGENTS.md', kind: 'read' })
+    expect(toolCall('Edit', '/repo/src/app.ts').verb).toBe('Edited')
+    expect(toolCall('Write', '/repo/src/new.ts')).toMatchObject({ verb: 'Wrote', target: 'new.ts', kind: 'edit' })
+    expect(toolCall('Grep', 'TODO')).toMatchObject({ verb: 'Searched', target: 'TODO', kind: 'search' })
+    expect(toolCall('Skill', 'browser')).toMatchObject({ verb: 'Used skill', target: 'browser', kind: 'other' })
+  })
+
+  test("Codex's item kinds read the same way", () => {
+    expect(toolCall('commandExecution', 'pnpm test')).toEqual({ verb: 'Ran', target: 'pnpm test', detail: 'pnpm test', kind: 'command' })
+    expect(toolCall('fileChange', '/repo/a.ts, /repo/src/b.ts')).toEqual({ verb: 'Edited', target: 'a.ts, b.ts', detail: '/repo/a.ts, /repo/src/b.ts', kind: 'edit' })
+    expect(toolCall('mcpToolCall', 'github.search')).toMatchObject({ verb: 'Called', target: 'github.search' })
+    expect(toolCall('webSearch', 'vitest docs')).toMatchObject({ verb: 'Searched the web', kind: 'search' })
+  })
+
+  test('a label the map does not know is its own verb: a camel-case kind as words, any other name as it is', () => {
+    expect(toolCall('imageView')).toEqual({ verb: 'Image view', kind: 'other' })
+    expect(toolCall('mcp__github__search', 'q')).toMatchObject({ verb: 'mcp__github__search', target: 'q' })
+    expect(toolCall('run https://example.test/1')).toEqual({ verb: 'run https://example.test/1', kind: 'other' })
+  })
+
+  test('a call with no detail has no target', () => {
+    expect(toolCall('TodoWrite')).toEqual({ verb: 'Updated todos', kind: 'other' })
+  })
+
+  test('a path that ends in a slash keeps its last part', () => {
+    expect(toolCall('Read', '/repo/src/').target).toBe('src')
+  })
+})
+
+describe('callsSummary', () => {
+  test('one kind is counted, singular and plural', () => {
+    expect(callsSummary([toolCall('Bash', 'a')])).toBe('Ran 1 command')
+    expect(callsSummary([toolCall('Bash', 'a'), toolCall('commandExecution', 'b')])).toBe('Ran 2 commands')
+  })
+
+  test('several kinds are counted in the order they first came', () => {
+    const calls = [toolCall('Read', '/a'), toolCall('Bash', 'x'), toolCall('Read', '/b'), toolCall('Edit', '/a'), toolCall('Grep', 'x'), toolCall('Skill', 'browser')]
+    expect(callsSummary(calls)).toBe('Read 2 files, ran 1 command, edited 1 file, searched 1 time, used 1 tool')
+  })
+})

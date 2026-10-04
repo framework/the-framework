@@ -113,7 +113,7 @@ export function App() {
   // the main pane that a session missing from the list is starting, not gone.
   // `runsOn` names the device a just-started remote agent executes on (#1067), so the live view can
   // mark where it runs and degrade the panels that are local-only. Undefined for a local agent.
-  const [agentStart, setAgentStart] = useState<{ tick: number; intent: string; id: string | null; runsOn?: string }>({ tick: 0, intent: '', id: null })
+  const [agentStart, setAgentStart] = useState<{ tick: number; intent: string; id: string | null; projectId: string | null; runsOn?: string }>({ tick: 0, intent: '', id: null, projectId: null })
   // The agents of the project on screen, for its pages, or of the picked project, for the sidebar:
   // the same project whenever both are set.
   const { agents: agents, reload, loaded: agentsLoaded } = useAgents(projectId ?? scope)
@@ -183,7 +183,7 @@ export function App() {
     // nothing would re-replay after a reset. Bumping the tick here is what blanked the transcript
     // the moment a message resumed an ended session; a continuation keeps the feed instead.
     const continued = startedId === agentId && inProject === projectId
-    setAgentStart(prev => ({ tick: continued ? prev.tick : prev.tick + 1, intent, id: startedId, ...(runsOn ? { runsOn } : {}) }))
+    setAgentStart(prev => ({ tick: continued ? prev.tick : prev.tick + 1, intent, id: startedId, projectId: inProject, ...(runsOn ? { runsOn } : {}) }))
     // The picked Context went with that run; the next launch starts from a clean focus (#948).
     resetContext()
     // Go to the run we just started — a real history entry, so Back returns to where you launched
@@ -452,6 +452,7 @@ export function App() {
           startTick={agentStart.tick}
           startIntent={agentStart.intent}
           startId={agentStart.id}
+          startProjectName={projects.find(p => p.id === agentStart.projectId)?.name}
           working={working}
           onDashboard={showDashboard}
           onSettings={showSettings}

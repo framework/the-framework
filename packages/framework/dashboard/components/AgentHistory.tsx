@@ -7,6 +7,7 @@ import { Button, buttonVariants } from './ui/button.js'
 import { Badge } from './ui/badge.js'
 import { cn } from '../lib/utils.js'
 import { formatRelative } from '../lib/format-date.js'
+import { usePreferences } from '../lib/preferences.js'
 import { STATUS_TONE } from '../lib/status-tone.js'
 import { agentLabel } from '../lib/agent-label.js'
 import { holdsMainAgent, isOpenSubagent, nestRows, taskLabel } from '../lib/subagents.js'
@@ -64,6 +65,7 @@ export function AgentHistory({
   startTick = 0,
   startIntent = '',
   startId = null,
+  startProjectName,
   working = false,
   onDashboard = () => {},
   onSettings = () => {},
@@ -113,10 +115,14 @@ export function AgentHistory({
   startIntent?: string
   /** The id the start reported for its run: the row the stand-in waits for. */
   startId?: string | null
+  /** The project that run was started in, by name: the stand-in row names it as the run's own row will. */
+  startProjectName?: string | undefined
   /** Just started an agent that reported no id, so there is nothing selected to highlight yet (#705):
    *  put the highlight on the running/optimistic row rather than the New row until the shell adopts
    *  the agent's real id. An agent that did report one is selected by URL instead (#784). */
 }) {
+  // The coding agent picked for the next start: the stand-in row's logo.
+  const preferences = usePreferences()
   // The optimistic row, and the id of the run it stands in for.
   const [optimistic, setOptimistic] = useState<{ intent: string; id: string | null } | null>(null)
 
@@ -280,7 +286,9 @@ export function AgentHistory({
                 {/* A just-started run, before its run.json exists — highlighted while following it. */}
                 {showOptimistic && (
                   <SidebarMenuItem>
-                    <AgentHistoryRow status="running" intent={optimistic?.intent ?? undefined} subtitle="starting…" active={starting} dim onClick={() => onSelect(null)} />
+                    {/* Drawn as the run's own row will be a few seconds on (the same words, the same
+                        logo, not dimmed), so that row taking its place changes nothing on screen. */}
+                    <AgentHistoryRow status="running" intent={optimistic?.intent ?? undefined} subtitle={crossProject && startProjectName ? `${startProjectName} · just now` : 'just now'} driver={preferences.driver} active={starting} standIn onClick={() => onSelect(null)} />
                   </SidebarMenuItem>
                 )}
                 {tree.map(({ row, subagents }) => {
@@ -489,7 +497,7 @@ function AgentHistoryRow({
   active,
   onClick,
   driver,
-  dim = false,
+  standIn = false,
   saving = false,
   remote = false,
   cloud = false,
@@ -507,7 +515,8 @@ function AgentHistoryRow({
   driver?: string | undefined
   active: boolean
   onClick: () => void
-  dim?: boolean
+  /** The row stands in for a run just started, until that run's own row lands. */
+  standIn?: boolean
   /** Ended clean, its process still saving its record and cleaning up its checkout (#1455): the row must
    *  not say "done" while the session's own pill says "saving…". */
   saving?: boolean
@@ -555,8 +564,8 @@ function AgentHistoryRow({
         // spans edge to edge and its clip/fade land on the border. Inner rows carry their own px-2.
         'rail-row h-auto w-full flex-col items-start gap-0.5 px-0 py-2 text-left',
         active && 'bg-accent text-accent-foreground',
-        dim && 'opacity-70',
       )}
+      {...(standIn ? { 'data-stand-in': '' } : {})}
       onClick={onClick}
     >
       <span className="flex w-full items-center gap-2 px-2">

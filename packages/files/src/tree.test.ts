@@ -35,8 +35,8 @@ function deps(agent: { status?: string; host?: string; branch?: string; pr?: { n
     }),
     mergeCommit: async (_branch, number) => {
       if (prs.pending && prs.value === undefined) return { pending: true }
-      const commit = prs.value?.find(pr => pr.number === number)?.mergeCommit
-      return commit ? { pending: false, commit } : { pending: false }
+      const pr = prs.value?.find(pr => pr.number === number)
+      return pr?.mergeCommit ? { pending: false, commit: pr.mergeCommit, ...(typeof pr['headRefOid'] === 'string' ? { head: pr['headRefOid'] } : {}) } : { pending: false }
     },
   }
 }
@@ -111,6 +111,7 @@ test('with no checkout, the local branch is read by ref', async () => {
       'f.txt': { status: 'added', committed: true },
       'src/d.txt': { status: 'deleted', committed: true },
     },
+    merged: false,
   })
   assert.match((await readAgentFileDiff(root, at, 'a.txt'))?.patch ?? '', /-a\n\+local/)
   assert.deepEqual(await readAgentFileContent(root, at, 'f.txt'), { path: 'f.txt', text: 'f', truncated: false, binary: false })
@@ -263,7 +264,7 @@ test('a run started from another run’s branch is measured from the commit its 
   // On its branch, its checkout gone.
   git(root, 'worktree', 'remove', subPath)
   const onBranch = await resolve(deps({ status: 'done', host: 'this-machine', branch: 'agent-subagent', baseCommit: start }))
-  assert.deepEqual(onBranch, { source: 'branch', branch: 'agent-subagent', ref: tip, base: start })
+  assert.deepEqual(onBranch, { source: 'branch', branch: 'agent-subagent', ref: tip, base: start, merged: false })
   const branchTree = await readAgentTree(root, onBranch)
   assert.deepEqual(branchTree.source === 'branch' && branchTree.changes, own)
   // A commit this machine does not have is no base: the default branch is.
@@ -316,4 +317,55 @@ test('a run from the default branch whose record names its start: what it took i
   const unnamed = await readAgentTree(root, await resolve(deps({ status: 'done', host: 'this-machine', branch: 'agent-started' })))
   assert.deepEqual(unnamed.source === 'branch' && unnamed.changes, {})
   git(root, 'branch', '-q', '-D', 'agent-started')
+})
+
+test('whether a run’s work is merged: not while the default branch lacks it, once that branch has it, once its pull request merged at its last commit, and never with work left uncommitted', async () => {
+  git(root, 'checkout', '-q', 'main')
+  const start = git(root, 'rev-parse', 'main')
+  const path = join(dir, 'wt-waiting')
+  git(root, 'worktree', 'add', '-q', '-b', 'agent-waiting', path, 'main')
+  const run = { status: 'done', host: 'this-machine', branch: 'agent-waiting', baseCommit: start }
+
+  // Nothing changed yet: nothing is merged, whatever the default branch holds.
+  const idle = await readAgentTree(root, await resolveAgentFiles(inCheckout(path, { baseCommit: start }), 'run-waiting'))
+  assert.equal(idle.source === 'checkout' && idle.merged, false)
+
+  const tip = commit(path, 'own work', { 'kept.txt': 'kept\n' }, ['c.txt'])
+  const waiting = await readAgentTree(root, await resolveAgentFiles(inCheckout(path, { baseCommit: start }), 'run-waiting'))
+  assert.equal(waiting.source === 'checkout' && waiting.merged, false, 'the default branch does not have it yet')
+  assert.ok(waiting.source === 'checkout' && waiting.files.includes('c.txt'), 'a deleted file is still listed while its deletion waits')
+
+  // Squashed by its pull request, the branch still here: merged when the request merged this very commit.
+  const squashed = { value: [{ number: 9, url: 'u', state: 'MERGED', title: '', mergeCommit: start, headRefOid: tip }] }
+  const bySquash = await resolve(deps({ ...run, pr: { number: 9 } }, squashed))
+  assert.deepEqual(bySquash, { source: 'branch', branch: 'agent-waiting', ref: tip, base: start, merged: true })
+  const movedOn = { value: [{ number: 9, url: 'u', state: 'MERGED', title: '', mergeCommit: start, headRefOid: start }] }
+  assert.equal((await resolve(deps({ ...run, pr: { number: 9 } }, movedOn)) as { merged?: boolean }).merged, false, 'a commit made after the merge is not merged')
+  assert.equal((await resolve(deps({ ...run, pr: { number: 9 } }, { pending: true })) as { merged?: boolean }).merged, false, 'a lookup still out says nothing')
+
+  // The default branch takes it in.
+  git(root, 'merge', '-q', '--ff-only', 'agent-waiting')
+  const inCheckoutTree = await readAgentTree(root, await resolveAgentFiles(inCheckout(path, { baseCommit: start }), 'run-waiting'))
+  assert.deepEqual(inCheckoutTree.source === 'checkout' && [inCheckoutTree.merged, inCheckoutTree.changes, inCheckoutTree.files.includes('c.txt')], [
+    true,
+    { 'c.txt': { status: 'deleted', committed: true }, 'kept.txt': { status: 'added', committed: true } },
+    false,
+  ])
+  // More work on disk, not committed: that is not merged, and the marks are back.
+  await writeFile(join(path, 'more.txt'), 'more\n')
+  const dirty = await readAgentTree(root, await resolveAgentFiles(inCheckout(path, { baseCommit: start }), 'run-waiting'))
+  assert.equal(dirty.source === 'checkout' && dirty.merged, false)
+  await unlink(join(path, 'more.txt'))
+
+  git(root, 'worktree', 'remove', path)
+  const onBranch = await readAgentTree(root, await resolve(deps(run)))
+  assert.deepEqual(onBranch, { source: 'branch', branch: 'agent-waiting', files: onBranch.source === 'branch' ? onBranch.files : [], changes: { 'c.txt': { status: 'deleted', committed: true }, 'kept.txt': { status: 'added', committed: true } }, merged: true })
+  assert.equal(onBranch.source === 'branch' && onBranch.files.includes('c.txt'), false, 'the tree of merged work holds no deleted path')
+  assert.match((await readAgentFileDiff(root, await resolve(deps(run)), 'kept.txt'))?.patch ?? '', /\+kept/, 'its diff is still read')
+
+  // Landed, its branch gone: merged by what it is.
+  git(root, 'update-ref', 'refs/landed/run-waiting', tip)
+  git(root, 'branch', '-q', '-D', 'agent-waiting')
+  const landed = await readAgentTree(root, await resolve(deps({ status: 'done', host: 'this-machine', baseCommit: start, landed: tip })))
+  assert.equal(landed.source === 'landed' && landed.merged, true)
 })

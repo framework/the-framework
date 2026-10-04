@@ -90,8 +90,9 @@ function Folder({ name, gitStatus, children }: {
 /** Stable, so the `useMemo` on the marks doesn't re-run for a fresh empty object. */
 const EMPTY_PROJECT: ProjectTree = { files: [], changes: {} }
 
-/** Where a run's tree was read from, in the words the caption says it. */
+/** Where a run's tree was read from, in the words the caption says it; for merged work, that nothing is waiting. */
 function sourceCaption(tree: AgentTree): string | undefined {
+  if ('merged' in tree && tree.merged) return 'Merged: nothing waiting. What it changed is under Changes.'
   if (tree.source === 'checkout') return 'From the run’s checkout'
   if (tree.source === 'branch') return `From branch ${tree.branch}`
   if (tree.source === 'merge') return `From the merge of #${tree.number}`
@@ -105,7 +106,9 @@ function sourceCaption(tree: AgentTree): string | undefined {
 // list, the project's own (the `project` read) on its page. A run's tree is its own read (the
 // `tree` read): its checkout, then its branch, then its merge commit, so a finished run keeps
 // showing what it changed; a run that changed nothing shows the project's files with nothing
-// marked, and a run whose changes none of those still holds says so in one line. It is a viewer,
+// marked, and a run whose changes none of those still holds says so in one line. The marks say
+// what is not merged yet: once a run's work is merged its tree is plain, a caption says so, and
+// what it changed is the Changes tab's to list (`ChangesPanel.tsx`). It is a viewer,
 // not an editor: hovering a file previews it. With no files, it says so in one line.
 //
 // Folders are native `<details>`: open/closed state, keyboard operation and the disclosure
@@ -183,7 +186,8 @@ export function FileTree({ projectId, agentId, activity, context }: ModulePanelP
   // pending for a moment: the tree it last showed stays until the new place answers, never a blank.
   const lastTree = useRef<{ agentId: string; tree: AgentTree } | null>(null)
   if (agentId && answer && 'files' in answer) lastTree.current = { agentId, tree: answer }
-  const runTree = answer?.source === 'pending' && lastTree.current?.agentId === agentId ? lastTree.current.tree : answer
+  const last = lastTree.current
+  const runTree = answer?.source === 'pending' && last !== null && last.agentId === agentId ? last.tree : answer
   // The agent did something: its files may have changed, so they are read again now rather than on
   // the next poll. A burst of events is one read, a moment after the last.
   useEffect(() => {
@@ -200,7 +204,9 @@ export function FileTree({ projectId, agentId, activity, context }: ModulePanelP
   }, [pending, reloadTree])
   const runFiles = runTree && 'files' in runTree ? runTree : undefined
   const shown = agentId ? (runFiles?.files ?? EMPTY_FILES) : projectTree.files
-  const marks = agentId ? (runFiles?.changes ?? EMPTY_MARKS) : projectTree.changes
+  // A merged run's tree is plain: its marks would say "not merged yet" of work that is.
+  const merged = runFiles !== undefined && 'merged' in runFiles && runFiles.merged
+  const marks = agentId ? (merged ? EMPTY_MARKS : (runFiles?.changes ?? EMPTY_MARKS)) : projectTree.changes
 
   const folderStatus = useMemo(() => foldersFromMarks(marks), [marks])
 

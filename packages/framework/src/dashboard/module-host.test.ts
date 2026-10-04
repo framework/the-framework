@@ -43,12 +43,15 @@ test('a run’s facts carry the commit its own work begins at and the commit it 
 })
 
 test('a merge lookup says "still asking" only while the git host has not answered at all', async () => {
-  const answering = (value: { number: number; mergeCommit?: string }[] | undefined, pending: boolean): ServerHostDeps => ({
+  const answering = (value: { number: number; mergeCommit?: string; headRefOid?: string }[] | undefined, pending: boolean): ServerHostDeps => ({
     prs: async () => ({ value: value as never, pending }),
   })
   assert.deepEqual(await serverHost('/p', answering(undefined, true)).mergeCommit('b', 1), { pending: true })
   assert.deepEqual(await serverHost('/p', answering([{ number: 1, mergeCommit: 'abc' }], true)).mergeCommit('b', 1), { pending: false, commit: 'abc' })
   assert.deepEqual(await serverHost('/p', answering([{ number: 2, mergeCommit: 'abc' }], false)).mergeCommit('b', 1), { pending: false })
+  // The last commit of the branch the request merged rides along when the git host says it.
+  assert.deepEqual(await serverHost('/p', answering([{ number: 1, mergeCommit: 'abc', headRefOid: 'def' }], false)).mergeCommit('b', 1), { pending: false, commit: 'abc', head: 'def' })
+  assert.deepEqual(await serverHost('/p', answering([{ number: 1, headRefOid: 'def' }], false)).mergeCommit('b', 1), { pending: false })
   assert.deepEqual(await serverHost('/p', { prs: async () => Promise.reject(new Error('offline')) }).mergeCommit('b', 1), { pending: false })
 })
 

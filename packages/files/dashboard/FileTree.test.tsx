@@ -71,6 +71,21 @@ describe('FileTree (#815)', () => {
     await waitFor(() => expect(screen.getByText('From the merge of #42')).toBeTruthy())
   })
 
+  test('a run whose work is merged shows a plain tree and says nothing is waiting, though the read still names what it changed', async () => {
+    readTree.mockResolvedValue({ source: 'branch', branch: 'agent-fix', files, merged: true, changes: { 'README.md': { status: 'modified', committed: true } } })
+    render(<FileTree projectId="p1" agentId="run-1" context={context()} />)
+    await waitFor(() => expect(screen.getByText('Merged: nothing waiting. What it changed is under Changes.')).toBeTruthy())
+    expect(screen.getByText('README.md')).toBeTruthy()
+    expect(screen.queryByLabelText(/committed/)).toBeNull()
+    expect(screen.queryByText('From branch agent-fix')).toBeNull()
+    cleanup()
+    // Not merged: the same read marks the file and names its source.
+    readTree.mockResolvedValue({ source: 'branch', branch: 'agent-fix', files, merged: false, changes: { 'README.md': { status: 'modified', committed: true } } })
+    render(<FileTree projectId="p1" agentId="run-2" context={context()} />)
+    await waitFor(() => expect(screen.getByLabelText('modified, committed')).toBeTruthy())
+    expect(screen.getByText('From branch agent-fix')).toBeTruthy()
+  })
+
   test('a run that changed nothing shows the project’s files with nothing marked, and says so in the caption', async () => {
     readTree.mockResolvedValue({ source: 'unchanged', files, changes: {} })
     render(<FileTree projectId="p1" agentId="run-1" context={context()} />)

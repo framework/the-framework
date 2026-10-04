@@ -35,6 +35,7 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 - **The session id is not a row** - the coding agent's session id update is plumbing, not conversation: it is left out of the list, and the run's menu reads it from the events.
 - **The quota only when it matters** - the coding agent reports the account's quota after every turn; a reading that is `allowed` is left out of the list, and one running low or used up is a row.
 - **The agent's steps are one folded line** - a run of tool calls and thoughts with no other row between them is one row, a folded line counting the calls; a thought is no row, and thoughts with no call among them show nowhere.
+- **The session line under the first prompt** - when the caller says what was set up for the agent, a folded "Session set up" line sits right under the first prompt, or first when the transcript has no prompt.
 - **The first prompt opens the transcript** - the first prompt is hoisted above the rows emitted before it, so the transcript starts with what the user asked.
 - **A gate is answered where it happened** - when the transcript knows its project, an open gate [4] renders as the interactive gate panel inline, an answered one as a collapsed card that replaces its "✓ chose" line, and a gate whose agent ended unanswered stays text.
 - **A screen is live where the agent used it** - the newest `screen` line at an address, on this machine's loopback and with neither an `ended` line for that address nor the agent's end after it (an end waiting on an answer does not count), is the live page itself, framed in the transcript; an earlier or ended one stays its one line, and every `ended` line is hidden.
@@ -135,6 +136,16 @@ A step is an event that is a tool call of the coding agent, or a thought of it. 
 - **The call going on now is not in its run yet.** While the agent works and writes no message, a tool call that is the last event of the transcript is the call going on now: the coding agent reports a call when it begins, and nothing has come since. It is left out of its run and is the transcript's last line instead, drawn moving (`ToolCalls.tsx`, "The line going on now"), counting the seconds since its event was written. When the next event arrives, the call joins its run ("Ran 1 command" becomes "Ran 2 commands", or a run line appears for a first call). When the agent is not working, or is writing its message, the last call is in its run like any other.
 - **Between calls the last line is a word.** While the agent works and writes no message, and the last event is not a tool call, the last line is "Starting…" when the last event is a prompt and "Working…" otherwise (a thought that is no row counts: the line then reads "Working…"), drawn moving the same way, counting the seconds since the last event was written.
 - **A subagent's row comes after the run.** A subagent [16] started by a call in the middle of a run has its row under the run's line, not inside it (the place rule of "A subagent has a row where it was started", read off the run's first step).
+
+### The session line under the first prompt
+
+#### Context
+
+**User story**: under their first message, the user reads one grey line saying the session was set up, and opens it to see the agent's checkout, its branch and the coding agent [5] that was started (`SessionLine.tsx`).
+
+#### Business logic
+
+The caller may hand the transcript what was set up for the agent (the agent view reads it off the agent's card, `AgentView.tsx`). With it, the transcript has one more row that is not an event [2], drawn by `SessionLine.tsx`: right under the first row when that row is a prompt (the first prompt opens the transcript, next section), and above every row otherwise. It has its own identity, so no other row's identity changes when it comes. It has no badge and no time. Without it, or while what was set up says nothing yet, there is no such row.
 
 ### The first prompt opens the transcript
 

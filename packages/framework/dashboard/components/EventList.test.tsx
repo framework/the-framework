@@ -6,6 +6,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 // stub; stub it (and the preferences plumbing) so nothing fetches a daemon that is not there.
 const sendChoice = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/control.js', () => ({ sendChoice }))
+// The session line names the model as the daemon lists it; no daemon here, so the list never answers.
+vi.mock('../rpc/models.js', () => ({ onModels: () => new Promise(() => {}) }))
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => ({}),
   updatePreferences: vi.fn(),
@@ -244,6 +246,33 @@ describe('EventList tool calls', () => {
     render(<EventList events={[prompt, call('Bash', 'ls'), { kind: 'view', id: 'v1', title: 'Plan', markdown: '# p' }, call('Bash', 'pwd')]} stick={false} />)
     expect(screen.getByRole('button', { name: 'Ran ls' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Ran pwd' })).toBeTruthy()
+  })
+})
+
+// The "Session set up" line: what was made for the agent before it began, under the first prompt.
+describe('EventList session line', () => {
+  const setup = { workspace: '/repo/.branches/agent-1', branch: 'agent-1', driver: 'codex' }
+  const ids = () => Array.from(document.querySelectorAll('[data-message-id]')).map(n => n.getAttribute('data-message-id'))
+  const prompt: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'go' } }
+  const said: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'Hello.' } }
+
+  test('it sits right under the first prompt, and opens to what was set up', () => {
+    render(<EventList events={[prompt, said, { ...prompt }]} setup={setup} stick={false} />)
+    expect(ids()).toEqual(['0', 'setup', '1', '2'])
+    fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
+    expect(screen.getByText('agent-1')).toBeTruthy()
+  })
+
+  test('under a prompt with nothing after it yet, and above everything in a log with no prompt', () => {
+    const { rerender } = render(<EventList events={[prompt]} setup={setup} stick={false} />)
+    expect(ids()).toEqual(['0', 'setup'])
+    rerender(<EventList events={[said]} setup={setup} stick={false} />)
+    expect(ids()).toEqual(['setup', '0'])
+  })
+
+  test('with no setup given there is no line', () => {
+    render(<EventList events={[prompt, said]} stick={false} />)
+    expect(screen.queryByText('Session set up')).toBeNull()
   })
 })
 

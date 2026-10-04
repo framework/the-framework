@@ -12,6 +12,7 @@ import { writeHookLines } from './built-in.js'
 import { installProject } from './install.js'
 import { runProjectHooks, runStartHook } from './project-hooks.js'
 import { publishLevelOf, publishPickIn } from './publish-levels.js'
+import { isBranchName } from './branch-name.js'
 import { hasRemote } from './has-remote.js'
 import { projectGitHost } from './store/git-host.js'
 
@@ -82,9 +83,10 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
   const onStart = async (prompt: string, options: StartAgentOptions = {}, targetProjectId?: string): Promise<StartAgentResult> => {
     // Run on a connected device (#1067): forward the start to the remote daemon, which runs its own
     // project's hook, and relay the run's events back. `remote` is stripped so the device does not
-    // relay onward. The device starts it in its own home project.
+    // relay onward, and `base` because a branch of this machine names nothing on the device (the device drops it too). The
+    // device starts it in its own home project.
     if (options.remote) {
-      const { remote, ...forwarded } = options
+      const { remote, base: _thisMachines, ...forwarded } = options
       const result = await startRemoteAgent(remote, { prompt, options: forwarded })
       if (result.ok) {
         // A relayed agent has no local checkout or pid, so its list row is a memory-only stub (#1077):
@@ -105,6 +107,9 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
     }
     const projectCwd = await resolveProject(targetProjectId)
     if (!projectCwd) return { ok: false, error: `unknown project: ${targetProjectId}` }
+    // The branch to start from ends up on the line's command line: only a branch name goes there.
+    // Refused, not dropped: a run started from the main branch instead would be a silent swap.
+    if (options.base !== undefined && !isBranchName(options.base)) return { ok: false, error: `not a branch name: ${String(options.base)}` }
     // A project with no git host package can open no pull request: the furthest its run publishes is
     // the branch. One with no remote can publish nothing, whatever pick the start carries.
     const publish = options.publish !== undefined ? publishLevelOf(publishPickIn(options.publish, (await projectGitHost(projectCwd).catch(() => undefined)) !== undefined, await hasRemote(projectCwd))) : undefined
@@ -114,6 +119,7 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
       ...(options.model !== undefined ? { model: options.model } : {}),
       ...(options.then !== undefined ? { then: options.then } : {}),
       ...(publish !== undefined ? { publish } : {}),
+      ...(options.base !== undefined ? { base: options.base } : {}),
     })
     // The line made a checkout (or is about to): the project's checkouts are read again on the
     // next look rather than a few seconds from now, so the new run's page finds its own.

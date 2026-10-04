@@ -17,8 +17,8 @@ A run in flight is a run record [1]: the `logs` skill's card on the project's `a
 
 ## Business logic — TL;DR
 
-- **The marker** - a card with the run's id, its start time, `status: running`, the prompt as the intent, the driver, the model when the run has one and the tool's mark, written to the branch with an empty diary; the mark's machine is also on the card as `caller.host`, and the mark's parent, when it names one, as `caller.parent`; the write says whether it reached origin.
-- **What a reader finds beside the host** - the mark's parent and the mark's `baseCommit`, each when the mark has one, are on the card a second time, as `caller.parent` and `caller.baseCommit`, outside the mark, for a reader that does not know the mark.
+- **The marker** - a card with the run's id, its start time, `status: running`, the prompt as the intent, the driver, the model when the run has one and the tool's mark, written to the branch with an empty diary; the mark's machine is also on the card as `caller.host`, and the mark's parent and the mark's `base`, each when it names one, as `caller.parent` and `caller.base`; the write says whether it reached origin.
+- **What a reader finds beside the host** - the mark's parent, the mark's `base` and the mark's `baseCommit`, each when the mark has one, are on the card a second time, as `caller.parent`, `caller.base` and `caller.baseCommit`, outside the mark, for a reader that does not know the mark.
 - **Reading the mark** - a card carries the tool's mark when `caller.runner` is an object with a `host` string; `pid` is kept only when it is a number, `then`, `parent`, `base` and `baseCommit` each only when it is a string, and `publish` only when it is one of the three publish levels [6]; a card without it is somebody else's run.
 - **What the reclaim is told** - the mark's `baseCommit`, when the mark has one, as the commit the run's branch was made at.
 - **Withdrawing** - a marker whose scheduler lost the cap is deleted from the branch, so no record says running for a run that never was.
@@ -45,7 +45,7 @@ Before a run's process exists, or as the first thing a person's run does, its ca
 
 #### Business logic
 
-Two of the mark's facts are written on the card a second time, beside `caller.host` and outside the mark, each only when the mark has it: the parent's id as `caller.parent`, and `baseCommit` as `caller.baseCommit`, the commit the run's own work begins at. The marker [5] carries the parent so. It carries no `baseCommit`: a marker is written before the run's checkout exists, so the commit is not known yet. The card a run starts with, and the card a resume writes, carry both (`run.ts`).
+Three of the mark's facts are written on the card a second time, beside `caller.host` and outside the mark, each only when the mark has it: the parent's id as `caller.parent`, the branch the run was told to start from (`run --base`) as `caller.base`, and `baseCommit` as `caller.baseCommit`, the commit the run's own work begins at. The marker [5] carries the parent and the base so. It carries no `baseCommit`: a marker is written before the run's checkout exists, so the commit is not known yet. The card a run starts with, and the card a resume writes, carry all three (`run.ts`).
 
 ### Reading the mark
 

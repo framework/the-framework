@@ -76,6 +76,27 @@ test('a Start publishes no further than the project can: nothing with no remote,
   }
 })
 
+test('a Start hands the line the branch to start from, and refuses a word that is no branch name before the line runs', async () => {
+  const BASE = `start: 'printf "%s" "\${BASE-unset}" > started.txt; echo "{\\"id\\":\\"run-9\\"}"'\n`
+  const home = await project(BASE)
+  const env = { XDG_CONFIG_HOME: join(home, 'cfg') }
+  await mkdir(env.XDG_CONFIG_HOME, { recursive: true })
+  const runtime = createProjectRuntime({ cwd: home, env })
+  try {
+    assert.deepEqual(await runtime.onStart('Fix it', { base: 'my/branch' }), { ok: true, agentId: 'run-9' })
+    assert.equal(await readFile(join(home, 'started.txt'), 'utf8'), 'my/branch')
+    assert.deepEqual(await runtime.onStart('Fix it'), { ok: true, agentId: 'run-9' })
+    assert.equal(await readFile(join(home, 'started.txt'), 'utf8'), 'unset', 'no pick: the line is given no branch')
+    await rm(join(home, 'started.txt'))
+    assert.deepEqual(await runtime.onStart('Fix it', { base: '--upload-pack=x' }), { ok: false, error: 'not a branch name: --upload-pack=x' })
+    assert.deepEqual(await runtime.onStart('Fix it', { base: '' }), { ok: false, error: 'not a branch name: ' })
+    await assert.rejects(readFile(join(home, 'started.txt'), 'utf8'), 'the line did not run')
+  } finally {
+    await runtime.dispose()
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
 test('adding a project writes the runner\'s start, resume and check lines, an empty folder included, and keeps a line already there', async () => {
   const folder = await realpath(await mkdtemp(join(tmpdir(), 'framework-add-')))
   const cfg = await realpath(await mkdtemp(join(tmpdir(), 'framework-add-cfg-')))

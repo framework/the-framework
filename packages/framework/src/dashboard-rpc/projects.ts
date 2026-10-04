@@ -1,8 +1,10 @@
 import { contextAddProject, contextProjectErrors, contextProjects, resolveProjectPath } from './context.js'
 import { readProjectCommands, type ProjectCommand } from '../project-commands.js'
-import { readProjectHooks, runCheckHook, type StartReadiness } from '../project-hooks.js'
+import { originDefaultBranch } from '@gemstack/agent-data'
+import { readProjectHooks, runCheckHook, startLineTakesBase, type StartReadiness } from '../project-hooks.js'
 import { isPublishPick, publishPickIn, type PublishPick } from '../publish-levels.js'
 import { hasRemote } from '../has-remote.js'
+import { currentBranch } from '../dashboard/git-status.js'
 import { pickDirectory, type PickDirectoryResult } from '../pick-directory.js'
 import { projectGitHost } from '../store/git-host.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
@@ -69,17 +71,26 @@ export interface ProjectLauncher {
   gitHost: boolean
   /** Whether the project's repository has an `origin` remote; without one nothing can be published, so the publish menu is not offered. */
   remote: boolean
+  /**
+   * The two branches an agent can start from here, for the launcher's "start from" chip: `main`,
+   * the name of origin's default branch, and `local`, the branch the project's folder is on now.
+   * Absent where the pick could not be obeyed or has nothing to pick between: the start line does
+   * not pass `BASE` on, the repository has no remote, or the folder is on no branch.
+   */
+  startFrom?: { main: string; local: string }
 }
 
 /**
- * The project's commands (#1774), read off its skills folders, whether it has a start hook, and whether it has a git host.
- * `null` when the project is unknown here.
+ * The project's commands (#1774), read off its skills folders, whether it has a start hook, whether
+ * it has a git host, and the branches an agent can start from. `null` when the project is unknown here.
  */
 export async function onCommands(projectId: string): Promise<ProjectLauncher | null> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return null
-  const [commands, hooks, gitHost, remote] = await Promise.all([readProjectCommands(cwd), readProjectHooks(cwd), projectGitHost(cwd).catch(() => undefined), hasRemote(cwd)])
-  return { commands, startHook: hooks.start !== undefined, gitHost: gitHost !== undefined, remote }
+  const [commands, hooks, gitHost, remote, main, local] = await Promise.all([readProjectCommands(cwd), readProjectHooks(cwd), projectGitHost(cwd).catch(() => undefined), hasRemote(cwd), originDefaultBranch(cwd), currentBranch(cwd)])
+  // Both read locally, never fetched. `HEAD` is a folder on no branch: there is no local branch to start from.
+  const startFrom = hooks.start !== undefined && startLineTakesBase(hooks.start) && remote && main !== undefined && local !== undefined && local !== 'HEAD' ? { main: main.slice('origin/'.length), local } : undefined
+  return { commands, startHook: hooks.start !== undefined, gitHost: gitHost !== undefined, remote, ...(startFrom ? { startFrom } : {}) }
 }
 
 /**

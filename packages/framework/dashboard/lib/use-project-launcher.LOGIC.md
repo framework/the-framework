@@ -1,4 +1,4 @@
-What the launcher offers for one project, read once per project: its commands [1], whether it has a start hook [2] and whether it has a git host provider [3].
+What the launcher offers for one project, read once per project: its commands [1], whether it has a start hook [2], whether it has a git host provider [3], whether its repository has a remote, and the two branches an agent can start from.
 
 ## Context
 
@@ -12,4 +12,4 @@ What the launcher offers for one project, read once per project: its commands [1
 
 ## Business logic
 
-The read asks the daemon for the project's commands [1], whether the project has a start hook [2], and whether it has a git host provider [3], which decides the options the launcher's publish menu offers. Its answer is nothing until the daemon has answered, nothing when no project is open, and nothing for a project the daemon does not know. It is asked again when the project changes. A surface therefore says "this project has no start hook" only once it holds an answer that says so.
+The read asks the daemon for the project's commands [1], whether the project has a start hook [2], whether it has a git host provider [3] and whether its repository has a remote, which decide the options the launcher's publish menu offers, and the two branches an agent can start from (the name of the project's main branch and the name of the branch the project's folder is on), which the daemon names only where the launcher's "start from" chip is to be shown (`dashboard-rpc/projects.ts`). The branches are as they were when the read was made: a branch the user checks out afterwards is seen when the launcher is opened again. Its answer is nothing until the daemon has answered, nothing when no project is open, and nothing for a project the daemon does not know. It is asked again when the project changes. A surface therefore says "this project has no start hook" only once it holds an answer that says so.

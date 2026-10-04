@@ -86,7 +86,7 @@ test('a run submitted with options.remote is created on the other daemon and its
   const homeIdA = projectId(resolve(cwdA))
 
   try {
-    const result = await runtimeA.onStart('build the thing', { remote: { url: deviceB.url, token: TOKEN, label: 'my-laptop' } })
+    const result = await runtimeA.onStart('build the thing', { base: 'a-branch-of-this-machine', remote: { url: deviceB.url, token: TOKEN, label: 'my-laptop' } })
 
     // The agent was created on B, and A returned B's own agent id (not a locally allocated one).
     assert.equal(result.ok, true)
@@ -94,6 +94,7 @@ test('a run submitted with options.remote is created on the other daemon and its
     assert.equal(bStarts.length, 1)
     assert.equal(bStarts[0]!.prompt, 'build the thing')
     assert.equal(bStarts[0]!.options.remote, undefined) // stripped before forwarding, no onward relay
+    assert.equal(bStarts[0]!.options.base, undefined) // a branch of this machine names nothing on the device
     assert.equal(bStarts[0]!.projectId, undefined) // slice 1: the device's own home checkout
 
     // The relayed agent keeps a local list row on A (#1077), so a dashboard reload re-opens it instead of

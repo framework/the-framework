@@ -1,8 +1,8 @@
-Draws the line of an agent's [1] transcript that says what was set up for the agent before it began: one folded grey line, "Session set up", which opens to the agent's checkout, its branch, and the coding agent [2] that was started.
+Draws the line of an agent's [1] transcript that says what was set up for the agent before it began: one folded grey line, "Session set up", which opens to the agent's checkout, its branch, the branch it was started from when that is not the main branch, and the coding agent [2] that was started.
 
 ## Context
 
-**User story**: the user opens an agent's page and, under their first message, reads one grey line saying the session was set up, as Claude Code on the web opens a session with "Initialized session". The user opens it to see where the agent works (the folder of its checkout), on which branch, and which coding agent and model were started. Nothing the tool did before the agent's first step is hidden.
+**User story**: the user opens an agent's page and, under their first message, reads one grey line saying the session was set up, as Claude Code on the web opens a session with "Initialized session". The user opens it to see where the agent works (the folder of its checkout), on which branch, and which coding agent and model were started. A user who picked "My local branch" in the launcher reads there that the agent started from that branch, and not from the project's main branch. Nothing the tool did before the agent's first step is hidden.
 
 **Business logic story**: the facts are read off the agent's card [3], which the dashboard reads again with the project's agents, so the line fills in and changes in place: the branch's name when the agent renames its branch, the model once the coding agent says which one it runs.
 
@@ -15,7 +15,7 @@ Draws the line of an agent's [1] transcript that says what was set up for the ag
 ## Business logic — TL;DR
 
 - **One folded line** - "Session set up" with a chevron; a click opens a bordered box, a click again folds it.
-- **What the box says** - the checkout's folder, the branch, the coding agent and its model; a fact the card [3] does not say is no line.
+- **What the box says** - the checkout's folder, the branch, the branch the agent was started from when its card [3] names one, the coding agent and its model; a fact the card does not say is no line.
 - **Nothing known, nothing drawn** - a card that says none of the three draws no line at all.
 
 ## Business logic
@@ -38,10 +38,11 @@ See `## Context`.
 
 #### Business logic
 
-The box holds up to three lines, in this order, each a grey label then its value in the dark text color, cut with an ellipsis when it does not fit and whole in a tooltip:
+The box holds up to four lines, in this order, each cut with an ellipsis when it does not fit. Three are a grey label then its value in the dark text color, whole in a tooltip; the third is a sentence:
 
 - "Checkout made" and the folder of the agent's checkout, when the card [3] says it;
 - "Branch" and the branch's name, when the card says it;
+- "Started from the branch <name>, not from the main branch.", the name in the dark text color and whole in a tooltip, when the card names the branch the agent was told to start from (`base`). The tool that starts an agent writes it only for an agent told where to start: one started from the launcher's "My local branch" option, and a subagent, which starts from its main agent's branch. An agent started from the project's main branch has no such line;
 - "Coding agent started" and the coding agent's [2] name ("Claude Code", "Codex"; a coding agent the dashboard has no name for reads as the card names it), followed by " · " and the model when the card says one. The model reads by the name its coding agent lists it under ("Opus 5.5"), and by its id while that list is not known or does not hold it (the naming rule in `lib/models.ts`).
 
 ### Nothing known, nothing drawn

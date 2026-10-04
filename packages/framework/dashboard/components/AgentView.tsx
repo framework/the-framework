@@ -70,7 +70,7 @@ export function AgentView({
   /** Whether the agent is still running; `null` while the daemon's list of agents has not been read, so it is not known yet. */
   live: boolean | null
   /** What the run's card says, off the runs poll: the status pill's and the details strip's facts the feed cannot carry. Absent until the card is listed. */
-  card?: (AgentCardFacts & AgentDetailsCard & Pick<AgentMeta, 'parent' | 'workspace' | 'branch'>) | undefined
+  card?: (AgentCardFacts & AgentDetailsCard & Pick<AgentMeta, 'parent' | 'workspace' | 'branch' | 'base'>) | undefined
   /** The session's own name — the same label the rail shows (#1030). It leads the action bar as
    * the stable identity, so the branch renaming itself near the end of an agent (#736) reads as a
    * detail changing rather than the whole view changing. */
@@ -150,8 +150,8 @@ export function AgentView({
   // A run started for another run: it opens no pull request, its main agent lands its work.
   const subagent = card?.parent !== undefined
   // What was set up for the agent before it began, off its card: the chat's "Session set up" line.
-  const { workspace, branch, driver, model } = card ?? {}
-  const setup = useMemo(() => ({ workspace, branch, driver, model }), [workspace, branch, driver, model])
+  const { workspace, branch, base, driver, model } = card ?? {}
+  const setup = useMemo(() => ({ workspace, branch, base, driver, model }), [workspace, branch, base, driver, model])
   const [open, setOpen] = useState(false)
   // What the installed modules add to this run's page: a summary in the bar above the message box.
   const { runSlots: mountedSlots } = useMountedModules()

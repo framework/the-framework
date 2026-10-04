@@ -12,7 +12,9 @@ vi.mock('../rpc/projects.js', () => ({ onCommands, onStartCheck, onProjects }))
 // Mutable so a test can pick the coding agent and the model; reset after each.
 const prefs = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))
 const updatePreferences = vi.hoisted(() => vi.fn())
-vi.mock('../lib/preferences.js', () => ({ usePreferences: () => prefs.current, updatePreferences }))
+// Whether the saved preferences have been read: a test turns it off to see what waits for them.
+const prefsLoaded = vi.hoisted(() => ({ current: true }))
+vi.mock('../lib/preferences.js', () => ({ usePreferences: () => prefs.current, usePreferencesLoaded: () => prefsLoaded.current, updatePreferences }))
 const device = vi.hoisted(() => ({ current: null as null | { id: string; url: string; token: string; label: string } }))
 vi.mock('../lib/profiles.js', () => ({ useConnectionProfiles: () => (device.current ? [device.current] : []) }))
 vi.mock('../lib/remote-target.js', () => ({ useSelectedRemoteDeviceId: () => device.current?.id ?? null }))
@@ -62,6 +64,7 @@ afterEach(() => {
   onStartCheck.mockReset()
   updatePreferences.mockReset()
   prefs.current = {}
+  prefsLoaded.current = true
   device.current = null
 })
 
@@ -72,6 +75,10 @@ const noop = () => {}
 const autoMenu = () => screen.getByRole('button', { name: 'Auto' })
 /** The labels of the publish options the open "Auto" menu lists. */
 const publishOptions = () => screen.getAllByRole('menuitem').map(item => item.querySelector('span > span')!.textContent)
+/** The launcher's "start from" chip, when there is one. */
+const startFromChip = () => screen.queryByRole('button', { name: 'The agent starts from' })
+/** A project whose start line passes the branch on, whose folder is on `my/work`. */
+const WITH_BRANCHES = { commands: [], startHook: true, gitHost: true, remote: true, startFrom: { main: 'main', local: 'my/work' } }
 const props = { projectId: 'p1', files: [], context: new Set<string>(), addContext: noop, removeContext: noop, toggleContext: noop }
 
 describe('StartAgentForm (#1774)', () => {
@@ -271,6 +278,82 @@ describe('StartAgentForm (#1774)', () => {
     expect(composerProps.current.aboveControls).toBeNull()
     rerender(<StartAgentForm {...props} projectName="gemstack" />)
     expect(screen.getByTestId('above').textContent).toBe('gemstack')
+  })
+
+  test('the "start from" chip is after the project\'s chip and reads the main branch until the person picks; then the Start names no branch', async () => {
+    onCommands.mockResolvedValue(WITH_BRANCHES)
+    start.mockResolvedValue({ agentId: 'r1' })
+    render(<StartAgentForm {...props} projectName="gemstack" />)
+    await waitFor(() => expect(startFromChip()).not.toBeNull())
+    expect(screen.getByTestId('above').textContent).toBe('gemstackmain')
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
+  })
+
+  test('the local pick is saved for this project alone, shown on the chip, and the Start names the local branch; the main pick takes the project out again', async () => {
+    onCommands.mockResolvedValue(WITH_BRANCHES)
+    start.mockResolvedValue({ agentId: 'r1' })
+    prefs.current = { startFrom: { other: 'local' } }
+    render(<StartAgentForm {...props} projectName="gemstack" />)
+    await waitFor(() => expect(startFromChip()).not.toBeNull())
+    // Another project's pick is not this one's.
+    expect(startFromChip()!.textContent).toBe('main')
+    await openMenu(startFromChip()!)
+    fireEvent.click(screen.getByRole('menuitem', { name: /^My local branch my\/work/ }))
+    expect(updatePreferences).toHaveBeenCalledWith({ startFrom: { other: 'local', p1: 'local' } })
+
+    cleanup()
+    updatePreferences.mockClear()
+    prefs.current = { startFrom: { other: 'local', p1: 'local' } }
+    render(<StartAgentForm {...props} projectName="gemstack" />)
+    await waitFor(() => expect(startFromChip()).not.toBeNull())
+    expect(startFromChip()!.textContent).toBe('my/work (local)')
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', { base: 'my/work' }))
+    await openMenu(startFromChip()!)
+    fireEvent.click(screen.getByRole('menuitem', { name: /^main/ }))
+    expect(updatePreferences).toHaveBeenCalledWith({ startFrom: { other: 'local' } })
+  })
+
+  test('a project whose start line does not pass the branch on has no "start from" chip, and a saved local pick names no branch', async () => {
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true, remote: true })
+    start.mockResolvedValue({ agentId: 'r1' })
+    prefs.current = { startFrom: { p1: 'local' } }
+    render(<StartAgentForm {...props} projectName="gemstack" />)
+    await waitFor(() => expect(onCommands).toHaveBeenCalled())
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
+    expect(startFromChip()).toBeNull()
+    expect(screen.getByTestId('above').textContent).toBe('gemstack')
+  })
+
+  test('with a device picked there is no "start from" chip, and the Start names no branch of this machine', async () => {
+    onCommands.mockResolvedValue(WITH_BRANCHES)
+    device.current = { id: 'd1', url: 'http://box:4200', token: 't', label: 'box' }
+    start.mockResolvedValue({ agentId: 'r2' })
+    prefs.current = { startFrom: { p1: 'local' } }
+    render(<StartAgentForm {...props} projectName="gemstack" />)
+    await waitFor(() => expect(onCommands).toHaveBeenCalled())
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', { remote: { url: 'http://box:4200', token: 't', label: 'box' } }))
+    expect(startFromChip()).toBeNull()
+  })
+
+  test('the "start from" chip waits for the project\'s name and for the saved pick, so it never moves and its words never flip', async () => {
+    onCommands.mockResolvedValue(WITH_BRANCHES)
+    prefs.current = { startFrom: { p1: 'local' } }
+    prefsLoaded.current = false
+    const { rerender } = render(<StartAgentForm {...props} />)
+    await waitFor(() => expect(onCommands).toHaveBeenCalled())
+    // The launcher has answered, the name has not: no chip yet, the name's chip would push it.
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(screen.getByTestId('above').textContent).toBe('')
+    rerender(<StartAgentForm {...props} projectName="gemstack" />)
+    // The saved pick is not read yet: no chip that would read "main" and then flip.
+    expect(screen.getByTestId('above').textContent).toBe('gemstack')
+    prefsLoaded.current = true
+    rerender(<StartAgentForm {...props} projectName="gemstack" />)
+    expect(screen.getByTestId('above').textContent).toBe('gemstackmy/work (local)')
   })
 
   test('the picked Context rides the prompt as one line at its end, after the command\'s own words', async () => {

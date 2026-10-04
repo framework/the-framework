@@ -191,6 +191,19 @@ export function usePreferences(): Preferences {
   return preferences
 }
 
+/**
+ * Whether the preferences have been read. Until then {@link usePreferences} answers the empty
+ * default, so a control that shows a saved pick waits for this: drawn before, it would show the
+ * default and flip when the read lands.
+ */
+export function usePreferencesLoaded(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => cache !== null,
+    () => false,
+  )
+}
+
 export type ThemePreference = NonNullable<Preferences['theme']>
 
 /** The chosen dashboard theme (#725); absent follows the OS (`system`). */

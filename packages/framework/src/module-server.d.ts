@@ -17,6 +17,8 @@ export interface RunFacts {
     /** The branch the run left its work on, by its last recorded name. */
     branch?: string
     pr?: { number: number }
+    /** The branch the run was told to start from, by its name; absent on a run that started from origin's default branch. */
+    base?: string
     /** The commit the run's own work begins at, for a run that made its own branch: what its changes are measured from when the default branch cannot tell them. */
     baseCommit?: string
     /** The last commit of the run's work, once its main agent landed it: its branch is gone, and its work is read here. */

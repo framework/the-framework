@@ -534,6 +534,9 @@ describe('a run just started', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
     expect(screen.getByText('/repo/.branches/agent-1')).toBeTruthy()
     expect(screen.getByText('agent-1')).toBeTruthy()
+    expect(screen.queryByText(/Started from the branch/)).toBeNull()
+    rerender(view({ live: true, events, card: { status: 'running', workspace: '/repo/.branches/agent-1', branch: 'agent-1', base: 'my/work', driver: 'codex' } }))
+    expect(screen.getByText(/Started from the branch/).textContent).toBe('Started from the branch my/work, not from the main branch.')
   })
 
   test('no spinner while the answer is being written, and none once the run has ended', () => {

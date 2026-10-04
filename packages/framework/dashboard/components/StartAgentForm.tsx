@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Folder } from 'lucide-react'
 import { onProjects, onStartCheck } from '../rpc/projects.js'
 import type { ProjectSummary } from '../../src/index.js'
-import { usePreferences, updatePreferences } from '../lib/preferences.js'
+import { usePreferences, usePreferencesLoaded, updatePreferences } from '../lib/preferences.js'
 import { offeredPublishPicks, publishPickIn } from '../../src/client.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId } from '../lib/remote-target.js'
@@ -13,6 +13,7 @@ import { promptWithContext } from '../lib/use-context-set.js'
 import { AutoMenu } from './AutoMenu.js'
 import { ContextMenu } from './ContextMenu.js'
 import { Composer, type ComposerHandle } from './Composer.js'
+import { StartFromMenu, type StartFrom } from './StartFromMenu.js'
 import { Chip } from './ui/chip.js'
 
 // Start a run in the selected project (#405, #1774): a free-text box, where `/` lists the project's
@@ -25,7 +26,13 @@ import { Chip } from './ui/chip.js'
 // The Context picker (#439/#314) narrows the run's focus to other projects and to files: the
 // picked paths ride the prompt as one `Context:` line at its end.
 // The row of chips above the box says where the Start goes: the "Run on" pick, which the Composer
-// draws first, then the project's name.
+// draws first, then the project's name, then the branch the agent starts from.
+// That last chip is a menu: the project's main branch (origin's default branch, fetched fresh), or
+// "My local branch", the branch the project's folder is on, as committed on this machine. The pick
+// is saved per project. The local pick hands the start hook the branch's name as `BASE`; the main
+// branch hands it none. The chip is drawn only where the pick is obeyed: the daemon names the two
+// branches only when the project's start line passes `BASE` on, and a device has its own branches,
+// so with a device picked there is no chip and the Start names no branch.
 // The "Auto" menu, under the box at the left (the model menu is at the right): what the agent
 // does by itself when it finishes. Its button reads the picks, so nothing is hidden.
 // In it, how far the run publishes its work: Nothing, Publish branch, Open PR, Merge on green. The
@@ -84,6 +91,16 @@ export function StartAgentForm({
   // A project with no remote can publish nothing: the menu would hold one pick, so it lists none.
   const remote = remoteDevice ? true : (launcher?.remote ?? true)
   const publishPick = publishPickIn(preferences.publish, gitHost, remote)
+  // The two branches the agent can start from, where the pick is offered at all.
+  const startFrom = remoteDevice ? undefined : launcher?.startFrom
+  const startFromPick: StartFrom = preferences.startFrom?.[projectId] ?? 'main'
+  const preferencesLoaded = usePreferencesLoaded()
+  // The whole map is written: a save names keys, and this is one key. The main branch is the
+  // absent entry, so picking it takes the project out.
+  const pickStartFrom = (pick: StartFrom) => {
+    const { [projectId]: _was, ...others } = preferences.startFrom ?? {}
+    updatePreferences({ startFrom: pick === 'local' ? { ...others, [projectId]: 'local' } : others })
+  }
 
   // Re-read when the pick changes: `claude` being logged in says nothing about `codex`. A device
   // runs on its own machine, so this one's CLIs say nothing about it.
@@ -111,6 +128,7 @@ export function StartAgentForm({
     const result = await start(projectId, promptWithContext(text, context), {
       ...startPicks({ ...preferences, publish: publishPick }),
       ...cleanupPick(preferences, commands),
+      ...(startFrom && startFromPick === 'local' ? { base: startFrom.local } : {}),
       ...(remoteDevice ? { remote: { url: remoteDevice.url, token: remoteDevice.token, label: remoteDevice.label } } : {}),
     })
     setNote(null)
@@ -148,7 +166,17 @@ export function StartAgentForm({
         }
         // No chip until the name is known, never a wrong one: the row is there all the same and
         // its height is fixed, so the name landing moves nothing.
-        aboveControls={projectName ? <Chip icon={<Folder className="h-3.5 w-3.5 shrink-0" aria-hidden />}>{projectName}</Chip> : null}
+        // The "start from" chip is the row's last, so nothing is beside it to push when it lands
+        // or when its words change. It waits for the name, which would otherwise land before it
+        // and push it, and for the saved pick, which would otherwise flip its words.
+        aboveControls={
+          projectName ? (
+            <>
+              <Chip icon={<Folder className="h-3.5 w-3.5 shrink-0" aria-hidden />}>{projectName}</Chip>
+              {startFrom && preferencesLoaded && <StartFromMenu main={startFrom.main} local={startFrom.local} pick={startFromPick} onPick={pickStartFrom} busy={busy} />}
+            </>
+          ) : null
+        }
         belowControls={
           <AutoMenu
             publish={publishPick}

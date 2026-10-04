@@ -128,7 +128,7 @@ export async function runProjectHooks(cwd: string, kind: HookKind, opts: RunHook
   }
 }
 
-/** What a `start` line is given: the prompt, the coding agent, model and publish level when the person picked them, and the follow-up when there is one. */
+/** What a `start` line is given: the prompt, the coding agent, model, publish level and branch to start from when the person picked them, and the follow-up when there is one. */
 export interface StartHookInput {
   prompt: string
   driver?: string
@@ -137,6 +137,17 @@ export interface StartHookInput {
   then?: string
   /** How far the run publishes when its agent finishes: `branch`, `pr` or `merge`. */
   publish?: string
+  /** The branch the run's own branch starts from; origin's default branch when absent. */
+  base?: string
+}
+
+/**
+ * Whether a `start` line passes the branch to start from on: it mentions `$BASE` or `${BASE`. A
+ * line is written once and kept, so one written before the pick existed, or a person's own, may
+ * not; the launcher then offers no pick, rather than one the line would drop.
+ */
+export function startLineTakesBase(line: string): boolean {
+  return /\$\{?BASE\b/.test(line)
 }
 
 /** What a `resume` line is given: the run, and the person's text or their answer to the question it ended on. */
@@ -145,8 +156,8 @@ export type ResumeHookInput = { runId: string } & ({ text: string } | { answer: 
 export type RunHookResult = { ok: true; id: string } | { ok: false; error: string }
 
 /**
- * Run the project's `start` line: the prompt in `PROMPT`, the picks in `DRIVER`, `MODEL` and
- * `PUBLISH` when made, the follow-up in `THEN` when there is one. The line answers one JSON
+ * Run the project's `start` line: the prompt in `PROMPT`, the picks in `DRIVER`, `MODEL`,
+ * `PUBLISH` and `BASE` when made, the follow-up in `THEN` when there is one. The line answers one JSON
  * document on stdout whose `id` names the run it started.
  */
 export function runStartHook(cwd: string, input: StartHookInput, opts: Omit<RunHooksOptions, 'log'> = {}): Promise<RunHookResult> {
@@ -156,6 +167,7 @@ export function runStartHook(cwd: string, input: StartHookInput, opts: Omit<RunH
     ...(input.model !== undefined ? { MODEL: input.model } : {}),
     ...(input.then !== undefined ? { THEN: input.then } : {}),
     ...(input.publish !== undefined ? { PUBLISH: input.publish } : {}),
+    ...(input.base !== undefined ? { BASE: input.base } : {}),
   }, opts)
 }
 

@@ -132,6 +132,17 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   run publishing nothing.
   Picked over handing over every option the launcher once had, which is how the options
   became the thing to maintain.
+- The line also gets the branch to start from, when the person picked their own local branch
+  on the launcher's chip: the branch the project's folder is on, as this machine has it,
+  commits that are not pushed included. With no pick the agent starts from the project's main
+  branch, fetched first, as before. The pick is saved per project, and the agent's page says
+  it. Picked over a pick saved once for every project: a branch belongs to one project.
+- The chip is shown only where the pick is obeyed: the project's start line passes the branch
+  on, the repository has a remote, the folder is on a branch, and the run is on this machine.
+  Picked over a chip shown everywhere, which on a start line written before the pick existed
+  would be a pick that silently does nothing. Picked over rewriting a person's start line.
+- A branch name that could be read as an option on the line's command line refuses the Start.
+  Picked over dropping it and starting from the main branch, which would be a silent swap.
 - A project with no `start` line cannot start a run from the dashboard, and the launcher
   says so and names the file. Picked over a built-in fallback: the hooks file is the one
   place that says what starts a run.

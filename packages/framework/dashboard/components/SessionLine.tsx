@@ -6,7 +6,7 @@ import { modelName, useModels } from '../lib/models.js'
 import { cn } from '../lib/utils.js'
 
 /** What was set up for the agent before it read its prompt, as its card says it. */
-export type SessionSetup = { [K in 'workspace' | 'branch' | 'driver' | 'model']?: AgentMeta[K] | undefined }
+export type SessionSetup = { [K in 'workspace' | 'branch' | 'base' | 'driver' | 'model']?: AgentMeta[K] | undefined }
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
@@ -21,8 +21,9 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 // The chat's first line under the prompt, as Claude Code on the web opens a session: one grey
 // folded line, "Session set up", opening to what was made for the agent before it began: its
-// checkout, its branch, the coding agent that was started. A card that says none of them yet
-// draws nothing.
+// checkout, its branch, the coding agent that was started. An agent told to start from a branch
+// other than the main one says so, in a sentence: a person's local branch, or, for a subagent,
+// its main agent's. A card that says none of them yet draws nothing.
 export function SessionLine({ setup }: { setup: SessionSetup }) {
   const [open, setOpen] = useState(false)
   const picked = driverFromImpl(setup.driver)
@@ -40,6 +41,11 @@ export function SessionLine({ setup }: { setup: SessionSetup }) {
         <div className="mt-1.5 flex flex-col gap-1.5 rounded-lg border border-border px-3 py-2">
           {setup.workspace !== undefined && <Fact label="Checkout made" value={setup.workspace} />}
           {setup.branch !== undefined && <Fact label="Branch" value={setup.branch} />}
+          {setup.base !== undefined && (
+            <div className="min-w-0 truncate" title={setup.base}>
+              Started from the branch <span className="text-foreground">{setup.base}</span>, not from the main branch.
+            </div>
+          )}
           {agent !== undefined && <Fact label="Coding agent started" value={model ? `${agent} · ${model}` : agent} />}
         </div>
       )}

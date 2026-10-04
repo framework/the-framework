@@ -1,4 +1,4 @@
-Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder), the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], whether an agent can be started there at all, whether a pull request can be opened there, and what would stop an agent before it is started.
+Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder), the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], whether an agent can be started there at all, whether a pull request can be opened there, which branches an agent can start from, and what would stop an agent before it is started.
 
 ## Context
 
@@ -23,7 +23,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 - **Adding a project** - a path is registered only after it has been installed as a project; an empty path is refused outright.
 - **The folder dialog is the daemon's** - the machine's own choose-a-folder dialog is opened by the daemon, because a browser cannot learn an absolute path; dismissing it is an ordinary answer, not a failure.
 - **The onboarding's first suggestion** - the directory the daemon was started in is offered as the first project, together with whether it is already registered.
-- **What the launcher offers** - the project's commands [3], read off its skills folders, whether its hooks file has a start hook [7], whether one of its packages provides a git host, and whether its repository has an `origin` remote (`../has-remote.ts`), without which the launcher shows no publish menu; an unknown project answers nothing.
+- **What the launcher offers** - the project's commands [3], read off its skills folders, whether its hooks file has a start hook [7], whether one of its packages provides a git host, and whether its repository has an `origin` remote (`../has-remote.ts`), without which the launcher shows no publish menu, and the two branches an agent can start from, named only where the pick would be obeyed; an unknown project answers nothing.
 - **What would stop an agent** - the project's check hook [8], run with the coding agent the user picked: its problems and its warnings; a check hook that fails is one warning; no check hook, or an unknown project, answers nothing.
 
 ## Business logic
@@ -80,11 +80,17 @@ The daemon answers with the directory it is running in, and with that directory'
 
 #### Context
 
-**User story**: a project's launcher [2] lists every command [3] the project has under `/` and in its Commands menu; on a project with no start hook [7], Start is off and the launcher says why; on a project where no package provides a git host, the launcher's publish menu offers "Nothing" and "Publish branch" only.
+**User story**: a project's launcher [2] lists every command [3] the project has under `/` and in its Commands menu; on a project with no start hook [7], Start is off and the launcher says why; on a project where no package provides a git host, the launcher's publish menu offers "Nothing" and "Publish branch" only; the launcher shows a chip that says which branch the agent starts from, the project's main branch or the user's own local branch, and lets the user pick.
+
+**Problem**: a project's start line is written once and kept, so a line written before the pick existed, or a person's own line, may not pass the picked branch on to the tool. A pick shown there would silently do nothing.
 
 #### Business logic
 
-For a given project [1] the daemon answers three things, read fresh each time: the project's commands (the rule is `project-commands.ts`'s: the skills written to be run by a person, each with its name and description), and whether the project's `.the-framework/hooks.yml` names a `start` line (`project-hooks.ts`; a hooks file that is missing or refused counts as no start line), and whether one of the project's packages declares that it provides the git host (`../store/git-host.ts`; a declaration that cannot be read counts as none): without one no pull request can be opened, so the launcher's publish menu stops at "Publish branch". A project id that names no registered project answers nothing at all.
+For a given project [1] the daemon answers three things, read fresh each time: the project's commands (the rule is `project-commands.ts`'s: the skills written to be run by a person, each with its name and description), and whether the project's `.the-framework/hooks.yml` names a `start` line (`project-hooks.ts`; a hooks file that is missing or refused counts as no start line), and whether one of the project's packages declares that it provides the git host (`../store/git-host.ts`; a declaration that cannot be read counts as none): without one no pull request can be opened, so the launcher's publish menu stops at "Publish branch".
+
+It also answers the two branches an agent can start from, `startFrom`: `main`, the name of origin's default branch (`main` for `origin/main`), and `local`, the name of the branch the project's folder has checked out now, which is the same name when the folder is on the default branch itself. Both are read from the local repository, never fetched (`originDefaultBranch` of `@gemstack/agent-data`, and the branch read of `../dashboard/git-status.ts`). `startFrom` is answered only when all of these hold, and is absent otherwise, so the launcher shows the chip only where the pick is obeyed: the project's start line mentions `$BASE` or `${BASE` (`project-hooks.ts`), the repository has an `origin` remote with a default branch this clone knows, and the folder is on a branch (a folder on a detached commit has no local branch to start from).
+
+A project id that names no registered project answers nothing at all.
 
 ### What would stop an agent
 

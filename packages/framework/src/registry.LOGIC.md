@@ -25,6 +25,7 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 - **The on/off preferences** - each kept only as a true or false, each with its own meaning when absent.
 - **The choice preferences** - the model, the driver, the publish menu's option, the editor and the theme, each constrained to the values the dashboard offers.
 - **The list preference** - the custom presets, trimmed, bounded and cleared when empty.
+- **The per-project preference** - which projects' launcher starts an agent from the user's local branch; a project not listed starts from its main branch.
 - **Unknown keys are dropped, never migrated** - a key this version does not know is dropped on read and never written back.
 - **Saving preferences: replace or patch** - a save replaces the block, a patch merges only the keys it names; blank clears; the dashboard's store tells the daemon which keys were written.
 - **Atomic, owner-only, serialized writes** - written to a temporary file with owner-only permission and renamed over the real one, one mutation after another.
@@ -114,6 +115,18 @@ Each of these keys of the preferences [2] is kept only when its value is a true 
 
 - `customPresets`: the presets the user saved. Each needs an `id`, a `label` and a `prompt`, all text and non-blank after trimming; the label is cut to 80 characters and the prompt to 20,000; an entry with a duplicate id, or malformed in any way, is skipped rather than failing the read; at most 30 are kept, in file order. When none survive, the key is left out of the file.
 
+### The per-project preference
+
+#### Context
+
+**User story**: in a project's launcher the user picks where an agent starts: the project's main branch, or their own local branch (the branch the project's folder is on, with its commits that are not pushed). The pick is remembered for that project, so another project keeps its own.
+
+**Problem**: the same as for the list: the map must stay bounded, and a junk entry must be dropped on its own.
+
+#### Business logic
+
+- `startFrom`: a map from a project's id to the word `local`: the projects whose launcher is set to "My local branch". An entry whose value is anything else, or whose id is empty, is dropped; a value that is not a map is dropped whole; at most 200 projects are kept, in file order. A project not in the map starts from its main branch, so that pick stores nothing, and when no project is left the key is left out of the file. The branch's name is not stored: the local branch is whichever branch the project's folder is on when the agent is started. An id is not checked against the list of projects, so a project removed and added again at the same path keeps its pick. The launcher's chip shows it and writes it, sending the whole map.
+
 ### Unknown keys are dropped, never migrated
 
 #### Context
@@ -132,7 +145,7 @@ A key this version does not know, whether a hand edit added it or an earlier ver
 
 #### Business logic
 
-Preferences [2] are saved in one of two ways. A save replaces the whole block with the one given, validated as above. A patch merges only the keys it names over the stored block, validates the merged result with the same rules, writes it and returns what was stored, so a write touches only what it names. Clearing needs no special value: a blank string or an empty list is dropped by validation, which is how "Open in editor" is reset and the last custom preset removed. Either way the project list and the token are preserved. The store handed to the dashboard tells its listener which keys the caller wrote, not the merged result, so the daemon can tell "this write switched a setting on" from "it was already on and something else changed"; the listener runs after the write has landed, and a listener that fails does not fail the save.
+Preferences [2] are saved in one of two ways. A save replaces the whole block with the one given, validated as above. A patch merges only the keys it names over the stored block, validates the merged result with the same rules, writes it and returns what was stored, so a write touches only what it names. Clearing needs no special value: a blank string, an empty list or an empty map is dropped by validation, which is how "Open in editor" is reset and the last custom preset removed. Either way the project list and the token are preserved. The store handed to the dashboard tells its listener which keys the caller wrote, not the merged result, so the daemon can tell "this write switched a setting on" from "it was already on and something else changed"; the listener runs after the write has landed, and a listener that fails does not fail the save.
 
 ### Atomic, owner-only, serialized writes
 

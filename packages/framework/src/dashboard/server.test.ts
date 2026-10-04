@@ -410,6 +410,20 @@ test('/_relay/start strips a nested remote target so a relayed run never relays 
   }
 })
 
+test('/_relay/start drops the branch to start from: a start relayed to a device never names a branch', async () => {
+  const { base, starts, close } = await relayDashboard()
+  try {
+    const body = JSON.stringify({ prompt: 'x', options: { base: 'a-branch-of-the-caller', model: 'opus' } })
+    const ok = await postAuth(`${base}/_relay/start`, body, `fw_daemon=${TOKEN}`)
+    assert.equal(ok.status, 200)
+    assert.equal(starts.length, 1)
+    assert.equal('base' in starts[0]!.options, false) // the caller's branch was dropped
+    assert.equal(starts[0]!.options.model, 'opus') // the rest of the options survive
+  } finally {
+    await close()
+  }
+})
+
 test('/_relay/events needs the cookie and streams the run\'s events as ndjson (#1067)', async () => {
   const { base, close } = await relayDashboard()
   try {

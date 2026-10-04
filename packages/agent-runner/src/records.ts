@@ -74,11 +74,12 @@ export function markerCard(run: { id: string; startedAt: string; prompt: string;
 }
 
 /**
- * What a reader of the card finds beside `host`, outside this tool's mark: the run's parent, and
- * the commit its own work begins at, which its changes are measured from.
+ * What a reader of the card finds beside `host`, outside this tool's mark: the run's parent, the
+ * branch it was started from when it was told one, and the commit its own work begins at, which
+ * its changes are measured from.
  */
-export function forReaders(mark: Pick<RunnerMark, 'parent' | 'baseCommit'>): { parent?: string; baseCommit?: string } {
-  return { ...(mark.parent !== undefined ? { parent: mark.parent } : {}), ...(mark.baseCommit !== undefined ? { baseCommit: mark.baseCommit } : {}) }
+export function forReaders(mark: Pick<RunnerMark, 'parent' | 'base' | 'baseCommit'>): { parent?: string; base?: string; baseCommit?: string } {
+  return { ...(mark.parent !== undefined ? { parent: mark.parent } : {}), ...(mark.base !== undefined ? { base: mark.base } : {}), ...(mark.baseCommit !== undefined ? { baseCommit: mark.baseCommit } : {}) }
 }
 
 /** What the reclaim of a run's checkout is told: the commit its branch was made at, when its mark names one. */

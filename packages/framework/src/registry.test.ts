@@ -221,6 +221,13 @@ test('sanitizePreferences reads only the current spellings', async () => {
   assert.deepEqual(await stored({ publish: 'merge' }), { publish: 'merge' })
   assert.deepEqual(await stored({ publish: 'nothing' }), { publish: 'nothing' })
   assert.deepEqual(await stored({ publish: 'push' }), {}, 'a word the launcher\'s menu does not list is dropped')
+  // Where an agent starts, per project: only the word `local` is stored, the main branch is the absent entry.
+  assert.deepEqual(await stored({ startFrom: { 'app-1a2b': 'local', 'web-3c4d': 'main', '': 'local', 'api-5e6f': true } }), { startFrom: { 'app-1a2b': 'local' } })
+  assert.deepEqual(await stored({ startFrom: {} }), {}, 'no project left: the key is left out')
+  assert.deepEqual(await stored({ startFrom: ['app-1a2b'] }), {})
+  assert.deepEqual(await stored({ startFrom: 'local' }), {})
+  const many = Object.fromEntries(Array.from({ length: 250 }, (_, i) => [`p-${i}`, 'local']))
+  assert.equal(Object.keys((await stored({ startFrom: many })).startFrom ?? {}).length, 200, 'bounded, like the presets')
 })
 
 test('patchPreferences merges only the keys it is given (#1148)', async () => {

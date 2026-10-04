@@ -43,8 +43,8 @@ See `## Context`.
 The section is titled "Waiting on you · <count of rows>". Under it, one row per agent [3] that waits on an open question [1]. A row is one line that never wraps, and reads from left to right:
 
 - an orange dot and the words "Needs input", in the warning color;
-- the agent's title: the first line of its intent cut at 80 characters, else its agent id. It takes at most half the row and is cut with "…" past that;
-- the title of the question the agent waits on (its gate [2]), muted, taking the room that is left and cut with "…" when it does not fit;
+- the agent's title: the first line of its intent cut at 80 characters, else its agent id. It takes at most half the row and is cut with "…" past that, and gives up more width in a narrow row;
+- the title of the question the agent waits on (its gate [2]), muted, taking the room that is left and cut with "…" when it does not fit. In a narrow row the title and the question both give up width; the other parts keep theirs, and the list never scrolls sideways;
 - the project's name, muted;
 - how long ago the agent last spoke, muted: "just now", "12m ago", "3h ago", "2d ago", then the date past a week. Nothing is shown when the daemon gave no time, or one that cannot be read;
 - an arrow pointing right.

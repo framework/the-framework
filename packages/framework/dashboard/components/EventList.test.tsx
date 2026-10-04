@@ -205,6 +205,41 @@ describe('EventList tool calls', () => {
     expect(screen.getByText('Working…')).toBeTruthy()
   })
 
+  test('while the agent works, the last call is the line going on now, not yet in its run', () => {
+    const { rerender } = render(<EventList events={[prompt, call('Bash', 'ls'), call('Read', '/repo/AGENTS.md')]} working stick={false} />)
+    expect(screen.getByRole('button', { name: 'Ran ls' })).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('ReadingAGENTS.md')
+    expect(screen.queryByText(/Working…|Starting…/)).toBeNull()
+    // The next event came: the call is over and joins its run; the agent is between calls.
+    rerender(<EventList events={[prompt, call('Bash', 'ls'), call('Read', '/repo/AGENTS.md'), thought('next')]} working stick={false} />)
+    expect(screen.getByRole('button', { name: 'Ran 1 command, read 1 file' })).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('Working…')
+  })
+
+  test('the first call of a turn is the line going on now alone: no run line above it yet', () => {
+    render(<EventList events={[prompt, call('Bash', 'ls')]} working stick={false} />)
+    expect(screen.getByRole('status').textContent).toBe('Runningls')
+    expect(screen.queryByRole('button', { name: 'Ran ls' })).toBeNull()
+  })
+
+  test('once the agent has ended, or while it writes its message, the last call is in its run', () => {
+    const events = [prompt, call('Bash', 'ls')]
+    const { rerender } = render(<EventList events={events} stick={false} />)
+    expect(screen.getByRole('button', { name: 'Ran ls' })).toBeTruthy()
+    expect(screen.queryByRole('status')).toBeNull()
+    rerender(<EventList events={events} working writing="So" stick={false} />)
+    expect(screen.getByRole('button', { name: 'Ran ls' })).toBeTruthy()
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  test('the line going on now counts from the time of the last event', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-04T10:00:07.000Z'))
+    render(<EventList events={[prompt, { ...call('Bash', 'ls'), at: '2026-10-04T10:00:00.000Z' }]} working stick={false} />)
+    expect(screen.getByRole('status').textContent).toBe('Runningls7s')
+    vi.useRealTimers()
+  })
+
   test('another kind of row between calls ends the run', () => {
     render(<EventList events={[prompt, call('Bash', 'ls'), { kind: 'view', id: 'v1', title: 'Plan', markdown: '# p' }, call('Bash', 'pwd')]} stick={false} />)
     expect(screen.getByRole('button', { name: 'Ran ls' })).toBeTruthy()

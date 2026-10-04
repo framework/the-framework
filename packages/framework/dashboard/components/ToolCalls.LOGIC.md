@@ -20,6 +20,7 @@ Draws what the coding agent [3] did between two of its messages in an agent's [1
 - **A call opens to its detail** - a call with a detail opens to the detail whole; one with none does not open.
 - **A thought is inside the box** - no line of the transcript; in the opened box it reads "Thought" and opens to the thought.
 - **Thoughts alone draw nothing** - a run with no call in it has no line.
+- **The line going on now** - while the agent works, one moving line: the call going on now in the present ("Running pnpm test 9s"), or a word given by the transcript, with moving dots, shimmering text and the seconds counting.
 
 ## Business logic
 
@@ -72,3 +73,22 @@ See "A thought is inside the box".
 #### Business logic
 
 A run with no tool call in it (the coding agent thought, then wrote its message) draws nothing at all. Such a thought is the one thing of the agent's diary the transcript does not let the user reach.
+
+### The line going on now
+
+#### Context
+
+**User story**: while the agent works, the user sees at the bottom of the transcript what the coding agent is doing at this moment and for how long, moving, so a quiet agent never looks stalled: "Reading AGENTS.md 9s", as Claude Code on the web shows it.
+
+**Problem**: the coding agents report a call when it begins and report nothing that sums it up in words, so the line can only say the command or the file. A call that began and has no later event is the call going on now.
+
+#### Business logic
+
+A second component draws the transcript's last line while the agent works (when it is shown, and which call or word it is given, is the transcript's rule, `EventList.tsx`). The line is announced to assistive technology as a status. It holds, in order:
+
+- three small dots rising one after the other, over and over;
+- when it is given a call: the call's line as in "A lone call is its own line", except that the verb is in its form for a call still going on ("Running", "Reading"; `lib/tool-calls.ts`), and the verb and the target are grey with a band of light crossing them, over and over. It opens to its detail on a click like any call;
+- when it is given no call: the word the transcript gave ("Starting…", "Working…"), with the same band of light;
+- when it is given the moment the line's subject began: the time since then, counted up every second, as "9s" below one minute and "1m 5s" from then on. Without that moment there is no count.
+
+For a reader whose system asks for reduced motion, the dots stand still and the text is plain grey.

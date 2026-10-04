@@ -1,7 +1,6 @@
 import type { AgentMeta, ChoiceRequest, FrameworkEvent } from '../../src/index.js'
 import { formatFrameworkEvent } from '../../src/client.js'
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
-import { Loader2 } from 'lucide-react'
 import { eventKindLabel } from '../lib/event-labels.js'
 import { pendingChoices } from '../lib/live-state.js'
 import { startedBefore, subagentEnd, subagentStartedAt, type SubagentEnd } from '../lib/subagents.js'
@@ -10,7 +9,7 @@ import { ChoicePanel } from './ChoicePanel.js'
 import { InlineScreen, isLoopbackScreen } from './InlineScreen.js'
 import { Markdown } from './Markdown.js'
 import { SubagentLine } from './SubagentLine.js'
-import { ToolCalls, type ToolStep } from './ToolCalls.js'
+import { LiveLine, ToolCalls, type ToolStep } from './ToolCalls.js'
 import { Badge } from './ui/badge.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
@@ -357,9 +356,17 @@ function stepOf(e: FrameworkEvent): ToolStep | undefined {
 /**
  * Fold each run of the agent's steps (tool calls and thoughts with no other row between them)
  * into its first row, which stands for the whole run. A run with no call in it, thoughts alone,
- * is no row at all: the chat has no thinking row.
+ * is no row at all: the chat has no thinking row. While the agent works (`live`), a call that is
+ * the last event is the call going on now (`current`): it is not in its run yet, the chat's last
+ * line says it.
  */
-export function foldSteps(events: readonly FrameworkEvent[]): { rows: FrameworkEvent[]; steps: Map<FrameworkEvent, ToolStep[]> } {
+export function foldSteps(
+  events: readonly FrameworkEvent[],
+  live = false,
+): { rows: FrameworkEvent[]; steps: Map<FrameworkEvent, ToolStep[]>; current?: Extract<ToolStep, { type: 'action' }> } {
+  const last = events[events.length - 1]
+  const going = live && last !== undefined ? stepOf(last) : undefined
+  if (going?.type === 'action') return { ...foldSteps(events.slice(0, -1)), current: going }
   const rows: FrameworkEvent[] = []
   const steps = new Map<FrameworkEvent, ToolStep[]>()
   let run: { head: FrameworkEvent; steps: ToolStep[] } | undefined
@@ -423,8 +430,9 @@ export function EventList({
   /** A message just sent to an ended agent: the last prompt row, until the prompt's own line
    *  arrives and takes the same row. Being a prompt, the scroller brings it into view. */
   sending?: string | undefined
-  /** The agent is working: while it writes nothing, a spinner row closes the feed ("Starting…" when
-   *  the last row is a prompt, "Working…" after), so a quiet agent never looks stalled. */
+  /** The agent is working: while it writes nothing, a moving line closes the feed: the call going
+   *  on now, else "Starting…" when the last row is a prompt and "Working…" after, so a quiet agent
+   *  never looks stalled. */
   working?: boolean
   stick?: boolean
   /** Where a non-following log opens; a replay opens at the outcome (#948), not page one. */
@@ -462,11 +470,11 @@ export function EventList({
   }
   // A reply that was only its question's block is no row: the card under it is the question.
   // A run of the agent's steps is one row, its first.
+  const written = withoutQuestionBlock(writing)
   const unfolded = kept.filter(e => !passed.has(e) && textOf(e) !== '')
-  const { rows: shown, steps } = foldSteps(unfolded)
+  const { rows: shown, steps, current } = foldSteps(unfolded, working && !written)
   // Nothing has come since the prompt, not even a thought that is no row: the agent is starting.
   const starting = unfolded.length > 0 && isTurnBoundary(unfolded[unfolded.length - 1]!)
-  const written = withoutQuestionBlock(writing)
   // The prompts that told this run one of its subagents ended: SUBAGENT rows, not the reader's own.
   const ends = new Map<FrameworkEvent, SubagentEnd>()
   for (const e of shown) {
@@ -610,10 +618,9 @@ export function EventList({
               </MessageScrollerItem>
             )}
             {working && !written && (
-              <MessageScrollerItem messageId="working" className="-mx-1.5 flex items-center gap-2 rounded-sm px-1.5 text-muted-foreground">
+              <MessageScrollerItem messageId="working" className="-mx-1.5 flex items-center gap-2 rounded-sm px-1.5">
                 <span className="w-28 shrink-0" />
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                <span role="status">{starting ? 'Starting…' : 'Working…'}</span>
+                <LiveLine call={current} word={starting ? 'Starting…' : 'Working…'} since={unfolded[unfolded.length - 1]?.at} />
               </MessageScrollerItem>
             )}
             {tail}

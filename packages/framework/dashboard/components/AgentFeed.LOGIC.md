@@ -17,4 +17,3 @@ The feed of one agent's [1] events [2] on the agent view: the list of events (`E
 - **The message being written** - handed in by the agent view while the agent runs and passed to the list, which shows it after the last row.
 - **The tail** - content the caller hands in is rendered after the last row inside the scroller, which is where a web agent's cloud mirror box rides.
 - **The subagents** - the agent's subagents (the agents started for it, when it split its task across them), what each working one is doing now, and how a click on one opens its page are handed in by the agent view and passed to the list, which gives each subagent its rows.
-- **Whether the job is still going** - handed in by the agent view while a subagent still holds the agent's job, and passed to the list, which then does not show the agent's last clean end as its end.

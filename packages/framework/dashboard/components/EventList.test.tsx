@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 // The session line names the model as the daemon lists it; no daemon here, so the list never answers.
 vi.mock('../rpc/models.js', () => ({ onModels: () => new Promise(() => {}) }))
 
-const { EventList, askedReplies, passedEnds, withoutQuestionBlock } = await import('./EventList.js')
+const { EventList, askedReplies, quietEnds, withoutQuestionBlock } = await import('./EventList.js')
 
 afterEach(cleanup)
 
@@ -67,8 +67,7 @@ describe('EventList conversation rows', () => {
     ]
     render(<EventList events={events} stick={false} />)
     for (const label of ['agent', 'view', 'choice', 'end']) expect(screen.queryByText(label)).toBeNull()
-    expect(screen.getByText(/✓ finished/)).toBeTruthy()
-    const column = screen.getByText(/✓ finished/).closest('[data-slot="message-scroller-content"]')!
+    const column = screen.getByText('On it.').closest('[data-slot="message-scroller-content"]')!
     expect(column.className).toContain('mx-auto')
     expect(column.className).toContain('max-w-3xl')
   })
@@ -330,16 +329,12 @@ describe('EventList row colour', () => {
     expect(screen.getByText(/stopped/).className).not.toContain('text-danger')
   })
 
-  test('a run waiting on its question is not a failure: it says so, and is not red (#1774)', () => {
-    render(<EventList events={[{ kind: 'end', ok: false, waiting: true }]} stick={false} />)
-    const row = screen.getByText(/waiting for an answer/)
-    expect(row.className).not.toContain('text-danger')
-    expect(screen.queryByText(/failed/)).toBeNull()
-  })
-
-  test('a finished run is not red (#1199)', () => {
+  test('a run waiting on its question is not a failure, and a finished one is not either: neither has an end line (#1774, #1199)', () => {
+    const { unmount } = render(<EventList events={[{ kind: 'end', ok: false, waiting: true }]} stick={false} />)
+    expect(screen.queryByText(/waiting for an answer|failed/)).toBeNull()
+    unmount()
     render(<EventList events={[{ kind: 'end', ok: true }]} stick={false} />)
-    expect(screen.getByText(/finished/).className).not.toContain('text-danger')
+    expect(screen.queryByText(/finished|failed/)).toBeNull()
   })
 })
 
@@ -472,10 +467,7 @@ describe('EventList row wash (#1508)', () => {
     expect(container.querySelector('[class*="bg-danger/10"]')).toBeTruthy()
   })
 
-  test('a clean end gets the green wash; a stopped one gets none', () => {
-    const { container } = render(<EventList events={[{ kind: 'end', ok: true }]} stick={false} />)
-    expect(container.querySelector('[class*="bg-success/10"]')).toBeTruthy()
-    cleanup()
+  test('a stopped end gets no wash', () => {
     const { container: stopped } = render(<EventList events={[{ kind: 'end', ok: false, stopped: true }]} stick={false} />)
     expect(stopped.querySelector('[class*="bg-info"], [class*="bg-danger"], [class*="bg-success"]')).toBeNull()
   })
@@ -631,7 +623,8 @@ describe('EventList subagent rows', () => {
   })
 })
 
-// What the run's details already count is not said again in the chat, and "finished" is said once.
+// What the run's details already count is not said again in the chat, and a turn that ended
+// cleanly or on a question has no end line: only a stopped or failed end is said.
 describe('EventList turn ends', () => {
   const prompt = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'start', prompt: text } })
   const reply = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'text', text } })
@@ -644,49 +637,34 @@ describe('EventList turn ends', () => {
     expect(screen.queryByText(/turn complete/)).toBeNull()
     expect(screen.queryByText(/spend/)).toBeNull()
     expect(screen.queryByText('cost')).toBeNull()
-    expect(screen.getByText(/finished/)).toBeTruthy()
   })
 
-  test('a clean end the run went on after is not a row: only the last one says finished', () => {
+  test('a clean end is not a row: not between two turns, and not as the last line', () => {
     render(<EventList events={[prompt('go'), reply('one'), end(), prompt('more'), reply('two'), end()]} stick={false} />)
-    expect(screen.getAllByText(/finished/)).toHaveLength(1)
-  })
-
-  test('the last clean end is not a row while the run is still going', () => {
-    render(<EventList events={[prompt('go'), reply('started them'), end()]} going stick={false} />)
     expect(screen.queryByText(/finished/)).toBeNull()
+    expect(screen.getByText('two')).toBeTruthy()
   })
 
-  test('a message just sent takes the place of the end above it at once, clean or waiting; a failed end stays', () => {
-    const { unmount } = render(<EventList events={[prompt('go'), reply('did it'), end()]} sending="and now this" stick={false} />)
-    expect(screen.queryByText(/finished/)).toBeNull()
-    unmount()
-    render(<EventList events={[prompt('go'), end({ ok: false, waiting: true })]} sending="my answer" stick={false} />)
-    expect(screen.queryByText(/waiting for an answer/)).toBeNull()
-    cleanup()
-    render(<EventList events={[prompt('go'), end({ ok: false, detail: 'boom' })]} sending="try again" stick={false} />)
-    expect(screen.getByText(/failed: boom/)).toBeTruthy()
-  })
-
-  test('an end that is not clean stays where it happened, and so does the clean end after it', () => {
-    const first = end({ ok: false, detail: 'boom' })
-    const stopped = end({ ok: false, stopped: true })
-    const last = end()
-    const events = [prompt('go'), first, prompt('again'), stopped, prompt('once more'), last]
-    expect(passedEnds(events, false).size).toBe(0)
-    expect([...passedEnds(events, true)]).toEqual([last])
-    // What is written after the last end without a new prompt (a pull request line) leaves it the run's end.
-    expect(passedEnds([prompt('go'), last, { kind: 'log', message: 'recorded' } as FrameworkEvent], false).size).toBe(0)
-    // A failed last end is the run's end even while it is going.
-    expect(passedEnds([prompt('go'), first], true).size).toBe(0)
-  })
-
-  test('an end waiting on an answer is not a row once the answer came, and is one until then, going or not', () => {
+  test('an end waiting on an answer is not a row, before the answer and after it', () => {
     const asked = end({ ok: false, waiting: true })
-    expect([...passedEnds([prompt('go'), asked, prompt('Approve'), reply('on it')], false)]).toEqual([asked])
-    expect(passedEnds([prompt('go'), asked], true).size).toBe(0)
-    render(<EventList events={[prompt('go'), asked]} going stick={false} />)
-    expect(screen.getByText(/waiting for an answer/)).toBeTruthy()
+    const { unmount } = render(<EventList events={[prompt('go'), asked]} stick={false} />)
+    expect(screen.queryByText(/waiting for an answer/)).toBeNull()
+    unmount()
+    render(<EventList events={[prompt('go'), asked, prompt('Approve'), reply('on it')]} stick={false} />)
+    expect(screen.queryByText(/waiting for an answer/)).toBeNull()
+  })
+
+  test('a stopped end and a failed end are rows where they happened, also once the run went on', () => {
+    const failed = end({ ok: false, detail: 'boom' })
+    const stopped = end({ ok: false, stopped: true })
+    const clean = end()
+    const waiting = end({ ok: false, waiting: true })
+    const events = [prompt('go'), failed, prompt('again'), stopped, prompt('once more'), waiting, prompt('yes'), clean]
+    expect([...quietEnds(events)]).toEqual([waiting, clean])
+    render(<EventList events={events} sending="try again" stick={false} />)
+    expect(screen.getByText(/failed: boom/)).toBeTruthy()
+    expect(screen.getByText(/stopped/)).toBeTruthy()
+    expect(screen.queryByText(/finished|waiting for an answer/)).toBeNull()
   })
 })
 
@@ -770,10 +748,6 @@ describe('EventList scroll anchor', () => {
     // A message just sent comes after the place of the end it follows.
     rerender(<EventList events={events} sending="second" stick={false} />)
     expect(ids()).toEqual(['0', '1', '2', 'sending'])
-    expect(container.querySelector('[data-message-id="2"]')?.hasAttribute('hidden')).toBe(true)
-    // The last end hidden because the job is still going keeps its place too.
-    rerender(<EventList events={events} going stick={false} />)
-    expect(ids()).toEqual(['0', '1', '2'])
     expect(container.querySelector('[data-message-id="2"]')?.hasAttribute('hidden')).toBe(true)
   })
 })

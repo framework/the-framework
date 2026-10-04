@@ -1,4 +1,4 @@
-Renders an agent's [1] transcript: the events [2] the agent emitted, one row each, in the order they happened, except those the page already says elsewhere or that no longer hold (a turn's end, the spend so far, an end the agent went on after) — for a running agent, whose rows arrive live, and for a finished agent replayed from the archive [3] alike. Most rows read as the one-line text the terminal prints; the user's prompts and the agent's replies, gates [4], live screens [15] and the agent's subagents [16] get their own row treatment, so the transcript reads like a conversation whose interactions can be acted on where they happened.
+Renders an agent's [1] transcript: the events [2] the agent emitted, one row each, in the order they happened, except those the page already says elsewhere or that the conversation already says (a turn's end, the spend so far, a clean end, an end waiting on an answer) — for a running agent, whose rows arrive live, and for a finished agent replayed from the archive [3] alike. Most rows read as the one-line text the terminal prints; the user's prompts and the agent's replies, gates [4], live screens [15] and the agent's subagents [16] get their own row treatment, so the transcript reads like a conversation whose interactions can be acted on where they happened.
 
 ## Context
 
@@ -30,7 +30,7 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 - **A moving line while the agent works** - while the agent works and writes nothing, the last row is a moving line: the tool call going on now ("Running pnpm test 9s"), else "Starting…" when nothing has come since the prompt and "Working…" otherwise, with the seconds since the last event; it gives way to the message being written, and goes when the agent ends.
 - **The message being written grows in place** - while the agent writes a message, it is one more agent row after the last, drawn as a finished reply is; when the whole message arrives, its own row replaces it and nothing moves.
 - **A turn's end and the spend are not rows** - the end of each turn [7] and the spend so far are left out: the agent's details strip counts the turns and totals the spend.
-- **An end the agent went on after is not a row** - a clean end, or an end waiting on an answer, that a later prompt follows is left out, and so is the last clean end while the caller says the agent's job is still going; a failed or stopped end stays where it happened.
+- **A clean end and a waiting end are not rows** - an end that is clean, or waiting on an answer, is never a row: the agent's last message, or its question, is how that turn ends; a failed or stopped end is a row where it happened.
 - **The question's block is not shown** - the JSON block an agent writes to ask is left out of the reply a gate [4] follows, and out of the message being written: the panel above the message box is the question.
 - **The session id is not a row** - the coding agent's session id update is plumbing, not conversation: it is left out of the list, and the run's menu reads it from the events.
 - **The quota only when it matters** - the coding agent reports the account's quota after every turn; a reading that is `allowed` is left out of the list, and one running low or used up is a row.
@@ -41,7 +41,7 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 - **A screen is live where the agent used it** - the newest `screen` line at an address, on this machine's loopback and with neither an `ended` line for that address nor the agent's end after it (an end waiting on an answer does not count), is the live page itself, framed in the transcript; an earlier or ended one stays its one line, and every `ended` line is hidden.
 - **A subagent has a row where it was started** - when the transcript is given the agent's subagents [16], each has a row before the first row written after it started: its task, then what it is doing now or how it ended, read off the subagent's card so the row changes in place.
 - **A subagent's end is not the user's prompt** - the prompt that told the agent one of its subagents ended is a row about the subagent saying `ended <status>`, with the rest of the message folded under it, not a grey box of the user's.
-- **No labels, a few colors** - no row wears a label saying its kind; a failed row is red on a red wash and a clean finish sits on a green wash.
+- **No labels, a few colors** - no row wears a label saying its kind; a failed row is red on a red wash.
 - **The time each line was written** - the first of a run of same-kind rows holds the time its diary line was written, shown while the pointer is on the row, the same live, after a reload and once the agent has ended; a line with no time holds none.
 - **Following the newest row** - a live transcript keeps the newest row in view until the reader scrolls up and offers "Jump to latest"; a replay opens at its end or its start as the caller decides.
 - **The view never jumps back when the agent goes on** - only the newest prompt is the scroller's anchor, a row keeps its identity when another row stops being shown, and an end that is no longer a row keeps an empty place where it was.
@@ -87,21 +87,19 @@ A prompt that is the end of a subagent [16] is not the user's and is not drawn t
 
 The event that ends a turn (the turn's final answer) and the event that reports the spend are never rows, for any agent. The other left-out events are described in "The session id is not a row", "The quota only when it matters" and the next section.
 
-### An end the agent went on after is not a row
+### A clean end and a waiting end are not rows
 
 #### Context
 
-**Problem**: an agent that is continued (by the user's next message, by an answer, or, for a main agent, by the message saying one of its subagents [16] ended) has one end event per leg. The transcript read "✓ finished" between two turns, and "? waiting for an answer" above the answer. And a main agent ends its turn clean while its subagents still work: "✓ finished" stood over work still going.
+**User story**: the user reads the agent's answer as the end of the turn, as on Claude Code on the web, with no "✓ finished" line under it. When the agent stopped on a question, the question above the message box says so; no "? waiting for an answer" line repeats it. The status word in the action bar still says "finished" or "waiting for an answer".
+
+**Problem**: an agent that is continued has one end event per leg, so the transcript read "✓ finished" between two turns and "? waiting for an answer" above the answer; and a main agent ends its turn clean while its subagents [16] still work, so "✓ finished" stood over work still going.
 
 #### Business logic
 
-Reading the events in order, an end is not a row when:
+An end is not a row when it is clean, or when it is waiting on an answer: at any place in the transcript, the last one included.
 
-- it is clean, or it is waiting on an answer, and a prompt comes after it before any other end: the agent went on. An end waiting on an answer that no prompt follows is a row, whatever the caller says about the agent's job;
-- it is the last end, it is clean or waiting on an answer, and the user has just sent a message that the transcript shows ahead of its own prompt line: that message is the prompt on its way, so the end above it goes at once rather than a few seconds later;
-- it is the last end, it is clean, no prompt follows it, and the caller says the agent's job is still going (the agent view says so while a subagent holds the job, `AgentView.tsx`).
-
-A failed or stopped end is always a row, where it happened: it says why the next prompt was needed. What is written after the last end without a new prompt (a line recorded after the agent ended) leaves that end the agent's end, and a row. So an agent's transcript says "✓ finished" at most once per stretch of clean legs, at the end, and only once nothing more is coming.
+A failed or stopped end is always a row, where it happened: it says why the agent is not going on, and why the next prompt was needed.
 
 ### The question's block is not shown
 
@@ -231,7 +229,7 @@ The same words in a prompt about an agent that is not one of these subagents, or
 
 #### Business logic
 
-No row wears a label saying its kind. A row reports a failure when it is the coding agent [5] (or its transport) erroring mid-run, an error the agent reported itself, or an end that is neither successful, nor a stop, nor waiting on an answer. A failing row's text is red and its whole line is washed with a faint red tint, findable from the scrollbar's distance. A clean end keeps its text tone on a faint green wash. A stopped agent's end is neither a failure nor a milestone: it keeps the neutral tone, since the user asked for the stop. Every other row keeps the transcript's tone with no wash.
+No row wears a label saying its kind. A row reports a failure when it is the coding agent [5] (or its transport) erroring mid-run, an error the agent reported itself, or an end that is neither successful, nor a stop, nor waiting on an answer. A failing row's text is red and its whole line is washed with a faint red tint, findable from the scrollbar's distance. A stopped agent's end is neither a failure nor a milestone: it keeps the neutral tone, since the user asked for the stop. Every other row keeps the transcript's tone with no wash.
 
 ### The time each line was written
 
@@ -265,4 +263,4 @@ By default the transcript follows its newest row: as rows arrive the view stays 
 
 - **One anchor.** Only the newest prompt among the rows shown is marked as the scroller's anchor: a message just sent while it is shown, else the last prompt of the transcript (a subagent's end counts, being a prompt). No earlier prompt is one.
 - **A row's identity is its event's place in the whole stream**, counted over every event [2], shown or not. A row that stops being shown, or one that is never shown, therefore changes no other row's identity. The message just sent, which is no event yet, has an identity of its own.
-- **An end that is no longer a row keeps its place.** Each end left out by "An end the agent went on after is not a row" stays in the list as an empty, hidden entry with its own identity, where it was: before the row that follows it, before a message just sent, or at the end of the list when nothing follows. The prompt after it is then past every entry the scroller already had, and is brought into view.
+- **An end that is no longer a row keeps its place.** Each end left out by "A clean end and a waiting end are not rows" stays in the list as an empty, hidden entry with its own identity, where it was: before the row that follows it, before a message just sent, or at the end of the list when nothing follows. The prompt after it is then past every entry the scroller already had, and is brought into view.

@@ -32,8 +32,9 @@ import {
 //     its "✓ chose" line.
 //   - Screens: the newest open `screen` line at an address, before the run's end, is the live
 //     screen itself (InlineScreen); an earlier one stays its one line, and an `ended` one is hidden.
-//   - A turn's end and the spend so far are not rows, and neither is a clean end the run went on
-//     after: the run's details count turns and spend, and "finished" between turns is not so.
+//   - A turn's end and the spend so far are not rows, and neither is a clean end or an end waiting
+//     on an answer: the agent's last message, or its question, is how such a turn ends. A stopped
+//     or failed end is a row.
 //   - The reply a question follows is shown whole: it is what the question asks about.
 //   - Subagents, when the log is given the run's: each has a row where it was started, read off
 //     its card, so the row of a working one says what it is doing now; and the prompt that told
@@ -95,14 +96,12 @@ function rowTone(e: FrameworkEvent): string {
 /**
  * The row's BACKGROUND wash (#1508): a tint across the whole line, findable from the scrollbar's
  * distance.
- * Only the rows the eye actually hunts for get one — failures, and the agent landing cleanly (the
- * reader's own turns are boxes already) — and at a whisper of alpha, so the
+ * Only the rows the eye actually hunts for get one — failures (the reader's own turns are boxes
+ * already) — and at a whisper of alpha, so the
  * text keeps the contrast and the bulk of the log stays plain canvas.
  */
 function rowWash(e: FrameworkEvent): string {
-  if (isFailure(e)) return 'bg-danger/10'
-  if (e.kind === 'end' && e.ok) return 'bg-success/10'
-  return ''
+  return isFailure(e) ? 'bg-danger/10' : ''
 }
 
 /**
@@ -192,25 +191,13 @@ export function foldScreenRows(events: readonly FrameworkEvent[]): { live: Set<F
 }
 
 /**
- * The ends that are not the run's end: a clean one, or one waiting on an answer, that a later
- * prompt follows (the run went on), and the last clean one while the run's subagents still work
- * (`going`). They are not rows: "finished" between two turns or over working subagents, and
- * "waiting for an answer" above the answer, say what is not so. A failed or stopped end stays
- * where it happened: it says why the next prompt was needed.
+ * The ends that are no row: a clean one, and one waiting on an answer. The agent's last message
+ * is how a clean turn ends, and the question above the message box is how a waiting one does; a
+ * line under them said it twice. A failed or stopped end is a row where it happened: it says why
+ * the agent is not going on, and why the next prompt was needed.
  */
-export function passedEnds(events: readonly FrameworkEvent[], going: boolean, sent = false): Set<FrameworkEvent> {
-  const passed = new Set<FrameworkEvent>()
-  let pending: FrameworkEvent | undefined
-  for (const e of events) {
-    if (e.kind === 'end') pending = e.ok || e.waiting ? e : undefined
-    else if (pending && isTurnBoundary(e)) {
-      passed.add(pending)
-      pending = undefined
-    }
-  }
-  // A message just sent (`sent`) is a prompt on its way: the end above it is passed already.
-  if (pending?.kind === 'end' && (sent || (going && pending.ok))) passed.add(pending)
-  return passed
+export function quietEnds(events: readonly FrameworkEvent[]): Set<FrameworkEvent> {
+  return new Set(events.filter(e => e.kind === 'end' && (e.ok || e.waiting)))
 }
 
 /**
@@ -411,7 +398,6 @@ export function EventList({
   projectId,
   subagents = NO_SUBAGENTS,
   doing = NOTHING_DOING,
-  going = false,
   setup,
   onOpenAgent,
 }: {
@@ -440,8 +426,6 @@ export function EventList({
   subagents?: readonly AgentMeta[]
   /** What each working subagent is doing now, by id. */
   doing?: Record<string, string>
-  /** The run's job is not over (its subagents still work): its last clean end is not shown as the end. */
-  going?: boolean
   /** What was set up for the agent before it began: the "Session set up" line under the first
    *  prompt (the first row when the log has no prompt). Without it, no such line. */
   setup?: SessionSetup | undefined
@@ -450,7 +434,7 @@ export function EventList({
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
   const screenRows = useMemo(() => foldScreenRows(events), [events])
-  const passed = useMemo(() => passedEnds(events, going, sending !== undefined), [events, going, sending])
+  const passed = useMemo(() => quietEnds(events), [events])
   const rowIds = useMemo(() => new Map(events.map((e, at) => [e, String(at)])), [events])
   const asked = useMemo(() => askedReplies(events), [events])
   const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))

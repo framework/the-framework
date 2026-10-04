@@ -336,7 +336,6 @@ export function AgentView({
           tail={<CloudMirrorRow target={target} events={shown} />}
           subagents={subagents}
           doing={doing}
-          going={subagentsRunning > 0}
           setup={setup}
           onOpenAgent={onOpenAgent}
         />

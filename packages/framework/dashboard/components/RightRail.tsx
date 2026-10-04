@@ -35,8 +35,8 @@ const TABS: Record<'views' | 'docs', { label: string; help: string }> = {
 // transcript now (#1455 items 6/7), so nothing here pulls focus for them.
 //
 // The rail is closed until the person opens it (`lib/side-panel.ts` remembers which): closed, it is
-// a narrow strip holding one button at the top right of the page; open, the same button, at the
-// end of the tabs, closes it. A closed rail renders no panel, so nothing in it reads anything.
+// a narrow strip holding one button at the top right of the page; open, it is half the page wide,
+// and the same button, at the end of the tabs, closes it. A closed rail renders no panel, so nothing in it reads anything.
 export function RightRail({
   projectId,
   agentId: agentId,
@@ -156,12 +156,9 @@ export function RightRail({
   const activePanel = panelOf(active)
 
   return (
-    <aside
-      className={cn(
-        'flex w-[22rem] shrink-0 flex-col border-l border-border',
-      )}
-    >
-      {/* flex-wrap: up to 7 tabs share a w-80 rail, and without it the tail clipped (#948).
+    // Open, the panel takes half the page, as Claude Code's does: a diff needs the room.
+    <aside className="flex w-1/2 min-w-[22rem] shrink-0 flex-col border-l border-border">
+      {/* flex-wrap: without it the tail of a long row of tabs clipped (#948).
           Announced as the tabset it visually is. */}
       <div className="flex items-start gap-1 p-2">
       <div role="tablist" aria-label="Rail panels" className="flex min-w-0 flex-1 flex-wrap gap-1">
@@ -188,11 +185,8 @@ export function RightRail({
       </div>
       {toggle}
       </div>
-      {/* The panel is as tall as it needs to be, and no taller than the rail allows: it sizes to its
-          own content (so a short file list does not stretch to the floor), and shrinks with its own
-          scroller once the content outgrows what is left. That is what puts the verdict below
-          directly under the last row rather than at the foot of an empty column. */}
-      <div className="flex min-h-0 flex-col overflow-hidden">
+      {/* The panel fills what is left of the side panel's height, and scrolls inside itself. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {activePanel ? (
           <ModuleSlot key={active} package={activePanel.package} label={`${activePanel.label} tab`}>
             <activePanel.Panel {...panelProps} />

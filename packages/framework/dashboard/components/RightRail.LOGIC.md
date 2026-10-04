@@ -1,4 +1,4 @@
-The dashboard's right rail: a narrow column beside the main pane holding the tabs the installed modules [10] add for the project (the Files module's "Files" tab first of all), then the views [1] the selected agent [2] pushed, and the project's `PLAN`/`TODO` documents. A module's tab is given the selected agent and how many events its feed has shown, so it can read again as the agent works. A module's tab is always offered where the project has the module; the rail's own two panels are earned by having something in them, and a rail with no tab left is not drawn at all.
+The dashboard's right rail: a column beside the main pane, half the page wide once opened, holding the tabs the installed modules [10] add for the project (the Files module's "Changes" tab first of all, then its "Files" tab), then the views [1] the selected agent [2] pushed, and the project's `PLAN`/`TODO` documents. A module's tab is given the selected agent and how many events its feed has shown, so it can read again as the agent works. A module's tab is always offered where the project has the module; the rail's own two panels are earned by having something in them, and a rail with no tab left is not drawn at all.
 
 ## Context
 
@@ -17,7 +17,7 @@ The dashboard's right rail: a narrow column beside the main pane holding the tab
 
 ## Business logic — TL;DR
 
-- **Closed until the user opens it** - the rail starts closed: a narrow strip with one button at the top right of the page; the button opens the rail, the same button at the end of the tabs closes it, and the browser remembers which.
+- **Closed until the user opens it** - the rail starts closed: a narrow strip with one button at the top right of the page; the button opens the rail, which is then half the page wide; the same button at the end of the tabs closes it, and the browser remembers which.
 - **The modules' tabs first, then the rail's own two** - every tab an installed module [10] adds for the project comes first, in package order, always offered; then "Views" and "Docs", each only when there is something in it; a rail with no tab left disappears.
 - **What a module's tab is given** - the project, the selected agent [2] when there is one, and the Context's [9] files with a way to add or remove one; a tab that throws shows its own error line and leaves the rest of the rail standing.
 - **No project, no rail** - with no project selected the rail is not drawn, and it is absent beside a full-width module page.
@@ -34,14 +34,16 @@ The dashboard's right rail: a narrow column beside the main pane holding the tab
 
 **User story**: the user reads the conversation in the whole width of the page, as on Claude Code on the web. The files and the changes are one click away, at the top right, and the page is as the user left it the next time.
 
-**Problem**: a rail that is always open takes a quarter of the page from the conversation, also for a user who never looks at it.
+**Problem**: a rail that is always open takes its width from the conversation, also for a user who never looks at it.
+
+**Problem**: a diff needs room: in a narrow column its lines are cut or wrapped. So the open rail is half the page wide, as the side panel of Claude Code on the web is.
 
 #### Business logic
 
 The rail is open or closed, and it is closed until the user opens it (`lib/side-panel.ts` keeps which, in this browser).
 
-- Closed: in the rail's place there is a narrow strip with one button at its top, at the top right of the page, named "Open the side panel"; its hover text names the tabs it would show ("Open the side panel: Files, Changes"). No tab and no panel is drawn, so a module's tab reads nothing while the rail is closed. A click opens the rail.
-- Open: the rail is drawn as the sections below say, and the same button sits at the end of the row of tabs, named "Close the side panel". A click closes the rail.
+- Closed: in the rail's place there is a narrow strip with one button at its top, at the top right of the page, named "Open the side panel"; its hover text names the tabs it would show ("Open the side panel: Changes, Files"). No tab and no panel is drawn, so a module's tab reads nothing while the rail is closed. A click opens the rail.
+- Open: the rail is drawn as the sections below say, and the same button sits at the end of the row of tabs, named "Close the side panel". A click closes the rail. The open rail is half the page wide, and never narrower than 22rem; its width is the same whatever tab is open. The row of tabs is at its top, and the open tab's panel fills the height left under it and scrolls inside itself.
 - A rail with no tab to show has no button either: nothing is drawn, as before.
 
 Nothing opens the rail but the button: the first view [1] an agent pushes picks the tab the rail will show (see "Which panel opens by itself"), and does not open a closed rail.
@@ -56,7 +58,7 @@ See `## Context`.
 
 The rail offers, in this order, each with its one-line explanation on hover:
 
-- Every tab an installed module [10] adds (`lib/use-modules.ts`), for a project that has that module, in package order: its label and its explanation are the module's. The built-in Files module adds "Files" — "The project’s files, or a session’s with what it changed, for as long as its checkout, branch or merge commit exists — hover one to preview it, click one to add it to the next run’s Context." A module's tab is offered on the project's home and on every agent's page, whatever it holds: when it has nothing, it says so inside.
+- Every tab an installed module [10] adds (`lib/use-modules.ts`), for a project that has that module, in package order: its label and its explanation are the module's. The built-in Files module adds "Changes" first, the list of the files that changed with the picked file's diff beside it, and then "Files" — "The project’s files, or a session’s with what it changed, for as long as its checkout, branch or merge commit exists — hover one to preview it, click one to add it to the next run’s Context." A module's tab is offered on the project's home and on every agent's page, whatever it holds: when it has nothing, it says so inside.
 - "Views" — "Documents the agent pushed up during the session — a plan, a summary, a writeup." Shown once the selected agent has pushed at least one view [1]. The views arrive on the agent's live event stream.
 - "Docs" — "The PLAN/TODO markdown files at the root of the workspace."
 
@@ -91,7 +93,7 @@ With no project selected the rail is not drawn. It is likewise absent beside the
 #### Business logic
 
 - The moment the selected agent's first view [1] arrives, the rail switches to "Views". A second view does not: the panel the user is on stays.
-- Until the user picks a tab by hand, and while there is no view, the rail rests on the first module tab when there is one and on "Docs" otherwise.
+- Until the user picks a tab by hand, and while there is no view, the rail rests on the first module tab when there is one (the Files module's "Changes" tab) and on "Docs" otherwise.
 - Once the user has picked a tab, the rail stops choosing for the user. Only a first view may still move it.
 
 ### A panel that loses its content hands over

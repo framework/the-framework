@@ -66,21 +66,21 @@ const baseProps = {
 describe('RightRail width', () => {
   const rail = (container: HTMLElement) => container.querySelector('aside')!
 
-  test('a list-shaped tab holds the fixed width', () => {
+  test('a list-shaped tab is half the page wide', () => {
     const { container } = render(<RightRail {...baseProps} />)
-    expect(rail(container).className).toContain('w-[22rem]')
+    expect(rail(container).className).toContain('w-1/2')
   })
 
   test('a pushed view keeps the same width — no expand', () => {
     const { container } = render(<RightRail {...baseProps} views={[view]} />)
     // The first view pulls the rail to the Views tab on its own, but the width does not change.
-    expect(rail(container).className).toContain('w-[22rem]')
+    expect(rail(container).className).toContain('w-1/2')
   })
 
   test('the width is unchanged after switching away from a view', async () => {
     const { container } = render(<RightRail {...baseProps} views={[view]} />)
     fireEvent.click(await screen.findByRole('tab', { name: /docs/i }))
-    expect(rail(container).className).toContain('w-[22rem]')
+    expect(rail(container).className).toContain('w-1/2')
   })
 
   test('no project means no rail', () => {

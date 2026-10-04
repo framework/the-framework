@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
 import { cn, useModuleHost, usePolled, type ModulePanelProps } from 'framework/module'
 import type { ProjectTree } from '../src/server.js'
 import type { AgentTree, FileMark } from '../src/tree.js'
 import { readProject, readTree } from './reads.js'
 import { FilePreviewCard } from './FilePreview.js'
 
-// The side rail's Changes tab: only the files that changed, each opening to its diff. On a run's
-// page, what that run changed, read from the same place its Files tree is (the `tree` read), and
-// kept once its work is merged: the Files tab's marks say what is not merged yet and go with the
-// merge, this list says what the run did and stays. On the project's own page, the files changed
-// in the project's folder and not committed (the `project` read).
+// The side panel's Changes tab, as Claude Code on the web draws it: the files that changed in a
+// list on the left, and on the right the diff of the one picked, the first file picked by itself.
+// On a run's page, what that run changed, read from the same place its Files tree is (the `tree`
+// read), and kept once its work is merged: the Files tab's marks say what is not merged yet and go
+// with the merge, this list says what the run did and stays. On the project's own page, the files
+// changed in the project's folder and not committed (the `project` read).
 
 const LABEL: Record<FileMark['status'], string> = {
   untracked: 'new',
@@ -26,27 +26,21 @@ const TONE: Record<FileMark['status'], string> = {
   deleted: 'text-danger',
 }
 
-function ChangeRow({ projectId, agentId, path, mark }: { projectId: string; agentId?: string | undefined; path: string; mark: FileMark }) {
-  const [open, setOpen] = useState(false)
+function ChangeRow({ path, mark, picked, onPick }: { path: string; mark: FileMark; picked: boolean; onPick: () => void }) {
   const dir = path.slice(0, path.lastIndexOf('/') + 1)
   const name = path.slice(path.lastIndexOf('/') + 1)
   return (
-    <li className="border-t border-border first:border-t-0">
-      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-accent">
-        <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />
-        <span className="min-w-0 flex-1 truncate font-mono text-xs">
+    <li>
+      <button type="button" onClick={onPick} aria-pressed={picked} title={path} className={cn('flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-accent', picked && 'bg-accent')}>
+        <span className="w-full truncate font-mono text-xs">
           <span className="text-muted-foreground">{dir}</span>
           <span className={cn(mark.status === 'deleted' && 'line-through')}>{name}</span>
         </span>
-        {!mark.committed && <span className="shrink-0 text-[10px] text-muted-foreground">not committed</span>}
-        <span className={cn('shrink-0 text-[10px] uppercase tracking-wide', TONE[mark.status])}>{LABEL[mark.status]}</span>
+        <span className="text-[10px] text-muted-foreground">
+          <span className={cn('uppercase tracking-wide', TONE[mark.status])}>{LABEL[mark.status]}</span>
+          {!mark.committed && ' · not committed'}
+        </span>
       </button>
-      {/* Mounted only while open: a diff is read for the files the reader asks about, no other. */}
-      {open && (
-        <div className="border-t border-border bg-muted/30">
-          <FilePreviewCard projectId={projectId} agentId={agentId} path={path} />
-        </div>
-      )}
     </li>
   )
 }
@@ -73,6 +67,12 @@ export function ChangesPanel({ projectId, agentId, activity }: ModulePanelProps)
     return () => clearTimeout(timer)
   }, [activity, reload])
 
+  // The file whose diff shows: the one clicked on this page, or the first of the list while none
+  // is, or once the one clicked is no longer in the list. A click counts for the page it was made
+  // on: another run's list starts at its own first file.
+  const [click, setClick] = useState<{ agentId: string | undefined; path: string } | null>(null)
+  const clicked = click !== null && click.agentId === agentId ? click.path : null
+
   if (agentId) {
     if (!treeLoaded || !runTree || runTree.source === 'pending') return <Line>Looking for this run’s changes…</Line>
     if (runTree.source === 'gone') return <Line>This run’s changes are gone from this machine: its checkout was reclaimed and it left no branch or merged pull request here.</Line>
@@ -83,14 +83,21 @@ export function ChangesPanel({ projectId, agentId, activity }: ModulePanelProps)
   if (paths.length === 0) return <Line>{agentId ? 'This run changed no files.' : 'Nothing is changed in the project’s folder.'}</Line>
   const merged = agentId !== undefined && runTree !== null && 'merged' in runTree && runTree.merged
   const caption = agentId ? (merged ? 'What this run changed. Merged.' : 'What this run changed. Not merged yet.') : 'Changed in the project’s folder, not committed.'
+  const picked = clicked !== null && paths.includes(clicked) ? clicked : paths[0]!
   return (
-    <div className="flex min-h-0 flex-auto flex-col p-2">
-      <p className="px-1 pb-1 text-[10px] text-muted-foreground">{caption}</p>
-      <ul className="min-h-0 flex-auto overflow-y-auto">
-        {paths.map(path => (
-          <ChangeRow key={path} projectId={projectId} agentId={agentId} path={path} mark={changes[path]!} />
-        ))}
-      </ul>
+    <div className="flex min-h-0 flex-auto flex-col">
+      <p className="px-3 pb-1 text-[10px] text-muted-foreground">{caption}</p>
+      <div className="flex min-h-0 flex-auto border-t border-border">
+        <ul aria-label="Changed files" className="w-1/3 max-w-56 min-w-32 shrink-0 space-y-0.5 overflow-y-auto border-r border-border p-1">
+          {paths.map(path => (
+            <ChangeRow key={path} path={path} mark={changes[path]!} picked={path === picked} onPick={() => setClick({ agentId, path })} />
+          ))}
+        </ul>
+        {/* Keyed by the file: a diff still being read is never shown under another file's name. */}
+        <div className="flex min-w-0 flex-auto flex-col overflow-auto">
+          <FilePreviewCard key={picked} projectId={projectId} agentId={agentId} path={picked} />
+        </div>
+      </div>
     </div>
   )
 }

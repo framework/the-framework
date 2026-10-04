@@ -110,9 +110,11 @@ Until the daemon's list of agents has been read (an agent opened from the Overvi
 
 **Problem**: the daemon's list of agents takes up to two seconds to notice a resumed agent, but its new events are already streaming. Waiting for the list would make the continuation land all at once, or, when the list loses the race entirely, not render until a refresh.
 
+**Problem**: the stream being ahead of the archive lasts only a moment. The archive is read again as soon as the stream is ahead, and catches up within milliseconds, well before the daemon's list notices the agent. Judged on "ahead" alone, the page said working, then ended again, then working: the composer's note and the feed's spinner row appeared, went and came back, and the feed changed height each time.
+
 #### Business logic
 
-The feed and the composer [5] are told the agent [1] is live when either the daemon's list says it is running, or the stream on screen is ahead of the archive [8] and has not ended (its current segment carries no end event). That verdict decides whether the feed follows new output and whether the composer offers Stop instead of a resume, so both switch the moment the first new event lands rather than when the daemon's list catches up.
+The feed and the composer [5] are told the agent [1] is live when either the daemon's list says it is running, or the stream on screen is ahead of the archive [8] and has not ended (its current segment carries no end event). Once the page has seen that, with the archive read, it keeps the agent live until the events shown carry an end for that segment, whether or not the stream is still ahead. An agent whose archive holds a segment with no end, which this page never saw start, is not live by it. That verdict decides whether the feed follows new output and whether the composer offers Stop instead of a resume, so both switch the moment the first new event lands rather than when the daemon's list catches up.
 
 ### Switching between agents
 

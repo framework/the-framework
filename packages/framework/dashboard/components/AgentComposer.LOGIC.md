@@ -74,7 +74,7 @@ As soon as the box has text, the slot is the send arrow, in every state.
 
 #### Business logic
 
-While the agent works the line is absent, except for the "Queued" status after a send. Once the agent has ended the line says what the next message will do:
+The line is there in every state, one line high, so the feed above it keeps its height when the agent starts or ends a turn. While the agent works it reads "Agent working — it reads your next message when its turn ends.", and after a send the "Queued" status takes its place. Once the agent has ended the line says what the next message will do:
 
 - waiting [5]: "The agent asked a question — answer it above, or your next message continues the session."
 - failed: "Session failed — your next message resumes it where it stopped."

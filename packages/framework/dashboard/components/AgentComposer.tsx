@@ -201,10 +201,13 @@ function Note({
   queued: string | null
   muted: boolean
 }) {
+  // One line in every state, the same height: the line coming and going with the agent's state
+  // made the feed above it jump by its height each time a message was sent and each time a turn ended.
   if (live) {
-    if (!queued || muted) return null
+    if (muted) return null
+    if (!queued) return <p className="mb-2 truncate px-2 text-xs text-muted-foreground">Agent working — it reads your next message when its turn ends.</p>
     return (
-      <p role="status" className="mb-1 truncate px-2 text-xs text-muted-foreground">
+      <p role="status" className="mb-2 truncate px-2 text-xs text-muted-foreground">
         Queued — the session reads it when its turn ends: &ldquo;{queued}&rdquo;
       </p>
     )

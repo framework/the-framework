@@ -30,6 +30,8 @@ And what the installed modules add to an agent's page:
 - **An ended agent** - once the read of what its branch holds has answered, the modules' summary is gone from the bar, and the details stay, told the agent is not working.
 - **A project without the module** - gets neither.
 
+- **A continued agent reads as going** - an ended agent's feed gets a new segment: the composer is told the agent is live; the archive is read again and holds the same lines, the list still saying ended: still live; the segment's end arrives: not live. An ended agent whose archive holds a segment with no end, shown from the first read, is not live.
+
 The rules for when a resume is offered belong to the composer and are covered by its own tests; the view only hands it how the agent ended.
 - **The pull request lookup is waited for** - while the branch's read says its pull request lookup is still out, and while the next read is unanswered, the bar is not ready; once the next read has the answer, it is.
 - **A run just started** - its prompt shows before any event, with "Starting…" under it, and once its own prompt line arrives it shows once, with "Working…" under the agent's first row; no spinner while the answer is being written, and none once the run has ended.

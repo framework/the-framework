@@ -116,6 +116,13 @@ describe('AgentComposer slot control (#1455)', () => {
 })
 
 describe('AgentComposer, live (#714)', () => {
+  test('a working agent says what the next message will do, in the line an ended one uses, so the feed above keeps its height', () => {
+    renderComposer()
+    expect(screen.getByText('Agent working — it reads your next message when its turn ends.')).toBeTruthy()
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.queryByText(/Agent ended/)).toBeNull()
+  })
+
   test('a submit goes to the run as a message, and the note says it waits for the turn to end', async () => {
     sendMessage.mockResolvedValue({ ok: true })
     const { onAgentStarted } = renderComposer()

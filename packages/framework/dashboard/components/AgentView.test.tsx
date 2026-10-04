@@ -41,7 +41,8 @@ vi.mock('./AgentActionBar.js', () => ({
     </>
   ),
 }))
-vi.mock('./AgentComposer.js', () => ({ AgentComposer: () => null }))
+// The composer shows only what the view tells it about the run going: the one fact of it under test here.
+vi.mock('./AgentComposer.js', () => ({ AgentComposer: ({ live }: { live: boolean }) => <span data-testid="composer-live">{String(live)}</span> }))
 
 const { AgentView } = await import('./AgentView.js')
 
@@ -124,6 +125,39 @@ describe('AgentView event source (#1026/#1383)', () => {
     render(view({ events: ahead }))
     await waitFor(() => expect(onAgent.mock.calls.length).toBeGreaterThanOrEqual(2))
     await waitFor(() => expect(screen.getByText(/pull request: #7/)).toBeTruthy())
+  })
+})
+
+describe('AgentView: a continued run reads as going', () => {
+  test('once the feed showed the new turn, the run stays going while the archive catches up and the poll has not said so yet, and ends with the turn', async () => {
+    const ended = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'log', message: 'first turn' }, { kind: 'end', ok: true }] as FrameworkEvent[]
+    const going = [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'log', message: 'second turn' }] as FrameworkEvent[]
+    // The archive as it was, then caught up with the channel: the same lines, no more.
+    onAgent.mockResolvedValueOnce(ended).mockResolvedValue(going)
+    const { rerender } = render(view({ events: ended }))
+    await waitFor(() => expect(screen.getByText(/first turn/)).toBeTruthy())
+    expect(screen.getByTestId('composer-live').textContent).toBe('false')
+
+    rerender(view({ events: going }))
+    await waitFor(() => expect(screen.getByTestId('composer-live').textContent).toBe('true'))
+    // The archive is read again and now holds as much as the channel: still going, with the poll still saying ended.
+    await waitFor(() => expect(onAgent.mock.calls.length).toBeGreaterThanOrEqual(2))
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(screen.getByTestId('composer-live').textContent).toBe('true')
+
+    // The turn ends in the log: the run is over, whatever the poll says.
+    const over = [...going, { kind: 'end', ok: true }] as FrameworkEvent[]
+    onAgent.mockResolvedValue(over)
+    rerender(view({ events: over }))
+    await waitFor(() => expect(screen.getByTestId('composer-live').textContent).toBe('false'))
+  })
+
+  test('an ended run whose archive holds an open turn the feed never showed starting is not read as going', async () => {
+    const open = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'log', message: 'cut short' }] as FrameworkEvent[]
+    onAgent.mockResolvedValue(open)
+    render(view({ events: open }))
+    await waitFor(() => expect(screen.getByText(/cut short/)).toBeTruthy())
+    expect(screen.getByTestId('composer-live').textContent).toBe('false')
   })
 })
 

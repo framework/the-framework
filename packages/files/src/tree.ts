@@ -23,12 +23,16 @@ import { cutToPreview, readFileContent, safeRepoPath, type FileContent } from '.
 // project's own repository, never copied, and never fetched: the tab polls, and a fetch on a poll
 // is a network call. A run none of them is left for is gone, and says so.
 
-/** Where a run's files are read from, and the commit its changes are measured from (`base`). */
+/**
+ * Where a run's files are read from, the commit its changes are measured from (`base`), and
+ * whether its committed work is merged: the default branch already has it, or its pull request
+ * merged it. A merge commit and a landed commit are merged by what they are.
+ */
 export type AgentFilesAt =
-  | { source: 'checkout'; path: string; base?: string }
-  | { source: 'branch'; branch: string; ref: string; base?: string }
+  | { source: 'checkout'; path: string; base?: string; merged: boolean }
+  | { source: 'branch'; branch: string; ref: string; base?: string; merged: boolean }
   | { source: 'merge'; number: number; ref: string; base?: string }
-  /** The run's main agent landed its work and its branch went: the last commit of its work. */
+  /** The run's work was landed and its branch went: the last commit of its work. */
   | { source: 'landed'; ref: string; base?: string }
   /** The run changed nothing: the project's default branch, where no path is marked. */
   | { source: 'unchanged'; ref: string }
@@ -44,12 +48,17 @@ export interface FileMark {
   committed: boolean
 }
 
-/** What the Files tab shows for a run: the tree at its last state, the paths it changed marked. */
+/**
+ * What the module shows for a run: the tree at its last state and the paths it changed. `merged`
+ * says the run changed something and all of it is merged, nothing left uncommitted: the Files tab
+ * then marks nothing, since its marks say what is not merged yet, and the Changes tab still lists
+ * the changes. The tree of merged work holds no deleted path.
+ */
 export type AgentTree =
-  | { source: 'checkout'; files: string[]; changes: Record<string, FileMark> }
-  | { source: 'branch'; branch: string; files: string[]; changes: Record<string, FileMark> }
-  | { source: 'merge'; number: number; files: string[]; changes: Record<string, FileMark> }
-  | { source: 'landed'; files: string[]; changes: Record<string, FileMark> }
+  | { source: 'checkout'; files: string[]; changes: Record<string, FileMark>; merged: boolean }
+  | { source: 'branch'; branch: string; files: string[]; changes: Record<string, FileMark>; merged: boolean }
+  | { source: 'merge'; number: number; files: string[]; changes: Record<string, FileMark>; merged: boolean }
+  | { source: 'landed'; files: string[]; changes: Record<string, FileMark>; merged: boolean }
   | { source: 'unchanged'; files: string[]; changes: Record<string, FileMark> }
   | { source: 'starting'; files: string[]; changes: Record<string, FileMark> }
   | { source: 'pending' }
@@ -93,13 +102,24 @@ async function forkPoint(ask: (args: string[]) => Promise<string>, tip: string, 
   return (await ask(['merge-base', fromStart, fromMain])) === fromStart ? fromMain : fromStart
 }
 
+/** Whether the default branch already has `tip`: everything on it is merged. */
+async function inDefaultBranch(ask: (args: string[]) => Promise<string>, tip: string): Promise<boolean> {
+  const main = await defaultBranch(ask)
+  const commit = await commitOf(ask, tip)
+  return Boolean(main && commit && (await ask(['merge-base', main, commit])) === commit)
+}
+
 /**
  * Where the run `agentId` of the project the host reads has its files: its checkout, else its
  * recorded branch (local, then origin's copy), else the commit its recorded pull request merged
  * as, else the commit its record kept when it was landed, else, for a run the host says changed
  * nothing, the default branch, else gone. A branch the
- * default branch already contains (a true merge) shows no change, so there the merge commit is
- * preferred when this machine has it.
+ * default branch already contains (a true merge) shows no change when the run's record names no
+ * start, so there the merge commit is preferred when this machine has it.
+ *
+ * A checkout and a branch also say whether their committed work is merged: the default branch
+ * has their last commit, or, for a branch, its pull request merged at that very commit (a squash
+ * leaves the branch outside the default branch; a commit made after the merge is not merged).
  */
 export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'run' | 'mergeCommit'>, agentId: string, git: GitRunner = nodeGitRunner(), thisHost: string = hostname()): Promise<AgentFilesAt> {
   const root = host.root
@@ -109,8 +129,9 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
   // source, and the run is not starting either: it just ended, and its record may not say so yet.
   const reclaimed = run?.checkout !== undefined && !existsSync(run.checkout)
   if (run?.checkout && !reclaimed) {
-    const base = await forkPoint(asker(git, run.checkout), 'HEAD', run.record?.baseCommit)
-    return { source: 'checkout', path: run.checkout, ...(base ? { base } : {}) }
+    const inCheckout = asker(git, run.checkout)
+    const base = await forkPoint(inCheckout, 'HEAD', run.record?.baseCommit)
+    return { source: 'checkout', path: run.checkout, ...(base ? { base } : {}), merged: await inDefaultBranch(inCheckout, 'HEAD') }
   }
   // Nothing known of the run yet: it is starting. A run writes its record, then makes its checkout
   // from origin's default branch, seconds after the page that started it opened: those are its files.
@@ -118,21 +139,22 @@ export async function resolveAgentFiles(host: Pick<ModuleServerHost, 'root' | 'r
   if (!record) return reclaimed ? { source: 'pending' } : starting(ask, root, git)
   const branch = record.branch
 
+  const lookup: MergeLookup | undefined = record.pr && branch !== undefined ? await host.mergeCommit(branch, record.pr.number).catch((): MergeLookup => ({ pending: false })) : undefined
   let onBranch: AgentFilesAt | undefined
   if (branch !== undefined) {
     for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
       const tip = await commitOf(ask, ref)
       if (!tip) continue
       const base = await forkPoint(ask, tip, record.baseCommit)
-      onBranch = { source: 'branch', branch, ref: tip, ...(base ? { base } : {}) }
+      const merged = (await inDefaultBranch(ask, tip)) || (lookup !== undefined && !lookup.pending && lookup.commit !== undefined && lookup.head === tip)
+      onBranch = { source: 'branch', branch, ref: tip, ...(base ? { base } : {}), merged }
       if (base !== tip) return onBranch
       break
     }
   }
 
-  if (record.pr && branch !== undefined) {
+  if (record.pr && lookup) {
     const number = record.pr.number
-    const lookup: MergeLookup = await host.mergeCommit(branch, number).catch((): MergeLookup => ({ pending: false }))
     if (lookup.pending && !onBranch) return { source: 'pending' }
     const ref = !lookup.pending && lookup.commit ? await commitOf(ask, lookup.commit) : undefined
     if (ref) {
@@ -207,16 +229,20 @@ export async function readAgentTree(root: string, at: AgentFilesAt, git: GitRunn
   if (at.source === 'checkout') {
     const [files, committed, pending] = await Promise.all([
       listFiles(at.path, git),
-      at.base ? committedChanges(git, at.path, at.base, 'HEAD') : {},
+      at.base ? committedChanges(git, at.path, at.base, 'HEAD') : ({} as Record<string, FileMark>),
       readFileStatuses(at.path, git),
     ])
     const changes: Record<string, FileMark> = { ...committed }
     for (const [path, status] of Object.entries(pending)) changes[path] = { status, committed: false }
-    return { source: 'checkout', files: withDeleted(files, changes), changes }
+    // Merged only with nothing left on disk: uncommitted work is not in the default branch.
+    const merged = at.merged && Object.keys(committed).length > 0 && Object.keys(pending).length === 0
+    return { source: 'checkout', files: merged ? files : withDeleted(files, changes), changes, merged }
   }
   if (at.source === 'unchanged' || at.source === 'starting') return { source: at.source, files: await treeAt(git, root, at.ref), changes: {} }
   const [files, changes] = await Promise.all([treeAt(git, root, at.ref), at.base ? committedChanges(git, root, at.base, at.ref) : ({} as Record<string, FileMark>)])
-  const tree = { files: withDeleted(files, changes), changes }
+  // A run that changed nothing has nothing merged: it reads as any tree with no mark.
+  const merged = (at.source === 'branch' ? at.merged : true) && Object.keys(changes).length > 0
+  const tree = { files: merged ? files : withDeleted(files, changes), changes, merged }
   if (at.source === 'landed') return { source: 'landed', ...tree }
   return at.source === 'branch' ? { source: 'branch', branch: at.branch, ...tree } : { source: 'merge', number: at.number, ...tree }
 }

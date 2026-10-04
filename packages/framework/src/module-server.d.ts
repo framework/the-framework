@@ -17,7 +17,7 @@ export interface RunFacts {
     /** The branch the run left its work on, by its last recorded name. */
     branch?: string
     pr?: { number: number }
-    /** The commit the run's own work begins at, for a run started from a branch other than the default one: what its changes are measured from. */
+    /** The commit the run's own work begins at, for a run that made its own branch: what its changes are measured from when the default branch cannot tell them. */
     baseCommit?: string
     /** The last commit of the run's work, once its main agent landed it: its branch is gone, and its work is read here. */
     landed?: string
@@ -26,8 +26,8 @@ export interface RunFacts {
   changedNothing: boolean
 }
 
-/** Where a pull request stands on the git host: still being asked, or answered (with its merge commit when merged). */
-export type MergeLookup = { pending: true } | { pending: false; commit?: string }
+/** Where a pull request stands on the git host: still being asked, or answered (with its merge commit when merged, and the last commit of the branch it merged, when the git host says it). */
+export type MergeLookup = { pending: true } | { pending: false; commit?: string; head?: string }
 
 /** What a read is given: the project it reads, and what the core knows about the project's runs. */
 export interface ModuleServerHost {

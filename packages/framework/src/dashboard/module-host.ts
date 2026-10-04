@@ -48,8 +48,8 @@ export function serverHost(root: string, deps: ServerHostDeps = {}): ModuleServe
     async mergeCommit(branch: string, number: number): Promise<MergeLookup> {
       const read = await (deps.prs ?? cachedPrsForBranch)(root, branch).catch((): Cached<LinkedPr[]> => ({ value: undefined, pending: false }))
       if (read.pending && read.value === undefined) return { pending: true }
-      const commit = read.value?.find(pr => pr.number === number)?.mergeCommit
-      return commit ? { pending: false, commit } : { pending: false }
+      const pr = read.value?.find(pr => pr.number === number)
+      return pr?.mergeCommit ? { pending: false, commit: pr.mergeCommit, ...(pr.headRefOid ? { head: pr.headRefOid } : {}) } : { pending: false }
     },
   }
 }

@@ -1,4 +1,4 @@
-The Files module's browser part: what it adds to the dashboard and the components that draw it. It adds one side-rail tab, Files, and fills an agent's [1] page's two run slots [3] with the count and the list of files a working agent has changed; all of it reads through the dashboard's call to the module's own server part (`../src/server.ts`), and it uses the dashboard's own building blocks, so it looks like the rest of the page. `dashboard.css` (the module's utilities, following the dashboard's theme) and the build and test configuration carry no business logic.
+The Files module's browser part: what it adds to the dashboard and the components that draw it. It adds two side-rail tabs, Files and Changes, and fills an agent's [1] page's two run slots [3] with the count and the list of files a working agent has changed; all of it reads through the dashboard's call to the module's own server part (`../src/server.ts`), and it uses the dashboard's own building blocks, so it looks like the rest of the page. `dashboard.css` (the module's utilities, following the dashboard's theme) and the build and test configuration carry no business logic.
 
 ## Glossary
 
@@ -8,8 +8,9 @@ The Files module's browser part: what it adds to the dashboard and the component
 
 ## Business logic — TL;DR
 
-- **What the module adds** (`index.tsx`) - the Files tab, counting the Context's [2] files on its label, and the two run slots.
-- **The Files tab** (`FileTree.tsx`) - the project's or an agent's files as a lazy tree, marked, filtered, previewed, and picked into the Context.
+- **What the module adds** (`index.tsx`) - the Files tab, counting the Context's [2] files on its label, the Changes tab, and the two run slots.
+- **The Files tab** (`FileTree.tsx`) - the project's or an agent's files as a lazy tree, marked while the change is not merged, filtered, previewed, and picked into the Context.
+- **The Changes tab** (`ChangesPanel.tsx`) - only the files that changed, an agent's kept once its work is merged or the project folder's own, each opening to its diff.
 - **The hover card** (`FilePreview.tsx`) - a file's diff or contents, read when it opens and kept fresh.
 - **A file in a card** (`DiffView.tsx`) - a diff as colored lines and a file as numbered lines.
 - **A working agent's changes** (`AgentChanges.tsx`) - the count in the action bar and the list under it.

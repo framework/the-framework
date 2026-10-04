@@ -13,7 +13,7 @@ The daemon's side of a module's [1] server part: the host a read is given, the p
 ## Business logic — TL;DR
 
 - **An agent's facts** - its checkout [3] while the project's branches provider lists one, its record (status, machine, branch, pull request number, the commit its own work begins at, the last commit of its work once its main agent landed it), and whether it finished on this machine having changed nothing; nothing for an id that is not an agent id, or for an agent with neither a checkout nor a record.
-- **A pull request's merge commit** - asked of the git host through the dashboard's shared cache: "still asking" only while the git host has not answered at all, else the commit when that pull request of the branch merged, else none.
+- **A pull request's merge commit** - asked of the git host through the dashboard's shared cache: "still asking" only while the git host has not answered at all, else the commit when that pull request of the branch merged, with the last commit of the branch it merged when the git host says it, else none.
 - **Calling a read** - the server part is imported once per daemon; a read gets the host and the input; a missing or broken part, an unknown read, an input that is not an object or is over 16 KB, a read that throws and a read that takes over 20 seconds each answer an error in words.
 
 ## Business logic
@@ -36,7 +36,7 @@ The id must look like an agent id (letters, digits, `-` and `_`); anything else 
 
 #### Business logic
 
-The branch's pull requests are read through the cache every pull request read of the dashboard shares. While that read has no answer at all, the lookup says it is still asking; once it has one (even while a refresh is out), the answer is the merge commit of the pull request with that number, or none. A failed read answers none.
+The branch's pull requests are read through the cache every pull request read of the dashboard shares. While that read has no answer at all, the lookup says it is still asking; once it has one (even while a refresh is out), the answer is the merge commit of the pull request with that number, or none. With a merge commit comes the last commit of the branch the pull request merged, when the git host says it: a module tells by it whether the branch as it is now is what was merged, or has a commit made since. A pull request with no merge commit answers none, whatever else is known of it. A failed read answers none.
 
 ### Calling a read
 

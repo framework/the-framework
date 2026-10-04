@@ -9,6 +9,7 @@ What the tests cover, against a real git repository with worktrees, branches and
 - **Gone** - with its recorded branch missing and no pull request, an agent on this machine that is `waiting`, an agent from another machine, and an agent whose record names no machine all answer gone; so do an agent that finished `done` on this machine whose pull request's merge commit this machine has not fetched, and one whose branch's pull request has a number that is not the agent's.
 - **Still looking** - while the pull request lookup has not answered and there is no branch, the answer is that it is not known yet.
 - **A file deleted on disk** - has no content to show.
+- **The commits of an agent's work** - an agent with two commits and one file left uncommitted in its checkout: its commits are listed newest first, each with its subject, author, short id and time, and the uncommitted file is in none; a file one commit added and the next deleted is not marked in the tree, and each commit read alone answers its own change (the first: that file added; the second: one file modified and that file deleted), with the diff of a file it changed, no diff for a path it did not change, and none for a path leaving the repository; the project's own commit and a branch name are not read, neither their changes nor a diff; once the checkout is gone the branch answers the same list and the same change for a commit; a gone agent and one that changed nothing list no commits.
 
 ## Glossary
 

@@ -278,3 +278,75 @@ export async function readAgentFileContent(root: string, at: AgentFilesAt, path:
   const { body, truncated } = cutToPreview(raw.replace(/\n$/, ''))
   return { path, text: body, truncated, binary: false }
 }
+
+/** One commit of a run's work. */
+export interface AgentCommit {
+  sha: string
+  /** Short sha, for display. */
+  short: string
+  subject: string
+  author: string
+  /** When it was committed, ISO 8601. */
+  date: string
+}
+
+/** The most commits a run's list holds: the newest ones. */
+const MAX_COMMITS = 200
+
+/** A tree with no file in it, as git names it: what a commit with no parent is measured from. */
+const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+
+/**
+ * Where a source's commits are read: the repository, the commit its changes are measured from and
+ * its last commit. None for a source with nothing measured: a run that changed nothing, one
+ * starting, pending or gone, and one whose start is not known.
+ */
+function spanOf(root: string, at: AgentFilesAt): { cwd: string; from: string; to: string } | undefined {
+  if (at.source === 'checkout') return at.base ? { cwd: at.path, from: at.base, to: 'HEAD' } : undefined
+  if (at.source === 'branch' || at.source === 'merge' || at.source === 'landed') return at.base ? { cwd: root, from: at.base, to: at.ref } : undefined
+  return undefined
+}
+
+/**
+ * The commits of a run's work, newest first, from the same source its tree is read from: the ones
+ * between the commit its changes are measured from and its last commit. Uncommitted work is in no
+ * commit, so a checkout's list may be shorter than what its tree marks.
+ */
+export async function readAgentCommits(root: string, at: AgentFilesAt, git: GitRunner = nodeGitRunner()): Promise<AgentCommit[]> {
+  const span = spanOf(root, at)
+  if (!span) return []
+  const out = await git(['log', `--max-count=${MAX_COMMITS}`, '--format=%H%x1f%h%x1f%s%x1f%an%x1f%cI', `${span.from}..${span.to}`], span.cwd).catch(() => '')
+  const commits: AgentCommit[] = []
+  for (const line of out.split('\n')) {
+    const [sha, short, subject, author, date] = line.split('\x1f')
+    if (sha && short && subject !== undefined && author !== undefined && date) commits.push({ sha, short, subject, author, date })
+  }
+  return commits
+}
+
+/**
+ * One commit of the run's work as a range, or undefined for a commit that is not one of them: a
+ * read names a commit by the id the list gave, and no other commit of the repository is shown.
+ */
+async function commitRange(root: string, at: AgentFilesAt, sha: string, git: GitRunner): Promise<{ cwd: string; from: string; to: string } | undefined> {
+  const span = spanOf(root, at)
+  if (!span || !/^[0-9a-f]{40}$/.test(sha)) return undefined
+  const ask = asker(git, span.cwd)
+  if (!(await ask(['rev-list', `${span.from}..${span.to}`])).split('\n').includes(sha)) return undefined
+  return { cwd: span.cwd, from: (await commitOf(ask, `${sha}^`)) ?? EMPTY_TREE, to: sha }
+}
+
+/** What one commit of the run's work changed, against the commit before it; null for a commit that is not the run's. */
+export async function readAgentCommitChanges(root: string, at: AgentFilesAt, sha: string, git: GitRunner = nodeGitRunner()): Promise<Record<string, FileMark> | null> {
+  const range = await commitRange(root, at, sha, git)
+  return range ? committedChanges(git, range.cwd, range.from, range.to) : null
+}
+
+/** One file's diff in one commit of the run's work; null for a commit that is not the run's, or a path it did not change. */
+export async function readAgentCommitFileDiff(root: string, at: AgentFilesAt, sha: string, path: string, git: GitRunner = nodeGitRunner()): Promise<FileDiff | null> {
+  if (!safeRepoPath(path)) return null
+  const range = await commitRange(root, at, sha, git)
+  if (!range) return null
+  const mark = (await committedChanges(git, range.cwd, range.from, range.to))[path]
+  return mark ? readFileDiff(range.cwd, path, mark.status, git, { from: range.from, to: range.to }) : null
+}

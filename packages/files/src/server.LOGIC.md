@@ -1,8 +1,8 @@
-The Files module's server part: the five reads its browser part makes, each given the project's folder and the agent's facts [3], each answering from git. A read about an agent [1] takes the agent's id and reads wherever the agent's files are now (`tree.ts`); a read without one is about the project's own checkout [2].
+The Files module's server part: the seven reads its browser part makes, each given the project's folder and the agent's facts [3], each answering from git. A read about an agent [1] takes the agent's id and reads wherever the agent's files are now (`tree.ts`); a read without one is about the project's own checkout [2].
 
 ## Context
 
-**User story**: the Files tab, the hover card and a working agent's list of changed files all read through these, so each shows the same files from the same place.
+**User story**: the Files tab, the Changes tab, the hover card and a working agent's list of changed files all read through these, so each shows the same files from the same place.
 
 ## Glossary
 
@@ -14,9 +14,11 @@ The Files module's server part: the five reads its browser part makes, each give
 
 - **`project`** - every file of the project's checkout, with each file changed on disk marked, all uncommitted.
 - **`tree`** - an agent's files wherever they are now, what it changed marked; the project's files unmarked for an agent the dashboard does not know yet (it is starting), gone for an input with no agent.
-- **`diff`** - one changed file's diff: the agent's, from the same place its tree is read; without an agent, the project checkout's uncommitted change, its status taken from git and never from the browser.
+- **`diff`** - one changed file's diff: the agent's, from the same place its tree is read, or, when the read names a commit, what that one commit of the agent's work changed in the file; without an agent, the project checkout's uncommitted change, its status taken from git and never from the browser.
 - **`content`** - one unchanged file's contents, from the same place.
 - **`changes`** - a working agent's changed files with their line counts, from its own checkout only.
+- **`commits`** - the commits of an agent's work, newest first; none without an agent.
+- **`commit`** - what one commit of an agent's work changed; nothing without an agent, without a commit, or for a commit that is not the agent's.
 
 ## Business logic
 
@@ -39,6 +41,18 @@ See `## Context`.
 #### Business logic
 
 With an agent's id, where the agent's files are is worked out once per read from the agent's facts [3] (`tree.ts`), and the tree, the diff or the contents come from that place, so the preview always shows the change the tree marked. A failure while reading the tree answers gone. Without an agent, the tree is gone (the project's own tree is `project`), a diff is the project checkout's uncommitted change for a path git reports changed (nothing for any other path), and the contents are the file on disk in the project's checkout. A path that is not a plain repository-relative path yields nothing (`read.ts`).
+
+A `diff` read with an agent's id may also name a commit: the answer is then that file's diff in that one commit, and nothing when the commit is not one of the agent's (`tree.ts`). Without an agent's id a named commit is ignored.
+
+### `commits` and `commit`
+
+#### Context
+
+**User story**: the Changes tab lists an agent's commits and shows what one of them alone changed.
+
+#### Business logic
+
+Both work out where the agent's files are from the agent's facts [3], as `tree` does, and read there (the rules in `tree.ts`). `commits`, with an agent's id, answers the commits of the agent's work, newest first; without one, or when the read fails, an empty list. `commit`, with an agent's id and a commit's id, answers each file that commit changed with its mark; it answers nothing without an agent's id, without a commit's id, for a commit that is not one of the agent's, and when the read fails.
 
 ### `changes`
 

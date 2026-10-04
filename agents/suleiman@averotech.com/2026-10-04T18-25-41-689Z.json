@@ -6,7 +6,6 @@
   "intent": "Run this one shell command: `printf \"line one\\nline two\\n\"; ls -la`. Then run `ls /no-such-folder`. Then read README.md if there is one. Change no file. Then say done.",
   "driver": "claude-code",
   "model": "claude-opus-5-5",
-  "branch": "agent-2026-10-04T18-25-41-689Z",
   "cost": 0.0721738,
   "caller": {
     "runner": {

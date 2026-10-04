@@ -13,7 +13,7 @@ import { CloudMirrorRow, CloudAgentNotice } from './CloudAgentNotice.js'
 import { RemoteAgentNotice } from './RemoteAgentNotice.js'
 import { ModuleSlot } from './ModulePageView.js'
 import { useMountedModules } from '../lib/use-modules.js'
-import { HandoffActions, HandoffSummary, AgentHandoffDetails } from './AgentHandoff.js'
+import { Committing, HandoffActions, HandoffSummary, AgentHandoffDetails, isCommitAsk } from './AgentHandoff.js'
 import { AgentDetails, type AgentDetailsCard } from './AgentDetails.js'
 import { SubagentsBar } from './SubagentLine.js'
 import { holdsMainAgent } from '../lib/subagents.js'
@@ -212,6 +212,10 @@ export function AgentView({
   const onSending = useCallback((text: string | null) => setSending(text === null ? null : { text, prompts }), [prompts])
   // A run just started writes its prompt line only once its record is saved and its checkout made.
   const shownSending = sending?.text ?? (startedWith && prompts === 0 ? startedWith : undefined)
+  // The agent is doing what the Commit button asked: said where the button was, from the ask going
+  // out until the agent's turn ends. Read off the last prompt, so a refresh says the same.
+  const lastPrompt = shownSending ?? [...shown].reverse().find(e => e.kind === 'driver' && e.event.type === 'start')
+  const committing = (feedLive || shownSending !== undefined) && isCommitAsk(typeof lastPrompt === 'string' ? lastPrompt : lastPrompt?.kind === 'driver' && lastPrompt.event.type === 'start' ? lastPrompt.event.prompt : undefined)
   // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
   const outcome = working ? undefined : agentOutcome(shown)
   // Until the handoff has actually loaded, a just-stopped agent keeps showing the modules' summaries
@@ -282,7 +286,7 @@ export function AgentView({
         actions={
           // A run that is working is still writing its branch; the next step is offered once it has ended,
           // and a run whose subagents still work has not: it goes on as each of them ends.
-          live === false && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} subagent={subagent} /> : undefined
+          committing ? <Committing /> : live === false && subagentsRunning === 0 ? <HandoffActions projectId={projectId} agentId={agentId} state={handoff} subagent={subagent} onAsked={onSending} /> : undefined
         }
       />
       {/* The always-available session-details strip: agent + spend (#322). Sits above the changes/

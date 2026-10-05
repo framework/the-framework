@@ -339,6 +339,15 @@ describe('EventList session line', () => {
   const prompt: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'go' } }
   const said: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'Hello.' } }
 
+  test('a prompt with a sentence added after it shows the person\'s words alone; the sentence is in the opened setup line', () => {
+    const told: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'Fix the typo', added: 'When you finish, if you changed any file, commit your work.' } }
+    render(<EventList events={[told, { kind: 'driver', event: { type: 'text', text: 'Fixed.' } }]} setup={{ workspace: '/w', branch: 'agent-1' }} stick={false} />)
+    expect(screen.getByText('Fix the typo')).toBeTruthy()
+    expect(screen.queryByText(/When you finish/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
+    expect(screen.getByText('“When you finish, if you changed any file, commit your work.”')).toBeTruthy()
+  })
+
   test('it sits right under the first prompt, and opens to what was set up', () => {
     render(<EventList events={[prompt, said, { ...prompt }]} setup={setup} stick={false} />)
     expect(ids()).toEqual(['0', 'setup', '1', '2'])

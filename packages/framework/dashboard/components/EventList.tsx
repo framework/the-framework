@@ -570,9 +570,12 @@ export function EventList({
   // then names the step going on now, and is the one moving line: the "Starting…" line under it
   // is not drawn.
   const settingUp = setup !== undefined && working && !written && starting && unfolded.filter(isTurnBoundary).length === 1
+  // What the run adds after each message is the same for all of them: read off the first.
+  const firstPrompt = events.find(isTurnBoundary)
+  const added = firstPrompt?.kind === 'driver' && firstPrompt.event.type === 'start' ? firstPrompt.event.added : undefined
   const setupRow = setup !== undefined && (
     <MessageScrollerItem key="setup" messageId="setup" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 empty:hidden">
-      <SessionLine setup={setup} working={working} {...(settingUp ? { live: { since: unfolded[unfolded.length - 1]?.at } } : {})} />
+      <SessionLine setup={setup} working={working} added={added} {...(settingUp ? { live: { since: unfolded[unfolded.length - 1]?.at } } : {})} />
     </MessageScrollerItem>
   )
   return (

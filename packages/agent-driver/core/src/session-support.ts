@@ -24,6 +24,16 @@ export function makeEmit(onEvent: ((event: DriverEvent) => void) | undefined, dr
   }
 }
 
+/** What the agent is sent: the prompt, and the caller's added sentence after an empty line when there is one. */
+export function promptSent(prompt: string, added: string | undefined): string {
+  return added !== undefined ? `${prompt}\n\n${added}` : prompt
+}
+
+/** The `start` event of a prompt: the prompt as written, the added sentence named apart. */
+export function startEvent(prompt: string, added: string | undefined): Extract<DriverEvent, { type: 'start' }> {
+  return { type: 'start', prompt, ...(added !== undefined ? { added } : {}) }
+}
+
 /** The live AbortSignals for a prompt — the session's and the per-call one, minus the absent. */
 export function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSignal[] {
   return signals.filter((s): s is AbortSignal => s != null)

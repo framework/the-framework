@@ -45,6 +45,16 @@ describe('SessionLine', () => {
     ])
   })
 
+  test('what Auto adds after each message is the last row, word for word; an agent with nothing added has no such row', () => {
+    const { container, rerender } = render(<SessionLine setup={setup} added="When you finish, if you changed any file, commit your work." />)
+    fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
+    expect(Array.from(container.querySelectorAll('.border > div')).map(n => n.textContent).at(-1)).toBe(
+      'Auto adds after each message: “When you finish, if you changed any file, commit your work.”',
+    )
+    rerender(<SessionLine setup={setup} />)
+    expect(screen.queryByText(/Auto adds/)).toBeNull()
+  })
+
   test('an agent started from the main branch has no such sentence', () => {
     render(<SessionLine setup={setup} />)
     fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))

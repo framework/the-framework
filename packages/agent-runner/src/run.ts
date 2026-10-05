@@ -19,7 +19,9 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
  * to, through the skills in its checkout. How far it takes its work is the run's publish level
  * (`run --publish <commit|branch|pr|merge>`), said in one sentence after the prompt: commit the work,
  * and from there push the branch, open its pull request, or set it to merge once its checks pass.
- * A run with no level gets its prompt as written, and its agent commits only when the prompt asks.
+ * The sentence follows every message the agent is sent, a queued one too, and the record keeps it
+ * apart from the message. A run with no level gets its prompt as written, and its agent commits
+ * only when the prompt asks.
  * This process records the run and reclaims the checkout when the
  * agent stops; a run that dies is caught by the sweep, which a scheduler runs on every tick.
  *
@@ -76,10 +78,20 @@ export const PUBLISH_LINES: Readonly<Record<Publish, string>> = {
 /** The sentence when a follow-up is coming: the agent publishes its work, this process merges the request later. */
 export const HOLD_MERGE_LINE = `${PUBLISH_OPENING} and open its pull request, but do not arm its merge: it is merged for you once a follow-up is done.`
 
-/** The prompt an agent gets: the run's own, then the sentence of its publish level; the hold sentence instead when the run names a follow-up. */
-export function agentPrompt(prompt: string, publish: Publish | undefined, then: string | undefined): string {
-  const line = then !== undefined ? HOLD_MERGE_LINE : publish !== undefined ? PUBLISH_LINES[publish] : undefined
-  return line !== undefined ? `${prompt}\n\n${line}` : prompt
+/**
+ * The sentence a run adds after every prompt of its agent, the first and each message after it:
+ * that of its publish level, the hold sentence instead when the run names a follow-up, none for a
+ * run with neither. The session sends it after the prompt and writes it down apart from it, so a
+ * reader shows the person's words as the person wrote them.
+ */
+export function addedLine(publish: Publish | undefined, then: string | undefined): string | undefined {
+  return then !== undefined ? HOLD_MERGE_LINE : publish !== undefined ? PUBLISH_LINES[publish] : undefined
+}
+
+/** The sentence as a session takes it: named, or left out. */
+function addedOf(publish: Publish | undefined, then: string | undefined): { added?: string } {
+  const added = addedLine(publish, then)
+  return added !== undefined ? { added } : {}
 }
 
 /** Filesystem-safe, time-ordered id from an ISO start: the shape the dashboard sorts runs by. */
@@ -198,7 +210,8 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
       id,
       checkout,
       card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { runner: mark, pid, host, ...forReaders(mark), kind: 'prompt', workspace: checkout.path } },
-      prompt: agentPrompt(opts.prompt, opts.publish, opts.then),
+      prompt: opts.prompt,
+      ...addedOf(opts.publish, opts.then),
       driver: opts.driver,
       ...modelOf(opts.model),
       ...(opts.branchPr ? { prBefore: opts.branchPr } : {}),
@@ -318,7 +331,8 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
       checkout,
       card: { ...runningCard },
       priorDiary: diary,
-      prompt: agentPrompt(prompt, previous.publish, previous.then),
+      prompt,
+      ...addedOf(previous.publish, previous.then),
       driver: opts.driver,
       ...modelOf(model),
       continued: true,
@@ -373,6 +387,8 @@ interface SessionRun {
   /** The diary the record already holds, for a continued run: written into the checkout before the session opens. */
   priorDiary?: AnyDiaryLine[]
   prompt: string
+  /** The sentence said after the prompt and after every message that follows it in this session. */
+  added?: string
   driver: Driver
   model?: string
   /** The pull request the run's branch had before this session: its end announces only a new one. */
@@ -453,7 +469,7 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
         for (const [i, prompt] of prompts.entries()) {
           // Only the last one drains the inbox: a line written meanwhile comes after these.
           const last = i === prompts.length - 1
-          const turn = await driverSession.prompt(prompt, { ...(last ? { inbox } : {}), ...(resume ? { resume: true } : {}) })
+          const turn = await driverSession.prompt(prompt, { ...(last ? { inbox } : {}), ...(resume ? { resume: true } : {}), ...(run.added !== undefined ? { added: run.added } : {}) })
           lastText = turn.text
           lastWords = turn.text
           resume = true

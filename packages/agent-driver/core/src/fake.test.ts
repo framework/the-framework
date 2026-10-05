@@ -12,6 +12,15 @@ test('FakeDriver replays scripted turns in order and repeats the last', async ()
   assert.deepEqual(session.prompts, ['a', 'b', 'c'])
 })
 
+test('a sentence added after a prompt: the agent is sent both, the start event names the sentence apart', async () => {
+  const events: DriverEvent[] = []
+  const session = await new FakeDriver({ turns: [{ text: 'one' }] }).start({ cwd: '/ws', onEvent: e => events.push(e) })
+  await session.prompt('Fix it', { added: 'Commit your work.' })
+  await session.prompt('And this')
+  assert.deepEqual(session.prompts, ['Fix it\n\nCommit your work.', 'And this'])
+  assert.deepEqual(events.filter(e => e.type === 'start'), [{ type: 'start', prompt: 'Fix it', added: 'Commit your work.' }, { type: 'start', prompt: 'And this' }])
+})
+
 test('FakeDriver answers dynamically when respond is given', async () => {
   const driver = new FakeDriver({ respond: (prompt, i) => `${i}:${prompt.toUpperCase()}` })
   const session = await driver.start({ cwd: '/ws' })

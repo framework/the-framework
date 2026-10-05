@@ -2,6 +2,7 @@ What the tests cover, for the session line (`SessionLine.tsx`):
 
 - **Folded** - it is one line, a button reading "Session set up", showing none of the facts.
 - **Opened** - it says, in order, "Made the checkout" with the checkout's folder, "Made the branch" with the branch, and "Started Claude Code" with its model by the name the coding agent lists it under, a green check in front of each of the three; a second click removes the box.
+- **What Auto adds** - given a sentence added after the user's messages, the box's last row reads "Auto adds after each message: “<sentence>”", word for word; with none given there is no such row.
 - **Started from another branch** - a card that names the branch the agent was told to start from adds one line under the branch: "Started from the branch my/work, not from the main branch."; a card that names none has no such line.
 - **A fact not known** - a card that says only the coding agent shows that one line, "Started Codex", the coding agent named alone when the card says no model.
 - **Nothing known** - a card that says none of them draws nothing.

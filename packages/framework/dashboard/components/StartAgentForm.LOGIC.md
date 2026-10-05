@@ -38,7 +38,7 @@ The launcher on a project home [1]: the box where the user says what an agent [3
 - **What a Start sends** - the text with the Context on one `Context:` line at its end, the coding agent [5] and the model when the user picked them, the publish level [13] when the publish menu's option is one, `/post-merge-cleanup` as the follow-up [12] when the box is offered and ticked, and the picked device's address and token; nothing else.
 - **A project with no start hook** - Start is off and the form says which line to add to which file; a picked device lifts the block, since the device runs its own hook.
 - **Before the Start: what would stop the agent** - the check hook's [10] problems in red and its warnings in amber, under the editor, for the coding agent picked; read again when the pick changes; not asked for a picked device; neither turns Start off.
-- **Feedback about the start itself** - "Starting…", the refusal in the start hook's own words, the note a loaded command or saved prompt [8] leaves, and an error that clears as soon as the user edits.
+- **Feedback about the start itself** - "Starting session" with moving dots, as the agent's transcript says it next, the refusal in the start hook's own words, the note a loaded command or saved prompt [8] leaves, and an error that clears as soon as the user edits.
 - **The moment an agent starts** - the agent is shown and selected immediately under the typed prompt, marked with the device it runs on, and the editor and the Context are emptied.
 
 ## Business logic
@@ -198,7 +198,7 @@ See `## Context`.
 
 #### Business logic
 
-- While the start is in flight the form shows "Starting…".
+- While the start is in flight the form shows "Starting session" under the editor, announced to assistive technology as a status: three moving dots, then the words in grey with a band of light crossing them. These are the words and the look of the first line of the agent's transcript (`SessionLine.tsx`), so the agent's page, which opens a moment later, goes on saying the same thing. The note goes when the start is answered.
 - A refused start shows its reason as an alert under the editor, in the words it came with: the start hook's own last line when the tool it names refused ("the start hook: …"), "this project has no start hook", "a non-empty prompt is required", or that the device could not be reached. A start that failed without a reason shows "Failed to start the agent.".
 - Loading a command [2] or a saved prompt [8] leaves the note described under "Commands load, never start". The note goes when the editor is emptied.
 - An error describes the attempt that failed: it is dropped as soon as the user edits the text or loads something.

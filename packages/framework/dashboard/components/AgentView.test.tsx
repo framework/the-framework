@@ -534,10 +534,17 @@ describe('a run just started', () => {
     expect(screen.getByText('Working…')).toBeTruthy()
   })
 
-  test('the chat says what was set up for the agent, off its card, and says nothing of it before the card is listed', () => {
+  test('an agent just started on a device says nothing of a set-up before its card is listed: no checkout is made for it here', () => {
+    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'text', text: 'Hi.' } }] as FrameworkEvent[]
+    render(view({ live: true, events, remoteLabel: 'laptop' }))
+    expect(screen.queryByText('Session set up')).toBeNull()
+  })
+
+  test('the chat says what was set up for the agent, off its card; before the card is listed the line of an agent at work has nothing to open', () => {
     const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'text', text: 'Hi.' } }] as FrameworkEvent[]
     const { rerender } = render(view({ live: true, events }))
-    expect(screen.queryByText('Session set up')).toBeNull()
+    expect(screen.getByText('Session set up')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Session set up' })).toBeNull()
     rerender(view({ live: true, events, card: { status: 'done', workspace: '/repo/.branches/agent-1', branch: 'agent-1', driver: 'codex' } }))
     fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
     expect(screen.getByText('/repo/.branches/agent-1')).toBeTruthy()

@@ -62,6 +62,19 @@ describe('SessionLine', () => {
     expect(container.firstChild).toBeNull()
   })
 
+  test('an agent at work whose card is not read yet says "Session set up" at once, with nothing to open; the button comes with the card', () => {
+    const { rerender } = render(<SessionLine setup={{}} working />)
+    expect(screen.getByText('Session set up')).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
+    rerender(<SessionLine setup={setup} working />)
+    expect(screen.getByRole('button', { name: 'Session set up' })).toBeTruthy()
+  })
+
+  test('an agent at work elsewhere, whose card may never say them, draws nothing', () => {
+    const { container } = render(<SessionLine setup={{ elsewhere: true }} working />)
+    expect(container.firstChild).toBeNull()
+  })
+
   test('while the session is set up it is one moving line naming the step going on, with the seconds, and no button', () => {
     const since = new Date(Date.now() - 3_000).toISOString()
     const { rerender } = render(<SessionLine setup={{}} live={{ since }} />)

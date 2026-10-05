@@ -39,8 +39,11 @@ function Step({ label, value }: { label: string; value?: string }) {
 // Once set up, it is one grey folded line, "Session set up", opening to the steps that were done,
 // a green check each: the checkout, the branch, the coding agent that was started. An agent told
 // to start from a branch other than the main one says so, in a sentence: a person's local branch,
-// or, for a subagent, its main agent's. A card that says none of them yet draws nothing.
-export function SessionLine({ setup, live }: { setup: SessionSetup; live?: { since?: string | undefined } | undefined }) {
+// or, for a subagent, its main agent's. A card that says none of them draws nothing.
+//
+// An agent seen at work before its card was read says the same words, with nothing to open yet:
+// its first row is there, so it was set up, and the line does not land after that row.
+export function SessionLine({ setup, live, working = false }: { setup: SessionSetup; live?: { since?: string | undefined } | undefined; working?: boolean }) {
   const [open, setOpen] = useState(false)
   const picked = driverFromImpl(setup.driver)
   const models = useModels()
@@ -56,7 +59,11 @@ export function SessionLine({ setup, live }: { setup: SessionSetup; live?: { sin
       </div>
     )
   }
-  if (setup.workspace === undefined && setup.branch === undefined && agent === undefined) return null
+  if (setup.workspace === undefined && setup.branch === undefined && agent === undefined) {
+    // An agent that runs elsewhere may never say any of them.
+    if (!working || setup.elsewhere) return null
+    return <div className="min-w-0 flex-1 font-sans text-sm text-muted-foreground">Session set up</div>
+  }
   return (
     <div className="min-w-0 flex-1 font-sans text-sm text-muted-foreground">
       <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex items-center gap-1.5 hover:text-foreground">

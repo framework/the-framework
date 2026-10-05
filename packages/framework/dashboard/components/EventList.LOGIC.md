@@ -150,7 +150,7 @@ The caller may hand the transcript what was set up for the agent (the agent view
 
 The session is being set up while all of these hold: the caller handed what was set up, the agent works and writes no message, nothing has come since the last prompt (the rule of "Starting…" in "The agent's steps are one folded line"), and the transcript holds one prompt, a message just sent counted. The row is then one moving line naming the step going on now, counting the seconds since the prompt was written, or with no seconds when the prompt has no time (`SessionLine.tsx`). It is the transcript's one moving line: the "Starting…" line is not drawn.
 
-In every other case the row is the folded "Session set up" line, and there is no such row while what was set up says nothing yet. The agent's first output ends the set-up: the row folds and the usual moving line shows ("Working…", or the call going on now). A later prompt is no set-up: with more than one prompt in the transcript the row stays the folded line and "Starting…" is the moving line.
+In every other case the row is the folded "Session set up" line. While what was set up says nothing yet, the transcript tells `SessionLine.tsx` whether the agent works: the row is then the words "Session set up" with nothing to open for an agent that works on this machine, so the line is there with the agent's first row and does not land after it, and there is no such row otherwise. The agent's first output ends the set-up: the row folds and the usual moving line shows ("Working…", or the call going on now). A later prompt is no set-up: with more than one prompt in the transcript the row stays the folded line and "Starting…" is the moving line.
 
 ### The first prompt opens the transcript
 

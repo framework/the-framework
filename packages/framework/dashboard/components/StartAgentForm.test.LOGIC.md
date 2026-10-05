@@ -3,6 +3,7 @@ What the tests cover, for the launcher on a project home [1]:
 - **No command buttons** - a project's command [2] shows as no `/<name>` button on the form, and nothing is started.
 - **Start carries the picks** - a Start sends the text with the coding agent [3] and the model the user picked, and the shell is told the id the start hook [4] answered.
 - **No pick, nothing sent** - with no coding agent and no model picked, neither is sent, so the start hook decides.
+- **While the start is asked for** - the form's status reads "Starting session", the first line of the agent's transcript, and there is no status once the start is answered.
 - **No start hook** - a project read as having no start hook shows the alert naming the `start:` line and `.the-framework/hooks.yml`, and no command to run, and the submit stays disabled with text in the editor.
 - **No false alarm** - before the project is read, and for a project that has a start hook, no message shows and the submit is on.
 - **A picked device** - the start carries the device's [5] URL, token and label, a project with no start hook of its own does not block it, and the check hook [6] is not asked.

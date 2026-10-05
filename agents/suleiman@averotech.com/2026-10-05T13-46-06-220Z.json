@@ -1,0 +1,15 @@
+{
+  "id": "2026-10-05T13-46-06-220Z",
+  "startedAt": "2026-10-05T13:46:06.311Z",
+  "status": "running",
+  "intent": "say hello, nothing else",
+  "driver": "claude-code",
+  "model": "opus",
+  "caller": {
+    "runner": {
+      "host": "Suleimans-MacBook-Pro.local",
+      "pid": 82381
+    },
+    "host": "Suleimans-MacBook-Pro.local"
+  }
+}

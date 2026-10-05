@@ -133,7 +133,10 @@ test('followFile survives a pull that rejects, and keeps pulling (#996)', async 
     { pollMs: 20 },
   )
   try {
-    await sleep(300)
+    // Waited for, not slept through: on a loaded machine five polls can take longer than any
+    // fixed pause, and the test then failed with the code right.
+    const deadline = Date.now() + 5_000
+    while (calls <= 4 && Date.now() < deadline) await sleep(10)
     assert.ok(calls > 4, `expected polling to continue past the failures, saw ${calls} pulls`)
   } finally {
     stop()

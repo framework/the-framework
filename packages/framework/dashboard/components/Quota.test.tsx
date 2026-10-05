@@ -3,13 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { ProjectSummary, QuotaView } from '../../src/index.js'
 import type { ModuleHost, ModuleProject } from '../module/index.js'
 import { ModulesContext, type MountedModules, type MountedUsageLimit } from '../lib/use-modules.js'
+import { hoverTooltip } from '../test-utils.js'
 
-/** Opens a Base UI tooltip in a test: hover alone leaves the popup unrendered until this settles. */
-async function openTooltip(trigger: HTMLElement) {
-  fireEvent.mouseEnter(trigger)
-  fireEvent.pointerEnter(trigger, { pointerType: 'mouse' })
-  await waitFor(() => expect(screen.getByRole('tooltip')).toBeTruthy())
-}
 
 /** The main figure's own trigger — its text is split across nodes (a coloured span for the
  * duration), so an exact string match on `getByText` can't find it as one element. */
@@ -146,7 +141,7 @@ describe('Quota (#960)', () => {
     await show()
     // One bar, and it is the account's week.
     expect(screen.getAllByRole('img')).toHaveLength(1)
-    await openTooltip(screen.getByText('show all limits'))
+    await hoverTooltip(screen.getByText('show all limits'))
     expect(screen.getByText('Current session')).toBeTruthy()
   })
 
@@ -347,7 +342,7 @@ describe('Quota (#960)', () => {
   test('the enabled status has its own tooltip naming what enabled means (#960 Edit)', async () => {
     view = reading(20, 15) // room left: enabled
     await show()
-    await openTooltip(screen.getByText('enabled', { selector: 'em' }).closest('span')!)
+    await hoverTooltip(screen.getByText('enabled', { selector: 'em' }).closest('span')!)
     expect(
       screen.getByText(
         'Autonomous AI enabled means that unattended work may start on its own while the account is under the line.',
@@ -358,7 +353,7 @@ describe('Quota (#960)', () => {
   test('the disabled status has its own tooltip naming what disabled means (#960 Edit)', async () => {
     view = reading(80, -50) // no room: disabled
     await show()
-    await openTooltip(screen.getByText('disabled', { selector: 'em' }).closest('span')!)
+    await hoverTooltip(screen.getByText('disabled', { selector: 'em' }).closest('span')!)
     expect(
       screen.getByText(
         'Autonomous AI disabled means that no agent starts on its own — every new agentic work is triggered by you manually.',
@@ -385,7 +380,7 @@ describe('Quota (#960)', () => {
     view = reading(20, 20)
     await show()
     const warning = screen.getByText('⚠️ Eager consumption')
-    await openTooltip(warning)
+    await hoverTooltip(warning)
     expect(screen.getByText("Autonomous AI will spend tokens 1 day faster than the week's pace allows")).toBeTruthy()
   })
 
@@ -394,7 +389,7 @@ describe('Quota (#960)', () => {
     // "1 day" at offset 20, proving the tooltip reads the real deviation rather than a hardcoded one.
     view = reading(20, 40)
     await show()
-    await openTooltip(screen.getByText('⚠️ Eager consumption'))
+    await hoverTooltip(screen.getByText('⚠️ Eager consumption'))
     expect(screen.getByText("Autonomous AI will spend tokens 2 days faster than the week's pace allows")).toBeTruthy()
   })
 
@@ -492,7 +487,7 @@ describe('Quota (#960)', () => {
   test('the main figure has its own tooltip naming the deviation against the quota boundary (#960 Edit)', async () => {
     view = reading(20)
     await show()
-    await openTooltip(mainFigureTrigger())
+    await hoverTooltip(mainFigureTrigger())
     expect(screen.getByText(/You are 2 days below the quota boundary\.\s*You're under-consuming: you spend slower/)).toBeTruthy()
   })
 
@@ -507,7 +502,7 @@ describe('Quota (#960)', () => {
   test('the quota boundary tooltip explains itself in its own paragraph, and ends on a fun fact (#960 Edit)', async () => {
     view = reading(20)
     await show()
-    await openTooltip(screen.getByText('Quota boundary'))
+    await hoverTooltip(screen.getByText('Quota boundary'))
     expect(
       screen.getByText("If your usage matches the quota boundary, then you're spending exactly what the week's pace allows."),
     ).toBeTruthy()
@@ -527,7 +522,7 @@ describe('Quota (#960)', () => {
     view = reading(20)
     view.windows.push({ label: 'Current week (Fable)', kind: 'week-model', percentUsed: 12, resetsAtText: 'Jul 28 at 7pm' })
     await show()
-    await openTooltip(screen.getByText('show all limits'))
+    await hoverTooltip(screen.getByText('show all limits'))
     const rows = screen.getAllByText(/Current (session|week)/).map(el => el.textContent)
     expect(rows).toEqual(['Current week (all models)', 'Current session', 'Current week (Fable)'])
   })
@@ -536,7 +531,7 @@ describe('Quota (#960)', () => {
     view = reading(20)
     view.windows.push({ label: 'Current week (Fable)', kind: 'week-model', percentUsed: 12, resetsAtText: 'Jul 28 at 7pm' })
     await show()
-    await openTooltip(screen.getByText('show all limits'))
+    await hoverTooltip(screen.getByText('show all limits'))
     const tooltip = screen.getByRole('tooltip')
     const table = tooltip.querySelector('table')!
     expect(table).toBeTruthy()

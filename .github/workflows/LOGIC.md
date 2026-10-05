@@ -8,6 +8,6 @@ The repository's three GitHub workflows: the check every push and every pull req
 
 ## Business logic — TL;DR
 
-- **Verifying every change** (`ci.yml`) - on every push, and on a pull request only when it comes from a fork, one job installs the monorepo, builds it, type-checks it and runs every package's tests, stopping at the first failure; the "CI" check's status is its only product, and it pushes nothing.
+- **Verifying every change** (`ci.yml`) - on every push, and on a pull request only when it comes from a fork, five jobs side by side each install and build the monorepo and then run one part: the type check, or one group of the packages' tests. A last job named "build" is green only when all five are: it is the check the merge rule on the main branch waits for.
 - **Publishing the website** (`website-deploy.yml`) - on a push to `main` that touches the website package, the site is built and replaces the whole `gh-pages` branch as one commit, carrying the custom domain `the-framework.ai`.
 - **Running an agent's turn on a runner** (`framework-agent.yml`) - only when dispatched by the driver [3], with a prompt and a correlation id: the run checks the repository out, runs Claude Code on the prompt with every permission granted on the user's subscription token, pushes whatever the coding agent left to the branch the driver named, and uploads the transcript and that branch name as one artifact keyed by the correlation id, even when the coding agent failed.

@@ -51,7 +51,9 @@
     "dev:daemon": "cd dashboard && FRAMEWORK_DEV_DAEMON=1 vite",
     "design:build": "tsx dashboard/design/build.mts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p dashboard/tsconfig.json",
-    "test": "tsc -p tsconfig.test.json && node scripts/run-tests.mjs && cd dashboard && vitest run",
+    "test": "pnpm test:node && pnpm test:dashboard",
+    "test:node": "tsc -p tsconfig.test.json && node scripts/run-tests.mjs",
+    "test:dashboard": "cd dashboard && vitest run",
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {

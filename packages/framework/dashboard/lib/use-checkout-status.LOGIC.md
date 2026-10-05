@@ -65,7 +65,7 @@ The caller can switch the read off. Nothing is asked of the daemon then, and the
 
 #### Context
 
-**Problem**: an agent's turn ends and its checkout is clean or dirty from that moment. Read only on the 10 second poll, the page said so up to 10 seconds late: "dirty" came after the agent had long said it was done.
+**Problem**: an agent's turn ends and its checkout is clean or dirty from that moment. Read only on the 10 second poll, the page knew it up to 10 seconds late: the bar above the message box, drawn when the checkout holds uncommitted changes, came after the agent had long said it was done.
 
 #### Business logic
 

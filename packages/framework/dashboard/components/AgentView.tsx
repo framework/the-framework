@@ -5,7 +5,6 @@ import { useLoaded, usePolled } from '../lib/use-async.js'
 import { useAgentHandoff } from '../lib/use-agent-handoff.js'
 import { useCheckoutStatus } from '../lib/use-checkout-status.js'
 import { isAgentActive, agentOutcome, pendingChoices } from '../lib/live-state.js'
-import type { AgentCardFacts } from '../lib/agent-status.js'
 import { AgentActionBar } from './AgentActionBar.js'
 import { AgentComposer } from './AgentComposer.js'
 import { AgentWorkBar } from './AgentWorkBar.js'
@@ -36,8 +35,6 @@ import { holdsMainAgent } from '../lib/subagents.js'
 /** How long the bar waits for the run's own reads before it shows the facts that are in. */
 const READY_WAIT_MS = 1_000
 
-/** How long after a turn seen ending the status word waits for the card to say whether the run is saving: the agents poll is every 2 seconds. */
-export const SETTLE_MS = 3_000
 /** How often what the working subagents are doing is read: the runs poll's own pace. */
 const DOING_EVERY_MS = 2_000
 const NO_SUBAGENTS: readonly AgentMeta[] = []
@@ -69,8 +66,8 @@ export function AgentView({
   events: FrameworkEvent[]
   /** Whether the agent is still running; `null` while the daemon's list of agents has not been read, so it is not known yet. */
   live: boolean | null
-  /** What the run's card says, off the runs poll: the status pill's and the details strip's facts the feed cannot carry. Absent until the card is listed. */
-  card?: (AgentCardFacts & AgentDetailsCard & Pick<AgentMeta, 'parent' | 'workspace' | 'branch' | 'base'>) | undefined
+  /** What the run's card says, off the runs poll: what the feed cannot carry (the details strip's facts, how the agent was set up, whether it is a subagent, whether its record is being saved). Absent until the card is listed. */
+  card?: (AgentDetailsCard & Pick<AgentMeta, 'saving' | 'parent' | 'workspace' | 'branch' | 'base'>) | undefined
   /** The session's own name — the same label the rail shows (#1030). It leads the action bar as
    * the stable identity, so the branch renaming itself near the end of an agent (#736) reads as a
    * detail changing rather than the whole view changing. */
@@ -215,23 +212,6 @@ export function AgentView({
   // The agent works, or is about to: on a message just sent, or as its feed shows before the
   // agents poll does.
   const going = feedLive || shownSending !== undefined
-  // The page just watched a turn end: for a moment the card has not said yet whether the run's
-  // process is saving its record. The status word says "saving…" through that moment after a clean
-  // end, in place of "finished", then "saving…", then "finished" again.
-  // A turn is one the events showed going, and it ends when they show its end: the agents poll
-  // says so up to two seconds later, and waiting for it left "finished" on screen until then. A
-  // message that was refused started no turn.
-  const turn = useRef<{ agentId: string | null; active: boolean; endedAt: number | null }>({ agentId: null, active: false, endedAt: null })
-  if (turn.current.agentId !== agentId) turn.current = { agentId, active, endedAt: null }
-  else if (turn.current.active !== active) turn.current = { agentId, active, endedAt: active ? null : Date.now() }
-  const endedAt = turn.current.endedAt
-  const settling = endedAt !== null && Date.now() - endedAt < SETTLE_MS
-  const [, settled] = useState(0)
-  useEffect(() => {
-    if (endedAt === null) return
-    const timer = setTimeout(() => settled(n => n + 1), Math.max(0, endedAt + SETTLE_MS - Date.now()))
-    return () => clearTimeout(timer)
-  }, [endedAt])
   // What the branch holds (#1023), read once for the bar above the message box. Read once
   // the agent stops rather than once the process does: while it is still writing to the branch
   // there is nothing to hand off yet, but a parked session's branch is finished work. "Stops" is
@@ -240,8 +220,8 @@ export function AgentView({
   // card says saving, the checkout is being cleaned up, and an empty branch is deleted with it, so
   // a publish offered then turned into "Branch gone" moments later: the answer is only shown then
   // for a branch with commits of its own, which the clean-up keeps.
-  // The agent's checkout (its branch, its pull request, clean or dirty), read once for the top bar
-  // and for the bar above the message box, and again the moment a turn starts or ends.
+  // The agent's checkout (its branch, its pull request, clean or dirty, its size), read once for
+  // the top bar and for the bar above the message box, and again the moment a turn starts or ends.
   const checkout = useCheckoutStatus(projectId, agentId, true, active) as AgentWorktree | null
   const read = useAgentHandoff(projectId, agentId, live === false && !going, card?.saving === true, going)
   const kept = read.handoff !== null && read.handoff.exists && !read.handoff.empty
@@ -309,9 +289,6 @@ export function AgentView({
         projectId={projectId}
         agentId={agentId}
         events={shown}
-        card={card}
-        subagentsRunning={subagentsRunning}
-        page={{ starting: shownSending !== undefined, settling }}
         label={label}
         projectName={projectName}
         retainedWorktree={hasWorktree}

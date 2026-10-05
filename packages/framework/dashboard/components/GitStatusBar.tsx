@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import type { GitStatus, AgentWorktree } from '../../src/index.js'
 import { ChevronRight, GitBranch } from 'lucide-react'
 import { useCheckoutStatus } from '../lib/use-checkout-status.js'
@@ -9,24 +8,22 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 // The checkout in play (#491, part of #488): active branch, a clean/dirty dot, the linked PR.
 // Polled, so it tracks an agent committing or branching. Hidden when there is no git repo.
 //
-// One component for both pages (#809). With a `agentId` it reads that session's own worktree, which
-// also carries its size on disk and the path it lives at; without one it reads the project's
-// checkout. A session used to have its own differently-styled chip, so the same facts wore two
-// looks depending on the page, and either could drift with an edit to the other.
+// One component for both pages (#809). Without an `agentId` it reads the project's checkout and
+// says its branch, clean or dirty, and its pull request. With one it reads that session's own
+// worktree and says only the session's name and the worktree's size on disk.
 //
 // `inline` renders just the status (for an action bar); otherwise a full-width row.
 //
-// With a `label` (an agent's page) the row is the agent's name, its tree's clean/dirty and its
-// state: its branch, what the branch holds and its pull request are said in the bar above the
-// message box (`AgentWorkBar.tsx`), beside the next step. `onToggle` makes the name a disclosure
-// for the detail the caller renders below.
+// An agent's row says nothing of its state or of its tree: whether it works and how it ended are
+// said by the feed and the message box, and its branch, what the branch holds and its pull request
+// in the bar above the message box (`AgentWorkBar.tsx`), beside the next step. `onToggle` makes
+// the name a disclosure for the detail the caller renders below.
 export function GitStatusBar({
   projectId,
   agentId: agentId,
   inline = false,
   label,
   projectName,
-  agentState,
   expanded = false,
   onToggle,
   ready = true,
@@ -42,21 +39,17 @@ export function GitStatusBar({
   /** The project the session belongs to. Given alongside a label, it prefixes the name as a
    * `project / session` breadcrumb; it gives up width first, so the session name truncates last. */
   projectName?: string | null | undefined
-  /** What state the agent itself is in (stopped, ready for merge, …), said beside the tree's own
-   *  clean/dirty rather than at the far end of the bar: they are one line of facts about the
-   *  session, where the bar's end is where its controls live. */
-  agentState?: ReactNode
   expanded?: boolean
-  /** Given, the branch reads as a disclosure for the detail the caller renders below. */
+  /** Given, the name reads as a disclosure for the detail the caller renders below. */
   onToggle?: (() => void) | undefined
   /** False while the caller's own facts are still being read: the label shows alone until then. */
   ready?: boolean
   /** The checkout as the caller already read it (`null`: not answered yet). Given, this bar reads nothing itself. */
   checkout?: GitStatus | AgentWorktree | null | undefined
 }) {
-  // Two reads: both carry the branch and its PR; the project's also its clean/dirty, the session's
-  // its checkout (path, clean/dirty, size) while it still has one. A caller that reads it for more
-  // than this bar hands its answer in (`checkout`), and nothing is read here.
+  // Two reads: the project's carries its branch, its clean/dirty and its PR; the session's its
+  // checkout, of which this bar says the size, while it still has one. A caller that reads it for
+  // more than this bar hands its answer in (`checkout`), and nothing is read here.
   const read = useCheckoutStatus(projectId, agentId, given === undefined)
   const status = given === undefined ? read : given
 
@@ -100,9 +93,8 @@ export function GitStatusBar({
       />
     )
 
-  // An agent's line waits only for `ready`, not for its checkout's answer: its status word is known
-  // before its checkout is read, and a new agent's checkout is read up to ten seconds after it
-  // starts. Until that answer the line says the name and the word, and nothing of the checkout.
+  // An agent's line waits only for `ready`, not for its checkout's answer: a new agent's checkout
+  // is read up to ten seconds after it starts, and the line is laid out the same with or without it.
   if (!ready || (!status && !agentId)) {
     if (!title) return null
     // Laid out as the disclosure below is (chevron, then name, same gap), so the facts landing
@@ -120,16 +112,11 @@ export function GitStatusBar({
     )
   }
 
-  // A session's facts are its own checkout's while it has one; once that is gone, only its
-  // recorded branch and PR, and no tree to be clean or dirty.
-  const checkout = agentId ? (status as AgentWorktree | null)?.checkout : undefined
-  const dirty = agentId ? checkout?.dirty : (status as GitStatus).dirty
-  const branch = status?.branch
-  const size = formatBytes(checkout?.sizeBytes, '')
-  // A session's checkout is the agent's tree, so uncommitted work there is the agent's; on the
-  // project's own checkout it is the user's. Same dot, honest wording.
-  const dirtyLabel = agentId ? 'Uncommitted changes in this agent' : 'Uncommitted changes'
-
+  // The project's own facts: its branch, whether its tree is clean, its pull request. An agent's
+  // line says none of them.
+  const project = agentId ? undefined : (status as GitStatus)
+  // Only a session has a worktree of its own to size, and only while it still has one.
+  const size = agentId ? formatBytes((status as AgentWorktree | null)?.checkout?.sizeBytes, '') : ''
 
   // One flat row so exactly one element gives up width: the label (or, with no label, the branch).
   // Everything else is shrink-0 and drops out at a container width instead of squeezing to mush.
@@ -144,28 +131,26 @@ export function GitStatusBar({
       {title}
       {/* The branch is the identity on the project home. An agent's branch is said in the bar above
           the message box, never here: not even for the moment its name is not known yet. */}
-      {!label && !agentId && (
+      {project && !label && (
         <span className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-hidden text-muted-foreground">
           <GitBranch className="h-3.5 w-3.5 shrink-0" />
           <Tooltip>
-            <TooltipTrigger render={<span className="max-w-[16rem] truncate font-medium text-foreground" />}>{branch ?? 'no branch'}</TooltipTrigger>
-            <TooltipContent>{`branch ${branch}`}</TooltipContent>
+            <TooltipTrigger render={<span className="max-w-[16rem] truncate font-medium text-foreground" />}>{project.branch ?? 'no branch'}</TooltipTrigger>
+            <TooltipContent>{`branch ${project.branch}`}</TooltipContent>
           </Tooltip>
         </span>
       )}
-      {agentState}
       {/* Clean is neutral, not green. Green means "added / new / done" everywhere else, so a
           green dot for "nothing changed" sat one pane away from the file tree's green dot for
           "this folder HAS changes": the same colour for opposite facts. A clean tree is the
           unremarkable default and has nothing to announce. */}
-      {/* A session whose checkout is gone has no tree to be either. */}
-      {dirty !== undefined && (
+      {project && (
         <Tooltip>
           <TooltipTrigger render={<span className="flex shrink-0 items-center gap-1.5" />}>
-            <span className={cn('h-2 w-2 rounded-full', dirty ? 'bg-warning' : 'bg-muted-foreground')} />
-            <span className="text-muted-foreground">{dirty ? 'dirty' : 'clean'}</span>
+            <span className={cn('h-2 w-2 rounded-full', project.dirty ? 'bg-warning' : 'bg-muted-foreground')} />
+            <span className="text-muted-foreground">{project.dirty ? 'dirty' : 'clean'}</span>
           </TooltipTrigger>
-          <TooltipContent>{dirty ? dirtyLabel : 'Clean'}</TooltipContent>
+          <TooltipContent>{project.dirty ? 'Uncommitted changes' : 'Clean'}</TooltipContent>
         </Tooltip>
       )}
       {/* Only a worktree has a size worth showing, and only once nothing is writing to it (#798). */}
@@ -196,24 +181,24 @@ export function GitStatusBar({
       ) : (
         facts
       )}
-      {!label && !agentId && status?.pr && (
+      {project?.pr && !label && (
         <Tooltip>
           <TooltipTrigger
             render={
               <a
-                href={status.pr.url}
+                href={project.pr.url}
                 target="_blank"
                 rel="noreferrer"
                 className={cn('flex shrink-0 items-center gap-1.5 text-primary hover:underline', !inline && 'ml-auto')}
               />
             }
           >
-            <span>PR #{status.pr.number}</span>
+            <span>PR #{project.pr.number}</span>
             <span className="rounded-full border border-border px-1.5 text-[10px] uppercase text-muted-foreground">
-              {status.pr.state.toLowerCase()}
+              {project.pr.state.toLowerCase()}
             </span>
           </TooltipTrigger>
-          <TooltipContent>{status.pr.title}</TooltipContent>
+          <TooltipContent>{project.pr.title}</TooltipContent>
         </Tooltip>
       )}
     </>

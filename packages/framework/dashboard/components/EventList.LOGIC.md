@@ -91,7 +91,7 @@ The event that ends a turn (the turn's final answer) and the event that reports 
 
 #### Context
 
-**User story**: the user reads the agent's answer as the end of the turn, as on Claude Code on the web, with no "✓ finished" line under it. When the agent stopped on a question, the question above the message box says so; no "? waiting for an answer" line repeats it. The status word in the action bar still says "finished" or "waiting for an answer".
+**User story**: the user reads the agent's answer as the end of the turn, as on Claude Code on the web, with no "✓ finished" line under it. When the agent stopped on a question, the question above the message box says so; no "? waiting for an answer" line repeats it.
 
 **Problem**: an agent that is continued has one end event per leg, so the transcript read "✓ finished" between two turns and "? waiting for an answer" above the answer; and a main agent ends its turn clean while its subagents [16] still work, so "✓ finished" stood over work still going.
 

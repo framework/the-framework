@@ -1,10 +1,14 @@
 name: CI
-on: [ push, pull_request ]
+# A pull request is verified by its own event, and the main branch by its pushes. A push to another
+# branch runs nothing: with both events a pull request got two runs, and the skipped twin's "build"
+# check read as green before the real one existed.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
 
 jobs:
   verify:
-    # Prevent workflow being run twice, https://github.com/orgs/community/discussions/57827#discussioncomment-6579237
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     runs-on: ubuntu-latest
     name: ${{ matrix.name }}
     strategy:
@@ -37,7 +41,7 @@ jobs:
   # The one check the merge rule on main waits for: green only when every part above is.
   build:
     needs: verify
-    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name)
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - run: test "${{ needs.verify.result }}" = success

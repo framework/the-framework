@@ -15,5 +15,6 @@ The feed of one agent's [1] events [2] on the agent view: the list of events (`E
 - **The message just sent** - handed in by the agent view and passed to the list as its last prompt; with it, an empty feed shows the list rather than the placeholder.
 - **The working spinner** - handed in by the agent view and passed to the list.
 - **The message being written** - handed in by the agent view while the agent runs and passed to the list, which shows it after the last row.
+- **What waits** - the messages a working agent has not read yet, and the count of subagents an ended agent waits for, are handed in by the agent view and passed to the list, which draws them as its last rows; with none of either, nothing is passed. A message that waits is a row, so a feed with no event yet shows it and not the words for an empty feed.
 - **The tail** - content the caller hands in is rendered after the last row inside the scroller, which is where a web agent's cloud mirror box rides.
 - **The subagents** - the agent's subagents (the agents started for it, when it split its task across them), what each working one is doing now, and how a click on one opens its page are handed in by the agent view and passed to the list, which gives each subagent its rows.

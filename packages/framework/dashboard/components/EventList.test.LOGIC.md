@@ -29,3 +29,5 @@ What the tests cover, for the transcript of an agent's [1] events [2]:
 - **The message just sent** - it shows as the last row, a grey box of its own.
 - **The session id** - a session id update shows no row and no "resume" label.
 - **The quota** - an `allowed` quota reading shows no row; one running low and one used up each show theirs.
+- **A queued message** - a message the working agent has not read yet is the last row, after the moving line: the user's box, dimmed, named "Your message, queued", with "Queued" under it, while a read message is not dimmed and says no such word; several are each a row, in the order sent; with none handed in, none is drawn.
+- **The wait for subagents** - an agent that does not work and waits for 2 subagents has "Waiting for 2 subagents" as its last, moving line, "Waiting for 1 subagent" for one, and no such line for none; while the agent works the only moving line is "Working…".

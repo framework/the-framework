@@ -103,7 +103,7 @@ An agent is still going when its current segment holds at least one event and no
 
 #### Context
 
-**User story**: a finished agent's [1] status pill and composer note say whether it finished, failed or was stopped by the user, instead of one "finished" for a crash and a clean pass alike.
+**User story**: a finished agent's [1] status pill and composer tell whether it finished, failed or was stopped by the user, instead of one "finished" for a crash and a clean pass alike.
 
 **Problem**: a resumed agent's stream holds its stopped segment's [10] `end`; reading the first end ever would keep a resumed agent "stopped" forever, even after it later finished clean.
 

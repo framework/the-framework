@@ -835,3 +835,45 @@ describe('EventList scroll anchor', () => {
     expect(container.querySelector('[data-message-id="2"]')?.hasAttribute('hidden')).toBe(true)
   })
 })
+
+// What the chat says in place of the line that was above the message box.
+describe('EventList queued messages and the wait for subagents', () => {
+  const ids = () => Array.from(document.querySelectorAll('[data-message-id]')).map(n => n.getAttribute('data-message-id'))
+  const prompt: FrameworkEvent = { kind: 'driver', event: { type: 'start', prompt: 'go' } }
+  const said: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'Hello.' } }
+
+  test('a message the working agent has not read yet is the last row: my box, dimmed, with "Queued" under it', () => {
+    render(<EventList events={[prompt, said]} working queued={['and then this']} stick={false} />)
+    expect(ids()).toEqual(['0', '1', 'working', 'queued-0'])
+    const box = screen.getByLabelText('Your message, queued')
+    expect(box.textContent).toBe('and then this')
+    expect(box.className).toContain('opacity-60')
+    expect(box.parentElement!.textContent).toBe('and then thisQueued')
+    // A message that was read is not dimmed and says no such word.
+    const read = screen.getByLabelText('Your message')
+    expect(read.className).not.toContain('opacity-60')
+    expect(read.parentElement!.textContent).toBe('go')
+  })
+
+  test('several queued messages are each a row, in the order sent; none queued, none drawn', () => {
+    const { rerender } = render(<EventList events={[prompt]} working queued={['one', 'two']} stick={false} />)
+    expect(screen.getAllByLabelText('Your message, queued').map(n => n.textContent)).toEqual(['one', 'two'])
+    rerender(<EventList events={[prompt]} working stick={false} />)
+    expect(screen.queryByLabelText('Your message, queued')).toBeNull()
+  })
+
+  test('an agent that ended its turn while subagents work says how many it waits for, as the moving last line', () => {
+    const { rerender } = render(<EventList events={[prompt, said]} waitingOn={2} stick={false} />)
+    expect(ids()).toEqual(['0', '1', 'waiting-on'])
+    expect(screen.getByRole('status').textContent).toBe('Waiting for 2 subagents')
+    rerender(<EventList events={[prompt, said]} waitingOn={1} stick={false} />)
+    expect(screen.getByRole('status').textContent).toBe('Waiting for 1 subagent')
+    rerender(<EventList events={[prompt, said]} stick={false} />)
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  test('while the agent works the moving line is its own: the wait for subagents is not said too', () => {
+    render(<EventList events={[prompt, said]} working waitingOn={2} stick={false} />)
+    expect(screen.getAllByRole('status').map(n => n.textContent)).toEqual(['Working…'])
+  })
+})

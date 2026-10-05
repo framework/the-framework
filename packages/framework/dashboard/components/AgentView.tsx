@@ -37,6 +37,8 @@ import { driverFromImpl } from '../../src/client.js'
 // events already on screen.
 /** How long the bar waits for the run's own reads before it shows the facts that are in. */
 const READY_WAIT_MS = 1_000
+/** How long a queued message stays shown once the agent no longer works: its next turn, which reads it, starts well within this. */
+const QUEUED_UNREAD_MS = 5_000
 
 /** How often what the working subagents are doing is read: the runs poll's own pace. */
 const DOING_EVERY_MS = 2_000
@@ -198,7 +200,7 @@ export function AgentView({
   // Once the feed has shown the run going again, it keeps saying so until the log shows that turn
   // end: the archive re-read above catches up with the channel within milliseconds, the channel
   // then knows no more than it, and without this the page said "ended" again until the poll
-  // landed, the note and the spinner row flashing in between. Only a turn seen starting past an
+  // landed, the spinner row flashing in between. Only a turn seen starting past an
   // archive that was read counts: before the first read the channel is ahead of nothing.
   const [resumedFor, setResumedFor] = useState<string | null>(null)
   const active = isAgentActive(shown)
@@ -216,6 +218,20 @@ export function AgentView({
     if (sending && prompts > sending.prompts) setSending(null)
   }, [sending, prompts])
   const onSending = useCallback((text: string | null) => setSending(text === null ? null : { text, prompts }), [prompts])
+  // The messages sent while the agent works: it reads them all when its turn ends, as its next
+  // prompt. Until that prompt's line arrives the feed shows them as queued. An agent that stopped
+  // working without reading them (it failed, it was stopped) shows them no longer.
+  const [queued, setQueued] = useState<{ texts: string[]; prompts: number } | null>(null)
+  useEffect(() => setQueued(null), [agentId])
+  useEffect(() => {
+    if (queued && prompts > queued.prompts) setQueued(null)
+  }, [queued, prompts])
+  useEffect(() => {
+    if (!queued || feedLive) return
+    const timer = setTimeout(() => setQueued(null), QUEUED_UNREAD_MS)
+    return () => clearTimeout(timer)
+  }, [queued, feedLive])
+  const onQueued = useCallback((text: string) => setQueued(was => ({ texts: [...(was?.texts ?? []), text], prompts })), [prompts])
   // A run just started writes its prompt line only once its record is saved and its checkout made.
   const shownSending = sending?.text ?? (startedWith && prompts === 0 ? startedWith : undefined)
   // The agent works, or is about to: on a message just sent, or as its feed shows before the
@@ -242,9 +258,9 @@ export function AgentView({
   const lastPrompt = shownSending ?? [...shown].reverse().find(e => e.kind === 'driver' && e.event.type === 'start')
   const commitAsked = isCommitAsk(typeof lastPrompt === 'string' ? lastPrompt : lastPrompt?.kind === 'driver' && lastPrompt.event.type === 'start' ? lastPrompt.event.prompt : undefined)
   const committing = commitAsked && (going || (live === false && !handoff.loaded))
-  // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
-  // How the agent ended: its events say it, and until they are read (or when they hold no ending)
-  // its card does, so the line above the message box is the right one from the first frame.
+  // How the agent ended (#948), read once for the Resume offer and the wait for subagents below:
+  // its events say it, and until they are read (or when they hold no ending) its card does, so
+  // both are right from the first frame.
   const outcome = working ? undefined : (agentOutcome(shown) ?? (card ? cardOutcome(card.status) : undefined))
   const questions = useMemo(() => pendingChoices(shown), [shown])
   // Until the handoff has actually loaded, a just-stopped agent keeps showing the modules' summaries
@@ -342,6 +358,8 @@ export function AgentView({
           writing={feedLive ? writing : ''}
           {...(shownSending !== undefined ? { sending: shownSending } : {})}
           working={feedLive || shownSending !== undefined}
+          queued={queued?.texts}
+          waitingOn={!going && live === false && outcome?.ok !== false && !outcome?.waiting ? subagentsRunning : 0}
           {...(feedLive ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This agent has no events.' })}
           // A web agent's log dead-ends at the hand-off (#1265): the mirror box rides the tail of
           // the scroller, where "and then…" belongs. Self-nulling for every other target.
@@ -392,8 +410,8 @@ export function AgentView({
         files={files}
         onAgentStarted={onAgentStarted}
         onSending={onSending}
+        onQueued={onQueued}
         outcome={outcome}
-        subagentsRunning={subagentsRunning}
         model={modelLabel}
       />
     </>

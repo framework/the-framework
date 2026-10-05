@@ -39,8 +39,14 @@ describe('ProjectHome', () => {
       await Promise.resolve()
       await Promise.resolve()
     })
-    expect(screen.getByText('start form')).toBeTruthy()
-    expect(screen.getByText('open questions')).toBeTruthy()
+    // The waiting rows come first and the box to start an agent last, as on an agent's page.
+    const questions = screen.getByText('open questions')
+    const form = screen.getByText('start form')
+    expect(questions.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // The rows scroll in the chat's column; the box is outside what scrolls, so it stays in place.
+    expect(questions.closest('.max-w-3xl')).toBeTruthy()
+    expect(form.closest('[data-slot="scroll-area"]')).toBeNull()
+    expect(questions.closest('[data-slot="scroll-area"]')).toBeTruthy()
     expect(screen.queryByRole('region', { name: 'Docs' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Docs' })).toBeNull()
     expect(screen.queryByText('PLAN.md')).toBeNull()

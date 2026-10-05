@@ -28,7 +28,7 @@ export function OpenQuestions({
   if (!loaded || questions.length === 0) return null
 
   return (
-    <section aria-label="Open questions" className="border-t border-border p-3">
+    <section aria-label="Open questions" className="p-3">
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Waiting on you · {questions.length}
       </h2>

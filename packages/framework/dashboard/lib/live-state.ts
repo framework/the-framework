@@ -1,4 +1,4 @@
-import type { FrameworkEvent, ChoiceRequest } from '../../src/index.js'
+import type { AgentMeta, FrameworkEvent, ChoiceRequest } from '../../src/index.js'
 
 // Live-run state derived from the event stream — kept pure so it can be driven and
 // tested on its own, away from React. The dashboard is a projection of the diary the
@@ -67,6 +67,16 @@ export function agentOutcome(events: readonly FrameworkEvent[]): AgentOutcome | 
   const end = currentAgentEvents(events).find(event => event.kind === 'end')
   if (!end || end.kind !== 'end') return undefined
   return { ok: end.ok, stopped: end.stopped === true, ...(end.waiting === true ? { waiting: true } : {}), ...(end.detail !== undefined ? { detail: end.detail } : {}) }
+}
+
+/**
+ * How the run's card says the agent ended, or undefined while it runs. It stands in for
+ * {@link agentOutcome} until the agent's events are read, and for a run whose process died
+ * before writing its ending.
+ */
+export function cardOutcome(status: AgentMeta['status']): AgentOutcome | undefined {
+  if (status === 'running') return undefined
+  return { ok: status === 'done', stopped: status === 'stopped', ...(status === 'waiting' ? { waiting: true } : {}) }
 }
 
 /**

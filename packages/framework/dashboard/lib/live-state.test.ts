@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { FrameworkEvent } from '../../src/index.js'
-import { agentViews, pendingChoices, isAgentActive, currentAgentEvents, agentOutcome, actionsRunUrl } from './live-state.js'
+import { agentViews, pendingChoices, isAgentActive, currentAgentEvents, agentOutcome, cardOutcome, actionsRunUrl } from './live-state.js'
 
 const view = (id: string, title: string, markdown: string): FrameworkEvent => ({ kind: 'view', id, title, markdown })
 const choice = (id: string, title: string): FrameworkEvent => ({
@@ -147,6 +147,16 @@ describe('currentAgentEvents', () => {
 })
 
 // #948: the overview pill must tell a crash, a user stop, and a clean finish apart.
+describe('cardOutcome', () => {
+  test('a running card says no ending; every other status says how the agent ended', () => {
+    expect(cardOutcome('running')).toBeUndefined()
+    expect(cardOutcome('done')).toEqual({ ok: true, stopped: false })
+    expect(cardOutcome('failed')).toEqual({ ok: false, stopped: false })
+    expect(cardOutcome('stopped')).toEqual({ ok: false, stopped: true })
+    expect(cardOutcome('waiting')).toEqual({ ok: false, stopped: false, waiting: true })
+  })
+})
+
 describe('agentOutcome', () => {
   test('undefined while the run is still going', () => {
     expect(agentOutcome([{ kind: 'log', message: 'hi' }])).toBeUndefined()

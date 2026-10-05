@@ -255,5 +255,5 @@ See `## Context`.
 
 - The feed follows new output while the agent [1] is live as the feed knows it. A finished agent's feed is static: it does not follow, and it opens at its end, where the outcome and the last changes are.
 - The health of the live event stream is passed to the feed, which shows a banner over the events when the stream is lost.
-- The composer [5] is told: whether the agent is live as the feed knows it; and, once the agent is finished, how it ended: cleanly, with an error, by a stop [15], or waiting on a question, with the detail the end event carries. The composer uses the ending for its note and its resume offer.
+- The composer [5] is told: whether the agent is live as the feed knows it; and, once the agent is finished, how it ended: cleanly, with an error, by a stop [15], or waiting on a question, with the detail the end event carries. The composer uses the ending for its note and its resume offer. Until the agent's events say how it ended (they are not read yet, or they hold no ending), the status on the agent's record says it, so the composer's line is the right one from the first frame.
 - When the composer's message continues this agent after it ended, the shell is told, and the page stays on the same agent as it goes on. When the action bar's menu deletes this agent, the page leaves for the project home [16].

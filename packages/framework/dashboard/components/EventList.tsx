@@ -9,6 +9,8 @@ import { AnsweredChoice } from './AnsweredChoice.js'
 import { InlineScreen, isLoopbackScreen } from './InlineScreen.js'
 import { Markdown } from './Markdown.js'
 import { SessionLine, type SessionSetup } from './SessionLine.js'
+import { ChangedFiles } from './ChangedFiles.js'
+import { turnChanges } from '../lib/turn-changes.js'
 import { SubagentLine } from './SubagentLine.js'
 import { LiveLine, ToolCalls, type CallOutput, type ToolStep } from './ToolCalls.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -453,6 +455,7 @@ export function EventList({
   doing = NOTHING_DOING,
   setup,
   onOpenAgent,
+  onOpenChange,
 }: {
   events: FrameworkEvent[]
   /** The message the agent is writing, as far as it has got: an AGENT row after the last, drawn
@@ -489,10 +492,16 @@ export function EventList({
   setup?: SessionSetup | undefined
   /** Open another run's page: what a subagent's row does on a click. */
   onOpenAgent?: ((agentId: string) => void) | undefined
+  /** Show a changed file's change: what the row of a file at the end of a turn does on a click.
+   *  Without it, the rows are no buttons. */
+  onOpenChange?: ((path: string) => void) | undefined
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
   const screenRows = useMemo(() => foldScreenRows(events), [events])
   const passed = useMemo(() => quietEnds(events), [events])
+  // The files each turn's edits changed: a row for each at the end of the turn, once it has ended.
+  const workspace = setup?.workspace
+  const changes = useMemo(() => turnChanges(events, workspace), [events, workspace])
   const rowIds = useMemo(() => new Map(events.map((e, at) => [e, String(at)])), [events])
   const asked = useMemo(() => askedReplies(events), [events])
   const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
@@ -587,6 +596,18 @@ export function EventList({
               return (
                 <Fragment key={idOf(e)}>
                 {passedAbove.get(e)?.map(placeOf)}
+                {changes.ended.has(e) && (
+                  <MessageScrollerItem messageId={`changes-${idOf(e)}`} className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
+                    <ChangedFiles files={changes.ended.get(e)!} onOpen={onOpenChange} />
+                  </MessageScrollerItem>
+                )}
+                {/* A message just sent ends the last turn as its own prompt line will: the turn's
+                    files stay above it, where they were, and do not go and come back. */}
+                {idOf(e) === 'sending' && changes.last.length > 0 && (
+                  <MessageScrollerItem messageId="changes-last" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
+                    <ChangedFiles files={changes.last} onOpen={onOpenChange} />
+                  </MessageScrollerItem>
+                )}
                 {i === setupAt && setupRow}
                 {startedRows(i)}
                 {/* Every row carries the same -mx/px pair so a washed row's band and a plain row's
@@ -648,6 +669,13 @@ export function EventList({
             {working && !written && !settingUp && (
               <MessageScrollerItem messageId="working" className="-mx-1.5 flex items-center gap-2 rounded-sm px-1.5">
                 <LiveLine call={current} word={starting ? 'Starting…' : 'Working…'} since={unfolded[unfolded.length - 1]?.at} />
+              </MessageScrollerItem>
+            )}
+            {/* The last turn's files, once it has ended: while the agent works the list still grows.
+                With a message just sent they are above that message, in the rows. */}
+            {!working && sending === undefined && changes.last.length > 0 && (
+              <MessageScrollerItem messageId="changes-last" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
+                <ChangedFiles files={changes.last} onOpen={onOpenChange} />
               </MessageScrollerItem>
             )}
             {!working && waitingOn > 0 && (

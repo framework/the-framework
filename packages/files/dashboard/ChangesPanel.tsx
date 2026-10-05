@@ -70,7 +70,10 @@ function Line({ children }: { children: string }) {
   return <p className="p-3 text-xs text-muted-foreground">{children}</p>
 }
 
-export function ChangesPanel({ projectId, agentId, activity }: ModulePanelProps) {
+/** The last ask from the chat that was taken: a tab opened again later does not take it a second time. */
+let revealTaken = 0
+
+export function ChangesPanel({ projectId, agentId, activity, reveal }: ModulePanelProps) {
   const host = useModuleHost()
   const { value: projectTree, loaded: projectLoaded } = usePolled<ProjectTree>(agentId ? null : () => readProject(host, projectId), EMPTY_PROJECT, 8_000, [projectId, agentId], { remember: projectKey(projectId) })
   const { value: answer, loaded: treeLoaded, reload } = usePolled<AgentTree | null>(agentId ? () => readTree(host, projectId, agentId) : null, null, 8_000, [projectId, agentId], agentId ? { remember: treeKey(projectId, agentId) } : undefined)
@@ -105,6 +108,16 @@ export function ChangesPanel({ projectId, agentId, activity }: ModulePanelProps)
   // in: another run's list, and another commit's, starts at its own first file.
   const [click, setClick] = useState<{ agentId: string | undefined; sha: string | undefined; path: string } | null>(null)
   const clicked = click !== null && click.agentId === agentId && click.sha === sha ? click.path : null
+  // A changed file asked for from the chat is picked as a click on it in "All changes" is: once
+  // for each ask, so a click made in the list after it stands.
+  const revealedAt = reveal?.at
+  const revealedPath = reveal?.path
+  useEffect(() => {
+    if (revealedAt === undefined || revealedPath === undefined || revealedAt <= revealTaken) return
+    revealTaken = revealedAt
+    setCommitClick(null)
+    setClick({ agentId, sha: undefined, path: revealedPath })
+  }, [revealedAt, revealedPath, agentId])
 
   if (agentId) {
     if (!treeLoaded || !commitsLoaded || !runTree || runTree.source === 'pending') return <Line>Looking for this run’s changes…</Line>
@@ -117,7 +130,10 @@ export function ChangesPanel({ projectId, agentId, activity }: ModulePanelProps)
   const paths = Object.keys(changes).sort()
   const merged = agentId !== undefined && runTree !== null && 'merged' in runTree && runTree.merged
   const caption = commit ? `${commit.short} ${commit.subject}` : agentId ? (merged ? 'What this run changed. Merged.' : 'What this run changed. Not merged yet.') : 'Changed in the project’s folder, not committed.'
-  const picked = clicked !== null && paths.includes(clicked) ? clicked : paths[0]
+  // A file asked for from the chat may be named by its whole path on disk, when the run's card no
+  // longer says where its checkout was: the listed file that path ends with is the one meant.
+  const meant = clicked === null || paths.includes(clicked) ? clicked : (paths.filter(path => clicked.endsWith(`/${path}`)).sort((a, b) => b.length - a.length)[0] ?? null)
+  const picked = meant !== null && paths.includes(meant) ? meant : paths[0]
   // What stands where the list and the diff would be, when the list is empty.
   const nothing = commit ? (commitLoaded ? 'This commit changed no files.' : 'Reading the commit…') : 'No change is left: the commits cancel out.'
   return (

@@ -13,6 +13,7 @@ import { cn } from '../lib/utils.js'
 import { usePolled } from '../lib/use-async.js'
 import { onDocs } from '../rpc/reads.js'
 import { setSidePanelOpen, sidePanelName, useSidePanelOpen } from '../lib/side-panel.js'
+import { useRevealedChange } from '../lib/reveal-change.js'
 import { PanelRightClose, PanelRightOpen } from 'lucide-react'
 
 /** The rail's own tabs, and a module's tab by its package and id. */
@@ -38,6 +39,9 @@ const TABS: Record<'views' | 'docs', { label: string; help: string }> = {
 // apart (`lib/side-panel.ts` remembers which are open): closed, it is
 // a narrow strip holding one button at the top right of the page; open, it is half the page wide,
 // and the same button, at the end of the tabs, closes it. A closed rail renders no panel, so nothing in it reads anything.
+/** The last ask from the chat the rail moved for. */
+let revealShown = 0
+
 export function RightRail({
   projectId,
   agentId: agentId,
@@ -99,6 +103,18 @@ export function RightRail({
     touched.current = true
     setTab(t)
   }
+  // A changed file asked for from the chat: the tab that lists changes takes it, and is shown.
+  const reveal = useRevealedChange(panelName)
+  const changesPanel = panels.find(panel => panel.changes)
+  const changesTab = changesPanel ? panelTab(changesPanel) : undefined
+  const revealedAt = reveal?.at
+  useEffect(() => {
+    // Each ask moves the rail once: an old one, met again on coming back to its page, moves nothing.
+    if (revealedAt === undefined || changesTab === undefined || revealedAt <= revealShown) return
+    revealShown = revealedAt
+    touched.current = true
+    setTab(changesTab)
+  }, [revealedAt, changesTab])
   const hasViews = views.length > 0
   const firstPanel = panels[0] ? panelTab(panels[0]) : undefined
 
@@ -148,6 +164,7 @@ export function RightRail({
     return panel?.count ? panel.count(panelProps) : 0
   }
   const activePanel = panelOf(active)
+  const activeProps: ModulePanelProps = activePanel?.changes && reveal ? { ...panelProps, reveal } : panelProps
 
   return (
     // Open, the panel takes half the page, as Claude Code's does: a diff needs the room.
@@ -183,7 +200,7 @@ export function RightRail({
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {activePanel ? (
           <ModuleSlot key={active} package={activePanel.package} label={`${activePanel.label} tab`}>
-            <activePanel.Panel {...panelProps} />
+            <activePanel.Panel {...activeProps} />
           </ModuleSlot>
         ) : active === 'views' && hasViews ? (
           <ViewsRail views={views} />

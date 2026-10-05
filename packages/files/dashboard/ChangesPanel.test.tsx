@@ -229,3 +229,54 @@ describe('ChangesPanel commits', () => {
     expect(screen.queryByRole('region', { name: 'Commits' })).toBeNull()
   })
 })
+
+// A changed file asked for from the chat (the row of a file at the end of a turn).
+describe('ChangesPanel, a file asked for from the chat', () => {
+  // Each ask is later than every one before it, across the tests too.
+  let asks = 1000
+  const ask = (path: string) => ({ path, at: ++asks })
+  const pressed = () => screen.getAllByRole('button').filter(row => row.getAttribute('aria-pressed') === 'true').map(row => row.textContent)
+
+  test('the file asked for is the one picked, not the first; a later click in the list stands; a new ask picks again', async () => {
+    const first = ask('src/app.ts')
+    const { rerender } = render(<ChangesPanel projectId="p1" agentId="run-1" context={context} reveal={first} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /app\.ts/ }).getAttribute('aria-pressed')).toBe('true'))
+    await waitFor(() => expect(readDiff).toHaveBeenCalledWith(expect.anything(), 'p1', 'src/app.ts', 'run-1', undefined))
+    fireEvent.click(screen.getByRole('button', { name: /new\.ts/ }))
+    rerender(<ChangesPanel projectId="p1" agentId="run-1" context={context} reveal={first} activity={1} />)
+    expect(screen.getByRole('button', { name: /new\.ts/ }).getAttribute('aria-pressed')).toBe('true')
+    rerender(<ChangesPanel projectId="p1" agentId="run-1" context={context} reveal={ask('src/app.ts')} activity={1} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /app\.ts/ }).getAttribute('aria-pressed')).toBe('true'))
+  })
+
+  test('an ask already taken is not taken again by a tab opened later', async () => {
+    const taken = ask('src/app.ts')
+    const first = render(<ChangesPanel projectId="p1" agentId="run-1" context={context} reveal={taken} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /app\.ts/ }).getAttribute('aria-pressed')).toBe('true'))
+    first.unmount()
+    render(<ChangesPanel projectId="p1" agentId="run-1" context={context} reveal={taken} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /old\.txt/ }).getAttribute('aria-pressed')).toBe('true'))
+  })
+
+  test('with a commit picked, the ask goes back to "All changes" and picks the file there', async () => {
+    const commit = { sha: 'b'.repeat(40), short: 'bbbbbbb', subject: 'Change the app', at: '2026-10-04T10:00:00.000Z' }
+    readCommits.mockResolvedValue([commit])
+    readCommit.mockResolvedValue({ 'src/app.ts': { status: 'modified', committed: true } })
+    const { rerender } = render(<ChangesPanel projectId="p1" agentId="run-1" context={context} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Change the app/ }))
+    await waitFor(() => expect(screen.queryByText('What this run changed. Not merged yet.')).toBeNull())
+    rerender(<ChangesPanel projectId="p1" agentId="run-1" context={context} reveal={ask('src/new.ts')} />)
+    await waitFor(() => expect(screen.getByText('What this run changed. Not merged yet.')).toBeTruthy())
+    expect(pressed().some(text => text?.includes('src/new.ts'))).toBe(true)
+  })
+
+  test('a file asked for that the list does not hold leaves the first file picked', async () => {
+    render(<ChangesPanel projectId="p1" agentId="run-1" context={context} reveal={ask('gone.md')} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /old\.txt/ }).getAttribute('aria-pressed')).toBe('true'))
+  })
+
+  test('a file asked for by its whole path on disk is the listed file that path ends with', async () => {
+    render(<ChangesPanel projectId="p1" agentId="run-1" context={context} reveal={ask('/repo/.branches/agent-1/src/app.ts')} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: /app\.ts/ }).getAttribute('aria-pressed')).toBe('true'))
+  })
+})

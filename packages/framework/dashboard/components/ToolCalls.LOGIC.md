@@ -12,7 +12,7 @@ Draws what the coding agent [3] did between two of its messages in an agent's [1
 [2] tool call: one use of a tool by the coding agent (running a command, reading a file, editing a file, searching), reported as a label and, when the call has one, a detail: the one argument that says what it did (the command, the file, the address), on one line and cut short. A call may also carry that argument whole, and what it gave back: its output [5].
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [4] step: a tool call, or a thought of the coding agent as its CLI summarizes it.
-[5] output: what a tool call printed, cut to a size limit by the tool that runs the coding agent, with whether the call failed and, for a command whose CLI reports one, its exit code.
+[5] output: what a tool call printed, cut to a size limit by the tool that runs the coding agent, with whether the call failed and, for a command whose CLI reports one, its exit code. The output of a call that edited files may also say the files the call changed, each with its lines added and removed; this component draws none of that (the transcript's rows of changed files do, `ChangedFiles.tsx`).
 
 ## Business logic — TL;DR
 

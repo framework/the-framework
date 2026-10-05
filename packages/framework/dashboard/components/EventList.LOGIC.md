@@ -28,6 +28,7 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 - **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown in the page's own font; the reply whole; the user's prompt as a grey box on the right with no label, cut short behind "Show more" when long, its time shown under it while the pointer is on it.
 - **The message just sent** - a message sent to an ended agent is one more grey box after the last row, a prompt like any other, so the scroller brings it into view; the prompt line of the continuation takes the same row when it arrives.
 - **A message that waits is the last row** - each message the caller says the working agent has not read yet is a row after every other, the user's grey box dimmed, with the word "Queued" under it.
+- **A row for each file a turn changed** - at the end of each turn [7], one bordered row per file the turn's edits changed (`ChangedFiles.tsx`): an ended turn's rows right before the prompt that ended it, the last turn's at the end of the transcript once the agent no longer works, and above a message just sent, which ends the turn as its prompt line will; a click on a row asks the caller to show that file's change.
 - **An ended agent that waits for its subagents says so** - given the count of subagents [16] an ended agent waits for, the last line is a moving "Waiting for N subagents"; not while the agent works.
 - **A moving line while the agent works** - while the agent works and writes nothing, the last row is a moving line: the tool call going on now ("Running pnpm test 9s"), else "Starting…" when nothing has come since the prompt and "Working…" otherwise, with the seconds since the last event; while the session is being set up it is not drawn, the session line being the one moving line; it gives way to the message being written, and goes when the agent ends.
 - **The message being written grows in place** - while the agent writes a message, it is one more agent row after the last, drawn as a finished reply is; when the whole message arrives, its own row replaces it and nothing moves.
@@ -94,6 +95,24 @@ The caller may hand the transcript the messages the working agent has not read y
 
 - **A queued message.** Each message handed in is one row, after every other row and after the moving line, in the order given. It is drawn as the user's own prompt (see "The conversation reads as messages"), cut short behind "Show more" the same way, with two differences: the box is dimmed, and the small line under it holds the word "Queued", always visible, where a read prompt's time shows on hover. Its accessible name is "Your message, queued". With no message handed in, there is no such row. When the agent reads the messages, the caller hands them in no longer and the agent's next prompt is in the events, drawn as a prompt like any other.
 - **The wait for subagents.** While the agent does not work and the count is above zero, the transcript's last line is a moving line, drawn as the "Working…" line is but with no seconds: "Waiting for 1 subagent", or "Waiting for N subagents". While the agent works, the moving line is its own (see "The agent's steps are one folded line") and the wait is not said too. With a count of zero there is no such line.
+
+### A row for each file a turn changed
+
+#### Context
+
+**User story**: the agent answers "Done." after editing three files. Under that answer the user reads three rows, one per file, as Claude Code on the web lists them: the file's name, the lines added and removed ("+11 −0"), an arrow. A click on a row opens the side panel on that file's change.
+
+**Problem**: what a turn [7] changed was said only inside the folded line of the coding agent's [5] tool calls, one call at a time, and in the side panel, which is closed until the user opens it.
+
+#### Business logic
+
+The transcript reads, off its events [2], the files each turn's edits changed (the rule in `lib/turn-changes.ts`: each file once per turn with its edits summed, in the order first changed, its path said from the agent's checkout, whose folder is read off what the caller says was set up for the agent). A turn that edited no file has no such rows. A file changed by a shell command is no edit and has no row.
+
+The files of one turn are one row of the transcript that is not an event, drawn by `ChangedFiles.tsx` as one bordered row per file. It has its own identity, so no other row's identity changes when it comes, and it has no time.
+
+- **An ended turn.** A turn a later prompt ended has its files right before that prompt, after everything else the turn wrote.
+- **The last turn.** The turn no prompt has ended yet has its files after every row and after the message being written, and before the wait for subagents and the queued messages (see "What waits: queued messages and the wait for subagents"). They are drawn there only while the agent does not work. A message just sent ends the turn as its own prompt line will: the files are then right above that message, in the same place, so they do not go and come back when its prompt line arrives. Otherwise: while the agent works the list still grows. Once the just-sent message's prompt is in the events, the turn is an ended one and its files are before that prompt.
+- **A click.** The caller may hand the transcript a way to show a changed file's change (`AgentView.tsx`). With it, each file's row is a button, and a click asks the caller for that file by its path. Without it, the rows are no buttons.
 
 ### A turn's end and the spend are not rows
 

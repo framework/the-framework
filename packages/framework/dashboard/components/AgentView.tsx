@@ -20,6 +20,8 @@ import { QuestionPanel } from './QuestionPanel.js'
 import { SubagentsBar } from './SubagentLine.js'
 import { holdsMainAgent } from '../lib/subagents.js'
 import { agentLogKey } from '../lib/agent-log.js'
+import { revealChange } from '../lib/reveal-change.js'
+import { sidePanelName } from '../lib/side-panel.js'
 import { modelName, useModels } from '../lib/models.js'
 import { driverFromImpl } from '../../src/client.js'
 
@@ -162,7 +164,11 @@ export function AgentView({
   const modelLabel = model ? modelName(picked ? models?.[picked] : undefined, model) : undefined
   const [open, setOpen] = useState(false)
   // What the installed modules add to this run's page: a summary in the bar above the message box.
-  const { runSlots: mountedSlots } = useMountedModules()
+  const { runSlots: mountedSlots, panels: mountedPanels } = useMountedModules()
+  // A changed file's row in the chat opens the side panel on the tab that lists changes, when a
+  // module of this project has one.
+  const listsChanges = mountedPanels.some(panel => panel.changes && panel.projects.includes(projectId))
+  const onOpenChange = useMemo(() => (listsChanges ? (path: string) => revealChange(sidePanelName(projectId, agentId), path) : undefined), [listsChanges, projectId, agentId])
   const runSlots = mountedSlots.filter(slots => slots.projects.includes(projectId))
   const toggle = useCallback(() => setOpen(o => !o), [])
 
@@ -368,6 +374,7 @@ export function AgentView({
           doing={doing}
           setup={setup}
           onOpenAgent={onOpenAgent}
+          onOpenChange={onOpenChange}
         />
       )}
       {/* Keyed by the run: a list opened for one main agent is not open for the next. */}

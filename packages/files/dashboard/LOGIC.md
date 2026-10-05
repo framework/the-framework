@@ -10,7 +10,7 @@ The Files module's browser part: what it adds to the dashboard and the component
 
 - **What the module adds** (`index.tsx`) - the Changes tab, first, the Files tab, counting the Context's [2] files on its label, and the run slot.
 - **The Files tab** (`FileTree.tsx`) - the project's or an agent's files as a lazy tree, marked while the change is not merged, filtered, previewed, and picked into the Context.
-- **The Changes tab** (`ChangesPanel.tsx`) - only the files that changed, an agent's kept once its work is merged or the project folder's own, as a list on the left, with the picked file's diff on the right; under the list an agent's commits, each showing its own change when clicked.
+- **The Changes tab** (`ChangesPanel.tsx`) - only the files that changed, an agent's kept once its work is merged or the project folder's own, as a list on the left, with the picked file's diff on the right; under the list an agent's commits, each showing its own change when clicked; a changed file clicked in the agent's chat is the one picked.
 - **The hover card** (`FilePreview.tsx`) - a file's diff or contents, read when it opens and kept fresh.
 - **A file in a card** (`DiffView.tsx`) - a diff as colored lines and a file as numbered lines.
 - **A working agent's changes** (`AgentChanges.tsx`) - the count in the bar above the message box.

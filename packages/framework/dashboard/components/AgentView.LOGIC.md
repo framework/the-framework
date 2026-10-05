@@ -48,6 +48,7 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 - **Notices for work that runs elsewhere** - an agent whose turns run on GitHub Actions, in a cloud session, or on a device gets a notice explaining what the feed can and cannot show.
 - **While the agent commits** - from a press on "Commit" the ask shows as the last prompt of the feed and the bar above the message box says "Committing…" where the next step would be, until the agent's turn has ended and its branch has been read again, so the place is never empty between the two; an ask that did not go through gives the button back. It is read off the last prompt, the message on its way or else the last prompt in the events shown, so a working agent whose last prompt is the button's ask says so after a refresh too, and any other prompt says nothing.
 - **The agent's subagents** - the agent's subagents [19] are handed to the feed, which gives each its rows; while any of them is `running`, what each is doing now is read every 2 seconds, and a line above the composer says how many are running; while any of them holds the agent's job (it is `running`, it is saving, or it ended less than 10 seconds ago), the feed of an agent that ended its turn clean closes with a moving line "Waiting for N subagents", its next step is not offered, and its last clean end is not shown as the end.
+- **A changed file's row opens the side rail** - the feed is handed a way to show a changed file's change only when a module [17] of this project has a side-rail tab that lists what an agent changed; a click on a file's row at the end of a turn then opens this page's side rail on that tab, with that file picked. With no such tab the rows are there and open nothing.
 - **The feed and the composer** - a finished feed is static and opens at its end; the composer knows how the agent ended, so it can offer a resume, and which model the agent runs on, to say it under the message box.
 
 ## Business logic
@@ -261,6 +262,21 @@ The caller hands the page the agent's subagents, oldest first, as the project's 
 - The line above the composer and the reading of what subagents are doing count only the subagents whose status is `running`, not the ones that merely hold the job.
 
 A click on a subagent, in the transcript or in the subagents line, opens that subagent's own page.
+
+### A changed file's row opens the side rail
+
+#### Context
+
+**User story**: at the end of a turn the transcript lists the files the turn's edits changed, a row each (`EventList.tsx`). The user clicks one and reads its diff beside the conversation, in the side rail's Changes tab, without looking for the file there.
+
+**Problem**: the tab that shows a file's change is a module's [17] (the Files module's Changes tab), which a dashboard may not have. A row that looks like a button and opens nothing reads as broken.
+
+#### Business logic
+
+The page hands the feed the folder of the agent's checkout [7] with what was set up (the TL;DR's "What was set up"), which is what the transcript says each changed file's path from.
+
+- When at least one installed module of this project has a side-rail tab that declares it lists what a run changed (`module/index.ts`), the page hands the feed a way to show a changed file's change. A click on a file's row then asks for that file, by its path in the agent's checkout, on this agent's page (`lib/reveal-change.ts`): the page's side rail opens, shows that tab and hands it the file (`RightRail.tsx`).
+- With no such tab, or one only another project's module has, the page hands the feed none: the rows are drawn and are no buttons.
 
 ### The feed and the composer
 

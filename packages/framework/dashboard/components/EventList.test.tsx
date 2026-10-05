@@ -877,3 +877,59 @@ describe('EventList queued messages and the wait for subagents', () => {
     expect(screen.getAllByRole('status').map(n => n.textContent)).toEqual(['Working…'])
   })
 })
+
+// A row for each file a turn's edits changed, at the end of the turn.
+describe('EventList changed files', () => {
+  const ids = () => Array.from(document.querySelectorAll('[data-message-id]')).map(n => n.getAttribute('data-message-id'))
+  const prompt = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'start', prompt: text } })
+  const said: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'Done.' } }
+  const WS = '/repo/.branches/agent-1'
+  const edit = (id: string, path: string, added: number, removed: number): FrameworkEvent[] => [
+    { kind: 'driver', event: { type: 'action', label: 'Edit', detail: path, id } },
+    { kind: 'driver', event: { type: 'output', id, text: 'ok', changed: [{ path, added, removed }] } },
+  ]
+  const rows = () => screen.queryAllByRole('list', { name: 'Files changed' }).map(list => list.textContent)
+
+  test('an ended turn\'s files are a row each right after its last row, before the next prompt; the last turn\'s close the chat', () => {
+    const events = [prompt('go'), ...edit('c1', `${WS}/A.md`, 2, 1), { ...said }, prompt('more'), ...edit('c2', `${WS}/src/b.ts`, 5, 0), { ...said }]
+    render(<EventList events={events} setup={{ workspace: WS }} stick={false} />)
+    expect(ids()).toEqual(['0', 'setup', '1', '3', 'changes-4', '4', '5', '7', 'changes-last'])
+    expect(rows()).toEqual(['A.md+2 −1', 'b.ts+5 −0'])
+  })
+
+  test('while the agent works on a turn, that turn\'s files are not listed yet', () => {
+    const events = [prompt('go'), ...edit('c1', `${WS}/A.md`, 2, 1), said]
+    const { rerender } = render(<EventList events={events} working stick={false} />)
+    expect(rows()).toEqual([])
+    rerender(<EventList events={events} stick={false} />)
+    expect(rows()).toHaveLength(1)
+  })
+
+  test('a message just sent leaves the ended turn\'s files where they were, above it: they do not go and come back', () => {
+    const events = [prompt('go'), ...edit('c1', `${WS}/A.md`, 2, 1), said]
+    const { rerender } = render(<EventList events={events} stick={false} />)
+    expect(ids()).toEqual(['0', '1', '3', 'changes-last'])
+    rerender(<EventList events={events} sending="and more" working stick={false} />)
+    expect(ids()).toEqual(['0', '1', '3', 'changes-last', 'sending', 'working'])
+    expect(rows()).toEqual(['A.md+2 −1'])
+    // Its own prompt line arrives: the same rows, above it.
+    rerender(<EventList events={[...events, prompt('and more')]} working stick={false} />)
+    expect(ids()).toEqual(['0', '1', '3', 'changes-4', '4', 'working'])
+    expect(rows()).toEqual(['A.md+2 −1'])
+  })
+
+  test('a turn that edited no file has no such row', () => {
+    render(<EventList events={[prompt('go'), said]} stick={false} />)
+    expect(rows()).toEqual([])
+  })
+
+  test('a click on a file\'s row asks for the file by its path in the checkout; with no way to show it the row is no button', () => {
+    const onOpenChange = vi.fn()
+    const events = [prompt('go'), ...edit('c1', `${WS}/docs/A.md`, 2, 1), said]
+    const { rerender } = render(<EventList events={events} setup={{ workspace: WS }} onOpenChange={onOpenChange} stick={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Show the change to A.md' }))
+    expect(onOpenChange.mock.calls).toEqual([['docs/A.md']])
+    rerender(<EventList events={events} setup={{ workspace: WS }} stick={false} />)
+    expect(screen.queryByRole('button', { name: 'Show the change to A.md' })).toBeNull()
+  })
+})

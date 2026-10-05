@@ -166,7 +166,9 @@ function renderBlocks(text: string, compact = false): ReactNode[] {
 
 // Inline spans: `code`, [text](url), **bold**, *italic*, bare URLs. Applied left-to-right,
 // non-overlapping; code wins over the rest so a URL inside backticks stays literal. Links
-// render only for http(s) targets — anything else stays plain text.
+// render only for http(s) targets. A link to a file path (no scheme: `/repo/a.md`, `src/a.ts`)
+// is the file's name as inline code with the path on hover: the browser cannot open a file, and
+// the raw `[a.md](/repo/a.md)` read as noise. Anything else stays plain text.
 const LINK_CLASS = 'text-primary underline underline-offset-2 break-all'
 
 function link(href: string, label: string, key: number): ReactNode {
@@ -179,7 +181,7 @@ function link(href: string, label: string, key: number): ReactNode {
 
 function inline(text: string): ReactNode {
   const parts: ReactNode[] = []
-  const re = /(`[^`]+`|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|\*\*[^*]+\*\*|\*[^*]+\*|https?:\/\/[^\s<>)\]]+)/g
+  const re = /(`[^`]+`|\[[^\]]+\]\((?:https?:\/\/)?[^\s):]+\)|\*\*[^*]+\*\*|\*[^*]+\*|https?:\/\/[^\s<>)\]]+)/g
   let last = 0
   let m: RegExpExecArray | null
   let key = 0
@@ -189,7 +191,14 @@ function inline(text: string): ReactNode {
     if (token.startsWith('`')) parts.push(<code key={key++} className="rounded bg-muted px-1 text-xs">{token.slice(1, -1)}</code>)
     else if (token.startsWith('[')) {
       const parsed = /^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/.exec(token)
+      const file = /^\[([^\]]+)\]\(([^\s):]+)\)$/.exec(token)
       if (parsed) parts.push(link(parsed[2]!, parsed[1]!, key++))
+      else if (file)
+        parts.push(
+          <code key={key++} title={file[2]} className="rounded bg-muted px-1 text-xs">
+            {file[1]}
+          </code>,
+        )
       else parts.push(<Fragment key={key++}>{token}</Fragment>)
     } else if (token.startsWith('**')) parts.push(<strong key={key++}>{token.slice(2, -2)}</strong>)
     else if (token.startsWith('*')) parts.push(<em key={key++}>{token.slice(1, -1)}</em>)

@@ -33,7 +33,7 @@ See `## Context`.
 
 #### Business logic
 
-The component is given the steps [4] of one run, in order (which steps make a run is the transcript's rule, `EventList.tsx`). It draws one grey line in the page's own font: the calls counted by kind (the wording in `lib/tool-calls.ts`, "Ran 2 commands, read 1 file") and a chevron pointing down. The line starts folded. A click opens, under the line, a box with a border and round corners holding one line per step, in the order they happened, and turns the chevron to point up; a click on the line again folds the box away.
+The component is given the steps [4] of one run, in order (which steps make a run is the transcript's rule, `EventList.tsx`). It draws one grey line in the page's own font: the calls counted by kind (the wording in `lib/tool-calls.ts`, "Ran 2 commands, read 1 file") and a chevron pointing right. The line starts folded. A click opens, under the line, a box with a border and round corners holding one line per step, in the order they happened, and turns the chevron to point down; a click on the line again folds the box away.
 
 ### A lone call is its own line
 

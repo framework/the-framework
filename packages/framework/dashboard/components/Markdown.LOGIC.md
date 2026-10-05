@@ -13,7 +13,7 @@ Renders the markdown agents [1] write — the project's surfaced `PLAN`/`TODO` d
 
 - **Blocks** - headings, bullet lists, task lists with read-only checkboxes, fenced code blocks (also when the fence is never closed), pipe tables, and paragraphs for everything else.
 - **Inline spans** - inline code, `[text](url)` links, bold, italic and bare URLs, applied left to right without overlap; code wins, so a URL inside backticks stays literal.
-- **Only safe links** - a link renders only for an `http`/`https` target and opens in a new tab without a referrer; any other target stays plain text.
+- **Only safe links** - a link renders only for an `http`/`https` target and opens in a new tab without a referrer; a link to a file path is the link's text as inline code, with the path as its hover text, and no link; any other target stays plain text.
 - **Compact** - the compact form uses smaller text and smaller headings.
 
 ## Business logic
@@ -53,7 +53,7 @@ See `## Context`.
 
 #### Business logic
 
-A link renders only when its target starts with `http://` or `https://`; a `[text](url)` with any other target (such as `javascript:`) is left as plain text. Every link opens in a new tab and sends no referrer.
+A link renders only when its target starts with `http://` or `https://`; a `[text](target)` whose target is a file path (it names no scheme: `/repo/PLAN.md`, `src/a.ts`) is not a link, since a browser cannot open a file: it shows the text as inline code, with the path as its hover text. A `[text](url)` with any other target (such as `javascript:`) is left as plain text, as typed. Every link opens in a new tab and sends no referrer.
 
 ### Compact
 

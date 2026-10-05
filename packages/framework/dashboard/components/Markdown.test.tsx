@@ -39,9 +39,20 @@ describe('Markdown links (#948)', () => {
     expect(screen.getByRole('link', { name: 'https://example.com/app' })).toBeTruthy()
   })
 
+  test('a link to a file path is the file\'s name as code, with the path on hover, and no link', () => {
+    render(<Markdown text={'Added [PROJECT.md](/Users/me/repo/PROJECT.md) and [the test](src/a.test.ts).'} />)
+    expect(screen.queryByRole('link')).toBeNull()
+    const name = screen.getByText('PROJECT.md')
+    expect(name.tagName).toBe('CODE')
+    expect(name.getAttribute('title')).toBe('/Users/me/repo/PROJECT.md')
+    expect(screen.getByText('the test').getAttribute('title')).toBe('src/a.test.ts')
+    expect(document.body.textContent).toContain('Added PROJECT.md and the test.')
+  })
+
   test('a javascript: target stays plain text', () => {
     render(<Markdown text={'[click](javascript:alert(1))'} />)
     expect(screen.queryByRole('link')).toBeNull()
+    expect(document.body.textContent).toContain('[click](javascript:alert(1))')
   })
 
   test('a URL inside backticks stays literal code', () => {

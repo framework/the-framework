@@ -172,6 +172,12 @@ export interface ModulePanelProps {
    * the project's own page.
    */
   activity?: number
+  /**
+   * On a tab that lists what a run changed (`changes`): the changed file a click in the chat
+   * asked to see, by its path in the run's checkout. `at` tells one ask from the next for the
+   * same file. Absent until a file is asked for.
+   */
+  reveal?: { path: string; at: number }
   context: ModuleContext
 }
 
@@ -189,6 +195,11 @@ export interface ModulePanel {
   help: string
   /** A count shown on the tab beside its label; none when absent or 0. */
   count?(props: ModulePanelProps): number
+  /**
+   * This tab lists what a run changed. The chat's row of a changed file then opens the side panel
+   * on it, and hands it the file as `reveal`. Without such a tab, those rows open nothing.
+   */
+  changes?: true
   /** The tab's contents. */
   Panel: ComponentType<ModulePanelProps>
 }

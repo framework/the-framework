@@ -26,6 +26,7 @@ export function AgentFeed({
   doing,
   setup,
   onOpenAgent,
+  onOpenChange,
 }: {
   events: FrameworkEvent[]
   /** The feed's own project: with it, an answered question is its ✓ card and an open one is no
@@ -55,6 +56,8 @@ export function AgentFeed({
   /** What was set up for the agent before it began: the chat's "Session set up" line. */
   setup?: SessionSetup | undefined
   onOpenAgent?: ((agentId: string) => void) | undefined
+  /** Show a changed file's change: a click on a file's row at the end of a turn. */
+  onOpenChange?: ((path: string) => void) | undefined
 }) {
   const lostBanner = lost && (
     <div role="status" className="flex items-center gap-2 border-b border-border bg-warning/10 px-4 py-2 text-xs text-warning">
@@ -89,6 +92,7 @@ export function AgentFeed({
         {...(doing ? { doing } : {})}
         setup={setup}
         onOpenAgent={onOpenAgent}
+        onOpenChange={onOpenChange}
       />
     </>
   )

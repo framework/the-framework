@@ -301,3 +301,66 @@ describe('RightRail open and closed', () => {
     await waitFor(() => expect(container.querySelector('aside')).toBeNull())
   })
 })
+
+// The row of a changed file in the chat asks for the file (`lib/reveal-change.ts`).
+describe('RightRail, a changed file asked for from the chat', () => {
+  const CHANGES: MountedPanel = {
+    id: 'changes',
+    label: 'Changes',
+    help: 'What changed',
+    changes: true,
+    Panel: (props: ModulePanelProps) => <div>changes: {props.reveal?.path ?? 'none asked'}</div>,
+    package: '@gemstack/files',
+    projects: ['p1'],
+  }
+
+  test('the ask opens a closed panel on the tab that lists changes and hands it the file; the other tabs are handed none', async () => {
+    const { revealChange, forgetRevealedChanges } = await import('../lib/reveal-change.js')
+    forgetRevealedChanges()
+    localStorage.removeItem('fw.side-panel')
+    render(<RightRail {...baseProps} />, [FILES, CHANGES])
+    expect(screen.queryByRole('tablist')).toBeNull()
+    act(() => revealChange('p1/r1', 'src/app.ts'))
+    await waitFor(() => expect(screen.getByText('changes: src/app.ts')).toBeTruthy())
+    expect(screen.getByRole('tab', { name: 'Changes' }).getAttribute('aria-selected')).toBe('true')
+    shown.mockClear()
+    fireEvent.click(screen.getByRole('tab', { name: /Files/ }))
+    expect(shown).toHaveBeenCalled()
+    expect(shown.mock.calls.every(([props]) => props.reveal === undefined)).toBe(true)
+  })
+
+  test('a tab picked by hand after the ask stays; a second ask for the same file shows the changes again', async () => {
+    const { revealChange, forgetRevealedChanges } = await import('../lib/reveal-change.js')
+    forgetRevealedChanges()
+    render(<RightRail {...baseProps} />, [FILES, CHANGES])
+    act(() => revealChange('p1/r1', 'src/app.ts'))
+    await waitFor(() => expect(screen.getByText('changes: src/app.ts')).toBeTruthy())
+    fireEvent.click(screen.getByRole('tab', { name: /Files/ }))
+    expect(screen.getByText('files')).toBeTruthy()
+    act(() => revealChange('p1/r1', 'src/app.ts'))
+    await waitFor(() => expect(screen.getByText('changes: src/app.ts')).toBeTruthy())
+  })
+
+  test('an ask made on another agent\'s page is not this page\'s', async () => {
+    const { revealChange, forgetRevealedChanges } = await import('../lib/reveal-change.js')
+    forgetRevealedChanges()
+    render(<RightRail {...baseProps} />, [FILES, CHANGES])
+    act(() => revealChange('p1/other', 'src/app.ts'))
+    fireEvent.click(screen.getByRole('tab', { name: 'Changes' }))
+    expect(screen.getByText('changes: none asked')).toBeTruthy()
+  })
+
+  test('an ask moves the rail once: met again on coming back to its page, it does not undo a tab picked by hand', async () => {
+    const { revealChange, forgetRevealedChanges } = await import('../lib/reveal-change.js')
+    forgetRevealedChanges()
+    localStorage.setItem('fw.side-panel', JSON.stringify(['p1/r1', 'p1/r2']))
+    const { rerender } = render(<RightRail {...baseProps} />, [FILES, CHANGES])
+    act(() => revealChange('p1/r1', 'src/app.ts'))
+    await waitFor(() => expect(screen.getByText('changes: src/app.ts')).toBeTruthy())
+    fireEvent.click(screen.getByRole('tab', { name: /Files/ }))
+    rerender(<RightRail {...baseProps} agentId="r2" />)
+    rerender(<RightRail {...baseProps} />)
+    await act(async () => {})
+    expect(screen.getByRole('tab', { name: /Files/ }).getAttribute('aria-selected')).toBe('true')
+  })
+})

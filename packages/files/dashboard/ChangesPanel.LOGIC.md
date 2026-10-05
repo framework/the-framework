@@ -10,6 +10,8 @@ The Changes tab the Files module [4] adds to the side rail: only the files that 
 
 **User story**: on the project's own page, the user sees which files of the project's folder are changed and not committed.
 
+**User story**: at the end of a turn, the agent's chat lists the files the turn's edits changed, a row each. The user clicks one: the side rail opens on the Changes tab with that file picked, and its diff beside the list.
+
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
@@ -24,6 +26,7 @@ The Changes tab the Files module [4] adds to the side rail: only the files that 
 - **One row per file** - in a column on the left: the file's path and, under it, "new", "modified" or "deleted", with "· not committed" for a change that is only on disk; a click picks the file.
 - **The commits** - on an agent's page, under the list of files: "All changes", picked at first, then one row per commit of the agent's work, newest first; a click on a commit shows that commit alone: its files in the list, its own diff on the right, and its short id and subject where the caption was.
 - **The picked file's diff** - on the right of the list, the diff of one file: the file the user clicked, or the first of the list while none was clicked or once the clicked file has left the list; only that file's diff is read.
+- **A file asked for from the chat** - the file a click in the agent's chat asked to see is picked as a click on its row in "All changes" is, once per ask: a picked commit gives way, a click made in the list afterwards stands, a file named by its whole path on disk is the listed file that path ends with, and a file the list does not hold leaves the first file picked.
 
 ## Business logic
 
@@ -82,7 +85,7 @@ With an agent [1] selected, the tab reads the commits of the agent's work from t
 
 When the agent has at least one commit, a section named "Commits" sits at the bottom of the left column, under the list of files. It shows the word "Commits" and the number of commits, then its rows; it takes at most 45% of the column's height and scrolls by itself. An agent with no commit has no such section. The rows:
 
-- "All changes", first, picked until the user clicks a commit;
+- "All changes", first, picked until the user clicks a commit, and again when a file is asked for from the chat (see "A file asked for from the chat");
 - one row per commit, newest first: the commit's subject, cut with an ellipsis and shown whole on hover, and under it the short id, the author's name and how long ago it was committed ("bbbbbbb · Agent · 2h ago").
 
 A click on a commit picks it, and the tab then shows that commit alone:
@@ -109,8 +112,29 @@ A picked commit holds only while it is one of the agent's commits as last read, 
 Exactly one file of the list is picked:
 
 - while the user has clicked no row, the first file of the list;
-- once the user clicked a row, that file, for as long as it is in the list;
+- once the user clicked a row, that file, for as long as it is in the list; a file asked for from the chat counts as a click on its row (see "A file asked for from the chat");
 - when the clicked file leaves the list (the agent undid its change), the first file of the list again;
 - a click counts for the list it was made in: on another agent's page, and after another commit or "All changes" is picked, the first file of the list then shown is picked, also when that list holds the same path.
 
 The rest of the tab's width, on the right of the list, shows the picked file's diff in the preview card's body (`FilePreview.tsx`): the path and the lines added and removed, then the diff, read for the selected agent (in the picked commit alone, when a commit is picked), or for the project's checkout when none is selected, and read again every 5 seconds. This area scrolls by itself. Only the picked file's diff is read, so the tab costs one diff read however many files the list holds. When another file or another commit is picked, the area starts over with "Reading the diff…": a diff still being read is never shown under another file's or commit's name. When the list is empty, the area holds one line instead (see "An agent's changes" and "The commits").
+
+### A file asked for from the chat
+
+#### Context
+
+See the user story on the agent's chat in `## Context`.
+
+**Business logic story**: the tab declares to the dashboard that it lists what a run changed (`index.tsx`). The dashboard then hands it the changed file a click in the agent's chat asked to see: its path in the agent's checkout [2], and a number that grows with each ask. The dashboard hands the last ask of the agent's page again each time it draws the tab.
+
+**Problem**: the last ask is handed again every time the tab is drawn. Taken each time, it would pick its file again over every click the user makes in the list, and again when the tab is closed and opened later.
+
+#### Business logic
+
+Each ask is taken once, by its number: an ask whose number is not above the last one taken, by this tab or by one drawn before it, is not taken. So a tab opened again later, still handed the same ask, picks the first file of its list as any tab does.
+
+Taking an ask does what two clicks do:
+
+- "All changes" is picked, so a picked commit gives way and the list is everything the agent changed;
+- the file asked for is the clicked file of that list, on this agent's page: its row is highlighted and its diff is the one read.
+
+After that the rules of "The picked file's diff" hold as for any click: a click the user makes in the list afterwards stands, the same ask not being taken again; a new ask, also for the same file, picks its file again; and while the list does not hold the file asked for (the agent undid its change, or the file is outside the agent's checkout), the first file of the list is picked.

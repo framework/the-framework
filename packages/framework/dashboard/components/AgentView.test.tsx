@@ -445,6 +445,45 @@ describe('the feed fills in one step (first visit)', () => {
   })
 })
 
+describe('a changed file\'s row in the chat', () => {
+  const WS = '/repo/.branches/agent-1'
+  const events = [
+    { kind: 'driver', event: { type: 'start', prompt: 'go' } },
+    { kind: 'driver', event: { type: 'action', label: 'Edit', detail: `${WS}/docs/A.md`, id: 'c1' } },
+    { kind: 'driver', event: { type: 'output', id: 'c1', text: 'ok', changed: [{ path: `${WS}/docs/A.md`, added: 2, removed: 1 }] } },
+    { kind: 'driver', event: { type: 'text', text: 'Done.' } },
+    { kind: 'end', ok: true },
+  ] as FrameworkEvent[]
+  const withPanels = (ui: ReactNode, panels: MountedModules['panels']) => {
+    const modules: MountedModules = { pages: [], cards: [], linkActions: [], panels, runSlots: [], settings: [], loaded: true }
+    return <ModulesContext.Provider value={modules}>{ui}</ModulesContext.Provider>
+  }
+  const panel = (over: object) => ({ id: 'changes', label: 'Changes', help: '', Panel: () => null, package: '@gemstack/files', projects: ['p1'], ...over })
+
+  test('with a tab that lists changes, a click opens this agent\'s side panel and asks for the file by its path in the checkout', async () => {
+    const { useRevealedChange, forgetRevealedChanges } = await import('../lib/reveal-change.js')
+    forgetRevealedChanges()
+    localStorage.removeItem('fw.side-panel')
+    const Asked = () => <span data-testid="asked">{useRevealedChange('p1/run-1')?.path ?? ''}</span>
+    onAgent.mockResolvedValue(events)
+    render(withPanels(<>{view({ events, card: { status: 'done', workspace: WS } })}<Asked /></>, [panel({ changes: true as const })]))
+    fireEvent.click(await screen.findByRole('button', { name: 'Show the change to A.md' }))
+    expect(screen.getByTestId('asked').textContent).toBe('docs/A.md')
+    expect(JSON.parse(localStorage.getItem('fw.side-panel') ?? '[]')).toEqual(['p1/run-1'])
+  })
+
+  test('with no such tab, or one of another project, the row is there and is no button', async () => {
+    onAgent.mockResolvedValue(events)
+    const { unmount } = render(withPanels(view({ events, card: { status: 'done', workspace: WS } }), [panel({})]))
+    expect((await screen.findByRole('list', { name: 'Files changed' })).textContent).toBe('A.md+2 −1')
+    expect(screen.queryByRole('button', { name: 'Show the change to A.md' })).toBeNull()
+    unmount()
+    render(withPanels(view({ events, card: { status: 'done', workspace: WS } }), [panel({ changes: true as const, projects: ['p2'] })]))
+    await screen.findByRole('list', { name: 'Files changed' })
+    expect(screen.queryByRole('button', { name: 'Show the change to A.md' })).toBeNull()
+  })
+})
+
 describe('what the modules add to a run’s page (#817)', () => {
   const Summary = ({ agentId, working }: ModuleRunProps) => <span>summary {agentId} {String(working)}</span>
   const withSlots = (ui: ReactNode, projects = ['p1']) => {

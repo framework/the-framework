@@ -266,9 +266,8 @@ describe('StartAgentForm (#1774)', () => {
     expect(above.querySelector('button')).toBeNull()
     // Cut short with an ellipsis where the row is too narrow for it.
     expect(screen.getByText('gemstack').className).toContain('truncate')
-    // The heading stays, above the chips.
-    const heading = screen.getByText('Start an agent')
-    expect(heading.compareDocumentPosition(above) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // No heading over the chips: the page is laid out as an agent's chat, whose box has none.
+    expect(screen.queryByText('Start an agent')).toBeNull()
   })
 
   test('until the project\'s name is known there is no project chip, and the row of chips is asked for all the same', () => {

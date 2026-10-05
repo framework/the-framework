@@ -6,18 +6,14 @@ import { AgentOverview } from './AgentOverview.js'
 import { OpenQuestions } from './OpenQuestions.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
-// The project home / launcher — what "Live" selects. Always the Start form + the current stack
-// overview; it is never consumed by an agent. Starting one appends an agent to
-// the rail and adds that agent's own view (AgentView) alongside — this page stays put, so you can
-// launch again. (Actually running several at once lands with git worktrees, #453.)
+// The project home / launcher: the "New agent" page. It is never consumed by an agent: starting
+// one appends an agent to the rail and adds that agent's own view (AgentView) alongside, and this
+// page stays put, so you can launch again.
 //
-// Below the form, the sections (#1455): every session's open questions in one answerable
-// place (item 4 + bonuses 1/2 — the launcher's main event now that tickets are gone). The
-// project's Docs are not here: they are the side panel's "Docs" tab (RightRail), on this page
-// as on an agent's. The tickets section
-// (item 5) was REMOVED on the maintainer's call: the /tickets page is the one clear path
-// to the backlog, and 67 open tickets pushed everything else below the fold. All the
-// sections can be tall, which is why the whole column scrolls.
+// It is laid out as an agent's page is. The agents that wait for an answer are rows at the top, in
+// the chat's column (#1455 item 4), and the box to start an agent is at the bottom, where an agent's
+// message box is. The project's Docs are not here: they are the side panel's "Docs" tab
+// (RightRail), on this page as on an agent's.
 export function ProjectHome({
   projectId,
   projectName,
@@ -52,11 +48,20 @@ export function ProjectHome({
   errors?: ProjectError[] | undefined
 }) {
   return (
-    <ScrollArea className="min-h-0 flex-1">
+    <>
       <ProjectActions projectId={projectId} projectName={projectName} />
-      {/* Above the start form, because an agent started on a project whose agent-data branch cannot
+      {/* Above everything, because an agent started on a project whose agent-data branch cannot
           reach origin (#1599) works from stale tickets and a queue nobody else will see. */}
       <ProjectErrorBanner errors={errors} />
+      {/* Laid out as an agent's page is: what waits for the person fills the page from the top, in
+          the chat's column, and scrolls there; the box to start an agent stays at the bottom, in
+          the place and at the width of an agent's message box. */}
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="mx-auto w-full max-w-3xl">
+          {events.length > 0 && <AgentOverview events={events} />}
+          <OpenQuestions projectId={scope} onOpenAgent={onOpenAgent} />
+        </div>
+      </ScrollArea>
       <StartAgentForm
         projectId={projectId}
         projectName={projectName}
@@ -67,8 +72,6 @@ export function ProjectHome({
         removeContext={removeContext}
         toggleContext={toggleContext}
       />
-      {events.length > 0 && <AgentOverview events={events} />}
-      <OpenQuestions projectId={scope} onOpenAgent={onOpenAgent} />
-    </ScrollArea>
+    </>
   )
 }

@@ -147,8 +147,9 @@ export function StartAgentForm({
   }
 
   return (
-    <form onSubmit={e => e.preventDefault()} className="p-3">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Start an agent</div>
+    // The width and the padding of an agent's message box (`AgentComposer.tsx`): the box is in the
+    // same place on both pages.
+    <form onSubmit={e => e.preventDefault()} className="mx-auto w-full max-w-3xl p-2">
       <Composer
         ref={composerRef}
         files={files}

@@ -116,7 +116,7 @@ export function App() {
   const [agentStart, setAgentStart] = useState<{ tick: number; intent: string; id: string | null; projectId: string | null; runsOn?: string }>({ tick: 0, intent: '', id: null, projectId: null })
   // The agents of the project on screen, for its pages, or of the picked project, for the sidebar:
   // the same project whenever both are set.
-  const { agents: agents, reload, loaded: agentsLoaded } = useAgents(projectId ?? scope)
+  const { agents: agents, reload, loaded: agentsLoaded } = useAgents(projectId ?? scope, agentStart.id !== null && agentStart.projectId === (projectId ?? scope) ? agentStart.id : null)
 
   // The Context set lives in the shell (#492/#504) so the two surfaces that feed it share one
   // source of truth: the launcher's `@`/`#` chips and Context picker, and the right rail's file tree.

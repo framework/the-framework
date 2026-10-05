@@ -549,7 +549,7 @@ export function EventList({
   const settingUp = setup !== undefined && working && !written && starting && unfolded.filter(isTurnBoundary).length === 1
   const setupRow = setup !== undefined && (
     <MessageScrollerItem key="setup" messageId="setup" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 empty:hidden">
-      <SessionLine setup={setup} {...(settingUp ? { live: { since: unfolded[unfolded.length - 1]?.at } } : {})} />
+      <SessionLine setup={setup} working={working} {...(settingUp ? { live: { since: unfolded[unfolded.length - 1]?.at } } : {})} />
     </MessageScrollerItem>
   )
   return (

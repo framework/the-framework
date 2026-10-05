@@ -87,4 +87,50 @@ describe('useAgents', () => {
     await settle(2000)
     expect(result.current.agents).toEqual(agents('a1')) // and no unhandled rejection
   })
+
+  test('an agent just started is read every 400ms until its card names its branch, then every 2s again', async () => {
+    onAgents.mockResolvedValue([])
+    renderHook(() => useAgents('a', 'new'))
+    await settle()
+    expect(onAgents).toHaveBeenCalledTimes(1)
+    // Not in the list yet.
+    await settle(400)
+    expect(onAgents).toHaveBeenCalledTimes(2)
+    // Its card is there, with no branch: its checkout is being made.
+    onAgents.mockResolvedValue([{ id: 'new', status: 'running' } as AgentMeta])
+    await settle(400)
+    await settle(400)
+    expect(onAgents).toHaveBeenCalledTimes(4)
+    // The card names the branch: set up.
+    onAgents.mockResolvedValue([{ id: 'new', status: 'running', branch: 'agent-new' } as AgentMeta])
+    await settle(400)
+    const read = onAgents.mock.calls.length
+    await settle(1200)
+    expect(onAgents.mock.calls.length - read).toBeLessThanOrEqual(1)
+  })
+
+  test('an agent that ended without a branch is not read more often', async () => {
+    onAgents.mockResolvedValue([{ id: 'new', status: 'failed' } as AgentMeta])
+    renderHook(() => useAgents('a', 'new'))
+    await settle()
+    await settle(1900)
+    expect(onAgents).toHaveBeenCalledTimes(1)
+  })
+
+  test('the quicker reads stop after 30s for an agent that never names a branch', async () => {
+    onAgents.mockResolvedValue([{ id: 'new', status: 'running' } as AgentMeta])
+    renderHook(() => useAgents('a', 'new'))
+    await settle(30_000)
+    const read = onAgents.mock.calls.length
+    await settle(4000)
+    expect(onAgents.mock.calls.length - read).toBe(2)
+  })
+
+  test('with no agent just started, nothing is read more often', async () => {
+    onAgents.mockResolvedValue([])
+    renderHook(() => useAgents('a'))
+    await settle()
+    await settle(1900)
+    expect(onAgents).toHaveBeenCalledTimes(1)
+  })
 })

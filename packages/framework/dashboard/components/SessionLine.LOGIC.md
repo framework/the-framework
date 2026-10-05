@@ -17,7 +17,7 @@ Draws the line of an agent's [1] transcript that says what is set up for the age
 - **One moving line while the session is being set up** - moving dots, the step going on now ("Starting session", "Making the checkout", "Starting Claude Code") and the seconds since the prompt; no chevron, nothing to open.
 - **One folded line** - once set up, "Session set up" with a chevron; a click opens a bordered box, a click again folds it.
 - **What the box says** - a row with a green check per step that was done: the checkout's folder, the branch, the coding agent and its model; and a sentence naming the branch the agent was started from when its card [3] names one; a fact the card does not say is no line.
-- **Nothing known, nothing drawn** - once set up, a card that says none of the three draws no line at all.
+- **Nothing known: plain words for an agent at work, else nothing** - once set up, a card that says none of the three draws the words "Session set up" with nothing to open for an agent at work on this machine, and no line at all otherwise.
 
 ## Business logic
 
@@ -68,12 +68,19 @@ The box holds up to four lines, in this order. Three are a step that was done: a
 - "Started from the branch <name>, not from the main branch.", the name in the dark text color, the sentence cut with an ellipsis when it does not fit and the name whole in a tooltip, when the card names the branch the agent was told to start from (`base`). The tool that starts an agent writes it only for an agent told where to start: one started from the launcher's "My local branch" option, and a subagent, which starts from its main agent's branch. An agent started from the project's main branch has no such line;
 - "Started Claude Code": "Started" and the coding agent's [2] name ("Claude Code", "Codex"; a coding agent the dashboard has no name for reads as the card names it), followed by the model when the card says one. The model reads by the name its coding agent lists it under ("Opus 5.5"), and by its id while that list is not known or does not hold it (the naming rule in `lib/models.ts`).
 
-### Nothing known, nothing drawn
+### Nothing known: plain words for an agent at work, else nothing
 
 #### Context
 
 **Problem**: a card just listed may say nothing yet, and an agent whose card is not listed has no facts at all. A line that opens to an empty box would say something was set up and show nothing.
 
+**Problem**: the agent's first row can reach the transcript before its card was read. A line drawn only once the card says something landed a moment after that row, pushing it down.
+
 #### Business logic
 
-Once the session is set up, when the card says neither a checkout, nor a branch, nor a coding agent, the component draws nothing. While the session is being set up, the moving line is drawn whatever the card says.
+Once the session is set up, when the card says neither a checkout, nor a branch, nor a coding agent:
+
+- for an agent at work, as the transcript says (`EventList.tsx`), that does not run elsewhere, the component draws the words "Session set up", grey, in the page's own font, with no chevron: it is no button and opens nothing. The agent's first row is there, so its session was set up. When the card says one of the three, the words become the folded line, a button, in place;
+- for an agent that runs elsewhere (on GitHub Actions, in the cloud, on another device), whose card may never say any of the three, and for an agent not at work, the component draws nothing.
+
+While the session is being set up, the moving line is drawn whatever the card says.

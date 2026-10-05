@@ -149,7 +149,8 @@ export function AgentView({
   const subagent = card?.parent !== undefined
   // What was set up for the agent before it began, off its card: the chat's "Session set up" line.
   const { workspace, branch, base, driver, model } = card ?? {}
-  const elsewhere = target !== undefined && target !== 'local'
+  // An agent just started on a device has no card listed yet: the device's name says where it runs.
+  const elsewhere = (target !== undefined && target !== 'local') || remoteLabel !== undefined
   const setup = useMemo(() => ({ workspace, branch, base, driver, model, elsewhere }), [workspace, branch, base, driver, model, elsewhere])
   const [open, setOpen] = useState(false)
   // What the installed modules add to this run's page: a summary in the bar above the message box.

@@ -372,6 +372,12 @@ describe('EventList session line', () => {
     expect(screen.getAllByRole('status').map(n => n.textContent)).toEqual(['Starting…'])
   })
 
+  test('the agent\'s first row came before its card was read: the line is there with that row, not after it', () => {
+    render(<EventList events={[prompt, said]} setup={{}} working stick={false} />)
+    expect(ids()).toEqual(['0', 'setup', '1', 'working'])
+    expect(screen.getByText('Session set up')).toBeTruthy()
+  })
+
   test('with no setup given there is no line', () => {
     render(<EventList events={[prompt, said]} stick={false} />)
     expect(screen.queryByText('Session set up')).toBeNull()

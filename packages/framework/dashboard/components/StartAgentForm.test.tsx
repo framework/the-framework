@@ -101,6 +101,17 @@ describe('StartAgentForm (#1774)', () => {
     expect(start).toHaveBeenCalledWith('p1', 'do the thing', { driver: 'codex', model: 'gpt-5' })
   })
 
+  test('while the start is asked for, the form says "Starting session", the chat\'s own first line, and nothing once it answers', async () => {
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
+    let answer!: (result: { agentId: string }) => void
+    start.mockReturnValue(new Promise(resolve => (answer = resolve)))
+    render(<StartAgentForm {...props} />)
+    fireEvent.click(screen.getByText('submit-typed'))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Starting session'))
+    answer({ agentId: 'r1' })
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
+  })
+
   test('the publish options: Nothing until the person picks, and then no level is handed to the start hook; a saved pick is shown and handed over; a change writes the saved setting', async () => {
     onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
     start.mockResolvedValue({ agentId: 'r1' })

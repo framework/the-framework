@@ -15,6 +15,10 @@ import { ContextMenu } from './ContextMenu.js'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { StartFromMenu, type StartFrom } from './StartFromMenu.js'
 import { Chip } from './ui/chip.js'
+import { Dots } from './ToolCalls.js'
+
+/** The note while the start is asked for: what the chat's first line says next. */
+const STARTING = 'Starting session'
 
 // Start a run in the selected project (#405, #1774): a free-text box, where `/` lists the project's
 // commands, and Start, which is the project's own start hook (posted over `sendStart`). The editor +
@@ -124,7 +128,7 @@ export function StartAgentForm({
 
   const submit = async (text: string) => {
     if (busy) return
-    setNote('Starting…')
+    setNote(STARTING)
     const result = await start(projectId, promptWithContext(text, context), {
       ...startPicks({ ...preferences, publish: publishPick }),
       ...cleanupPick(preferences, commands),
@@ -203,7 +207,16 @@ export function StartAgentForm({
 
       {/* Feedback right where the action is (#948). */}
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
-      {note && !error && <p role="status" className="mt-2 text-xs text-muted-foreground">{note}</p>}
+      {note === STARTING && !error ? (
+        // The chat's own first line (`SessionLine.tsx`), in its words and its look: the page that
+        // opens a moment later goes on saying it.
+        <p role="status" className="mt-2 flex items-center gap-2 px-1.5 text-sm text-muted-foreground">
+          <Dots />
+          <span className="text-shimmer">{note}</span>
+        </p>
+      ) : (
+        note && !error && <p role="status" className="mt-2 text-xs text-muted-foreground">{note}</p>
+      )}
       {readiness?.problems.map(problem => (
         <p key={problem} role="alert" className="mt-2 text-xs text-danger">
           {problem}

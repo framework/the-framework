@@ -77,3 +77,37 @@ export function callArgument(argument: string | undefined): { detail?: string; w
   const whole = cutOutput(argument.trim())
   return whole === detail ? { detail } : { detail, whole }
 }
+
+/** How many lines a text holds: a last line with no line break counts, an empty text holds none. */
+export function lineCount(text: string): number {
+  if (text === '') return 0
+  return text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
+}
+
+/**
+ * The lines a patch adds and removes, off the lines of its hunks: one that starts with `+` is
+ * added, one with `-` removed, whatever the rest of it is (a removed `-- note` reads `--- note`).
+ * The file headers of a unified diff are no hunk's lines: {@link hunkLines} leaves them out.
+ */
+export function patchSize(lines: readonly string[]): { added: number; removed: number } {
+  let added = 0
+  let removed = 0
+  for (const line of lines) {
+    if (line.startsWith('+')) added++
+    else if (line.startsWith('-')) removed++
+  }
+  return { added, removed }
+}
+
+/**
+ * The lines of a unified diff's hunks: all that follows its first `@@` line. What is before it is
+ * the diff's file headers (`--- a/x`, `+++ b/x`), which read like a removed and an added line.
+ * `undefined` for a text that is no unified diff: one whose first line is neither a hunk's `@@`
+ * nor a header.
+ */
+export function hunkLines(diff: string): string[] | undefined {
+  const lines = diff.split('\n')
+  if (!/^(@@|--- |\+\+\+ |diff |index )/.test(lines[0] ?? '')) return undefined
+  const first = lines.findIndex(line => line.startsWith('@@'))
+  return first === -1 ? undefined : lines.slice(first)
+}

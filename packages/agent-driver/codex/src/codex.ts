@@ -2,7 +2,7 @@ import { execFile, spawn as nodeSpawn } from 'node:child_process'
 import { copyFile, lstat, mkdir, readlink, readdir, realpath, rename, rm, stat, symlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, oneLine, cutOutput, callArgument, checkCliReady, type AgentCliParser, type CliIo, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverModel, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
+import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, oneLine, cutOutput, callArgument, lineCount, patchSize, hunkLines, checkCliReady, type AgentCliParser, type CliIo, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type FileChange, type DriverModel, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /**
  * Codex's sandbox policy for the shell commands the model writes.
@@ -328,6 +328,26 @@ function codexArgument(item: Record<string, unknown>): string | undefined {
   return undefined
 }
 
+/**
+ * One file of a Codex change: its path, its kind (`add`, `delete`, `update`, as a word or as
+ * `{ type }`) and its `diff`. A changed file's diff is a patch, whose `+` and `-` lines are
+ * counted. An added or a deleted file's diff is the file's content when it is no patch: every
+ * line of it is added, or removed. A change with no path says nothing.
+ */
+function codexFileChange(raw: unknown): FileChange[] {
+  if (typeof raw !== 'object' || raw === null) return []
+  const change = raw as Record<string, unknown>
+  const path = change['path']
+  if (typeof path !== 'string') return []
+  const kindOf = change['kind']
+  const kind = typeof kindOf === 'string' ? kindOf : typeof kindOf === 'object' && kindOf !== null ? (kindOf as Record<string, unknown>)['type'] : undefined
+  const diff = typeof change['diff'] === 'string' ? change['diff'] : ''
+  const hunks = hunkLines(diff)
+  if (kind === 'add') return [{ path, added: hunks ? patchSize(hunks).added : lineCount(diff), removed: 0, created: true }]
+  if (kind === 'delete') return [{ path, added: 0, removed: hunks ? patchSize(hunks).removed : lineCount(diff) }]
+  return [{ path, ...patchSize(hunks ?? []) }]
+}
+
 /** The one turn a {@link CodexAppServerParser} asks for. */
 export interface CodexTurnRequest {
   /** The prompt. */
@@ -517,10 +537,17 @@ export class CodexAppServerParser implements AgentCliParser {
     if (NOT_TOOLS.has(type)) return []
     const id = item['id']
     if (!completed) return [{ type: 'action', label: type, ...callArgument(codexArgument(item)), ...(typeof id === 'string' ? { id } : {}) }]
+    if (typeof id !== 'string') return []
+    // A change to files that finished reports each file and its patch. A change that did not go
+    // through changed none.
+    if (Array.isArray(item['changes'])) {
+      const changed = item['status'] === 'failed' || item['status'] === 'declined' ? [] : item['changes'].flatMap(codexFileChange)
+      return changed.length > 0 ? [{ type: 'output', id, text: '', changed }] : []
+    }
     // A command that finished reports all it printed, and its exit code. Other tools report neither.
     const printed = item['aggregatedOutput']
     const exitCode = item['exitCode']
-    if (typeof id !== 'string' || typeof printed !== 'string') return []
+    if (typeof printed !== 'string') return []
     const text = cutOutput(printed)
     const failed = typeof exitCode === 'number' && exitCode !== 0
     if (text === '' && !failed) return []

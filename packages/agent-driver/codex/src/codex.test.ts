@@ -514,6 +514,54 @@ test('CodexDriver.listModels asks `codex debug models`, and says why when Codex 
   await assert.rejects(new CodexDriver({ spawn: fakeSpawn([], undefined, 1) }).listModels(), /`codex debug models` failed \(code 1\)/)
 })
 
+test('a Codex change to files that finished says each file it changed: lines added and removed, and the files it made', async () => {
+  const events: DriverEvent[] = []
+  const change = (id: string, changes: unknown[], status = 'completed') => item(false, { type: 'fileChange', id, changes, status })
+  // Its headers are no lines of the file; a removed `-- note` and an added `++i;` are.
+  const patch = '--- a/x.txt\n+++ b/x.txt\n@@ -1,4 +1,5 @@\n one\n-two\n--- note\n+TWO\n+two and a half\n+++i;\n three\n'
+  const turn = [
+    // A changed file's diff is a patch; an added file's is its content, or a patch; a deleted file's the same.
+    change('fc_1', [
+      { path: '/ws/x.txt', kind: { type: 'update', move_path: null }, diff: patch },
+      { path: '/ws/new.txt', kind: { type: 'add' }, diff: 'one\ntwo\nthree\n' },
+      { path: '/ws/new2.txt', kind: 'add', diff: '@@ -0,0 +1,2 @@\n+a\n+b\n' },
+      { path: '/ws/gone.txt', kind: { type: 'delete' }, diff: 'bye\nbye\n' },
+      // An added file whose own content holds a line like a hunk's is content all the same.
+      { path: '/ws/new.diff', kind: 'add', diff: 'notes\n@@ -1 +1 @@\n+x\n' },
+      { path: '/ws/gone2.txt', kind: 'delete', diff: '@@ -1 +0,0 @@\n-bye\n' },
+      // No diff given: the file is named, with no size. No path: nothing to name.
+      { path: '/ws/bare.txt', kind: 'update' },
+      { kind: 'add', diff: 'x' },
+      'not a change',
+    ]),
+    // A change that did not go through changed nothing; neither does one still going on.
+    change('fc_2', [{ path: '/ws/no.txt', kind: 'add', diff: 'x\n' }], 'failed'),
+    change('fc_3', [{ path: '/ws/no.txt', kind: 'add', diff: 'x\n' }], 'declined'),
+    item(true, { type: 'fileChange', id: 'fc_4', changes: [{ path: '/ws/later.txt', kind: 'add', diff: 'x\n' }], status: 'inProgress' }),
+    item(false, { type: 'agentMessage', id: 'msg_1', text: 'Done', phase: 'final_answer' }),
+    completed('completed'),
+  ]
+  const session = await new CodexDriver({ spawn: fakeAppServer({ turn }) }).start({ cwd: '/ws', onEvent: e => events.push(e) })
+  await session.prompt('go')
+  assert.deepEqual(events.filter(e => e.type === 'output'), [
+    {
+      type: 'output',
+      id: 'fc_1',
+      text: '',
+      changed: [
+        { path: '/ws/x.txt', added: 3, removed: 2 },
+        { path: '/ws/new.txt', added: 3, removed: 0, created: true },
+        { path: '/ws/new2.txt', added: 2, removed: 0, created: true },
+        { path: '/ws/gone.txt', added: 0, removed: 2 },
+        { path: '/ws/new.diff', added: 3, removed: 0, created: true },
+        { path: '/ws/gone2.txt', added: 0, removed: 1 },
+        { path: '/ws/bare.txt', added: 0, removed: 0 },
+      ],
+    },
+  ])
+  await session.dispose()
+})
+
 test('a Codex command that finished says what it printed and its exit code, for the id of its call', async () => {
   const events: DriverEvent[] = []
   const command = (id: string, done: Record<string, unknown> | undefined) => item(done === undefined, { type: 'commandExecution', id, command: '/bin/zsh -lc "pnpm test\n  --run"', ...done })
@@ -522,9 +570,10 @@ test('a Codex command that finished says what it printed and its exit code, for 
     command('exec-1', { status: 'completed', aggregatedOutput: '12 passed\n', exitCode: 0 }),
     command('exec-2', undefined),
     command('exec-2', { status: 'failed', aggregatedOutput: '', exitCode: 1 }),
-    // Nothing printed and no failure: nothing to say. A tool that is no command reports no output.
+    // Nothing printed and no failure: nothing to say.
     command('exec-3', { status: 'completed', aggregatedOutput: '', exitCode: 0 }),
-    item(false, { type: 'fileChange', id: 'fc_1', changes: [{ path: '/tmp/a', kind: 'add' }], status: 'completed' }),
+    // A tool that is no command and changed no file reports no output.
+    item(false, { type: 'mcpToolCall', id: 'mcp_1', server: 's', tool: 't', status: 'completed' }),
     item(false, { type: 'agentMessage', id: 'msg_1', text: 'Done', phase: 'final_answer' }),
     completed('completed'),
   ]

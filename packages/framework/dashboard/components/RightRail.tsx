@@ -46,7 +46,6 @@ export function RightRail({
   context,
   toggleContext,
   activity,
-  docsInMain = false,
 }: {
   projectId: string | null
   /** The selected agent: the modules' tabs are then about it (#815). */
@@ -60,12 +59,6 @@ export function RightRail({
   toggleContext: (path: string) => void
   /** How many events the selected run's feed has shown, for the modules' tabs. */
   activity?: number
-  /**
-   * The launcher renders Docs in its main column (#1455 item 2), so while it is the main view the
-   * rail must not repeat it: the tab is withheld and the poll skipped. A session view passes false
-   * (or nothing) and keeps the full rail.
-   */
-  docsInMain?: boolean
 }) {
   // The two content panels are read here rather than each polling for itself: the rail has to
   // know whether they have anything before it can decide which tabs to offer, and whether to be
@@ -74,10 +67,10 @@ export function RightRail({
   // Remembered per project: a project seen before says whether it has documents from the first
   // frame, so its tab neither comes late nor shows and goes.
   const { value: docs, loaded: docsLoaded } = usePolled<WorkspaceDoc[]>(
-    projectId && !docsInMain ? () => onDocs(projectId) : null,
+    projectId ? () => onDocs(projectId) : null,
     [],
     4000,
-    [projectId, docsInMain],
+    [projectId],
     projectId ? { remember: `docs:${projectId}` } : undefined,
   )
 
@@ -93,9 +86,8 @@ export function RightRail({
   // While the first read is out, the tab stands in only for a rail that would otherwise have no
   // tab at all, so switching projects does not blink the rail out and back in. Beside other tabs
   // it waits for the answer: held there, it showed on every agent's page and went again a moment
-  // later, for every project with no documents. While the launcher owns this panel (#1455 item
-  // 2), the tab is withheld outright.
-  const hasDocs = !docsInMain && (docsLoaded ? docs.length > 0 : panels.length === 0 && views.length === 0)
+  // later, for every project with no documents.
+  const hasDocs = docsLoaded ? docs.length > 0 : panels.length === 0 && views.length === 0
 
   const panelName = sidePanelName(projectId ?? '', agentId)
   const open = useSidePanelOpen(panelName)

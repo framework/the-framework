@@ -12,8 +12,9 @@ import type { ModulePanelProps } from '../module/index.js'
 const onDocs = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onDocs }))
 
-// The panels themselves are rendered elsewhere; here they are stand-ins.
-vi.mock('./DocsPanel.js', () => ({ DocsPanel: () => <div>docs</div> }))
+// The panels themselves are rendered elsewhere; here they are stand-ins. The Docs one names the
+// documents it was handed.
+vi.mock('./DocsPanel.js', () => ({ DocsPanel: ({ docs }: { docs: { name: string }[] }) => <div>docs: {docs.map(d => d.name).join(', ')}</div> }))
 
 const { RightRail } = await import('./RightRail.js')
 const { forgetRemembered } = await import('../lib/use-async.js')
@@ -102,37 +103,41 @@ describe('RightRail tab labels (#1145)', () => {
   })
 })
 
-// Every tab is earned by its content (#1146): a panel that can only say "nothing yet" costs a tab
-// nobody wants, and when none of them has anything the rail itself is noise.
-describe('RightRail docsInMain (#1455 items 2/3)', () => {
+// The project's documents are the rail's "Docs" tab on the "New agent" page exactly as on an
+// agent's page: the launcher shows none of its own.
+describe('RightRail Docs with no agent selected', () => {
   const settle = () => act(async () => {
     await Promise.resolve()
     await Promise.resolve()
   })
 
-  test('the launcher owning Docs withholds its tab and skips its read', async () => {
-    render(<RightRail {...baseProps} files={['a.ts']} docsInMain />)
+  test('the "New agent" page offers the Docs tab and shows the document', async () => {
+    render(<RightRail {...baseProps} agentId={null} />, [])
     await settle()
-    expect(screen.queryByRole('tab', { name: /docs/i })).toBeNull()
-    // Withheld means not even asked for: the main column polls it itself.
-    expect(onDocs).not.toHaveBeenCalled()
-    // The rest of the rail is untouched.
+    expect(onDocs).toHaveBeenCalledWith('p1')
+    expect(screen.getByRole('tab', { name: /docs/i }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByText('docs: PLAN.md')).toBeTruthy()
+  })
+
+  test('beside a module\'s tab, the Docs tab is there too and opens the document', async () => {
+    render(<RightRail {...baseProps} agentId={null} />)
+    await settle()
     expect(screen.getByRole('tab', { name: /files/i })).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: /docs/i }))
+    expect(screen.getByText('docs: PLAN.md')).toBeTruthy()
   })
 
-  test('with only Docs to offer, the launcher shows no rail at all', async () => {
-    const { container } = render(<RightRail {...baseProps} agentId={null} docsInMain />, [])
+  test('with no document and no module tab, the "New agent" page has no rail', async () => {
+    onDocs.mockResolvedValue([])
+    const { container } = render(<RightRail {...baseProps} agentId={null} />, [])
     await settle()
+    expect(onDocs).toHaveBeenCalledWith('p1')
     expect(container.querySelector('aside')).toBeNull()
-  })
-
-  test('a session view (docsInMain off) keeps the tab, as before', async () => {
-    render(<RightRail {...baseProps} />)
-    await settle()
-    expect(screen.getByRole('tab', { name: /docs/i })).toBeTruthy()
   })
 })
 
+// Every tab is earned by its content (#1146): a panel that can only say "nothing yet" costs a tab
+// nobody wants, and when none of them has anything the rail itself is noise.
 describe('RightRail empty panels (#1146)', () => {
   const settle = () => act(async () => {
     await Promise.resolve()

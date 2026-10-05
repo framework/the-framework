@@ -2,7 +2,7 @@ The dashboard's right rail: a column beside the main pane, half the page wide on
 
 ## Context
 
-**User story**: while an agent [2] works, the user watches what it produces without leaving the page — the plan it wrote up, the files it changed. All of that lives to the right of the conversation, one click away and never in the way. On a project's home the Files tab is where the user clicks the files the next agent should focus on.
+**User story**: while an agent [2] works, the user watches what it produces without leaving the page — the plan it wrote up, the files it changed. All of that lives to the right of the conversation, one click away and never in the way. On the project home [8] the Files tab is where the user clicks the files the next agent should focus on, and the "Docs" tab is where the user reads the project's `PLAN`/`TODO` documents before starting one.
 
 **Problem**: a tab that can only say "nothing yet" teaches the user that the feature is broken. A rail that reorders or jumps while the user is reading it does the same. So the rail's own tabs are decided by what exists, and the rail moves the user's attention exactly once: for the first view an agent pushes. A module's tab cannot be judged empty without drawing it, so it is offered and says itself, in one line, when it has nothing.
 
@@ -23,7 +23,7 @@ The dashboard's right rail: a column beside the main pane, half the page wide on
 - **No project, no rail** - with no project selected the rail is not drawn, and it is absent beside a full-width module page.
 - **Which panel opens by itself** - the first view [1] an agent [2] pushes brings the rail to it; otherwise the rail rests on the first module's tab, or on the documents when there is none; once the user picks a tab by hand, nothing moves it again.
 - **A panel that loses its content hands over** - when the open panel stops existing the rail falls back to the first one that still does, rather than showing an empty column.
-- **The documents are read on a poll, and yield to the launcher** - the project's `PLAN`/`TODO` documents are re-read every few seconds, and are withheld entirely while the project home [8] shows them in its main column.
+- **The documents are read on a poll** - the project's `PLAN`/`TODO` documents are re-read every few seconds, on the project home [8] as on an agent's page; the rail is the only place that shows them.
 - **Counts on the tabs** - "Views" carries the number of views [1], and a module's tab the count it asks for (the Files tab: the Context's files); "Docs" carries none.
 
 ## Business logic
@@ -60,7 +60,7 @@ The rail offers, in this order, each with its one-line explanation on hover:
 
 - Every tab an installed module [10] adds (`lib/use-modules.ts`), for a project that has that module, in package order: its label and its explanation are the module's. The built-in Files module adds "Changes" first, the list of the files that changed with the picked file's diff beside it, and then "Files" — "The project’s files, or a session’s with what it changed, for as long as its checkout, branch or merge commit exists — hover one to preview it, click one to add it to the next run’s Context." A module's tab is offered on the project's home and on every agent's page, whatever it holds: when it has nothing, it says so inside.
 - "Views" — "Documents the agent pushed up during the session — a plan, a summary, a writeup." Shown once the selected agent has pushed at least one view [1]. The views arrive on the agent's live event stream.
-- "Docs" — "The PLAN/TODO markdown files at the root of the workspace."
+- "Docs" — "The PLAN/TODO markdown files at the root of the workspace." Shown when the project has at least one such document, on the project home [8] as on an agent's page.
 
 A gate [7] is answered inline in the agent's transcript, where it was asked, so the rail holds no panel for questions and never pulls attention for one. Past work is read on the agents' own pages, so the rail holds no history panel either.
 
@@ -106,15 +106,17 @@ With no project selected the rail is not drawn. It is likewise absent beside the
 
 When the panel the rail is on no longer has a tab, the rail shows the first tab that still exists instead of an empty panel.
 
-### The documents are read on a poll, and yield to the launcher
+### The documents are read on a poll
 
 #### Context
 
-**Problem**: the project home [8] already shows the `PLAN`/`TODO` documents in its main column. Repeating them in the rail beside it shows the same document twice and costs a second read of the same files.
+**User story**: the user reads the project's `PLAN`/`TODO` documents in one place, the rail's "Docs" tab, whether the page is the project home [8] or an agent's [2].
+
+**Problem**: the rail must know whether the project has documents before it can decide to offer the "Docs" tab, and a tab that shows and then goes reads as a fault.
 
 #### Business logic
 
-The project's `PLAN`/`TODO` documents are re-read from the daemon every four seconds while the tab may be shown. While the project home [8] renders them in its main column, the tab is withheld and the documents are not read at all.
+The project's `PLAN`/`TODO` documents are re-read from the daemon every four seconds while a project is selected, with or without a selected agent [2]. The project home [8] shows no documents of its own: the rail's "Docs" tab is the only place they are shown.
 
 While the very first read of a project's documents is still out, the "Docs" tab is shown only when the rail has no other tab: it holds the rail in place, so changing project does not blink the rail out and back in. Beside other tabs it waits for the answer and is shown only when there are documents: shown before the answer, it appeared on every agent's page and went again a moment later, for every project with no documents. The answer is remembered per project for as long as the page is open (`lib/use-async.ts`), so a project seen before shows or withholds the tab from the first frame.
 

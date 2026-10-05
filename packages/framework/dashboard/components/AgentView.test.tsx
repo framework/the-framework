@@ -55,8 +55,9 @@ vi.mock('./AgentWorkBar.js', () => ({
 }))
 // The composer shows only what the view tells it about the run going: the one fact of it under test here.
 vi.mock('./AgentComposer.js', () => ({
-  AgentComposer: ({ live, outcome }: { live: boolean; outcome?: unknown }) => (
+  AgentComposer: ({ live, outcome, model }: { live: boolean; outcome?: unknown; model?: string }) => (
     <>
+      <span data-testid="composer-model">{model ?? ''}</span>
       <span data-testid="composer-live">{String(live)}</span>
       <span data-testid="composer-outcome">{JSON.stringify(outcome ?? null)}</span>
     </>
@@ -519,6 +520,17 @@ describe('a question the agent stopped on', () => {
     render(view({ events: on, live: true }))
     await waitFor(() => expect(screen.getAllByLabelText('Your message')).toHaveLength(2))
     expect(screen.queryByRole('region', { name: 'Which database?' })).toBeNull()
+  })
+})
+
+describe('the model under the message box', () => {
+  test('the box is handed the model the agent\'s card names, and none before the card or when it names none', () => {
+    const { rerender } = render(view({ live: true, events: [] }))
+    expect(screen.getByTestId('composer-model').textContent).toBe('')
+    rerender(view({ live: true, events: [], card: { status: 'running', driver: 'claude-code', model: 'opus' } }))
+    expect(screen.getByTestId('composer-model').textContent).toMatch(/opus/i)
+    rerender(view({ live: true, events: [], card: { status: 'running', driver: 'claude-code' } }))
+    expect(screen.getByTestId('composer-model').textContent).toBe('')
   })
 })
 

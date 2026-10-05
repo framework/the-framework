@@ -92,7 +92,7 @@ function applyTemplate(editor: Editor, text: string): void {
 }
 
 export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(function PromptEditor(
-  { onChange, onSubmit, onPreset, onMentionProject, onMentionFile, onMentionRemoved, projects, files = [], commands, customPresets = [], projectPresets = [], onNewPreset, disabled = false, placeholder = 'Describe what to do…  ( / commands · @ projects · # files )', initialText, compact = false },
+  { onChange, onSubmit, onPreset, onMentionProject, onMentionFile, onMentionRemoved, projects, files = [], commands, customPresets = [], projectPresets = [], onNewPreset, disabled = false, placeholder = 'Describe what to do…', initialText, compact = false },
   ref,
 ) {
   const [isEmpty, setIsEmpty] = useState(true)
@@ -336,10 +336,10 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   }, [editor, initialText])
 
   // The placeholder is absolutely positioned, so it must share the editor's padding to sit exactly
-  // where the first typed character will (#721). The full composer breathes with more room; the
-  // compact navbar row stays tight.
-  const pad = compact ? 'px-2 py-1.5' : 'px-4 pt-4 pb-3'
-  const placeholderInset = compact ? 'left-2 top-1.5' : 'left-4 top-4'
+  // where the first typed character will (#721). The full composer's box is one line tall when
+  // empty, as tall as the submit beside it; the compact navbar row stays tight.
+  const pad = compact ? 'px-2 py-1.5' : 'px-3 py-2.5'
+  const placeholderInset = compact ? 'left-2 top-1.5' : 'left-3 top-2.5'
   return (
     <div className="relative">
       {/* The scroll rides a ScrollArea (#1046) so a long prompt shows our thin overlay bar, not the
@@ -351,7 +351,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
         className={compact ? 'rounded-md border border-border focus-within:ring-2 focus-within:ring-[var(--color-primary)]' : ''}
         // The height cap goes on the viewport (the scroller), not the Root — a Root max-h cannot be
         // resolved by the viewport's height, so the editor would grow instead of scrolling.
-        viewportClassName={compact ? 'max-h-32 min-h-8' : 'max-h-64 min-h-[2.75rem]'}
+        viewportClassName={compact ? 'max-h-32 min-h-8' : 'max-h-64 min-h-10'}
       >
         <EditorContent editor={editor} className={`w-full bg-transparent text-sm ${pad}`} />
       </ScrollArea>

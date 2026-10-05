@@ -44,7 +44,7 @@ function StatusDot({ status }: { status: DeviceStatus | undefined }) {
 // One flat "Run on" list (#1066/#1067): this machine, then the saved devices and "Add a device",
 // with a single checkmark. When genuinely on a remote daemon (a manual connection), that device
 // carries the mark, and "This machine" goes home.
-// Two looks for the one menu: an icon button for a box's control row, and a chip that also says
+// Two looks for the one menu: an icon button for the compact single row, and a chip that also says
 // the target in words, for the launcher's row above the box.
 export function RunOnMenu({ connection, busy, chip = false }: { connection: ConnectionControl; busy: boolean; chip?: boolean | undefined }) {
   // The selected device (#1067), meaningful only on the local daemon; on a remote daemon the
@@ -96,7 +96,7 @@ export function RunOnMenu({ connection, busy, chip = false }: { connection: Conn
         </TooltipTrigger>
         <TooltipContent>{`Run on — ${summary}`}</TooltipContent>
       </Tooltip>
-      {/* The chip is at the row's left, the icon button at a box's right: the menu opens inward. */}
+      {/* The chip is at the row's left, the icon button at the compact row's right: the menu opens inward. */}
       <DropdownMenuContent align={chip ? 'start' : 'end'} className="min-w-[19rem] max-w-[22rem]">
         <DropdownMenuItem
           className="items-start"

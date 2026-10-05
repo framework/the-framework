@@ -1,6 +1,6 @@
 import type { CustomPreset } from '../../src/index.js'
 import type { ProjectLauncher } from '../rpc/projects.js'
-import { SquareSlash, Plus, X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
 import { OptionLabel } from './ui/option-label.js'
@@ -98,9 +98,9 @@ export function CommandsMenu({
             />
           }
         >
-          <SquareSlash className="h-4 w-4" aria-hidden />
+          <Plus className="h-4 w-4" aria-hidden />
         </TooltipTrigger>
-        <TooltipContent>Run a command or load a saved prompt — also available by typing / in the editor</TooltipContent>
+        <TooltipContent>Run a command or load a saved prompt. In the box: / commands · @ projects · # files</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="start" className="min-w-[16rem] max-w-[20rem]">
         <DropdownMenuGroup>

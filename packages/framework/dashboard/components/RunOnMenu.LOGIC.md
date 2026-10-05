@@ -29,7 +29,7 @@ The "Run on" pick of the composer [1]: one dropdown that says where the next age
 
 **User story**: at the launcher the user reads where the next agent [2] runs without opening anything: the first chip [5] above the box says "This machine" or the device's name.
 
-**Problem**: an icon alone does not say which device is picked. Where there is room for words (the launcher's row above the box) the button says them; where there is not (a box's own control row, the compact single row) it stays an icon. It is one menu with two looks, chosen by the embedding composer (`Composer.tsx`).
+**Problem**: an icon alone does not say which device is picked. Where there is room for words (the launcher's row above the box) the button says them; where there is not (the compact single row) it stays an icon. It is one menu with two looks, chosen by the embedding composer (`Composer.tsx`).
 
 #### Business logic
 

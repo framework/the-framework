@@ -48,10 +48,10 @@ export interface ComposerHandle {
   focus: () => void
 }
 
-// The shared agent composer (#721): the Tiptap editor (`/` `@` `#` triggers) plus the control
-// row — the commands menu, the agent/model select, the "Run on" pick, and the submit button.
-// The launcher adds a row under the box, which then holds the agent/model select, and a row of
-// chips above it, which then holds the "Run on" pick.
+// The shared agent composer (#721), laid out as Claude Code's: a box one line tall when empty that
+// holds the text alone (the Tiptap editor, `/` `@` `#` triggers) with the submit at its right; a
+// row under it with the commands menu and the caller's controls at the left and the model at the
+// right; and, where an agent is started, a row of chips above it led by the "Run on" pick.
 // Factored out of the launcher (StartAgentForm) so the run-view chat (AgentComposer) gets the
 // same surface, wired to the same data (files, commands, saved prompts, prefs). The caller owns
 // what happens on submit: the launcher starts a run, the chat says the text to the run. The `@`
@@ -64,14 +64,14 @@ export const Composer = forwardRef<ComposerHandle, {
   addContext?: ((path: string) => void) | undefined
   /** Drop a path from the Context when its `@`/`#` chip leaves the editor (#948). */
   removeContext?: ((path: string) => void) | undefined
-  /** The control the launcher hangs at the start of the control row (#1046): the Context picker. */
-  launcherControls?: ReactNode
-  /** A row of chips above the box, the launcher's: the "Run on" pick as its first chip instead of
-   *  inside the box, then these chips. Not in the compact form. */
+  /** The launcher's chips, after the "Run on" chip in the row above the box. */
   aboveControls?: ReactNode
-  /** A row under the box, the launcher's: this content at its left (the "Auto" menu), and the
-   *  agent/model select at its right instead of inside the box. */
+  /** The caller's controls in the row under the box, after the commands menu: the launcher's
+   *  Context picker and "Auto" menu. */
   belowControls?: ReactNode
+  /** Inside a session: the model it runs on, said at the right of the row under the box, where
+   *  the launcher has its select. Words, not a menu: a session keeps the model it started with. */
+  sessionModel?: string | undefined
   /** Run the composed text. */
   onSubmit: (text: string) => void | Promise<void>
   /** Mirror the live prompt out, so the launcher can drive its note. */
@@ -101,7 +101,7 @@ export const Composer = forwardRef<ComposerHandle, {
    *  without one the slot keeps its collapse-when-empty behavior for the launcher. */
   idleControl?: ReactNode
 }>(function Composer(
-  { files, addContext, removeContext, launcherControls, aboveControls, belowControls, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, canSubmit = true, idleControl },
+  { files, addContext, removeContext, aboveControls, belowControls, sessionModel, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, canSubmit = true, idleControl },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
@@ -232,13 +232,12 @@ export const Composer = forwardRef<ComposerHandle, {
       onDeleteProject={id => saveProjectPresetList(projectPresets.filter(p => p.id !== id))}
     />
   )
-  const above = !compact && aboveControls !== undefined
   // Where the next run starts (#1052/#1067): this machine or a saved device. Launcher-only: a
   // session already runs where it was started.
   const runOnEl = inAgent ? null : (
     <RunOnMenu
       busy={busy}
-      chip={above}
+      chip={!compact}
       connection={{
         profiles,
         currentUrl,
@@ -284,9 +283,9 @@ export const Composer = forwardRef<ComposerHandle, {
               'h-8 w-8 shrink-0 transition-[margin,opacity,transform] duration-150 ease-out',
               hasPrompt
                 ? 'ml-0 translate-x-0 opacity-100 disabled:opacity-100'
-                // -2.375rem = the button's own w-8 (2rem) plus the row's gap-1.5 (0.375rem), so a hidden
-                // submit leaves the gear flush to the box edge — bottom and right padding stay equal.
-                : 'pointer-events-none -ml-[2.375rem] translate-x-2 opacity-0 disabled:opacity-0',
+                // The hidden submit takes no room: its own w-8 (2rem) back, and in the compact row the
+                // row's gap-1.5 (0.375rem) too, so the control beside it sits flush.
+                : cn('pointer-events-none translate-x-2 opacity-0 disabled:opacity-0', compact ? '-ml-[2.375rem]' : '-ml-8'),
             )}
           />
         }
@@ -296,8 +295,6 @@ export const Composer = forwardRef<ComposerHandle, {
       <TooltipContent>{busy ? submitBusyLabel : `${submitLabel}  (Enter · Shift+Enter for a new line)`}</TooltipContent>
     </Tooltip>
   )
-
-  const below = belowControls !== undefined
 
   // One slot, three states (#1455): with an idleControl, the empty box shows it (Stop / Resume)
   // and typing swaps in the send arrow — instead of the launcher's collapse-to-nothing.
@@ -330,45 +327,36 @@ export const Composer = forwardRef<ComposerHandle, {
 
   return (
     <>
-      {/* The row of chips above the box. A fixed height and no wrap, so a name that lands late or
-          a chip added later moves nothing below. In a row too narrow for its chips the later ones
-          give way first, each cut short, and the "Run on" pick last. A next chip goes in
-          `aboveControls`. */}
-      {above && (
+      {/* The row of chips above the box, where an agent is started. A fixed height and no wrap, so
+          a name that lands late or a chip added later moves nothing below. In a row too narrow for
+          its chips the later ones give way first, each cut short, and the "Run on" pick last. */}
+      {!inAgent && (
         <div className="mb-1.5 flex h-6 items-center gap-1.5">
           <div className="flex min-w-0 items-center">{runOnEl}</div>
           <div className="flex min-w-0 shrink-[100] items-center gap-1.5">{aboveControls}</div>
         </div>
       )}
 
-      {/* The composer box (#721): the editor and its run controls under one rounded border, so the
-          prompt and the buttons that act on it read as a single input surface. The editor is
-          borderless here (its border moved out to this box); controls sit tucked below it. */}
-      <div className="rounded-lg border border-border bg-transparent focus-within:border-muted-foreground/40">
-        {editorEl}
-        {/* Run controls (#649/#650/#654/#668): the commands menu and the Context picker at the
-            start, the agent+model select, the "Run on" pick and submit clustered at the end. With
-            a row under the box, the agent+model select is there instead; with a row of chips
-            above it, the "Run on" pick is there instead. */}
-        <div className="flex flex-wrap items-center gap-1.5 px-2 pb-2">
-          {commandsEl}
-          {launcherControls}
-          <div className="ml-auto flex items-center gap-1.5">
-            {!below && driverModelEl}
-            {!above && runOnEl}
-            {slotEl}
-          </div>
-        </div>
+      {/* The box: the text alone, one line tall when empty and growing with what is typed, and the
+          submit at its right, kept at the last line. The editor is borderless: the border is the
+          box's. */}
+      <div className="flex items-end rounded-lg border border-border bg-transparent focus-within:border-muted-foreground/40">
+        <div className="min-w-0 flex-1">{editorEl}</div>
+        <div className="flex shrink-0 items-center p-1">{slotEl}</div>
       </div>
 
-      {/* The row under the box. A fixed height and no wrap, and the left side is the one that
-          gives way: a longer label there never moves the agent+model select or the page below. */}
-      {below && (
-        <div className="mt-1 flex h-8 items-center gap-2">
-          <div className="flex min-w-0 flex-1 items-center">{belowControls}</div>
-          <div className="shrink-0">{driverModelEl}</div>
+      {/* The row under the box: the commands menu and the caller's controls at the left, the model
+          at the right. A fixed height and no wrap, and the left side is the one that gives way: a
+          longer label there never moves the model or the page below. */}
+      <div className="mt-1 flex h-8 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          {commandsEl}
+          {belowControls}
         </div>
-      )}
+        <div className="shrink-0">
+          {driverModelEl || (sessionModel !== undefined && <span className="px-2 text-xs text-muted-foreground">{sessionModel}</span>)}
+        </div>
+      </div>
 
       {offlineNote}
 

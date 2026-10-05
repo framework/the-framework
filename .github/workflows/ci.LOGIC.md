@@ -2,13 +2,13 @@ Verifies every change to the repository on GitHub-hosted runners: five jobs run 
 
 ## Context
 
-**User story**: a contributor pushes a branch or opens a pull request and sees a green or red "CI" check on it before anyone reviews or merges; a red check names the step that failed.
+**User story**: a contributor opens a pull request and sees green or red checks on it before anyone reviews or merges; a red check names the part that failed.
 
-**Problem**: a pull request opened from a branch of this same repository fires both a push event and a pull request event for the same commit, which would verify it twice for no information; a pull request from a fork fires no push event here, so it needs the pull request event.
+**Problem**: a pull request opened from a branch of this same repository fires both a push event and a pull request event for the same commit. Run for both, it was verified twice; with one of the two skipped, the skipped run's "build" check read as green on the pull request before the real one existed, and a pull request set to merge on green merged unverified.
 
 ## Business logic — TL;DR
 
-- **When it runs** - on every push to any branch, and on a pull request only when the pull request comes from a fork.
+- **When it runs** - on every pull request, from a fork or not, and on every push to the main branch. A push to another branch runs nothing.
 - **What it verifies** - the type check and every package's tests, as five jobs at the same time, each after its own install and build; a failing job does not stop the others.
 - **The one check** - a job named "build" waits for the five and is green only when all of them are.
 - **What it may do and produces** - the repository's default token permissions, no artifact, no push: its only product is the check's status.
@@ -23,7 +23,7 @@ See `## Context`.
 
 #### Business logic
 
-The workflow, named "CI", runs on every push to any branch and on every pull request event, with one exclusion: a pull request event whose head branch lives in this same repository is skipped, because the push of that branch already runs the workflow. A pull request from a fork is not skipped, since a push to a fork never reaches this repository's workflows.
+The workflow, named "CI", runs on every pull request event and on every push to the main branch. A push to any other branch does not run it: the branch is verified once a pull request is opened for it, by the pull request's event, so a pull request has exactly one run for each commit.
 
 ### What it verifies
 
@@ -56,7 +56,7 @@ A job that fails does not stop the other four: one run says everything that is w
 
 #### Business logic
 
-A job named "build" runs after the five jobs, whatever their result, and passes only when all five passed. It is skipped, as they are, for a pull request event from a branch of this same repository.
+A job named "build" runs after the five jobs, whatever their result, and passes only when all five passed. Until the five have ended it has no result, so a pull request set to merge on green waits for it.
 
 ### What it may do and produces
 

@@ -34,6 +34,7 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 - **The message just sent** - a message sent to an ended agent is shown at once as the feed's last prompt, until the prompt line of its continuation arrives; switching agents drops it. So is the prompt the page just started an agent with, until the agent's first prompt line arrives: the run writes it only once its record is saved and its checkout made.
 - **What was set up** - the agent view hands the feed the checkout's folder, the branch, the branch the agent was told to start from, the coding agent and the model the agent's card says, for the transcript's session line (`SessionLine.tsx`): the step going on now while the session is being set up, the folded "Session set up" line after; with no card listed yet it hands no fact, so the line reads "Starting session" while the session is being set up; after, it is the words "Session set up" with nothing to open while the agent works, and is not shown for an agent not at work, nor for one just started on a device, which has no checkout made here.
 - **The question above the message box** - each gate the agent stopped on and has not gone on from is asked in a panel between the feed and the composer (`QuestionPanel.tsx`), the newest one taking the keyboard; the feed says the question in one "Asking" line that takes no answer (`EventList.tsx`); an answer in the user's own words, or a skip, shows in the feed at once as the message just sent; the panel goes when the agent goes on.
+- **A message sent while the agent works** - each one shows as a queued message at the end of the feed, in the order sent, until the agent's next prompt line arrives; switching agents drops them, and so do 5 seconds of the agent not working without having read them.
 - **The working spinner** - while the agent works, or a message just sent is on its way, the feed is told to close with a spinner row.
 - **The message being written** - handed to the feed only while the feed is live, so a finished agent never shows one.
 - **Loading and empty states** - on a first visit the feed stays blank until the agent's own events are in, then fills in one step, and not at all for an ended agent whose archive was read ahead from its row in the left column; a finished agent whose archive is still being read after a second says "Loading agent…"; a finished agent with no events at all says "This agent has no events."; a running agent with nothing yet simply waits for its first event.
@@ -46,8 +47,8 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 - **Removing a kept checkout** - a finished agent that kept its checkout (it failed or was stopped) is offered a Remove, which disappears at once when used.
 - **Notices for work that runs elsewhere** - an agent whose turns run on GitHub Actions, in a cloud session, or on a device gets a notice explaining what the feed can and cannot show.
 - **While the agent commits** - from a press on "Commit" the ask shows as the last prompt of the feed and the bar above the message box says "Committing…" where the next step would be, until the agent's turn has ended and its branch has been read again, so the place is never empty between the two; an ask that did not go through gives the button back. It is read off the last prompt, the message on its way or else the last prompt in the events shown, so a working agent whose last prompt is the button's ask says so after a refresh too, and any other prompt says nothing.
-- **The agent's subagents** - the agent's subagents [19] are handed to the feed, which gives each its rows; while any of them is `running`, what each is doing now is read every 2 seconds, and a line above the composer says how many are running; while any of them holds the agent's job (it is `running`, it is saving, or it ended less than 10 seconds ago), the agent reads as waiting for its subagents in the composer, its next step is not offered, and its last clean end is not shown as the end.
-- **The feed and the composer** - a finished feed is static and opens at its end; the composer knows how the agent ended, so it can say what the next message will do and offer a resume, and which model the agent runs on, to say it under the message box.
+- **The agent's subagents** - the agent's subagents [19] are handed to the feed, which gives each its rows; while any of them is `running`, what each is doing now is read every 2 seconds, and a line above the composer says how many are running; while any of them holds the agent's job (it is `running`, it is saving, or it ended less than 10 seconds ago), the feed of an agent that ended its turn clean closes with a moving line "Waiting for N subagents", its next step is not offered, and its last clean end is not shown as the end.
+- **The feed and the composer** - a finished feed is static and opens at its end; the composer knows how the agent ended, so it can offer a resume, and which model the agent runs on, to say it under the message box.
 
 ## Business logic
 
@@ -114,7 +115,7 @@ Until the daemon's list of agents has been read (an agent opened from the Overvi
 
 **Problem**: the daemon's list of agents takes up to two seconds to notice a resumed agent, but its new events are already streaming. Waiting for the list would make the continuation land all at once, or, when the list loses the race entirely, not render until a refresh.
 
-**Problem**: the stream being ahead of the archive lasts only a moment. The archive is read again as soon as the stream is ahead, and catches up within milliseconds, well before the daemon's list notices the agent. Judged on "ahead" alone, the page said working, then ended again, then working: the composer's note and the feed's spinner row appeared, went and came back, and the feed changed height each time.
+**Problem**: the stream being ahead of the archive lasts only a moment. The archive is read again as soon as the stream is ahead, and catches up within milliseconds, well before the daemon's list notices the agent. Judged on "ahead" alone, the page said working, then ended again, then working: the line then shown above the message box and the feed's spinner row appeared, went and came back, and the feed changed height each time.
 
 #### Business logic
 
@@ -225,6 +226,22 @@ Where the agent runs is one of: this machine, a GitHub Actions runner, a device 
 - a cloud agent's work happens in a cloud session this machine cannot stream; the notice points at where it is instead of showing an empty feed (`CloudAgentNotice.tsx`), and a mirror row rides the tail of the feed where the story continues;
 - a relayed agent's notice only flags that the browser preview stays local, since its changes and its next step [9] relay to the device (`RemoteAgentNotice.tsx`).
 
+### A message sent while the agent works
+
+#### Context
+
+**User story**: the agent works and the user types "also add a logout button". The message [6] waits until the agent's turn ends. The user sees it at once at the end of the chat, as their own message, dimmed, with "Queued" under it; when the agent takes it, it is a message like the others.
+
+**Problem**: a message that waits is in no event [4] until the agent reads it, so without this the send looked like nothing happened. A line above the message box used to say it; the chat says it now.
+
+#### Business logic
+
+- The composer [5] tells the page each time a message went through to an agent that is live as the feed knows it (`AgentComposer.tsx`). The page keeps those messages, each one sent, in the order sent, and hands them to the feed, which draws each as a queued message after its last row (`EventList.tsx`).
+- The agent reads every message that waits as its next prompt when its turn ends. So when a prompt line arrives that was not there when the last of them was sent, the page drops them all: that prompt is in the feed as a message that was read.
+- Switching to another agent drops them: they are not the next agent's.
+- An agent that stops being live as the feed knows it without reading them (it failed, it was stopped) shows them for 5 seconds more, then no longer. An agent that ended its turn to read them starts its next turn well within that time.
+- A message sent to an agent that had ended is not queued: it continues the agent, and shows as the message just sent (the TL;DR's "The message just sent").
+
 ### The agent's subagents
 
 #### Context
@@ -240,7 +257,7 @@ The caller hands the page the agent's subagents, oldest first, as the project's 
 - The subagents, and the way to open one, are passed to the feed, whose transcript gives each subagent a row where it was started and reads the message that told the agent a subagent ended as the subagent's row (`EventList.tsx`).
 - While at least one subagent's status is `running`, the daemon is asked every 2 seconds, the pace of the project's list of agents, what each running subagent is doing now, and the answer is passed to the feed and to the subagents line. When the set of running subagents changes, the last answer stays on screen until the next one lands. While none is running, nothing is asked.
 - Between the feed and the composer sits the subagents line (`SubagentLine.tsx`): "Subagents · N of M running", opening to one line per subagent, shown only while a subagent is `running`. It is folded until the user opens it, per agent: opened for one main agent, it is folded again on the next agent's page.
-- The subagents that hold the agent's job are counted (the rule in `lib/subagents.ts`: a subagent holds it while it is `running`, it is saving, or it ended less than 10 seconds ago). A main agent never waits in a process: it ends its turn after starting its subagents and is continued each time one of them ends, a few seconds after that subagent's card says it ended. So its record says `done` while the work it was asked for is still going, and the page said "finished" and "Agent ended" and offered "Open PR" between its turns. While the count is above zero: the composer's line above the box reads "Waiting for its subagents — it continues as each one ends, or now with your next message." (`AgentComposer.tsx`); and the bar above the message box offers no next step [9].
+- The subagents that hold the agent's job are counted (the rule in `lib/subagents.ts`: a subagent holds it while it is `running`, it is saving, or it ended less than 10 seconds ago). A main agent never waits in a process: it ends its turn after starting its subagents and is continued each time one of them ends, a few seconds after that subagent's card says it ended. So its record says `done` while the work it was asked for is still going, and the page said "finished" and "Agent ended" and offered "Open PR" between its turns. While the count is above zero, the bar above the message box offers no next step [9], and the feed is handed the count, which it says in a moving last line, "Waiting for 1 subagent" or "Waiting for N subagents" (`EventList.tsx`). The feed is handed that count only for an agent that ended its turn clean: the daemon's list says it ended, it is not live as the feed knows it, no message just sent is on its way, and it neither failed, nor was stopped, nor waits on a question. Every other agent is handed zero and has no such line: a failed or stopped one says how it ended, a waiting one asks its question, and a working one says what it is doing.
 - The line above the composer and the reading of what subagents are doing count only the subagents whose status is `running`, not the ones that merely hold the job.
 
 A click on a subagent, in the transcript or in the subagents line, opens that subagent's own page.
@@ -255,6 +272,6 @@ See `## Context`.
 
 - The feed follows new output while the agent [1] is live as the feed knows it. A finished agent's feed is static: it does not follow, and it opens at its end, where the outcome and the last changes are.
 - The health of the live event stream is passed to the feed, which shows a banner over the events when the stream is lost.
-- The composer [5] is told: whether the agent is live as the feed knows it; and, once the agent is finished, how it ended: cleanly, with an error, by a stop [15], or waiting on a question, with the detail the end event carries. The composer uses the ending for its note and its resume offer. Until the agent's events say how it ended (they are not read yet, or they hold no ending), the status on the agent's record says it, so the composer's line is the right one from the first frame.
+- The composer [5] is told: whether the agent is live as the feed knows it; and, once the agent is finished, how it ended: cleanly, with an error, by a stop [15], or waiting on a question, with the detail the end event carries. The composer uses the ending for its resume offer alone. Until the agent's events say how it ended (they are not read yet, or they hold no ending), the status on the agent's record says it, so the offer is the right one from the first frame.
 - The composer is also handed the model the agent's card [3] names, by the name its coding agent gives it (`lib/models.ts`; the card's own word for the model when the coding agent's list does not hold it), for the row under the message box. Before the card is listed, and when the card names no model, it is handed none.
 - When the composer's message continues this agent after it ended, the shell is told, and the page stays on the same agent as it goes on. When the action bar's menu deletes this agent, the page leaves for the project home [16].

@@ -122,7 +122,6 @@ describe('AgentComposer slot control (#1455)', () => {
     cleanup()
     renderComposer({ live: false, outcome: { ok: false, stopped: false, waiting: true } })
     expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
-    expect(screen.getByText(/The agent asked a question/)).toBeTruthy()
   })
 
   test('after a pressed Resume the slot holds a busy Resume until the run reads live — no flicker (#1460)', async () => {
@@ -144,47 +143,57 @@ describe('AgentComposer slot control (#1455)', () => {
 })
 
 describe('AgentComposer, live (#714)', () => {
-  test('a working agent says what the next message will do, in the line an ended one uses, so the feed above keeps its height', () => {
-    renderComposer()
-    expect(screen.getByText('Agent working — it reads your next message when its turn ends.')).toBeTruthy()
-    expect(screen.queryByRole('status')).toBeNull()
-    expect(screen.queryByText(/Agent ended/)).toBeNull()
+  test('nothing is said above the box, whatever the agent\'s state: the chat says it', () => {
+    const states: Partial<Parameters<typeof AgentComposer>[0]>[] = [
+      {},
+      { live: false, outcome: { ok: true, stopped: false } },
+      { live: false, outcome: { ok: false, stopped: false } },
+      { live: false, outcome: { ok: false, stopped: true } },
+      { live: false, outcome: { ok: false, stopped: false, waiting: true } },
+    ]
+    for (const state of states) {
+      const { container } = render(<AgentComposer projectId="p1" agentId="run-1" live files={[]} {...state} />)
+      expect(container.querySelector('p')).toBeNull()
+      expect(screen.queryByRole('status')).toBeNull()
+      cleanup()
+    }
   })
 
-  test('a submit goes to the run as a message, and the note says it waits for the turn to end', async () => {
+  test('a submit goes to the run as a message, and the page is told it waits for the turn to end', async () => {
     sendMessage.mockResolvedValue({ ok: true })
-    const { onAgentStarted } = renderComposer()
+    const onQueued = vi.fn()
+    const { onAgentStarted } = renderComposer({ onQueued })
     fireEvent.click(screen.getByText('submit'))
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith('p1', 'hello', 'run-1'))
-    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('hello'))
+    await waitFor(() => expect(onQueued).toHaveBeenCalledWith('hello'))
     // The run was live already: nothing was started, so the shell is told nothing.
     expect(onAgentStarted).not.toHaveBeenCalled()
   })
 
   test('a refused message shows why, and is not reported as queued', async () => {
     sendMessage.mockResolvedValue({ ok: false, error: 'unknown session' })
-    renderComposer()
+    const onQueued = vi.fn()
+    renderComposer({ onQueued })
     fireEvent.click(screen.getByText('submit'))
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('unknown session'))
-    expect(screen.queryByRole('status')).toBeNull()
+    expect(onQueued).not.toHaveBeenCalled()
   })
 })
 
 describe('AgentComposer, ended (#720, #1774)', () => {
-  test('says the session can be continued rather than leaving it a dead end', () => {
+  test('the box\'s own words say the session can be continued, rather than leaving it a dead end', () => {
     renderComposer({ live: false, outcome: { ok: true, stopped: false } })
-    expect(screen.getByText(/your next message continues it/)).toBeTruthy()
     expect(props().placeholder).toMatch(/continue it/)
     expect(props().busyLabel).toBe('Resuming…')
   })
 
-  test('an ended run whose subagents still work says it waits for them; a stopped one keeps its own note', () => {
-    renderComposer({ live: false, outcome: { ok: true, stopped: false }, subagentsRunning: 2 })
-    expect(screen.getByText(/Waiting for its subagents/)).toBeTruthy()
-    expect(screen.queryByText(/Agent ended/)).toBeNull()
-    cleanup()
-    renderComposer({ live: false, outcome: { ok: false, stopped: true }, subagentsRunning: 2 })
-    expect(screen.getByText(/Session stopped/)).toBeTruthy()
+  test('a message sent to an ended run is not queued: it continues the run', async () => {
+    sendMessage.mockResolvedValue({ ok: true })
+    const onQueued = vi.fn()
+    const { onAgentStarted } = renderComposer({ live: false, outcome: { ok: true, stopped: false }, onQueued })
+    fireEvent.click(screen.getByText('submit'))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalled())
+    expect(onQueued).not.toHaveBeenCalled()
   })
 
   test('a send is the same message call: the daemon resumes the run, and the shell follows the same run', async () => {

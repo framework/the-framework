@@ -15,7 +15,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 export const RESUME_MESSAGE =
   'This session was stopped before it finished, not because the work was done. Look at what you had already done, then carry on from there.'
 
-// One composer for a session, live or finished (#1026).
+// One composer for a session, live or finished (#1026). Nothing is said above the box: how the
+// agent ended, that it works, a message that waits and subagents that still work are all said by
+// the chat, and a question by its panel.
 //
 // A send is always the same call, `sendMessage`: the person's words, the next prompt of the same
 // conversation (#1774). What happens to them is the daemon's side of it: a run that is working
@@ -33,8 +35,8 @@ export function AgentComposer({
   files,
   onAgentStarted,
   onSending,
+  onQueued,
   outcome,
-  subagentsRunning = 0,
   model,
 }: {
   projectId: string
@@ -47,10 +49,11 @@ export function AgentComposer({
   onAgentStarted?: ((intent: string, agentId: string) => void) | undefined
   /** A message is on its way to an ended run (`null`: it did not go through), so the feed shows it at once. */
   onSending?: ((text: string | null) => void) | undefined
-  /** How the agent ended (#948), so the note does not call a crash "ended". */
+  /** A message went into a working run's inbox: the run reads it when its turn ends, and until
+   *  then the feed shows it as queued, or the send would look like nothing happened (#948). */
+  onQueued?: ((text: string) => void) | undefined
+  /** How the agent ended (#948): a stopped one is offered Resume in the box. */
   outcome?: AgentOutcome | undefined
-  /** How many of the run's subagents are still working: an ended run is then waiting for them. */
-  subagentsRunning?: number
   /** The model the session runs on, by its name: said under the box. */
   model?: string | undefined
 }) {
@@ -77,16 +80,6 @@ export function AgentComposer({
     if (live) setResuming(false)
   }, [live])
   const stopping = stopBusy || (stopRequested && live)
-  // The last message that went through: a line in the inbox is invisible until the agent takes
-  // it when its turn ends, so without this the send looked like nothing happened (#948).
-  // Reset like the latches above: the note is about THIS agent's live session, so it must not
-  // survive an agent switch or outlive the session it was queued into.
-  const [queued, setQueued] = useState<string | null>(null)
-  useEffect(() => setQueued(null), [agentId])
-  useEffect(() => {
-    if (!live) setQueued(null)
-  }, [live])
-
   /** Say `text` to the run. Resolves whether it went through; a refusal's words are shown. */
   const say = async (text: string): Promise<boolean> => {
     const wasLive = live
@@ -100,7 +93,7 @@ export function AgentComposer({
       if (!wasLive) onSending?.(null)
       return false
     }
-    if (wasLive) setQueued(text)
+    if (wasLive) onQueued?.(text)
     // An ended run goes live again under the same id: tell the shell, which keeps its feed (#762).
     else onAgentStarted?.(text, agentId)
     return true
@@ -167,7 +160,6 @@ export function AgentComposer({
 
   return (
     <div className="mx-auto w-full max-w-3xl p-2">
-      <Note live={live} outcome={outcome} waitingOnSubagents={subagentsRunning > 0} queued={queued} muted={Boolean(surfacedError)} />
       {surfacedError && <p role="alert" className="mb-1 px-2 text-xs text-danger">{surfacedError}</p>}
       <Composer
         ref={composerRef}
@@ -184,42 +176,4 @@ export function AgentComposer({
       />
     </div>
   )
-}
-
-/** What a send will do from here, in one line — it is not the same thing live and ended. */
-function Note({
-  live,
-  outcome,
-  waitingOnSubagents,
-  queued,
-  muted,
-}: {
-  live: boolean
-  outcome: AgentOutcome | undefined
-  /** The run ended its turn while its subagents still work: it is told as each ends. */
-  waitingOnSubagents: boolean
-  queued: string | null
-  muted: boolean
-}) {
-  // One line in every state, the same height: the line coming and going with the agent's state
-  // made the feed above it jump by its height each time a message was sent and each time a turn ended.
-  if (live) {
-    if (muted) return null
-    if (!queued) return <p className="mb-2 truncate px-2 text-xs text-muted-foreground">Agent working — it reads your next message when its turn ends.</p>
-    return (
-      <p role="status" className="mb-2 truncate px-2 text-xs text-muted-foreground">
-        Queued — the session reads it when its turn ends: &ldquo;{queued}&rdquo;
-      </p>
-    )
-  }
-  const text = outcome?.waiting
-    ? 'The agent asked a question — answer it above, or your next message continues the session.'
-    : outcome && !outcome.ok && !outcome.stopped
-      ? 'Session failed — your next message resumes it where it stopped.'
-      : outcome?.stopped
-        ? 'Session stopped — your next message resumes it.'
-        : waitingOnSubagents
-          ? 'Waiting for its subagents — it continues as each one ends, or now with your next message.'
-          : 'Agent ended — your next message continues it.'
-  return <p className="mb-2 px-2 text-xs text-muted-foreground">{text}</p>
 }

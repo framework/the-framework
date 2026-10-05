@@ -15,6 +15,8 @@ export function AgentFeed({
   writing = '',
   sending,
   working = false,
+  queued,
+  waitingOn,
   stick = true,
   openAt,
   emptyLabel = 'Waiting for the session to start…',
@@ -37,6 +39,9 @@ export function AgentFeed({
   sending?: string | undefined
   /** The agent is working: a spinner row closes the feed while it writes nothing. */
   working?: boolean
+  /** Messages the working agent has not read yet, and how many subagents an ended turn waits on: the feed's last rows. */
+  queued?: readonly string[] | undefined
+  waitingOn?: number | undefined
   /** A finished log is static (#1026): it does not follow new output, and opens at its end. */
   stick?: boolean
   openAt?: 'start' | 'end'
@@ -57,7 +62,8 @@ export function AgentFeed({
       Live stream lost — reconnecting. The session keeps running; this view may be behind.
     </div>
   )
-  if (events.length === 0 && sending === undefined) {
+  // A message that waits is a row too: with no event yet it is the feed's only one.
+  if (events.length === 0 && sending === undefined && !queued?.length) {
     return (
       <>
         {lostBanner}
@@ -73,6 +79,8 @@ export function AgentFeed({
         writing={writing}
         {...(sending !== undefined ? { sending } : {})}
         working={working}
+        {...(queued ? { queued } : {})}
+        {...(waitingOn ? { waitingOn } : {})}
         stick={stick}
         {...(openAt ? { openAt } : {})}
         {...(tail ? { tail } : {})}

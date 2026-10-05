@@ -292,12 +292,14 @@ function Answer({ question, answer }: { question: string; answer: string }) {
 // whose it is; the place and the box do. A long one is cut short with "Show more" under it. The
 // time it was sent sits under the box and shows while the pointer is on the message; its line is
 // always there, so nothing moves when it shows.
-function Prompt({ text, at }: { text: string; at: string | undefined }) {
+// `queued`: a message the working agent has not read yet. Dimmed, with the word under it where a
+// read message's time shows on hover.
+function Prompt({ text, at, queued = false }: { text: string; at?: string | undefined; queued?: boolean }) {
   const [open, setOpen] = useState(false)
   const tall = isTall(text)
   return (
     <div className="group/prompt flex min-w-0 flex-1 flex-col items-end font-sans text-foreground">
-      <div role="group" aria-label="Your message" className="max-w-[85%] min-w-0 rounded-xl bg-muted px-3.5 py-2">
+      <div role="group" aria-label={queued ? 'Your message, queued' : 'Your message'} className={`max-w-[85%] min-w-0 rounded-xl bg-muted px-3.5 py-2 ${queued ? 'opacity-60' : ''}`}>
         <div className={tall && !open ? 'max-h-40 overflow-hidden' : ''}>
           <Markdown text={text} />
         </div>
@@ -307,6 +309,9 @@ function Prompt({ text, at }: { text: string; at: string | undefined }) {
           </button>
         )}
       </div>
+      {queued ? (
+        <span className="h-4 pr-1 text-[10px] text-muted-foreground">Queued</span>
+      ) : (
       <time
         dateTime={at}
         title={at === undefined ? undefined : new Date(at).toLocaleString()}
@@ -314,6 +319,7 @@ function Prompt({ text, at }: { text: string; at: string | undefined }) {
       >
         {at === undefined ? '' : formatTime(at)}
       </time>
+      )}
     </div>
   )
 }
@@ -415,6 +421,7 @@ const TIME = 'ml-auto shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foregr
 
 const SUBAGENT = 'subagent'
 const NO_SUBAGENTS: readonly AgentMeta[] = []
+const NONE_QUEUED: readonly string[] = []
 const NOTHING_DOING: Record<string, string> = {}
 
 /**
@@ -436,6 +443,8 @@ export function EventList({
   writing = '',
   sending,
   working = false,
+  queued = NONE_QUEUED,
+  waitingOn = 0,
   stick = true,
   openAt,
   tail,
@@ -456,6 +465,11 @@ export function EventList({
    *  on now, else "Starting…" when the last row is a prompt and "Working…" after, so a quiet agent
    *  never looks stalled. */
   working?: boolean
+  /** Messages sent while the agent works, which it reads when its turn ends: each the last row of
+   *  the feed, dimmed, with "Queued" under it, until the agent's next turn shows them as read. */
+  queued?: readonly string[]
+  /** How many subagents an agent that ended its turn still waits on: a moving last line says so. */
+  waitingOn?: number
   stick?: boolean
   /** Where a non-following log opens; a replay opens at the outcome (#948), not page one. */
   openAt?: 'start' | 'end'
@@ -636,6 +650,16 @@ export function EventList({
                 <LiveLine call={current} word={starting ? 'Starting…' : 'Working…'} since={unfolded[unfolded.length - 1]?.at} />
               </MessageScrollerItem>
             )}
+            {!working && waitingOn > 0 && (
+              <MessageScrollerItem messageId="waiting-on" className="-mx-1.5 flex items-center gap-2 rounded-sm px-1.5">
+                <LiveLine word={`Waiting for ${waitingOn} ${waitingOn === 1 ? 'subagent' : 'subagents'}`} />
+              </MessageScrollerItem>
+            )}
+            {queued.map((text, at) => (
+              <MessageScrollerItem key={`queued-${at}`} messageId={`queued-${at}`} className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5">
+                <Prompt text={text} queued />
+              </MessageScrollerItem>
+            ))}
             {tail}
           </MessageScrollerContent>
         </MessageScrollerViewport>

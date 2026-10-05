@@ -55,8 +55,9 @@ vi.mock('./AgentWorkBar.js', () => ({
 }))
 // The composer shows only what the view tells it about the run going: the one fact of it under test here.
 vi.mock('./AgentComposer.js', () => ({
-  AgentComposer: ({ live, outcome, model }: { live: boolean; outcome?: unknown; model?: string }) => (
+  AgentComposer: ({ live, outcome, model, onQueued }: { live: boolean; outcome?: unknown; model?: string; onQueued?: (text: string) => void }) => (
     <>
+      <button type="button" onClick={() => onQueued?.('and then this')}>queue-one</button>
       <span data-testid="composer-model">{model ?? ''}</span>
       <span data-testid="composer-live">{String(live)}</span>
       <span data-testid="composer-outcome">{JSON.stringify(outcome ?? null)}</span>
@@ -520,6 +521,81 @@ describe('a question the agent stopped on', () => {
     render(view({ events: on, live: true }))
     await waitFor(() => expect(screen.getAllByLabelText('Your message')).toHaveLength(2))
     expect(screen.queryByRole('region', { name: 'Which database?' })).toBeNull()
+  })
+})
+
+// What was a line above the message box is said by the chat.
+describe('a message sent while the agent works', () => {
+  const start = (prompt: string) => ({ kind: 'driver', event: { type: 'start', prompt } }) as FrameworkEvent
+  const text = { kind: 'driver', event: { type: 'text', text: 'Hi.' } } as FrameworkEvent
+  const queuedBoxes = () => screen.queryAllByLabelText('Your message, queued')
+
+  test('it shows in the chat as queued, each one sent, until the agent\'s next prompt arrives: then it is a read message', () => {
+    const { rerender } = render(view({ live: true, events: [start('go'), text] }))
+    expect(queuedBoxes()).toHaveLength(0)
+    fireEvent.click(screen.getByText('queue-one'))
+    fireEvent.click(screen.getByText('queue-one'))
+    expect(queuedBoxes().map(n => n.textContent)).toEqual(['and then this', 'and then this'])
+    rerender(view({ live: true, events: [start('go'), text, start('and then this')] }))
+    expect(queuedBoxes()).toHaveLength(0)
+    expect(screen.getAllByLabelText('Your message')).toHaveLength(2)
+  })
+
+  test('queued before the agent\'s first event, it is the chat\'s only row, not hidden behind the waiting words', () => {
+    render(view({ live: true, events: [] }))
+    fireEvent.click(screen.getByText('queue-one'))
+    expect(queuedBoxes().map(n => n.textContent)).toEqual(['and then this'])
+  })
+
+  test('it is another agent\'s no longer: a switch shows none', () => {
+    const { rerender } = render(view({ live: true, events: [start('go'), text] }))
+    fireEvent.click(screen.getByText('queue-one'))
+    expect(queuedBoxes()).toHaveLength(1)
+    rerender(view({ agentId: 'run-2', live: true, events: [start('other'), text] }))
+    expect(queuedBoxes()).toHaveLength(0)
+  })
+
+  test('an agent that stopped working without reading it shows it for five seconds more, not for good', () => {
+    vi.useFakeTimers()
+    try {
+      const { rerender } = render(view({ live: true, events: [start('go'), text] }))
+      fireEvent.click(screen.getByText('queue-one'))
+      const ended = [start('go'), text, { kind: 'end', ok: false, stopped: true }] as FrameworkEvent[]
+      rerender(view({ live: false, events: ended }))
+      act(() => void vi.advanceTimersByTime(4_000))
+      expect(queuedBoxes()).toHaveLength(1)
+      act(() => void vi.advanceTimersByTime(1_500))
+      expect(queuedBoxes()).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('an ended agent whose subagents still work', () => {
+  const sub = (over: Record<string, unknown>) => ({ id: 'c1', parent: 'run-1', startedAt: '2026-10-01T10:00:00.000Z', updatedAt: '2026-10-01T10:00:00.000Z', status: 'running', ...over }) as never
+  const waits = () => screen.queryAllByRole('status').map(n => n.textContent).filter(t => t?.startsWith('Waiting for'))
+
+  test('the chat\'s last line says how many it waits for; none once they ended', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    const { rerender } = render(view({ card: { status: 'done' }, subagents: [sub({}), sub({ id: 'c2' })] }))
+    await waitFor(() => expect(waits()).toEqual(['Waiting for 2 subagents']))
+    rerender(view({ card: { status: 'done' }, subagents: [sub({ status: 'done', endedAt: '2026-10-01T10:02:00.000Z' }), sub({ id: 'c2', status: 'done', endedAt: '2026-10-01T10:02:00.000Z' })] }))
+    await waitFor(() => expect(waits()).toEqual([]))
+  })
+
+  test('a stopped or a failed agent says how it ended, not that it waits; a working one says what it does', async () => {
+    onAgent.mockResolvedValue(ARCHIVED)
+    const { rerender } = render(view({ card: { status: 'stopped' }, subagents: [sub({})] }))
+    await waitFor(() => expect(onAgent).toHaveBeenCalled())
+    await act(async () => {})
+    expect(waits()).toEqual([])
+    rerender(view({ card: { status: 'failed' }, subagents: [sub({})] }))
+    await act(async () => {})
+    expect(waits()).toEqual([])
+    rerender(view({ live: true, subagents: [sub({})] }))
+    await act(async () => {})
+    expect(waits()).toEqual([])
   })
 })
 

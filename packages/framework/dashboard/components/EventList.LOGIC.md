@@ -27,6 +27,8 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 - **One row per event, as the terminal's line** - every event [2] is one row in one centered column: the terminal's one-line text for that event, with no label saying its kind.
 - **The conversation reads as messages** - the user's prompt and the agent's reply render as Markdown in the page's own font; the reply whole; the user's prompt as a grey box on the right with no label, cut short behind "Show more" when long, its time shown under it while the pointer is on it.
 - **The message just sent** - a message sent to an ended agent is one more grey box after the last row, a prompt like any other, so the scroller brings it into view; the prompt line of the continuation takes the same row when it arrives.
+- **A message that waits is the last row** - each message the caller says the working agent has not read yet is a row after every other, the user's grey box dimmed, with the word "Queued" under it.
+- **An ended agent that waits for its subagents says so** - given the count of subagents [16] an ended agent waits for, the last line is a moving "Waiting for N subagents"; not while the agent works.
 - **A moving line while the agent works** - while the agent works and writes nothing, the last row is a moving line: the tool call going on now ("Running pnpm test 9s"), else "Starting…" when nothing has come since the prompt and "Working…" otherwise, with the seconds since the last event; while the session is being set up it is not drawn, the session line being the one moving line; it gives way to the message being written, and goes when the agent ends.
 - **The message being written grows in place** - while the agent writes a message, it is one more agent row after the last, drawn as a finished reply is; when the whole message arrives, its own row replaces it and nothing moves.
 - **A turn's end and the spend are not rows** - the end of each turn [7] and the spend so far are left out: the agent's details strip counts the turns and totals the spend.
@@ -77,6 +79,21 @@ The user's own prompt is drawn as a chat message: a grey box with round corners 
 - **The time shows on hover.** Under the box, at its right, one small line holds the time the prompt's diary line was written (hours, minutes and seconds in the reader's locale; the full date and time as its tooltip). The line is invisible until the pointer is on the message, and it is always there, also for a prompt that has no time: nothing moves when the time shows or arrives.
 
 A prompt that is the end of a subagent [16] is not the user's and is not drawn this way (see "A subagent's end is not the user's prompt"). Neither is the prompt that carries an answer given in the question's panel (see "An answer given in the panel is a box on the left").
+
+### What waits: queued messages and the wait for subagents
+
+#### Context
+
+**User story**: the user sends a message while the agent works: it is at the end of the chat at once, as their own message, marked as not read yet. And an agent that ended its turn while its subagents [16] still work does not look finished: the chat's last line says it waits for them.
+
+**Problem**: neither is an event [2]: a message that waits is in the agent's diary only once the agent reads it, and a main agent that waits writes nothing. A line above the message box used to say both.
+
+#### Business logic
+
+The caller may hand the transcript the messages the working agent has not read yet, in the order sent, and the count of subagents an agent that ended its turn waits for (`AgentView.tsx` decides both).
+
+- **A queued message.** Each message handed in is one row, after every other row and after the moving line, in the order given. It is drawn as the user's own prompt (see "The conversation reads as messages"), cut short behind "Show more" the same way, with two differences: the box is dimmed, and the small line under it holds the word "Queued", always visible, where a read prompt's time shows on hover. Its accessible name is "Your message, queued". With no message handed in, there is no such row. When the agent reads the messages, the caller hands them in no longer and the agent's next prompt is in the events, drawn as a prompt like any other.
+- **The wait for subagents.** While the agent does not work and the count is above zero, the transcript's last line is a moving line, drawn as the "Working…" line is but with no seconds: "Waiting for 1 subagent", or "Waiting for N subagents". While the agent works, the moving line is its own (see "The agent's steps are one folded line") and the wait is not said too. With a count of zero there is no such line.
 
 ### A turn's end and the spend are not rows
 

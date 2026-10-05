@@ -16,10 +16,10 @@ The box at the bottom of an agent view [1]: where the user says something to tha
 
 ## Business logic — TL;DR
 
-- **One send, working or ended** - the text goes to the daemon addressed at this agent; while the agent works the box says the message is queued, and when the agent had ended the shell is told to follow the same agent as it goes on. A message to an ended agent is handed to the feed the moment it is sent, since its continuation takes seconds to write its first line, and taken back if the send fails.
+- **One send, working or ended** - the text goes to the daemon addressed at this agent; while the agent works the box tells the agent view the message is queued, so the transcript shows it as such, and when the agent had ended the shell is told to follow the same agent as it goes on. A message to an ended agent is handed to the feed the moment it is sent, since its continuation takes seconds to write its first line, and taken back if the send fails.
 - **A refusal** - the daemon's reason is shown as an alert, the text stays in the box, and nothing is reported as queued or resumed.
 - **The slot: Stop, Resume, or send** - the empty box's corner holds "Stop agent" while the agent works and "Resume" once it was stopped; typing swaps in the send arrow.
-- **The line above the box** - what a send will do from here: queued, continues, resumes, or answer the question above; an agent that ended clean while its subagents (the agents started for it, when it split its task across them) still run is said to be waiting for them.
+- **Nothing above the box** - the box says nothing above its editor but a refusal: that the agent works, how it ended, a message that is queued and subagents that still work are said by the transcript, and a question by its panel.
 - **What the box leaves out** - no coding agent and model select and no "Run on": an agent cannot change either; the model the agent runs on is said in words under the box.
 
 ## Business logic
@@ -36,7 +36,7 @@ The editor and its controls are the shared composer (`Composer.tsx`); this box o
 
 A send hands the daemon the project, the text and this agent's id. It is the same call whatever the agent's state: while the agent works, the daemon puts the text in the agent's inbox [4]; once it has ended — done, stopped, failed or waiting [5] — the daemon resumes it through the project's resume hook [3].
 
-When the send went through, the box is emptied and focused again. For a working agent it then shows, as a status, "Queued — the session reads it when its turn ends: "`<text>`"", because a line in the inbox is invisible until the agent takes it. The note goes when the user opens another agent or when this agent ends. For an agent that had ended, the box instead tells the shell that this same agent was continued with that text, so the shell keeps its page and its feed as the agent goes on under the same id.
+When the send went through, the box is emptied and focused again. For a working agent it then tells the agent view that this text is queued, because a line in the inbox is invisible until the agent takes it: the agent view shows it in the transcript as a queued message until the agent reads it (`AgentView.tsx`, `EventList.tsx`). The box itself keeps and shows no queued message. For an agent that had ended, the box instead tells the shell that this same agent was continued with that text, so the shell keeps its page and its feed as the agent goes on under the same id.
 
 The box does not remount when the agent ends, so a half-typed message survives the ending.
 
@@ -48,7 +48,7 @@ See `## Context`.
 
 #### Business logic
 
-When the daemon refuses a send — the project has no resume hook, the resume hook's tool refused, the agent is unknown, the device could not be reached — the box shows the daemon's reason as an alert above the editor. A send that failed without a reason shows "Could not send. Your text is kept, try again.". Either way the text stays in the editor, no "Queued" note appears, and the shell is not told the agent was continued. A refused Resume behaves the same way: the button does not hold its busy state, and the reason is shown. A failed Stop shows "Could not stop the agent." in the same place.
+When the daemon refuses a send — the project has no resume hook, the resume hook's tool refused, the agent is unknown, the device could not be reached — the box shows the daemon's reason as an alert above the editor. A send that failed without a reason shows "Could not send. Your text is kept, try again.". Either way the text stays in the editor, the agent view is not told a message is queued, and the shell is not told the agent was continued. A refused Resume behaves the same way: the button does not hold its busy state, and the reason is shown. A failed Stop shows "Could not stop the agent." in the same place.
 
 ### The slot: Stop, Resume, or send
 
@@ -66,23 +66,15 @@ While the box is empty:
 
 As soon as the box has text, the slot is the send arrow, in every state.
 
-### The line above the box
+### Nothing above the box
 
 #### Context
 
-**Problem**: the same box does different things depending on the agent's state, and the user should not have to guess which.
+**Problem**: a grey line above the box used to say the agent's state in every state ("Agent ended — your next message continues it.", "Agent working — …", "Session stopped — …"). The transcript and the question's panel right above it already said the same, except for two things, which the transcript now says: a message that is queued, and an ended agent whose subagents (the agents started for it, when it split its task across them) still work.
 
 #### Business logic
 
-The line is there in every state, one line high, so the feed above it keeps its height when the agent starts or ends a turn. While the agent works it reads "Agent working — it reads your next message when its turn ends.", and after a send the "Queued" status takes its place. Once the agent has ended the line says what the next message will do:
-
-- waiting [5]: "The agent asked a question — answer it above, or your next message continues the session."
-- failed: "Session failed — your next message resumes it where it stopped."
-- stopped: "Session stopped — your next message resumes it."
-- ended clean while at least one of its subagents still holds its job, as the caller counts them (the agent view counts a subagent that is running, is saving, or ended less than 10 seconds ago): "Waiting for its subagents — it continues as each one ends, or now with your next message." The agent ended its turn after starting them and is continued each time one ends, so "Agent ended" would say the job is over when it is not;
-- otherwise: "Agent ended — your next message continues it."
-
-The "Queued" status is hidden while an error is shown, so the box never says "queued" next to a refusal. The editor's placeholder reads "Message the agent…" while the agent works and "Message the agent to continue it…" once it has ended.
+The box draws nothing above its editor in any state of the agent — working, ended clean, failed, stopped or waiting [5] — except the alert of a refusal (see "A refusal"). How the agent ended is used for one thing only: to offer Resume in the slot of an agent that was stopped (see "The slot: Stop, Resume, or send"). The editor's placeholder reads "Message the agent…" while the agent works and "Message the agent to continue it…" once it has ended.
 
 ### What the box leaves out
 

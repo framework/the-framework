@@ -305,8 +305,8 @@ export function App() {
   // project home/launcher, a running agent's live output, or a finished agent's replay. Each live
   // run streams its own feed and is steered by its own id (#749).
   // Until the project's own list is read, the row clicked in the all-projects list says who the
-  // agent is: without it a jump to another project's agent showed a page with no name, and the
-  // line above the message box said "Agent ended" whatever the agent's state, for a moment.
+  // agent is: without it a jump to another project's agent showed a page with no name, and its
+  // message box offered what an ended agent's does whatever the agent's state, for a moment.
   const selectedAgent = agentId
     ? (agents.find(agent => agent.id === agentId) ??
       (agentsLoaded ? undefined : recentAgents.find(recent => recent.projectId === projectId && recent.agent.id === agentId)?.agent))

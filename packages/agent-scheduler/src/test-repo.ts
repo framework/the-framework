@@ -2,8 +2,8 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { strict as assert } from 'node:assert'
-import { DATA_BRANCH, nodeGitRunner } from '@gemstack/agent-data'
-import { readDiary, type AnyDiaryLine } from '@gemstack/skill-logs'
+import { DATA_BRANCH, nodeGitRunner } from '@openagt/agent-data'
+import { readDiary, type AnyDiaryLine } from '@openagt/skill-logs'
 
 /**
  * A project for the tests: one commit on `main`, a bare `origin`, the `agent-data` branch born

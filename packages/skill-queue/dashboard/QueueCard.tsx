@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FastForward, ListTodo, Play } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, StartAgentButton, Tooltip, TooltipContent, TooltipTrigger, usePolled, useModuleHost, type ModuleCardProps, type ModuleProject } from 'framework/module'
+import { Card, CardContent, CardHeader, CardTitle, StartAgentButton, Tooltip, TooltipContent, TooltipTrigger, usePolled, useModuleHost, type ModuleCardProps, type ModuleProject } from '@openagt/dashboard/module'
 import { DEFAULT_FAN_OUT_COUNT, entryLabel, fanOut, fanOutLabel, topEntries, workOnEntryPrompt } from '../src/module.js'
 
 // The Overview's AI Queue card: every project's open entries, the work agents pick up on their own,

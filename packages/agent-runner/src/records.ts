@@ -1,5 +1,5 @@
-import type { FileBranchWrite } from '@gemstack/agent-data'
-import { deleteRun, writeRun, type AnyDiaryLine, type LogsDeps, type RunCard } from '@gemstack/skill-logs'
+import type { FileBranchWrite } from '@openagt/agent-data'
+import { deleteRun, writeRun, type AnyDiaryLine, type LogsDeps, type RunCard } from '@openagt/skill-logs'
 
 /**
  * A run in flight is a run record (#1774): the `logs` skill's card on the project's `agent-data`

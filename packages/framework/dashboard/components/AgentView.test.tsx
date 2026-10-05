@@ -459,7 +459,7 @@ describe('a changed file\'s row in the chat', () => {
     const modules: MountedModules = { pages: [], cards: [], linkActions: [], panels, runSlots: [], settings: [], loaded: true }
     return <ModulesContext.Provider value={modules}>{ui}</ModulesContext.Provider>
   }
-  const panel = (over: object) => ({ id: 'changes', label: 'Changes', help: '', Panel: () => null, package: '@gemstack/files', projects: ['p1'], ...over })
+  const panel = (over: object) => ({ id: 'changes', label: 'Changes', help: '', Panel: () => null, package: '@openagt/files', projects: ['p1'], ...over })
 
   test('with a tab that lists changes, a click opens this agent\'s side panel and asks for the file by its path in the checkout', async () => {
     const { useRevealedChange, forgetRevealedChanges } = await import('../lib/reveal-change.js')
@@ -488,7 +488,7 @@ describe('a changed file\'s row in the chat', () => {
 describe('what the modules add to a run’s page (#817)', () => {
   const Summary = ({ agentId, working }: ModuleRunProps) => <span>summary {agentId} {String(working)}</span>
   const withSlots = (ui: ReactNode, projects = ['p1']) => {
-    const modules: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [{ summary: Summary, package: '@gemstack/files', projects }], settings: [], loaded: true }
+    const modules: MountedModules = { pages: [], cards: [], linkActions: [], panels: [], runSlots: [{ summary: Summary, package: '@openagt/files', projects }], settings: [], loaded: true }
     return <ModulesContext.Provider value={modules}>{ui}</ModulesContext.Provider>
   }
 

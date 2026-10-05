@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Checkbox, SettingsRow, SettingsSection, cn, useModuleHost, usePolled, type ModuleSettingsProps } from 'framework/module'
+import { Checkbox, SettingsRow, SettingsSection, cn, useModuleHost, usePolled, type ModuleSettingsProps } from '@openagt/dashboard/module'
 import type { PublishPick } from '../src/state.js'
 import { MAX_SPEND_OFFSET, PUBLISH_LABELS, loosestSpendOffset, offsetsThatDiffer, pace, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerStatus, typedOffset, type Saved, type SchedulerRow } from './schedulers.js'
 

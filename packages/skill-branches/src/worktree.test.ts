@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { mkdir, mkdtemp, rm, writeFile, stat, realpath, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { nodeGitRunner, type GitRunner, BRANCHES_DIR } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner, BRANCHES_DIR } from '@openagt/agent-data'
 import {
   nameBranch,
   addWorktree,

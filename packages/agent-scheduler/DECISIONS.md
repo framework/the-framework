@@ -15,15 +15,15 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - Two tools: `agent-runner` runs one agent from start to end, `agent-scheduler` keeps the
   timetable and has `agent-runner` run what is due. Picked over one tool doing both: its
   name said schedule, yet it ran every agent, the Start box's too.
-- The scheduler uses `agent-runner` as a library, not its command line: the tick writes
+- The scheduler uses `@openagt/agent-runner` as a library, not its command line: the tick writes
   the marker, counts the cap again, and only then spawns the run, so it needs the run's id
   before the run exists.
 - Standalone, beside `agent-driver`, not inside it. `agent-driver` depends on nothing; the
   runner and the scheduler need git for the checkouts and the records, and inside the
   driver every user of the driver would get git and the skills with it. Either way was
   open; this one for now.
-- The scheduler depends on `agent-runner` for the runs, the records and the sweep, on
-  `agent-driver` for the quota reading, on the branches package for the project root, on
+- The scheduler depends on `@openagt/agent-runner` for the runs, the records and the sweep, on
+  `@openagt/agent-driver` for the quota reading, on the branches package for the project root, on
   the logs package to count the records, and on `agent-data` for the branch. It never
   depends on The Framework, and The Framework never depends on it. Its dashboard part is
   the exception: it is drawn with the dashboard's module contract, and the tool itself runs

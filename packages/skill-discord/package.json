@@ -1,5 +1,5 @@
 {
-  "name": "@gemstack/skill-discord",
+  "name": "@openagt/skill-discord",
   "version": "0.0.1",
   "description": "Discord as a skill: post one message to a Discord channel through its webhook, set once per machine.",
   "license": "MIT",

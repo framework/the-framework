@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { DATA_BRANCH, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { DATA_BRANCH, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { prsForBranch, type LinkedPr } from './dashboard/pull-requests.js'
 import { listAgents, type AgentMeta } from './store/index.js'

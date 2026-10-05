@@ -16,10 +16,10 @@ test('every built-in package is installed with the framework, and their commands
 test('a project with nothing installed gets its runs, its branches and a repository to create from the built-in packages, and nothing it has no package for', async () => {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-built-in-')))
   try {
-    assert.equal((await providedCommand(root, 'runs'))?.package, '@gemstack/skill-logs')
-    assert.equal((await providedCommand(root, 'branches'))?.package, '@gemstack/skill-branches')
+    assert.equal((await providedCommand(root, 'runs'))?.package, '@openagt/skill-logs')
+    assert.equal((await providedCommand(root, 'branches'))?.package, '@openagt/skill-branches')
     assert.deepEqual(await lookupProvided(root, 'tickets'), {})
-    assert.equal((await providedCommand(root, 'repository'))?.package, '@gemstack/skill-github', 'the built-in package that can create its repository')
+    assert.equal((await providedCommand(root, 'repository'))?.package, '@openagt/skill-github', 'the built-in package that can create its repository')
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -34,7 +34,7 @@ test('a project\'s own package for a kind wins over the built-in one', async () 
     await writeFile(join(own, 'bin', 'mine'), '')
     await writeFile(join(root, 'package.json'), JSON.stringify({ dependencies: { 'my-logs': '1.0.0' } }))
     assert.equal((await providedCommand(root, 'runs'))?.package, 'my-logs')
-    assert.equal((await providedCommand(root, 'branches'))?.package, '@gemstack/skill-branches', 'a kind the project has no package for still comes built in')
+    assert.equal((await providedCommand(root, 'branches'))?.package, '@openagt/skill-branches', 'a kind the project has no package for still comes built in')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

@@ -1,4 +1,4 @@
-import { useModuleHost, usePolled, type ModulePageProps, type ModuleProject } from 'framework/module'
+import { useModuleHost, usePolled, type ModulePageProps, type ModuleProject } from '@openagt/dashboard/module'
 import type { PlacedEntry } from '../src/queue.js'
 import { entryLabel } from '../src/module.js'
 

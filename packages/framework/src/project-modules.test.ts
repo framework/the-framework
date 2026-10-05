@@ -53,7 +53,7 @@ test('a project\'s modules are the dependencies whose package exports ./dashboar
     assert.equal(modules[2]!.dir, join(elsewhere, 'w'), 'the link is followed to the package itself')
 
     // A project with no package.json brings none of its own: it has the built-in packages that are modules, only.
-    assert.deepEqual((await readProjectModules(join(root, 'node_modules'))).map(module => module.package), ['@gemstack/files', '@gemstack/skill-logs'])
+    assert.deepEqual((await readProjectModules(join(root, 'node_modules'))).map(module => module.package), ['@openagt/files', '@openagt/skill-logs'])
   } finally {
     await rm(root, { recursive: true, force: true })
     await rm(elsewhere, { recursive: true, force: true })
@@ -63,19 +63,19 @@ test('a project\'s modules are the dependencies whose package exports ./dashboar
 test('a module may bring a server part; every project has the built-in modules, and its own copy of one wins', async () => {
   const root = await tempDir('framework-modules-server-')
   try {
-    await pkg(root, { dependencies: { withServer: '1', '@gemstack/files': '1' } })
+    await pkg(root, { dependencies: { withServer: '1', '@openagt/files': '1' } })
     const nodeModules = join(root, 'node_modules')
     await pkg(join(nodeModules, 'withServer'), { name: 'withServer', exports: { './dashboard': './d.js', './server': { node: './s.js' } } }, { 'd.js': 'export default {}', 's.js': 'export default { reads: {} }' })
-    await pkg(join(nodeModules, '@gemstack/files'), { name: '@gemstack/files', version: '9.9.9', exports: { './dashboard': './d.js' } }, { 'd.js': 'export default {}' })
+    await pkg(join(nodeModules, '@openagt/files'), { name: '@openagt/files', version: '9.9.9', exports: { './dashboard': './d.js' } }, { 'd.js': 'export default {}' })
 
     const modules = await readProjectModules(root)
     assert.equal(modules.find(module => module.package === 'withServer')?.server, join(nodeModules, 'withServer', 's.js'))
-    const files = modules.filter(module => module.package === '@gemstack/files')
+    const files = modules.filter(module => module.package === '@openagt/files')
     assert.equal(files.length, 1)
     assert.equal(files[0]!.version, '9.9.9', 'the project’s own copy, not the framework’s')
 
     // Without its own copy, a project has the framework's: its browser part and its server part.
-    const builtIn = (await readProjectModules(join(root, 'no-such-project'))).find(module => module.package === '@gemstack/files')
+    const builtIn = (await readProjectModules(join(root, 'no-such-project'))).find(module => module.package === '@openagt/files')
     assert.ok(builtIn, 'the built-in Files module is there for every project')
     assert.ok(builtIn.server, 'with its server part')
   } finally {

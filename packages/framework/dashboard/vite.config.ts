@@ -94,7 +94,7 @@ function frameworkDevDaemon(): Plugin {
 //
 // React ships as CommonJS, and a re-export of CommonJS (`export * from 'react'`) keeps none of its
 // names, so each React entry is generated: its names are read off the very package the build uses,
-// here, so an upgrade that adds a name can never leave it out. `framework/module` is a real file.
+// here, so an upgrade that adds a name can never leave it out. `@openagt/dashboard/module` is a real file.
 const HOST_MODULES: Record<string, string> = {
   react: 'react',
   'react/jsx-runtime': 'react-jsx-runtime',
@@ -124,7 +124,7 @@ function frameworkHostModules(): Plugin {
     transformIndexHtml() {
       const imports: Record<string, string> = {}
       for (const [spec, file] of Object.entries(HOST_MODULES)) imports[spec] = serving ? `/@id/${HOST_PREFIX}${spec}` : `/host/${file}.js`
-      imports['framework/module'] = serving ? '/module/index.ts' : '/host/module.js'
+      imports['@openagt/dashboard/module'] = serving ? '/module/index.ts' : '/host/module.js'
       return [{ tag: 'script', attrs: { type: 'importmap' }, children: JSON.stringify({ imports }, null, 2), injectTo: 'head-prepend' }]
     },
   }

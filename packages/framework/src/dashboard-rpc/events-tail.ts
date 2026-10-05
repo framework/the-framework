@@ -1,7 +1,7 @@
 import { existsSync, statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
-import { logLiveFile } from 'agent-driver'
+import { logLiveFile } from '@openagt/agent-driver'
 import { JsonlTailer, followFile } from '../jsonl-tail.js'
 
 /** How often the poll backstop re-reads the log when `fs.watch` says nothing. */

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { ModuleHostContext, type ModuleCommandResult, type ModuleHost } from 'framework/module'
+import { ModuleHostContext, type ModuleCommandResult, type ModuleHost } from '@openagt/dashboard/module'
 import { SubagentsSettings } from './SubagentsSettings.js'
 import { runnerChoices, runnerOf, runnerValue } from './choices.js'
 
@@ -27,7 +27,7 @@ function fakeHost(saved: Record<string, unknown> = {}, refuse?: (projectId: stri
     return { ok: true, output: { ok: true, ...(files[projectId] as object) } }
   })
   const host: ModuleHost = {
-    package: '@gemstack/skill-orchestration',
+    package: '@openagt/skill-orchestration',
     runCommand,
     act: runCommand,
     read: vi.fn(async () => ({ ok: false as const, error: 'no server part' })),

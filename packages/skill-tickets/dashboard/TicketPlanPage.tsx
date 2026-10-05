@@ -1,4 +1,4 @@
-import { Button, Markdown, Tooltip, TooltipTrigger, TooltipContent, usePolled, useModuleHost, type ModuleAgent } from 'framework/module'
+import { Button, Markdown, Tooltip, TooltipTrigger, TooltipContent, usePolled, useModuleHost, type ModuleAgent } from '@openagt/dashboard/module'
 import { planAgentFor, planPath, readShown } from '../src/module.js'
 import { TicketPageShell, TicketPageNote } from './TicketPageShell.js'
 

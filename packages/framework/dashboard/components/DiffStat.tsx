@@ -1,7 +1,7 @@
 import { cn } from '../lib/utils.js'
 
 // A change's size as the `+12 −3` pair, the one way the dashboard says it: in a run's handoff and,
-// through `framework/module`, wherever a module shows a change.
+// through `@openagt/dashboard/module`, wherever a module shows a change.
 
 /** Added/removed counts as the `+12 −3` pair. */
 export function DiffStat({ added, removed, className }: { added: number; removed: number; className?: string }) {

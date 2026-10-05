@@ -1,4 +1,4 @@
-import { writeHookLines, type InitOutcome } from 'agent-runner'
+import { writeHookLines, type InitOutcome } from '@openagt/agent-runner'
 
 /**
  * `init`: this tool's lines written into a dashboard's hooks file, so the scheduler runs while the

@@ -7,7 +7,7 @@ import { createInterface } from 'node:readline'
 import { test } from 'node:test'
 import { PassThrough, Readable } from 'node:stream'
 import { CodexDriver, codexReady, defaultCodexHome, parseCodexModels, parseCodexUsage } from './codex.js'
-import { AgentExitError, type SpawnLike, type SpawnedProcess, type Driver, type DriverEvent } from 'agent-driver'
+import { AgentExitError, type SpawnLike, type SpawnedProcess, type Driver, type DriverEvent } from '@openagt/agent-driver'
 
 type Message = { method: string; params: Record<string, unknown> }
 const note = (method: string, params: Record<string, unknown>): Message => ({ method, params })

@@ -2,7 +2,7 @@ Activates a repository for The Framework, which is what adding a project does to
 
 ## Context
 
-**User story**: the user adds a repository by path on the Overview, or runs `the-framework` inside one, and from then on the repository is a project agents [1] can work: it carries one commit titled "[The Framework] install The Framework" and a `.the-framework/` directory, and nothing the user had uncommitted is touched.
+**User story**: the user adds a repository by path on the Overview, or runs `openagent` inside one, and from then on the repository is a project agents [1] can work: it carries one commit titled "[The Framework] install The Framework" and a `.the-framework/` directory, and nothing the user had uncommitted is touched.
 
 ## Glossary
 

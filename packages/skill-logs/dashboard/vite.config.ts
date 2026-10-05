@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 
 // The module's build: one browser module, `dist/dashboard/dashboard.js`, plus its stylesheet. React
-// and `framework/module` stay bare imports: the dashboard's import map supplies its own running
+// and `@openagt/dashboard/module` stay bare imports: the dashboard's import map supplies its own running
 // copies, so the module shares the page's React and components instead of bundling them.
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
@@ -18,7 +18,7 @@ export default defineConfig({
       cssFileName: 'dashboard',
     },
     rollupOptions: {
-      external: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', 'framework/module'],
+      external: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@openagt/dashboard/module'],
     },
   },
 })

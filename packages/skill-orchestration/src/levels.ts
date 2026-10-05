@@ -1,4 +1,4 @@
-import type { DriverName } from 'agent-runner'
+import type { DriverName } from '@openagt/agent-runner'
 
 /**
  * What the person's subagent settings are, with nothing that needs Node: the command reads and

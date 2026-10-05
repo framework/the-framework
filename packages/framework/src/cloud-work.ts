@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { pickAgentPr, prsForBranchOrThrow, type LinkedPr } from './dashboard/pull-requests.js'
 import { openRemoteBranchPullRequest, type HandoffResult } from './dashboard/agent-handoff.js'
 import { listAgents, projectRuns, startedAtFromAgentId, type AgentMeta, type RunPatch } from './store/index.js'

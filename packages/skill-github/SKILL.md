@@ -9,7 +9,7 @@ The project's pull requests and issues are on GitHub. This skill is how you reac
 
 ## The command
 
-`github` is a dependency of this repository (`@gemstack/skill-github`). If `node_modules` is missing, install with the lockfile's package manager (`npm install` for `package-lock.json`). Then run `npx github` inside your checkout. It prints JSON; a refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
+`github` is a dependency of this repository (`@openagt/skill-github`). If `node_modules` is missing, install with the lockfile's package manager (`npm install` for `package-lock.json`). Then run `npx github` inside your checkout. It prints JSON; a refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
 ## Your pull request
 

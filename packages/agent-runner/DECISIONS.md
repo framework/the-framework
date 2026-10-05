@@ -13,8 +13,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - Standalone, beside `agent-driver`, not inside it. `agent-driver` depends on nothing; the
   runner needs git for its checkouts and its records, and inside the driver every user of
   the driver would get git and the skills with it. Either way was open; this one for now.
-- The runner depends on `agent-driver` for the session contract, on each coding agent's
-  adapter (`@agent-driver/claude`, `@agent-driver/codex`) for its driver and its readiness
+- The runner depends on `@openagt/agent-driver` for the session contract, on each coding agent's
+  adapter (`@openagt/agent-driver-claude`, `@openagt/agent-driver-codex`) for its driver and its readiness
   check, on the branches package for the checkout and the reclaim, on the logs package for
   the records, and on `agent-data` for the branch. It never depends on The Framework, and
   The Framework never depends on it.
@@ -36,7 +36,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - `run --detach` writes the marker and spawns the run's process the way a scheduler's tick does,
   answering the id at once: the line a dashboard's start hook runs. Picked over the
   dashboard spawning the run's process itself, which would name the tool and hold a pid.
-- The run is a checkout from the branches package, a session from `agent-driver`, the
+- The run is a checkout from the branches package, a session from `@openagt/agent-driver`, the
   prompt once, and the agent's own loop to the end. No system prompt, no gates, no
   steering: the command's skill file is the whole instruction. Picked over carrying The
   Framework's run child over: its flow is the dashboard's, not a scheduled run's.

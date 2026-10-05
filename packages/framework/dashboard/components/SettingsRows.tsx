@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { cn } from '../lib/utils.js'
 
 // The Settings page's building blocks (#958): a section, a row, a row picked from a list. The page's
-// own sections are made of them, and so is a section a module brings (`framework/module` exports
+// own sections are made of them, and so is a section a module brings (`@openagt/dashboard/module` exports
 // them), so every section of the page looks alike.
 
 /** One section of the Settings page: a titled card of rows. */

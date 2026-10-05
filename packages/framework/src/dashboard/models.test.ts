@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import type { DriverModel } from 'agent-driver'
+import type { DriverModel } from '@openagt/agent-driver'
 import { cachedModelsSource } from './models.js'
 
 /** A driver that answers each ask with the next of `answers`, counting the asks. */

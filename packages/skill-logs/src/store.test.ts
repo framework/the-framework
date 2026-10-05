@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner, fileBranchPath, withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
+import { nodeGitRunner, fileBranchPath, withFileBranch, DATA_BRANCH } from '@openagt/agent-data'
 import { deleteRun, findRun, listRuns, patchRun, readDiary, runFiles, writeRun } from './store.js'
 import { RUNS_DIR } from './names.js'
 

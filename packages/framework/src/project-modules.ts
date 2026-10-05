@@ -1,6 +1,6 @@
 import { realpath, stat } from 'node:fs/promises'
 import { dirname, join, normalize, sep } from 'node:path'
-import { packageBins, projectPackages, readManifest, runPackageCommand, type PackageCommandResult, type ProjectPackage } from '@gemstack/agent-data'
+import { packageBins, projectPackages, readManifest, runPackageCommand, type PackageCommandResult, type ProjectPackage } from '@openagt/agent-data'
 import { builtInPackages } from './built-in.js'
 
 /**

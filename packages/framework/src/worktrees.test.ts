@@ -5,9 +5,9 @@ import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { deleteProjectAgent, removeProjectWorktree } from './worktrees.js'
-import { nodeGitRunner } from '@gemstack/agent-data'
-import { runFiles, writeRun } from '@gemstack/skill-logs'
-import { addWorktree, agentBranchName } from '@gemstack/skill-branches'
+import { nodeGitRunner } from '@openagt/agent-data'
+import { runFiles, writeRun } from '@openagt/skill-logs'
+import { addWorktree, agentBranchName } from '@openagt/skill-branches'
 import { linkBranchesProvider } from './store/test-branches.js'
 // The dashboard's side of reclaiming a checkout: when it may be asked for, and whose refusal is answered. The rule itself lives in the branches package, the project's branches provider here (#1774), and is tested there.
 // Against real git, because "was the diff actually destroyed" is not a question a fake answers.
@@ -160,9 +160,9 @@ test('a project none of whose own packages provides its checkouts is asked throu
  */
 async function recordRun(repo: string, id: string): Promise<{ card: string; diary: string }> {
   const manifest = JSON.parse(await readFile(join(repo, 'package.json'), 'utf8').catch(() => '{}')) as { devDependencies?: Record<string, string> }
-  await writeFile(join(repo, 'package.json'), JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, '@gemstack/skill-logs': '*' } }))
-  await mkdir(join(repo, 'node_modules', '@gemstack'), { recursive: true })
-  await symlink(resolve(dirname(fileURLToPath(import.meta.resolve('@gemstack/skill-logs'))), '..'), join(repo, 'node_modules', '@gemstack', 'skill-logs'))
+  await writeFile(join(repo, 'package.json'), JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, '@openagt/skill-logs': '*' } }))
+  await mkdir(join(repo, 'node_modules', '@openagt'), { recursive: true })
+  await symlink(resolve(dirname(fileURLToPath(import.meta.resolve('@openagt/skill-logs'))), '..'), join(repo, 'node_modules', '@openagt', 'skill-logs'))
   const written = await writeRun(repo, { id, startedAt: '2026-01-01T00:00:00.000Z', status: 'stopped' }, [{ kind: 'ended', status: 'stopped' }])
   assert.ok(written.ok || written.committed, 'the record landed')
   return (await runFiles(repo, id))!

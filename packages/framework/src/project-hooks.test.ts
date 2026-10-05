@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runCheckHook, runProjectHooks, runResumeHook, runStartHook, startLineTakesBase } from './project-hooks.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
-import { initHooks } from 'agent-runner'
+import { initHooks } from '@openagt/agent-runner'
 
 // The hooks file and the runner (#1774), for real: `sh -c` in a throwaway project, the lines
 // leaving traces in files the assertions read back.

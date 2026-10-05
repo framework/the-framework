@@ -14,7 +14,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   dashboard importing the package was the alternative and was not taken: the dashboard
   names no skill. The executable is `logs`. The package ships `SKILL.md`, the agent's
   instructions.
-- A run is two files on `agent-data`, the branch `@gemstack/agent-data` names, never on a
+- A run is two files on `agent-data`, the branch `@openagt/agent-data` names, never on a
   code branch: `agents/<who>/<id>.json`, the card, and `agents/<who>/<id>.jsonl`, the
   diary. Both are pushed. Keeping the diary on the machine that ran it was considered and
   dropped: a run's page on another machine, a continued run on another machine and a

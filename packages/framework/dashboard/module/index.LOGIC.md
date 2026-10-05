@@ -1,4 +1,4 @@
-`framework/module`: what the dashboard offers a module [1]. It is at once the module author's contract (the shapes a module exports, the services it may call, the building blocks it may use) and, at runtime, the dashboard's own running module, which a module reaches by the bare name `framework/module`. A module adds pages, Overview cards, tabs in the side rail, what an agent's page shows, sections of the Settings page and a stop line [7] on the usage bar, offers actions on the links [3] the dashboard's pages show, and may read through its own server part.
+`@openagt/dashboard/module`: what the dashboard offers a module [1]. It is at once the module author's contract (the shapes a module exports, the services it may call, the building blocks it may use) and, at runtime, the dashboard's own running module, which a module reaches by the bare name `@openagt/dashboard/module`. A module adds pages, Overview cards, tabs in the side rail, what an agent's page shows, sections of the Settings page and a stop line [7] on the usage bar, offers actions on the links [3] the dashboard's pages show, and may read through its own server part.
 
 ## Context
 

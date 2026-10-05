@@ -13,7 +13,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   and names no skill; where the job is broken without a capability, it says so in
   capability words and stops. Picked over a command naming the capabilities it uses,
   which would tie the job to a package. A capability never names another skill.
-- One package per command, `@gemstack/skill-<command>`, the SKILL.md at the package root
+- One package per command, `@openagt/skill-<command>`, the SKILL.md at the package root
   like the capability skills. Picked over one package holding every command, so a project
   installs the commands it wants and nothing else; the name follows Claude Code's own
   convention, a command is a skill.

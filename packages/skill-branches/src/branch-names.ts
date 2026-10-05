@@ -1,14 +1,14 @@
-import { DATA_BRANCH } from '@gemstack/agent-data/names'
+import { DATA_BRANCH } from '@openagt/agent-data/names'
 
 /**
  * The naming rules for everything the package mints in git, and the layout they imply under
- * `.branches/` (the directory is `@gemstack/agent-data`'s convention).
+ * `.branches/` (the directory is `@openagt/agent-data`'s convention).
  * Pure: no node imports, so browser-safe code can name branches too.
  */
 
 /**
  * An agent id is path-safe — no separators or traversal, only our own charset — and is not `data`:
- * `agent-data` is the shared data branch of `@gemstack/agent-data`, checked out beside the agent
+ * `agent-data` is the shared data branch of `@openagt/agent-data`, checked out beside the agent
  * checkouts as `.branches/agent-data`, and an agent of that id would be indistinguishable from it.
  */
 export function isSafeAgentId(id: string): boolean {

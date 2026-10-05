@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { Readable, Writable } from 'node:stream'
 import { existsSync, readFileSync } from 'node:fs'
 import { ClaudeCodeDriver, StreamJsonParser, claudeCodeReady } from './claude-code.js'
-import { runCliSession, type SpawnLike, type SpawnedProcess, type DriverEvent } from 'agent-driver'
+import { runCliSession, type SpawnLike, type SpawnedProcess, type DriverEvent } from '@openagt/agent-driver'
 
 test('StreamJsonParser surfaces assistant text + tool names, keeps the result', () => {
   const p = new StreamJsonParser()

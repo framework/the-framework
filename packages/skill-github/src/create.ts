@@ -1,5 +1,5 @@
 import { basename } from 'node:path'
-import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { errorMessage, type GhRunner } from './gh.js'
 
 /**

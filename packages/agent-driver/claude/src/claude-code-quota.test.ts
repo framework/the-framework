@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { Readable, Writable } from 'node:stream'
 import { parseQuotaReadout, readClaudeQuota } from './claude-code-quota.js'
-import { isTransientQuotaReason, type SpawnLike, type SpawnedProcess } from 'agent-driver'
+import { isTransientQuotaReason, type SpawnLike, type SpawnedProcess } from '@openagt/agent-driver'
 
 /**
  * A real 2.1.210 readout, verbatim, including the trailing behaviour breakdown

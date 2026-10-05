@@ -1,5 +1,5 @@
 import { Flame } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, LinkActions, Tooltip, TooltipContent, TooltipTrigger, cn, usePolled, useModuleHost, type ModuleCardProps, type ModuleProject } from 'framework/module'
+import { Card, CardContent, CardHeader, CardTitle, LinkActions, Tooltip, TooltipContent, TooltipTrigger, cn, usePolled, useModuleHost, type ModuleCardProps, type ModuleProject } from '@openagt/dashboard/module'
 import { heldBack, holderAgent, hotLane, readListed, ticketLink, type HotLane } from '../src/module.js'
 import type { WorkspaceTicket } from './lib/types.js'
 

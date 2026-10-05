@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, readFile, readlink, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner, BRANCHES_DIR, DATA_BRANCH } from '@gemstack/agent-data'
+import { nodeGitRunner, BRANCHES_DIR, DATA_BRANCH } from '@openagt/agent-data'
 import { syncTickets, ticketsCheckoutPath, ticketsDir } from './store.js'
 
 const git = nodeGitRunner()

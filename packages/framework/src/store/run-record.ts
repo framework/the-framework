@@ -1,4 +1,4 @@
-import type { DriverEvent } from 'agent-driver'
+import type { DriverEvent } from '@openagt/agent-driver'
 import type { AnyDiaryLine, RunCard } from './runs.js'
 import type { ChoiceOption, FrameworkEvent } from '../events.js'
 import type { AgentMeta } from './agent-store.js'

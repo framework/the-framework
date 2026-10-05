@@ -1,5 +1,5 @@
 import { basename, join } from 'node:path'
-import { nodeGitRunner, type GitRunner, BRANCHES_DIR } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner, BRANCHES_DIR } from '@openagt/agent-data'
 import { isAgentBranch } from './branch-names.js'
 import { worktreeDirEntries, worktreeBranch, type WorktreeDirEntry } from './worktree.js'
 

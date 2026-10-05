@@ -40,7 +40,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   the scheduler letting each package hook into a run's start.
 
 ## The adapters
-- Each driver is its own package, `@agent-driver/<name>`, on the contract `agent-driver`
+- Each driver is its own package, `@openagt/agent-driver-<name>`, on the contract `@openagt/agent-driver`
   keeps: the types, the shared process core, the inbox, the question, the log and the
   fake. A package is one of three kinds: a coding agent on this machine (`claude`,
   `codex`); a shared place that runs any coding agent's CLI (`github-actions`:

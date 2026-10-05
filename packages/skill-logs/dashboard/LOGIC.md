@@ -13,4 +13,4 @@ The `logs` skill's module [1] for the dashboard: one page, Logs, listing the rec
 
 - **The module's definition** (`index.tsx`) - one page at `/logs`, labelled Logs with a scroll icon, and the stylesheet beside the module.
 - **The Logs page** (`LogsPage.tsx`) - each project's newest 50 runs from `logs --limit 50`, merged newest first, a failing project named with the command's reason, a row opening the run's page.
-- **Built to share, not to bundle** (`vite.config.ts`, `dashboard.css`, `tsconfig.json`) - the module leaves React and `framework/module` as bare imports the dashboard supplies, and its stylesheet holds only its own utilities, coloured by the dashboard's theme file; these files carry no business logic beyond that.
+- **Built to share, not to bundle** (`vite.config.ts`, `dashboard.css`, `tsconfig.json`) - the module leaves React and `@openagt/dashboard/module` as bare imports the dashboard supplies, and its stylesheet holds only its own utilities, coloured by the dashboard's theme file; these files carry no business logic beyond that.

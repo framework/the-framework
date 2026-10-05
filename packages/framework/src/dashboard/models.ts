@@ -1,6 +1,6 @@
-import { ClaudeCodeDriver } from '@agent-driver/claude'
-import { CodexDriver } from '@agent-driver/codex'
-import type { Driver, DriverModel } from 'agent-driver'
+import { ClaudeCodeDriver } from '@openagt/agent-driver-claude'
+import { CodexDriver } from '@openagt/agent-driver-codex'
+import type { Driver, DriverModel } from '@openagt/agent-driver'
 import { DRIVERS, type DriverName } from '../driver-names.js'
 
 /** What one coding agent offers: its models, or why it could not say. */

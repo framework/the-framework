@@ -4,7 +4,7 @@ The instructions every agent [1] reads before touching the agent queue [2]: wher
 
 **User story**: an agent about to work the agent queue [2] reads what agents will work next, takes the first entry, queues a task it discovered at the right priority, and removes the entry it finished, so the user's queue in the dashboard is always the work that remains, in the order it will be done.
 
-**Business logic story**: everything the skill says the command does is enforced by the rules in `src/cli.ts` and `src/queue.ts`, and the one-commit write by `@gemstack/agent-data`; an agent started with the `work-queue` command skill takes entries in the same order.
+**Business logic story**: everything the skill says the command does is enforced by the rules in `src/cli.ts` and `src/queue.ts`, and the one-commit write by `@openagt/agent-data`; an agent started with the `work-queue` command skill takes entries in the same order.
 
 ## Glossary
 
@@ -32,7 +32,7 @@ See `## Context`.
 
 #### Business logic
 
-The agent is told that the agent queue [2], `TODO_AGENTS.md`, lives on the branch `agent-data` [5], never on a code branch, so its own checkout [3] does not contain it, and that the file lists every task agents will work on next, in the order they will be taken. It reads and changes the queue with the `queue` command, a dependency of the repository (`@gemstack/skill-queue`): with no `node_modules` it first installs with the lockfile's package manager (`npm install` for `package-lock.json`), then runs `npx queue`. It is told that every change the command makes is one commit pushed straight to the `agent-data` branch, that the command's `--local` and `--full` flags are for the dashboard that shows the queue and never for it, that a refusal exits 1 with a line on stderr, and that a wrong command line exits 2 with the usage.
+The agent is told that the agent queue [2], `TODO_AGENTS.md`, lives on the branch `agent-data` [5], never on a code branch, so its own checkout [3] does not contain it, and that the file lists every task agents will work on next, in the order they will be taken. It reads and changes the queue with the `queue` command, a dependency of the repository (`@openagt/skill-queue`): with no `node_modules` it first installs with the lockfile's package manager (`npm install` for `package-lock.json`), then runs `npx queue`. It is told that every change the command makes is one commit pushed straight to the `agent-data` branch, that the command's `--local` and `--full` flags are for the dashboard that shows the queue and never for it, that a refusal exits 1 with a line on stderr, and that a wrong command line exits 2 with the usage.
 
 ### Reading
 

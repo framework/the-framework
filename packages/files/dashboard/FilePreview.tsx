@@ -1,4 +1,4 @@
-import { DiffStat, PreviewCard, useModuleHost, usePolled } from 'framework/module'
+import { DiffStat, PreviewCard, useModuleHost, usePolled } from '@openagt/dashboard/module'
 import type { FileContent } from '../src/read.js'
 import type { FileDiff } from '../src/diff.js'
 import { readContent, readDiff } from './reads.js'

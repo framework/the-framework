@@ -1,8 +1,8 @@
-Implements the `the-framework` command: four options and no verbs. The bare command serves the dashboard in the foreground; the command runs no agent. An agent [1] is started from the dashboard, by the project's own start hook [2], and belongs to whatever tool that hook names.
+Implements the `openagent` command: four options and no verbs. The bare command serves the dashboard in the foreground; the command runs no agent. An agent [1] is started from the dashboard, by the project's own start hook [2], and belongs to whatever tool that hook names.
 
 ## Context
 
-**User story**: the user runs `the-framework` inside a project's checkout and gets the dashboard at `http://127.0.0.1:4200`; Ctrl+C closes it. Everything else the user does (start an agent [1], watch it, answer its question, stop it) happens in the dashboard.
+**User story**: the user runs `openagent` inside a project's checkout and gets the dashboard at `http://127.0.0.1:4200`; Ctrl+C closes it. Everything else the user does (start an agent [1], watch it, answer its question, stop it) happens in the dashboard.
 
 **Problem**: a command with a second, private mode for starting agents would make the daemon the owner of a runner. The daemon names no tool, so the command has nothing to run but the dashboard.
 
@@ -26,11 +26,11 @@ Implements the `the-framework` command: four options and no verbs. The bare comm
 
 #### Context
 
-**User story**: `the-framework --help` shows everything the command accepts; the user never starts an agent [1] from this command line: a run is started from the dashboard, by the project's own start hook [2].
+**User story**: `openagent --help` shows everything the command accepts; the user never starts an agent [1] from this command line: a run is started from the dashboard, by the project's own start hook [2].
 
 #### Business logic
 
-The command accepts `--port <n>`, `--host <addr>`, `-h`/`--help` and `-v`/`--version`, and nothing else: it runs no agent. `--port` must be a non-negative integer (`0` asks for an ephemeral port); anything else is "invalid --port: must be a non-negative integer". `--host` without a value is "invalid --host: missing address". Any other word is "unknown option: <word>" when it starts with a dash and "unknown command: <word>" otherwise, so a verb such as `start` is refused, and so is `--agent`, the option the daemon once started its own agent processes with. A usage error is printed together with "Run `framework --help` for usage." and the exit code is 2, whatever else was on the line. Otherwise, in this order of precedence: `--help` prints the help text (which presents the command as `framework`) and exits 0; `--version` prints the version and exits 0; and the bare command serves the dashboard. The help text says that everything else is the dashboard: it shows a project's agents [1] from their files, and starts one through the project's own start hook [2] in `.the-framework/hooks.yml`, which names the tool that runs it.
+The command accepts `--port <n>`, `--host <addr>`, `-h`/`--help` and `-v`/`--version`, and nothing else: it runs no agent. `--port` must be a non-negative integer (`0` asks for an ephemeral port); anything else is "invalid --port: must be a non-negative integer". `--host` without a value is "invalid --host: missing address". Any other word is "unknown option: <word>" when it starts with a dash and "unknown command: <word>" otherwise, so a verb such as `start` is refused, and so is `--agent`, the option the daemon once started its own agent processes with. A usage error is printed together with "Run `openagent --help` for usage." and the exit code is 2, whatever else was on the line. Otherwise, in this order of precedence: `--help` prints the help text (which presents the command as `openagent`) and exits 0; `--version` prints the version and exits 0; and the bare command serves the dashboard. The help text says that everything else is the dashboard: it shows a project's agents [1] from their files, and starts one through the project's own start hook [2] in `.the-framework/hooks.yml`, which names the tool that runs it.
 
 ### The version is read from the package
 
@@ -46,7 +46,7 @@ The version is read once from the `package.json` of the installed package itself
 
 #### Context
 
-**User story**: the user runs `the-framework` in a project and the dashboard is up; Ctrl+C closes it. An agent [1] in flight is not the dashboard's process and goes on to its end. There is no background mode.
+**User story**: the user runs `openagent` in a project and the dashboard is up; Ctrl+C closes it. An agent [1] in flight is not the dashboard's process and goes on to its end. There is no background mode.
 
 #### Business logic
 
@@ -70,4 +70,4 @@ When `--host` is a non-loopback address, the daemon token [3] is created, or the
 
 #### Business logic
 
-After the running lines the terminal prints "Type a prompt on the dashboard to start an agent, or use:", "  framework --help              All options" and "The Framework v<version>". Then, without holding anything up, the npm registry is asked whether a newer version of the package is published; the answer line lands a moment later above the daemon's logs, either "✅ Up to date (v<version>)" or an "⬆️  Update available" line naming the newer version and the install command. When the registry does not answer within 2.5 seconds, or the machine is offline, no line is printed at all. The comparison and the wording are `update-check.ts`'s.
+After the running lines the terminal prints "Type a prompt on the dashboard to start an agent, or use:", "  openagent --help              All options" and "The Framework v<version>". Then, without holding anything up, the npm registry is asked whether a newer version of the package is published; the answer line lands a moment later above the daemon's logs, either "✅ Up to date (v<version>)" or an "⬆️  Update available" line naming the newer version and the install command. When the registry does not answer within 2.5 seconds, or the machine is offline, no line is printed at all. The comparison and the wording are `update-check.ts`'s.

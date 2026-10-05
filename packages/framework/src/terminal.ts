@@ -1,4 +1,4 @@
-import type { DriverEvent, DriverRateLimit } from 'agent-driver'
+import type { DriverEvent, DriverRateLimit } from '@openagt/agent-driver'
 import { pickedIds, type ChoiceOption, type FrameworkEvent } from './events.js'
 
 // The terminal surface for the agent's event stream: render one {@link FrameworkEvent} as one

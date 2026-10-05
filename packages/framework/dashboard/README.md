@@ -38,7 +38,7 @@ merging the package removed.
 ## Run it
 
 ```bash
-pnpm --filter framework dev:dashboard
+pnpm --filter @openagt/dashboard dev:dashboard
 # open http://localhost:4300
 ```
 
@@ -50,5 +50,5 @@ the files that tool writes. The CLI keeps four options and no verbs; it starts n
 ## Tests
 
 `vitest` with a jsdom environment, which is why the package runs two test runners: `node --test`
-over the compiled `src/`, then `vitest` over this directory. `pnpm --filter framework test`
+over the compiled `src/`, then `vitest` over this directory. `pnpm --filter @openagt/dashboard test`
 runs both.

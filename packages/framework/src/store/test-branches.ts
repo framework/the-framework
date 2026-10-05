@@ -41,7 +41,7 @@ export function testBranches(byProject: Record<string, Checkout[]> = {}, states:
 }
 
 /** The name of the package whose command is the branches provider of every project a test makes real. */
-const BRANCHES_PACKAGE = '@gemstack/skill-branches'
+const BRANCHES_PACKAGE = '@openagt/skill-branches'
 
 /**
  * Make the real branches package the project's provider, the way a project has it: listed as a

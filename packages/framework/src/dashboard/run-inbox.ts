@@ -1,6 +1,6 @@
 import { hostname } from 'node:os'
 import { join } from 'node:path'
-import { appendInbox, takeInbox, type InboxLine } from 'agent-driver'
+import { appendInbox, takeInbox, type InboxLine } from '@openagt/agent-driver'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import { runResumeHook } from '../project-hooks.js'
 import { findAgent, isPidAlive, resolveAgentCheckout } from '../store/index.js'

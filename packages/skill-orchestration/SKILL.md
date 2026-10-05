@@ -5,7 +5,7 @@ description: "Split your task across subagents: plan it, get the person's yes, s
 
 # Orchestration
 
-A subagent is another coding agent you start on one part of your task: it works alone, in its own checkout. Use the `orchestration` command, a dependency of this repository (`@gemstack/skill-orchestration`), run as `npx orchestration`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again.
+A subagent is another coding agent you start on one part of your task: it works alone, in its own checkout. Use the `orchestration` command, a dependency of this repository (`@openagt/skill-orchestration`), run as `npx orchestration`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again.
 
 ```
 npx orchestration plan <file>    save the file as your plan; answers the `question` to ask the person

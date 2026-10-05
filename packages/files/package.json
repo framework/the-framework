@@ -1,5 +1,5 @@
 {
-  "name": "@gemstack/files",
+  "name": "@openagt/files",
   "version": "0.0.1",
   "description": "The Files module for the OpenAgent dashboard: a project's or a run's files as a tree, what the run changed marked, any file previewed on hover.",
   "license": "MIT",
@@ -31,7 +31,7 @@
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
-    "@gemstack/agent-data": "workspace:*"
+    "@openagt/agent-data": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

@@ -1,4 +1,4 @@
-import { nodeGitRunner, originDefaultBranch, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, originDefaultBranch, type GitRunner } from '@openagt/agent-data'
 import { isAgentBranch } from './branch-names.js'
 import {
   currentBranch,

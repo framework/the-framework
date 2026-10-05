@@ -2,7 +2,7 @@ Runs The Framework's one daemon per machine, in the foreground: it binds the das
 
 ## Context
 
-**User story**: the user runs `the-framework` inside a repository and the dashboard comes up at `http://127.0.0.1:4200`; that repository is a project of the dashboard from then on. Ctrl-C closes the dashboard, and there is no way to leave the daemon running detached; an agent [1] in flight is not the daemon's process and goes on to its end. Started with `--host` on an address other than loopback, the dashboard is reachable from the network, and the URL the user has to open carries a token.
+**User story**: the user runs `openagent` inside a repository and the dashboard comes up at `http://127.0.0.1:4200`; that repository is a project of the dashboard from then on. Ctrl-C closes the dashboard, and there is no way to leave the daemon running detached; an agent [1] in flight is not the daemon's process and goes on to its end. Started with `--host` on an address other than loopback, the dashboard is reachable from the network, and the URL the user has to open carries a token.
 
 **Business logic story**: the daemon owns no agent and no agent's state. The tool that runs an agent keeps the agent's card and diary [4] in the agent's checkout [5], and the dashboard is a projection of those files; what the user says to an agent goes the other way through the agent's inbox [6], or through the project's resume hook once the agent has ended. The daemon therefore serves files, runs the projects' hooks [18] and runs the sweeps [2]. The rules for starting an agent live in `daemon-runtime.ts`, for writing to one in `dashboard/run-inbox.ts`, the sweeps in `daemon-services.ts`, the HTTP server and its request guard in `dashboard/server.ts`.
 
@@ -49,7 +49,7 @@ The port defaults to `4200`; a port of `0` asks the operating system for a free 
 
 #### Context
 
-**User story**: the user runs `the-framework` inside a repository and finds it in the dashboard's Projects list without registering it by hand.
+**User story**: the user runs `openagent` inside a repository and finds it in the dashboard's Projects list without registering it by hand.
 
 **Problem**: the daemon creates a `.the-framework/` directory for its own state wherever it runs, so a daemon started from a subfolder of a registered repository would otherwise register that subfolder as a second, nested project on every start.
 

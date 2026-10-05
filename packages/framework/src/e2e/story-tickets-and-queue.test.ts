@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { makeWorld } from './harness.js'
 import { runModuleCommand } from '../dashboard-rpc/modules.js'
-import { DATA_BRANCH, pullFileBranch } from '@gemstack/agent-data'
+import { DATA_BRANCH, pullFileBranch } from '@openagt/agent-data'
 import { onDashboard, onQueue } from '../dashboard-rpc/reads.js'
 
 // The roadmap stories (README.md): tickets are proposals, the agent queue holds confirmed work —
@@ -15,8 +15,8 @@ import { onDashboard, onQueue } from '../dashboard-rpc/reads.js'
 
 const TICKET_FILE = '2026-08-01_login-page.md'
 /** The fixture's provider packages: the modules' commands are these packages' own. */
-const QUEUE_PACKAGE = '@gemstack/skill-queue'
-const TICKETS_PACKAGE = '@gemstack/skill-tickets'
+const QUEUE_PACKAGE = '@openagt/skill-queue'
+const TICKETS_PACKAGE = '@openagt/skill-tickets'
 const TICKET = [
   'priority: 8',
   '',

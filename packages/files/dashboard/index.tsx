@@ -4,7 +4,7 @@
 // checkout, branch or merge commit exists. Changes lists only the files that changed: a run's,
 // kept after its work is merged, or the project folder's own. And, on a working run's page, the count of files it has changed so far, in the bar
 // above the message box. Its data is its own server part's reads (`../src/server.ts`).
-import { defineModule } from 'framework/module'
+import { defineModule } from '@openagt/dashboard/module'
 import { FileTree } from './FileTree.js'
 import { ChangesPanel } from './ChangesPanel.js'
 import { ChangesSummary } from './AgentChanges.js'

@@ -1,5 +1,5 @@
-import { appendInbox, takeInbox, type InboxLine } from 'agent-driver'
-import { worktreePath } from '@gemstack/skill-branches'
+import { appendInbox, takeInbox, type InboxLine } from '@openagt/agent-driver'
+import { worktreePath } from '@openagt/skill-branches'
 import { inboxPath, readLiveCard } from './live-card.js'
 import { runnerMark } from './records.js'
 

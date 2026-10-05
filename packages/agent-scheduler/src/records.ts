@@ -1,5 +1,5 @@
-import { runnerMark } from 'agent-runner'
-import { listRuns, type LogsDeps, type RunCard } from '@gemstack/skill-logs'
+import { runnerMark } from '@openagt/agent-runner'
+import { listRuns, type LogsDeps, type RunCard } from '@openagt/skill-logs'
 import { promptCommand, type Schedule } from './schedule.js'
 
 /**

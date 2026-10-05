@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { forgetRemembered } from 'framework/module'
+import { forgetRemembered } from '@openagt/dashboard/module'
 import { renderWithHost as render } from './test-host.js'
 
 const readProject = vi.fn(async () => ({ files: [], changes: {} }) as unknown)

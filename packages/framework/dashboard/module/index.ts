@@ -1,4 +1,4 @@
-// `framework/module`: what the dashboard offers a module (#1774).
+// `@openagt/dashboard/module`: what the dashboard offers a module (#1774).
 //
 // A module is a package that adds to the dashboard; its browser part is the file it exports as
 // `./dashboard`. The dashboard finds it in a
@@ -7,7 +7,7 @@
 // neither: the dashboard's import map points both at the dashboard's own running copies, so a
 // module renders inside the same React tree and uses the same components as the rest of the page.
 //
-// This file IS `framework/module`: the dashboard's build emits it as its own entry (`/host/module.js`),
+// This file IS `@openagt/dashboard/module`: the dashboard's build emits it as its own entry (`/host/module.js`),
 // sharing every chunk with the dashboard itself. Nothing here names a skill.
 import { createContext, useContext, type ComponentType } from 'react'
 import type { AgentStatus } from '../../src/index.js'

@@ -1,8 +1,8 @@
 import { stat } from 'node:fs/promises'
-import { gitReason, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
-import { isAgentBranch, removeWorktree, worktreeBranch, worktreeClean, worktreePath } from '@gemstack/skill-branches'
-import { agentLines, findRun, listRuns, publicCard, readDiary, type RunCard } from '@gemstack/skill-logs'
-import { AGENT_ID_ENV, isDriverName, markerCard, readLiveCard, recordRun, runIdFrom, runnerMark, type DriverName, type readyToRun, type spawnRun } from 'agent-runner'
+import { gitReason, type FileBranchWrite, type GitRunner } from '@openagt/agent-data'
+import { isAgentBranch, removeWorktree, worktreeBranch, worktreeClean, worktreePath } from '@openagt/skill-branches'
+import { agentLines, findRun, listRuns, publicCard, readDiary, type RunCard } from '@openagt/skill-logs'
+import { AGENT_ID_ENV, isDriverName, markerCard, readLiveCard, recordRun, runIdFrom, runnerMark, type DriverName, type readyToRun, type spawnRun } from '@openagt/agent-runner'
 import { APPROVE, planApproved, planQuestion, readPlan, writePlan } from './plan.js'
 import { DEFAULT_AT_ONCE, readSettings, runnerFor, type Level } from './settings.js'
 

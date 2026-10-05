@@ -5,7 +5,7 @@ description: Post a message to the team's Discord channel from the shell, when a
 
 # Discord
 
-Post one message to a Discord channel with the `discord` command, a dependency of this repository (`@gemstack/skill-discord`), run as `npx discord`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again.
+Post one message to a Discord channel with the `discord` command, a dependency of this repository (`@openagt/skill-discord`), run as `npx discord`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again.
 
 ```
 npx discord send "<message>"     post the message to this machine's webhook

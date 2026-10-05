@@ -1,7 +1,7 @@
 import { basename } from 'node:path'
 import { listProjects } from './registry.js'
 import { startDaemonTick, DAEMON_TICK_MS } from './daemon-tick.js'
-import { DATA_BRANCH, pullFileBranch } from '@gemstack/agent-data'
+import { DATA_BRANCH, pullFileBranch } from '@openagt/agent-data'
 import type { ProjectErrors } from './project-errors.js'
 import { startCloudScratchSweep } from './cloud-scratch-refs.js'
 import { adoptCloudWork, startCloudWorkAdoption } from './cloud-work.js'

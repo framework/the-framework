@@ -4,7 +4,7 @@ import { moduleUrl } from '../dashboard/module-serve.js'
 import { providedDataChanged } from '../store/provided.js'
 import { callModuleRead, serverHost, type ModuleReadResult } from '../dashboard/module-host.js'
 import { relayOr } from './relay-agent.js'
-import { DATA_BRANCH, pullFileBranch } from '@gemstack/agent-data'
+import { DATA_BRANCH, pullFileBranch } from '@openagt/agent-data'
 
 export type { ModuleCommandResult } from '../project-modules.js'
 export type { ModuleReadResult } from '../dashboard/module-host.js'

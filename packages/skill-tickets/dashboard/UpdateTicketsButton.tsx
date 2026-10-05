@@ -1,5 +1,5 @@
 import { RefreshCw } from 'lucide-react'
-import { StartAgentButton } from 'framework/module'
+import { StartAgentButton } from '@openagt/dashboard/module'
 import { UPDATE_TICKETS_PROMPT } from '../src/module.js'
 
 /**

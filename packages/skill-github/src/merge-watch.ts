@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BRANCHES_DIR } from '@gemstack/agent-data'
+import { BRANCHES_DIR } from '@openagt/agent-data'
 import type { GhRunner } from './gh.js'
 
 /**

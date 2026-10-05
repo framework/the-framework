@@ -1,4 +1,4 @@
-import { checkoutRoot, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { checkoutRoot, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 
 /**
  * Who the command claims as, read from where it runs — nothing for the agent to type or know.

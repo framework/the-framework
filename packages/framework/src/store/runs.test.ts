@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readProvidedCommand } from '@gemstack/agent-data'
+import { readProvidedCommand } from '@openagt/agent-data'
 import { parseRunCard, providedRuns } from './runs.js'
 
 // The finished-runs contract (#1774): a project's package declares `"framework": { "runs": "<command>" }`

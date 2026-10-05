@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import type { ModuleAgent } from 'framework/module'
+import type { ModuleAgent } from '@openagt/dashboard/module'
 import type { MountedModules } from '../../framework/dashboard/lib/use-modules.js'
 import { fakeHost, renderWithHost, type FakeHost } from './test-host.js'
 import { TicketDetailPage } from './TicketDetailPage.js'

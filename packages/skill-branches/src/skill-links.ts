@@ -1,6 +1,6 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { nodeGitRunner, type GitRunner, excludeFromGit } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner, excludeFromGit } from '@openagt/agent-data'
 import { nodeLinkFs, type LinkFs } from './worktree-deps.js'
 
 /**

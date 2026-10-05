@@ -1,5 +1,5 @@
 {
-  "name": "@gemstack/skill-github",
+  "name": "@openagt/skill-github",
   "version": "0.0.1",
   "description": "GitHub as a skill for coding agents: the project's pull requests and issues through gh, and the one command the framework and the scheduler run for the git host: requests, open, merge, home.",
   "license": "MIT",
@@ -43,7 +43,7 @@
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
-    "@gemstack/agent-data": "workspace:*"
+    "@openagt/agent-data": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

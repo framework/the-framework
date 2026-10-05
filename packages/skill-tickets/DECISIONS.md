@@ -18,7 +18,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   agent's instructions.
 - A ticket is a markdown file in `tickets/`. Its plan and its claim sit beside it:
   `<name>.plan.md` and `<name>.lock.md`, `<name>` the filename without `.md`.
-- Tickets live on `agent-data`, the branch `@gemstack/agent-data` names, never on a code
+- Tickets live on `agent-data`, the branch `@openagt/agent-data` names, never on a code
   branch. The program links `tickets` at the project root to the relative target
   `.branches/agent-data/tickets`, only when nothing of that name sits at the root; the
   target may not exist yet, so the link dangles until the first ticket lands. The link is
@@ -105,7 +105,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   every other result and every refusal is an object with `ok`.
 - The command's write is one commit per command, pushed straight to origin through a
   throwaway worktree at origin's tip; a push that loses a race is re-applied on the new
-  tip by `@gemstack/agent-data`. The program's writes go through its persistent checkout's
+  tip by `@openagt/agent-data`. The program's writes go through its persistent checkout's
   cycle instead.
 - The Overview's Hot tickets card is this package's, reading `list --local` like the page, with
   three lanes: claimed; unclaimed at priority 7 or up, neither in review nor waiting; and

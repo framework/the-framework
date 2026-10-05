@@ -6,7 +6,6 @@
   "intent": "say hello, nothing else",
   "driver": "claude-code",
   "model": "claude-opus-5-5",
-  "branch": "agent-2026-10-05T13-45-50-483Z",
   "cost": 0.04274,
   "caller": {
     "runner": {

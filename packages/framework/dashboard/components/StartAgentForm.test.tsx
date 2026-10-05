@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { openMenu } from '../test-utils.js'
 
 // Everything the form reads goes through a lib module, so the mocks stop at the `rpc/` stubs: an
@@ -39,8 +39,7 @@ vi.mock('./Composer.js', async () => {
     return (
       <>
         <div data-testid="above">{props.aboveControls}</div>
-        {props.launcherControls}
-        {props.belowControls}
+        <div data-testid="below">{props.belowControls}</div>
         <button type="button" disabled={!props.canSubmit} onClick={() => props.onSubmit('do the thing')}>
           submit-typed
         </button>
@@ -110,6 +109,16 @@ describe('StartAgentForm (#1774)', () => {
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Starting session'))
     answer({ agentId: 'r1' })
     await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
+  })
+
+  test('under the box: the Context picker, then the "Auto" menu', async () => {
+    onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true, remote: true })
+    render(<StartAgentForm {...props} />)
+    const below = screen.getByTestId('below')
+    await waitFor(() => expect(below.contains(autoMenu())).toBe(true))
+    const context = within(below).getAllByRole('button')[0]!
+    expect(context).not.toBe(autoMenu())
+    expect(context.compareDocumentPosition(autoMenu()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   test('the publish options: Nothing until the person picks, and then no level is handed to the start hook; a saved pick is shown and handed over; a change writes the saved setting', async () => {

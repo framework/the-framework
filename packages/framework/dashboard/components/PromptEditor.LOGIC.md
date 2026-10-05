@@ -23,7 +23,7 @@ The prompt editor of the composer [2]: where the user writes an agent's [1] prom
 - **Chips and how the menus behave** - a chip reads as a pill but submits as its text; a menu closes on a space or a non-matching query and never traps a stray character; the `/` menu also closes once a command is typed in full.
 - **Loading a prompt replaces the draft** - a command, a saved prompt or an opening text replaces whatever is typed without asking, in one undo step; the caller learns whether a draft was replaced so it can say that undo brings it back.
 - **Submit keys** - Enter and Cmd/Ctrl+Enter submit; Shift+Enter and Alt+Enter do not; Enter is left alone while a menu is open, inside a code block, or during an IME composition.
-- **Placeholder, disabled state and the compact form** - an empty editor shows "Describe what to do…  ( / commands · @ projects · # files )"; a disabled editor is read-only; the navbar's compact form starts one line tall.
+- **Placeholder, disabled state and the compact form** - an empty editor shows "Describe what to do…"; a disabled editor is read-only; the editor starts one line tall, in the full composer and in the navbar's compact form.
 
 ## Business logic
 
@@ -129,10 +129,10 @@ The editor remembers which `@` and `#` chips its content holds. After every chan
 
 #### Context
 
-**User story**: an empty composer [2] teaches its three menus in its placeholder; while an agent is starting the editor cannot be typed into; the navbar's quick launch offers the same editor in one line.
+**User story**: an empty composer [2] says in a few words what to type; while an agent is starting the editor cannot be typed into; the navbar's quick launch offers the same editor in one line.
 
 #### Business logic
 
-- While the editor is empty it shows the placeholder "Describe what to do…  ( / commands · @ projects · # files )", unless the surface supplies its own placeholder.
+- While the editor is empty it shows the placeholder "Describe what to do…", with no list of the three menus' triggers, unless the surface supplies its own placeholder.
 - A disabled editor is read-only; enabling it makes it editable again.
-- The editor grows with its content up to a maximum height, after which it scrolls. The compact form (the navbar's quick launch) starts one line tall and has a lower cap; the full composer starts taller. The compact form draws its own border; the full composer's border belongs to the composer box around it.
+- The editor grows with its content up to a maximum height, after which it scrolls. It starts one line tall in both forms: in the full composer as tall as the submit beside it, and in the compact form (the navbar's quick launch) tighter and with a lower cap. The compact form draws its own border; the full composer's border belongs to the composer box around it.

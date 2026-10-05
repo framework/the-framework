@@ -20,6 +20,8 @@ import { QuestionPanel } from './QuestionPanel.js'
 import { SubagentsBar } from './SubagentLine.js'
 import { holdsMainAgent } from '../lib/subagents.js'
 import { agentLogKey } from '../lib/agent-log.js'
+import { modelName, useModels } from '../lib/models.js'
+import { driverFromImpl } from '../../src/client.js'
 
 // One session's view, whether it is running or finished (#1026).
 //
@@ -152,6 +154,10 @@ export function AgentView({
   // An agent just started on a device has no card listed yet: the device's name says where it runs.
   const elsewhere = (target !== undefined && target !== 'local') || remoteLabel !== undefined
   const setup = useMemo(() => ({ workspace, branch, base, driver, model, elsewhere }), [workspace, branch, base, driver, model, elsewhere])
+  // The model by the name its coding agent gives it, for the row under the message box.
+  const picked = driverFromImpl(driver)
+  const models = useModels()
+  const modelLabel = model ? modelName(picked ? models?.[picked] : undefined, model) : undefined
   const [open, setOpen] = useState(false)
   // What the installed modules add to this run's page: a summary in the bar above the message box.
   const { runSlots: mountedSlots } = useMountedModules()
@@ -388,6 +394,7 @@ export function AgentView({
         onSending={onSending}
         outcome={outcome}
         subagentsRunning={subagentsRunning}
+        model={modelLabel}
       />
     </>
   )

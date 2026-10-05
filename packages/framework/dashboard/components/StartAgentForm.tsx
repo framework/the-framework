@@ -159,16 +159,6 @@ export function StartAgentForm({
         files={files}
         addContext={addContext}
         removeContext={removeContext}
-        launcherControls={
-          <ContextMenu
-            otherProjects={otherProjects}
-            context={context}
-            contextFiles={contextFiles}
-            summary={contextSummary}
-            busy={busy}
-            onToggle={toggleContext}
-          />
-        }
         // No chip until the name is known, never a wrong one: the row is there all the same and
         // its height is fixed, so the name landing moves nothing.
         // The "start from" chip is the row's last, so nothing is beside it to push when it lands
@@ -183,6 +173,15 @@ export function StartAgentForm({
           ) : null
         }
         belowControls={
+          <>
+          <ContextMenu
+            otherProjects={otherProjects}
+            context={context}
+            contextFiles={contextFiles}
+            summary={contextSummary}
+            busy={busy}
+            onToggle={toggleContext}
+          />
           <AutoMenu
             publish={publishPick}
             picks={remote ? offeredPublishPicks(gitHost, remote) : []}
@@ -191,6 +190,7 @@ export function StartAgentForm({
             onCleanup={next => updatePreferences({ postMergeCleanup: next })}
             busy={busy}
           />
+          </>
         }
         onSubmit={submit}
         onPromptChange={value => {

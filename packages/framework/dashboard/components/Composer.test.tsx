@@ -117,7 +117,7 @@ const STUDIO = 'http://192.168.1.5:4200'
 const agentTrigger = () => screen.getByRole('button', { name: /^Driver: / })
 
 describe('Composer (#721)', () => {
-  test('renders the full control row: commands, agent/model, "Run on", and the submit button', async () => {
+  test('renders the commands menu, the agent/model select, "Run on", and the submit button', async () => {
     renderComposer({ submitLabel: 'Start session' })
     // Commands have a visible surface (#948): the `/` menu stays the fast path, the button is
     // the discoverable one.
@@ -260,43 +260,75 @@ describe('Composer (#721)', () => {
   })
 })
 
-// The bordered box: the nearest element holding both the editor and the Commands button.
+// The bordered box: the nearest element around the editor that draws the border.
 const box = (): HTMLElement => {
-  const editor = screen.getByLabelText('prompt')
-  let el: HTMLElement = screen.getByRole('button', { name: 'Commands' })
-  while (!el.contains(editor)) el = el.parentElement!
+  let el: HTMLElement = screen.getByLabelText('prompt')
+  while (!el.className.split(' ').includes('border')) el = el.parentElement!
   return el
 }
+const commands = () => screen.getByRole('button', { name: 'Commands' })
+
+describe('the box', () => {
+  test('it holds the text and the submit alone: the commands menu, the model and "Run on" are outside it', () => {
+    renderComposer()
+    fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'x' } })
+    expect(box().contains(screen.getByRole('button', { name: 'Send' }))).toBe(true)
+    expect(box().contains(commands())).toBe(false)
+    expect(box().contains(agentTrigger())).toBe(false)
+    expect(box().contains(screen.getByRole('button', { name: 'Run on' }))).toBe(false)
+  })
+
+  test('the submit is at the right of the text and stays at its last line', () => {
+    renderComposer()
+    const editor = screen.getByLabelText('prompt')
+    const submit = box().querySelector('button[aria-label="Send"]')!
+    expect(editor.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(box().className).toContain('items-end')
+  })
+
+  test('a session\'s idle control takes the submit\'s place in the box', () => {
+    renderComposer({ inAgent: true, idleControl: <button type="button">stop</button> })
+    expect(box().contains(screen.getByRole('button', { name: 'stop' }))).toBe(true)
+  })
+})
 
 describe('the row under the box', () => {
-  test('with belowControls, its content and the agent/model select are in one row under the box, and the select is not in the box', () => {
+  test('the commands menu, then the caller\'s controls, then the agent/model select at the right, in one row right under the box', () => {
     renderComposer({ belowControls: <span>below-left</span> })
-    const select = agentTrigger()
-    expect(box().contains(select)).toBe(false)
-    expect(box().compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     const row = box().nextElementSibling!
     const left = screen.getByText('below-left')
+    const select = agentTrigger()
+    expect(row.contains(commands())).toBe(true)
     expect(row.contains(left)).toBe(true)
     expect(row.contains(select)).toBe(true)
+    expect(commands().compareDocumentPosition(left) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(left.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    // The rest of the box's own row stays in the box.
-    expect(box().contains(screen.getByRole('button', { name: 'Run on' }))).toBe(true)
     // One line of a fixed height: a longer label at the left cannot move the select or the page.
     expect(row.className).toContain('h-8')
     expect(row.className).not.toContain('flex-wrap')
     expect(select.parentElement!.className).toContain('shrink-0')
   })
 
-  test('with belowControls holding nothing, the row still carries the agent/model select', () => {
-    renderComposer({ belowControls: null })
-    expect(box().contains(agentTrigger())).toBe(false)
-    expect(box().nextElementSibling!.contains(agentTrigger())).toBe(true)
+  test('with no controls of the caller, the row still carries the commands menu and the select', () => {
+    renderComposer()
+    const row = box().nextElementSibling!
+    expect(row.contains(commands())).toBe(true)
+    expect(row.contains(agentTrigger())).toBe(true)
   })
 
-  test('without belowControls there is no row under the box: the agent/model select is inside the box', () => {
-    renderComposer()
-    expect(box().contains(agentTrigger())).toBe(true)
-    expect(box().nextElementSibling).toBeNull()
+  test('in a session the model is said in words where the select would be, and is no button', () => {
+    renderComposer({ inAgent: true, showDriverModel: false, sessionModel: 'Opus 5.5' })
+    const row = box().nextElementSibling!
+    const said = screen.getByText('Opus 5.5')
+    expect(row.contains(said)).toBe(true)
+    expect(said.closest('button')).toBeNull()
+    expect(commands().compareDocumentPosition(said) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Driver: / })).toBeNull()
+  })
+
+  test('a session whose model is not known says none', () => {
+    renderComposer({ inAgent: true, showDriverModel: false })
+    expect(box().nextElementSibling!.textContent).toBe('')
   })
 })
 
@@ -321,8 +353,8 @@ describe('the row of chips above the box', () => {
     expect(chip.parentElement!.className).toContain('shrink-[100]')
   })
 
-  test('with aboveControls holding nothing, the row still carries the "Run on" chip', () => {
-    renderComposer({ aboveControls: null })
+  test('with no chips of the caller, the row still carries the "Run on" chip', () => {
+    renderComposer()
     expect(box().previousElementSibling!.contains(runOn())).toBe(true)
     expect(box().contains(runOn())).toBe(false)
   })
@@ -346,13 +378,6 @@ describe('the row of chips above the box', () => {
     renderComposer({ aboveControls: null })
     await waitFor(() => expect(screen.getByText(/Studio is offline/)).toBeTruthy())
     expect(runOn().textContent).toBe('Studio')
-  })
-
-  test('without aboveControls there is no row above the box: "Run on" is an icon button inside the box', () => {
-    renderComposer()
-    expect(box().previousElementSibling).toBeNull()
-    expect(box().contains(runOn())).toBe(true)
-    expect(runOn().textContent).toBe('')
   })
 
   test('the compact form has no row of chips: "Run on" stays an icon button in its one row', () => {

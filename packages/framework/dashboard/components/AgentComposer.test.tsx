@@ -16,7 +16,7 @@ vi.mock('./Composer.js', async () => {
         submit
       </button>
       <span data-testid="composer-props">
-        {JSON.stringify({ showDriverModel: props.showDriverModel, inAgent: props.inAgent, busyLabel: props.submitBusyLabel, placeholder: props.placeholder })}
+        {JSON.stringify({ showDriverModel: props.showDriverModel, inAgent: props.inAgent, busyLabel: props.submitBusyLabel, placeholder: props.placeholder, sessionModel: props.sessionModel })}
       </span>
       {/* The empty-box slot control (#1455), rendered so the Stop/Resume tests can press it. */}
       {props.idleControl}
@@ -33,7 +33,7 @@ function renderComposer(over: Partial<Parameters<typeof AgentComposer>[0]> = {})
   return { onAgentStarted }
 }
 
-const props = (): { showDriverModel: boolean; inAgent: boolean; busyLabel: string; placeholder: string } =>
+const props = (): { showDriverModel: boolean; inAgent: boolean; busyLabel: string; placeholder: string; sessionModel?: string } =>
   JSON.parse(screen.getByTestId('composer-props').textContent ?? '{}')
 
 beforeEach(() => {
@@ -51,6 +51,24 @@ describe('AgentComposer column', () => {
     const box = container.firstElementChild!
     expect(box.className).toContain('mx-auto')
     expect(box.className).toContain('max-w-3xl')
+  })
+})
+
+describe('AgentComposer box', () => {
+  test('the model the session runs on is handed to the box, to be said under it; none when not known', () => {
+    renderComposer({ model: 'Opus 5.5' })
+    expect(props().sessionModel).toBe('Opus 5.5')
+    cleanup()
+    renderComposer()
+    expect(props().sessionModel).toBeUndefined()
+  })
+
+  test('the box\'s own words are short: no list of the triggers, live or ended', () => {
+    renderComposer()
+    expect(props().placeholder).toBe('Message the agent…')
+    cleanup()
+    renderComposer({ live: false })
+    expect(props().placeholder).toBe('Message the agent to continue it…')
   })
 })
 

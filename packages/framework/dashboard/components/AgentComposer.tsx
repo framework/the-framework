@@ -35,6 +35,7 @@ export function AgentComposer({
   onSending,
   outcome,
   subagentsRunning = 0,
+  model,
 }: {
   projectId: string
   /** Which run this addresses (#749). */
@@ -50,6 +51,8 @@ export function AgentComposer({
   outcome?: AgentOutcome | undefined
   /** How many of the run's subagents are still working: an ended run is then waiting for them. */
   subagentsRunning?: number
+  /** The model the session runs on, by its name: said under the box. */
+  model?: string | undefined
 }) {
   const composerRef = useRef<ComposerHandle>(null)
   const { busy, error, run } = useAction()
@@ -175,12 +178,9 @@ export function AgentComposer({
         submitBusyLabel={live ? 'Sending…' : 'Resuming…'}
         showDriverModel={false}
         inAgent
+        sessionModel={model}
         idleControl={idleControl}
-        placeholder={
-          live
-            ? 'Message the agent…  ( / commands · @ projects · # files )'
-            : 'Message the agent to continue it…  ( / commands · @ projects · # files )'
-        }
+        placeholder={live ? 'Message the agent…' : 'Message the agent to continue it…'}
       />
     </div>
   )

@@ -28,7 +28,7 @@ See `## Context`.
 
 #### Business logic
 
-The button is named "Commands" and its tooltip reads "Run a command or load a saved prompt — also available by typing / in the editor". The menu holds:
+The button is named "Commands", shows a plus icon, and its tooltip reads "Run a command or load a saved prompt. In the box: / commands · @ projects · # files", so the editor's three typed triggers are said here and not in the editor's placeholder. The menu holds:
 
 - "Commands": every command [2] of the open project, each as `/<name>`, with its description as the row's tooltip when it has one. A project with none shows "This project has no commands." in its place.
 - "Your saved prompts": the user's own saved prompts [3], by name. The section is absent when there are none.

@@ -20,7 +20,7 @@ The box at the bottom of an agent view [1]: where the user says something to tha
 - **A refusal** - the daemon's reason is shown as an alert, the text stays in the box, and nothing is reported as queued or resumed.
 - **The slot: Stop, Resume, or send** - the empty box's corner holds "Stop agent" while the agent works and "Resume" once it was stopped; typing swaps in the send arrow.
 - **The line above the box** - what a send will do from here: queued, continues, resumes, or answer the question above; an agent that ended clean while its subagents (the agents started for it, when it split its task across them) still run is said to be waiting for them.
-- **What the box leaves out** - no coding agent and model select and no "Run on": an agent cannot change either.
+- **What the box leaves out** - no coding agent and model select and no "Run on": an agent cannot change either; the model the agent runs on is said in words under the box.
 
 ## Business logic
 
@@ -92,4 +92,4 @@ The "Queued" status is hidden while an error is shown, so the box never says "qu
 
 #### Business logic
 
-The box shows no coding agent and model select and no "Run on" pick. The Commands button, the `/` list and the `@` and `#` mentions work as at the launcher: inside an agent a command is a message like any other.
+The box shows no coding agent and model select and no "Run on" pick. The model the agent runs on, as the agent view names it, is handed to the shared composer, which says it in words in the row under the box, where the launcher has its select (`Composer.tsx`); when the agent view names none, nothing is said. The Commands button, the `/` list and the `@` and `#` mentions work as at the launcher: inside an agent a command is a message like any other.

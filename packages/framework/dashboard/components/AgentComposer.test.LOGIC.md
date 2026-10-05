@@ -7,6 +7,8 @@ What the tests cover, for the box at the bottom of an agent view:
 - **A send to a working agent** - the text goes to the daemon as a message for this agent, and the box says it is queued until the agent's turn ends; a refused message shows why and is not reported as queued.
 - **A send to an ended agent** - the box says the session can be continued; the send is the same message call, and the shell is told to follow the same agent; a refused resume shows why and the shell is told nothing.
 - **What is left out** - no coding agent and model select and no "Run on" pick, since an agent cannot change either.
+- **The model under the box** - the model the agent runs on is handed to the shared composer, and none when it is not known.
+- **The placeholder** - "Message the agent…" for a working agent and "Message the agent to continue it…" for an ended one, with no list of the triggers.
 
 ## Glossary
 

@@ -1,4 +1,4 @@
-The launcher's [1] "Context" picker: a dropdown at the start of the composer's control row, next to the Commands button, through which the user narrows the next agent's [2] focus to other registered projects and to specific files — the Context [3].
+The launcher's [1] "Context" picker: a dropdown in the row under the composer's box, after the Commands button and before the "Auto" menu, through which the user narrows the next agent's [2] focus to other registered projects and to specific files — the Context [3].
 
 ## Context
 

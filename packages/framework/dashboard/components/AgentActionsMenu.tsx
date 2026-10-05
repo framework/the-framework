@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { GitHostHome, FrameworkEvent, RepositoryOffer } from '../../src/index.js'
 import { sessionInfo } from '../../src/client.js'
-import { MoreVertical, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy, CloudUpload } from 'lucide-react'
+import { MoreVertical, ChevronDown, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy, CloudUpload, Info } from 'lucide-react'
 import { onGitHostHome, onRepositoryOffer } from '../rpc/reads.js'
 import {
   sendOpenInApp,
@@ -30,13 +30,21 @@ import {
   DropdownMenuSubContent,
 } from './ui/dropdown-menu.js'
 
-// One ⋮ overflow menu for everything you can DO to a session (#toolbar-menu), instead of a row of
-// five-plus icon buttons that came and went with the agent's state: git host / folder / editor,
-// the Stop button, Remove worktree, Open session, and Delete. The project home's bar shows the
-// same menu with no session: the items that open the project itself, under "Project actions". The handoff's Push / Open PR stay visible in the bar — they move the work
-// forward, not just open it somewhere. Serve keeps its state (Serve → Open/Stop, or a picker
-// submenu in a multi-app repo); the editor keeps its preferred-editor submenu; Delete opens its
-// confirm dialog (a menu item cannot also be the dialog's trigger, so the dialog is controlled).
+// The menus of a page's top bar, as Claude Code on the web splits them.
+//
+// On an agent's page there are two. The agent's name is the first (`part="session"`): the name
+// with a small ⌄, opening to what belongs to this session — its details, its folder, its editor,
+// its session link, the command that resumes it, and Stop, Remove worktree, Delete. The ⋮ at the
+// bar's end is the second (`part="project"`): what belongs to the project — its page on its git
+// host. A project with no such page has no ⋮ there: its place is kept, so nothing beside it moves
+// when the answer lands.
+//
+// On the "New agent" page there is no session, and one ⋮ holds all of the project's (no `part`):
+// its git host page, the offer of a repository, its folder, its editor.
+//
+// The handoff's Push / Open PR are not here: they move the work forward, and sit in the bar above
+// the message box. The editor keeps its preferred-editor submenu; Delete opens its confirm dialog
+// (a menu item cannot also be the dialog's trigger, so the dialog is controlled).
 export function AgentActionsMenu({
   projectId,
   agentId: agentId,
@@ -45,15 +53,27 @@ export function AgentActionsMenu({
   retainedWorktree = false,
   onWorktreeRemoved,
   onDeleted,
+  part,
+  details,
+  size,
 }: {
   projectId: string
   agentId?: string | null | undefined
   events: FrameworkEvent[]
+  /** The session's name: what the session's menu reads. Not known yet, a grey bar holds its place. */
   label?: string | undefined
   retainedWorktree?: boolean
   onWorktreeRemoved?: (() => void) | undefined
   onDeleted?: (() => void) | undefined
+  /** Which of an agent's page's two menus this is; absent, the one menu of a page with no session. */
+  part?: 'session' | 'project' | undefined
+  /** The session's details strip under the bar (its coding agent, its spend): the session's menu shows and hides it. */
+  details?: { open: boolean; onToggle: () => void } | undefined
+  /** The size on disk of the session's worktree, said beside "Remove worktree". */
+  size?: string | undefined
 }) {
+  const ofSession = part !== 'project'
+  const ofProject = part !== 'session'
   const active = isAgentActive(events)
   const info = sessionInfo(events)
   const session = describeSessionLink(info)
@@ -86,11 +106,11 @@ export function AgentActionsMenu({
   // Hold the last git host page while a new project's loads, so the item does not flicker.
   // Asked again after a repository is created: the project has a page on its git host from then on.
   const [created, setCreated] = useState(0)
-  const home = useLoaded<GitHostHome | null>(() => onGitHostHome(projectId), null, [projectId, created], 'previous')
+  const home = useLoaded<GitHostHome | null>(ofProject ? () => onGitHostHome(projectId) : null, null, [projectId, created, ofProject], 'previous')
   // A project that lives on this machine only may be offered a repository on a host; the project's
   // menu offers it, a session's does not. Creating one puts the project's code on a server under
   // the person's account, so it is asked once more before it happens.
-  const offer = useLoaded<RepositoryOffer | null>(() => (agentId ? Promise.resolve(null) : onRepositoryOffer(projectId)), null, [projectId, agentId, created])
+  const offer = useLoaded<RepositoryOffer | null>(ofProject && !agentId ? () => onRepositoryOffer(projectId) : null, null, [projectId, agentId, created, ofProject])
   const [confirmCreate, setConfirmCreate] = useState(false)
 
   const { busy, error, run } = useAction()
@@ -116,28 +136,52 @@ export function AgentActionsMenu({
 
   const name = label?.trim() || agentId
   // What the button is called: the menu acts on one session, or, with none, on the project.
-  const title = agentId ? 'Session actions' : 'Project actions'
+  const title = part === 'session' ? 'Session actions' : 'Project actions'
   const removable = retainedWorktree && !active && !!agentId
   const deletable = !!onDeleted && !active && !!agentId
+
+  // The project's menu of an agent's page holds the git host page alone: with none, no menu. Its
+  // place is kept either way, so the count beside it does not move when the answer lands.
+  if (part === 'project' && !home) return <span data-testid="project-menu-place" className="h-7 w-7 shrink-0" aria-hidden />
 
   return (
     <>
       <DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <DropdownMenuTrigger
-                type="button"
-                aria-label={title}
-                className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
-              />
-            }
+        {part === 'session' ? (
+          // The session's name is the menu's button: the name, cut short when the bar is tight, and a
+          // small ⌄. A name not known yet is a grey bar in its place, so the bar is laid out the
+          // same from the first frame.
+          <DropdownMenuTrigger
+            type="button"
+            aria-label={title}
+            title={label}
+            className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-left text-xs hover:bg-muted data-[popup-open]:bg-muted"
           >
-            <MoreVertical className="h-3.5 w-3.5" />
-          </TooltipTrigger>
-          <TooltipContent>{title}</TooltipContent>
-        </Tooltip>
-        <DropdownMenuContent align="end" className="min-w-[14rem]">
+            {label ? <span className="min-w-0 truncate font-medium text-foreground">{label}</span> : <span data-testid="title-placeholder" className="h-3 w-40 max-w-full rounded bg-muted" />}
+            <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+          </DropdownMenuTrigger>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  type="button"
+                  aria-label={title}
+                  className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
+                />
+              }
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>{title}</TooltipContent>
+          </Tooltip>
+        )}
+        <DropdownMenuContent align={part === 'session' ? 'start' : 'end'} className="min-w-[14rem]">
+          {details && ofSession && (
+            <DropdownMenuItem onClick={details.onToggle}>
+              <Info className="h-3.5 w-3.5 shrink-0" /> {details.open ? 'Hide details' : 'Show details'}
+            </DropdownMenuItem>
+          )}
           {home && (
             <DropdownMenuItem render={<a href={home.url} target="_blank" rel="noreferrer" />}>
               <ExternalLink className="h-3.5 w-3.5 shrink-0" /> Open on {home.name}
@@ -148,6 +192,8 @@ export function AgentActionsMenu({
               <CloudUpload className="h-3.5 w-3.5 shrink-0" /> Create a repository on {offer.name}…
             </DropdownMenuItem>
           )}
+          {ofSession && (
+            <>
           {/* Named for what it actually opens (#1195): once a session's worktree is gone this
               resolves to the project root, and calling that "the session's folder" was a lie the
               user could not see. */}
@@ -207,13 +253,16 @@ export function AgentActionsMenu({
 
           {removable && (
             <DropdownMenuItem disabled={busy} onClick={() => removeWorktree()}>
-              <FolderX className="h-3.5 w-3.5 shrink-0" /> Remove worktree
+              <FolderX className="h-3.5 w-3.5 shrink-0" /> <span className="flex-1">Remove worktree</span>
+              {size && <span className="ml-auto pl-3 text-[10px] text-muted-foreground">{size}</span>}
             </DropdownMenuItem>
           )}
           {deletable && (
             <DropdownMenuItem onClick={() => setConfirmDelete(true)} className="text-danger">
               <Trash2 className="h-3.5 w-3.5 shrink-0" /> Delete session
             </DropdownMenuItem>
+          )}
+            </>
           )}
 
           {error && <p className="px-2 py-1.5 text-xs text-danger">{error}</p>}

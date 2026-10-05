@@ -2,7 +2,7 @@ import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
 import { DRIVER_LABELS, driverFromImpl } from '../../src/client.js'
 import { modelName, useModels } from '../lib/models.js'
 
-// The session-details strip behind the action bar's disclosure (always available now, so the
+// The session-details strip behind "Show details" in the session's menu (always available now, so the
 // chevron no longer pops in and out with the git/handoff data). It shows the "about this agent"
 // facts the wrapped agent's own chat does not: which agent and model ran it, off the run's card, the
 // model by the name its agent gives it ("Opus 5.5" for `opus`),

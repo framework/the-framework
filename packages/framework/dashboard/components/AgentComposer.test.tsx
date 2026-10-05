@@ -80,7 +80,7 @@ describe('AgentComposer slot control (#1455)', () => {
     fireEvent.click(stop)
     await waitFor(() => expect(sendStop).toHaveBeenCalledWith('p1', 'run-1'))
     // A landed Stop must not be re-fireable while the end event is still in flight: the button
-    // stays disabled ("Stopping…") until `live` flips — the ⋮ menu's own latch.
+    // stays disabled ("Stopping…") until `live` flips — the session's menu's own latch.
     await waitFor(() => expect((screen.getByRole('button', { name: 'Stop agent' }) as HTMLButtonElement).disabled).toBe(true))
   })
 

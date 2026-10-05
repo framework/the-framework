@@ -36,8 +36,9 @@ vi.mock('../lib/preferences.js', () => ({
 // The `actions` and `summary` slots of the bar above the message box ARE rendered, so the handoff
 // cluster and the modules' summaries stay reachable.
 vi.mock('./AgentActionBar.js', () => ({
-  AgentActionBar: ({ ready, checkout, onToggle }: { ready?: boolean; checkout: unknown; onToggle?: () => void }) => (
+  AgentActionBar: ({ ready, checkout, onToggle, runsOn }: { ready?: boolean; checkout: unknown; onToggle?: () => void; runsOn?: string }) => (
     <>
+      <span data-testid="bar-runs-on">{runsOn}</span>
       <button type="button" onClick={onToggle}>details</button>
       <span data-testid="bar-ready">{String(ready)}</span>
       <span data-testid="bar-checkout">{JSON.stringify(checkout)}</span>
@@ -635,6 +636,24 @@ describe('an ended agent whose subagents still work', () => {
     rerender(view({ live: true, subagents: [sub({})] }))
     await act(async () => {})
     expect(waits()).toEqual([])
+  })
+})
+
+describe('where the agent runs, for the chip beside its name', () => {
+  test('this machine by itself; a device by the name it was given; the cloud and GitHub Actions by theirs', () => {
+    const runsOn = () => screen.getByTestId('bar-runs-on').textContent
+    const { rerender } = render(view({ live: true }))
+    expect(runsOn()).toBe('This machine')
+    rerender(view({ live: true, target: 'local' }))
+    expect(runsOn()).toBe('This machine')
+    rerender(view({ live: true, target: 'remote', remoteLabel: 'Studio' }))
+    expect(runsOn()).toBe('Studio')
+    rerender(view({ live: true, target: 'remote' }))
+    expect(runsOn()).toBe('A device')
+    rerender(view({ live: true, target: 'web' }))
+    expect(runsOn()).toBe('Cloud')
+    rerender(view({ live: true, target: 'actions' }))
+    expect(runsOn()).toBe('GitHub Actions')
   })
 })
 

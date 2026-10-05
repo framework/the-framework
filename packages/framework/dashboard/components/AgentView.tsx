@@ -79,7 +79,7 @@ export function AgentView({
    * the stable identity, so the branch renaming itself near the end of an agent (#736) reads as a
    * detail changing rather than the whole view changing. */
   label?: string | undefined
-  /** The session's project, shown as a `project / session` breadcrumb in the action bar. */
+  /** The session's project, said in the chip beside the session's name in the top bar. */
   projectName?: string | null | undefined
   /** Where the agent executes (#1053/#610): `actions` swaps the live feed for a burst-mode affordance; `remote` is relayed to a device (#1067); `web` is handed to a Claude Code cloud session. */
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
@@ -162,6 +162,8 @@ export function AgentView({
   const picked = driverFromImpl(driver)
   const models = useModels()
   const modelLabel = model ? modelName(picked ? models?.[picked] : undefined, model) : undefined
+  // Where the agent runs, for the chip beside its name: a device by the name it was given.
+  const runsOn = remoteLabel ?? (target === 'web' ? 'Cloud' : target === 'actions' ? 'GitHub Actions' : target === 'remote' ? 'A device' : 'This machine')
   const [open, setOpen] = useState(false)
   // What the installed modules add to this run's page: a summary in the bar above the message box.
   const { runSlots: mountedSlots, panels: mountedPanels } = useMountedModules()
@@ -324,6 +326,7 @@ export function AgentView({
         events={shown}
         label={label}
         projectName={projectName}
+        runsOn={runsOn}
         retainedWorktree={hasWorktree}
         onWorktreeRemoved={onWorktreeRemoved}
         onDeleted={onDeleted}

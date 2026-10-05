@@ -245,7 +245,7 @@ describe('the project select (#1513)', () => {
     render(<App />)
     fireEvent.click(await screen.findByText('site ran'))
     expect(url()).toBe(`/${OTHER.id}/s3`)
-    await waitFor(() => expect(document.querySelector('main span[title="site ran"], span.font-medium[title="site ran"]')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('button[aria-label="Session actions"][title="site ran"]')).toBeTruthy())
   })
 
   test('New agent starts in the picked project; picking another on the launcher moves to its launcher, and all keeps the page', async () => {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react'
+import { hoverTooltip } from '../test-utils.js'
 import type { ReactElement, ReactNode } from 'react'
 import type { AgentView } from '../lib/live-state.js'
 import { ModulesContext, type MountedModules, type MountedPanel } from '../lib/use-modules.js'
@@ -97,9 +98,7 @@ describe('RightRail tab labels (#1145)', () => {
   test('a tab says what it holds when hovered', async () => {
     render(<RightRail {...baseProps} />)
     const tab = await screen.findByRole('tab', { name: /docs/i })
-    fireEvent.mouseEnter(tab)
-    fireEvent.pointerEnter(tab, { pointerType: 'mouse' })
-    await waitFor(() => expect(screen.getByRole('tooltip').textContent).toContain('PLAN/TODO'))
+    expect((await hoverTooltip(tab)).textContent).toContain('PLAN/TODO')
   })
 })
 

@@ -306,6 +306,17 @@ export type DriverQuota =
   | { available: false; reason: DriverQuotaUnavailableReason }
 
 /**
+ * One file a tool call changed, as the call's own CLI reports it: the path as the CLI names it,
+ * how many lines the call added and how many it removed, and `created` when the call made the file.
+ */
+export interface FileChange {
+  path: string
+  added: number
+  removed: number
+  created?: true
+}
+
+/**
  * A black-box progress event from the wrapped agent. A caller shows these for
  * visibility but never gates on them: the gate is the code and the outcome, not
  * which tool the agent reached for.
@@ -345,9 +356,11 @@ export type DriverEvent =
   /**
    * What a tool call gave back once it was over: `id` is its `action`'s, `text` is what it printed,
    * cut to a size limit (`cutOutput`). `failed` says the call failed; `exitCode` is the command's
-   * exit code, for a CLI that reports one. A call that gave nothing back has no `output`.
+   * exit code, for a CLI that reports one. `changed` is the files the call changed, as its CLI
+   * reports them: an edit, a write, a patch. A call that gave nothing back and changed no file has
+   * no `output`.
    */
-  | { type: 'output'; id: string; text: string; failed?: true; exitCode?: number }
+  | { type: 'output'; id: string; text: string; failed?: true; exitCode?: number; changed?: FileChange[] }
   /** What the agent thought before it acted, as its CLI summarizes it. */
   | { type: 'thought'; text: string }
   /**

@@ -73,6 +73,39 @@ test('StreamJsonParser gives each tool call its id, and what the call gave back 
   assert.ok(long?.type === 'output' && long.text.startsWith('aaa') && long.text.endsWith('END') && long.text.includes('… 1003 characters cut …'))
 })
 
+// The two accounts below are what Claude Code 2 printed for a Write and an Edit, cut to the fields read.
+test('StreamJsonParser says what an edit or a write did to its file: lines added and removed, and whether it made the file', () => {
+  const p = new StreamJsonParser()
+  const line = (blocks: unknown[], account?: unknown) => JSON.stringify({ type: 'user', message: { role: 'user', content: blocks }, ...(account === undefined ? {} : { tool_use_result: account }) })
+  const said = (id: string, text = 'ok') => ({ type: 'tool_result', tool_use_id: id, content: text })
+  // A file the call made: its content's lines, all added.
+  assert.deepEqual(p.push(line([said('w1')], { type: 'create', filePath: '/ws/a.txt', content: 'one\ntwo\nthree', structuredPatch: [], originalFile: null })), [
+    { type: 'output', id: 'w1', text: 'ok', changed: [{ path: '/ws/a.txt', added: 3, removed: 0, created: true }] },
+  ])
+  // A file the call changed: the patch's own lines, over all its hunks.
+  const hunk = (lines: string[]) => ({ oldStart: 1, oldLines: 3, newStart: 1, newLines: 4, lines })
+  assert.deepEqual(p.push(line([said('e1')], { filePath: '/ws/a.txt', oldString: 'two', newString: 'TWO\ntwo and a half', structuredPatch: [hunk([' one', '-two', '+TWO', '+two and a half', ' three']), hunk(['-x', '+y'])] })), [
+    { type: 'output', id: 'e1', text: 'ok', changed: [{ path: '/ws/a.txt', added: 3, removed: 2 }] },
+  ])
+  // A write over a file that was there is a change, not a new file.
+  assert.deepEqual(p.push(line([said('w2')], { type: 'update', filePath: '/ws/a.txt', content: 'x', structuredPatch: [hunk(['-one', '+x'])] })), [
+    { type: 'output', id: 'w2', text: 'ok', changed: [{ path: '/ws/a.txt', added: 1, removed: 1 }] },
+  ])
+  // An edit that printed nothing is still said, for what it changed.
+  assert.deepEqual(p.push(line([said('e2', '')], { filePath: '/ws/b.txt', structuredPatch: [hunk(['+z'])] })), [{ type: 'output', id: 'e2', text: '', changed: [{ path: '/ws/b.txt', added: 1, removed: 0 }] }])
+  // A call that failed changed nothing; an account that names no file, or holds no patch, says nothing of one.
+  assert.deepEqual(p.push(line([{ ...said('e3', 'no match'), is_error: true }], { filePath: '/ws/a.txt', structuredPatch: [hunk(['+z'])] })), [{ type: 'output', id: 'e3', text: 'no match', failed: true }])
+  assert.deepEqual(p.push(line([said('r1')], { type: 'text', file: { filePath: '/ws/a.txt' } })), [{ type: 'output', id: 'r1', text: 'ok' }])
+  assert.deepEqual(p.push(line([said('b1')], { stdout: 'ok', stderr: '' })), [{ type: 'output', id: 'b1', text: 'ok' }])
+  assert.deepEqual(p.push(line([said('x1')], { filePath: '/ws/a.txt' })), [{ type: 'output', id: 'x1', text: 'ok' }])
+  assert.deepEqual(p.push(line([said('s1')], 'plain words')), [{ type: 'output', id: 's1', text: 'ok' }])
+  // One account on a line of two results: no telling whose it is, so neither says it.
+  assert.deepEqual(p.push(line([said('m1'), said('m2')], { type: 'create', filePath: '/ws/c.txt', content: 'c' })), [
+    { type: 'output', id: 'm1', text: 'ok' },
+    { type: 'output', id: 'm2', text: 'ok' },
+  ])
+})
+
 test('StreamJsonParser passes the message being written as the text so far, each text block from empty', () => {
   const p = new StreamJsonParser()
   const piece = (event: object): string => JSON.stringify({ type: 'stream_event', event })

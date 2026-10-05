@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readClaudeQuota } from './claude-code-quota.js'
 import { readClaudeModels } from './claude-code-models.js'
-import { combineFraming, combineSignals, makeEmit, readWorkspaceFile, cutOutput, callArgument, runCliSession, checkCliReady, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, finishTurn, agentEnv, oneLine, attachLog, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type DriverModel, type DriverPromptOptions, type DriverQuota, type DriverRateLimit, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
+import { combineFraming, combineSignals, makeEmit, readWorkspaceFile, cutOutput, callArgument, lineCount, patchSize, runCliSession, checkCliReady, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, finishTurn, agentEnv, oneLine, attachLog, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type FileChange, type DriverModel, type DriverPromptOptions, type DriverQuota, type DriverRateLimit, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /** Claude Code permission modes we pass through to the CLI. */
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
@@ -255,6 +255,23 @@ function stdinLines(text: string): string {
 /** The input keys, in order, whose value says what a tool call did; the first one present is the call's detail. */
 const DETAIL_KEYS = ['skill', 'command', 'file_path', 'notebook_path', 'path', 'url', 'pattern', 'query', 'description', 'prompt']
 
+/**
+ * What an edit or a write did to its file, off the CLI's own account of the call: a file it made
+ * holds its content's lines, all added; a file it changed holds a patch, whose `+` and `-` lines
+ * are counted. Any other call's account names no file this way, and says nothing.
+ */
+function fileChange(result: unknown): FileChange | undefined {
+  if (typeof result !== 'object' || result === null) return undefined
+  const account = result as Record<string, unknown>
+  const path = account['filePath']
+  if (typeof path !== 'string') return undefined
+  if (account['type'] === 'create') return { path, added: typeof account['content'] === 'string' ? lineCount(account['content']) : 0, removed: 0, created: true }
+  const patch = account['structuredPatch']
+  if (!Array.isArray(patch)) return undefined
+  const lines = patch.flatMap(hunk => (typeof hunk === 'object' && hunk !== null && Array.isArray((hunk as Record<string, unknown>)['lines']) ? ((hunk as Record<string, unknown>)['lines'] as unknown[]) : []))
+  return { path, ...patchSize(lines.filter((line): line is string => typeof line === 'string')) }
+}
+
 /** The one argument that says what a tool call did, as it was given. */
 function toolArgument(input: unknown): string | undefined {
   if (typeof input !== 'object' || input === null) return undefined
@@ -391,7 +408,9 @@ export class StreamJsonParser {
 
   /**
    * The CLI's own line after a tool call: a `user` message whose `tool_result` blocks each name
-   * the call (`tool_use_id`) and hold what it gave back. A result with no text says nothing.
+   * the call (`tool_use_id`) and hold what it gave back. A result with no text says nothing. The
+   * line of an edit or a write also says, beside the message, what the call did to the file
+   * (`tool_use_result`): that is the result's `changed`.
    */
   private handleResults(obj: Record<string, unknown>): DriverEvent[] {
     const message = obj['message']
@@ -399,13 +418,16 @@ export class StreamJsonParser {
     const content = (message as Record<string, unknown>)['content']
     if (!Array.isArray(content)) return []
     const events: DriverEvent[] = []
+    // The line describes one call: with several results on it, there is no telling whose it is.
+    const change = content.length === 1 ? fileChange(obj['tool_use_result']) : undefined
     for (const item of content) {
       if (typeof item !== 'object' || item === null) continue
       const block = item as Record<string, unknown>
       if (block['type'] !== 'tool_result' || typeof block['tool_use_id'] !== 'string') continue
       const text = cutOutput(resultText(block['content']))
-      if (text === '' && block['is_error'] !== true) continue
-      events.push({ type: 'output', id: block['tool_use_id'], text, ...(block['is_error'] === true ? { failed: true as const } : {}) })
+      const failed = block['is_error'] === true
+      if (text === '' && !failed && !change) continue
+      events.push({ type: 'output', id: block['tool_use_id'], text, ...(failed ? { failed: true as const } : {}), ...(change && !failed ? { changed: [change] } : {}) })
     }
     return events
   }

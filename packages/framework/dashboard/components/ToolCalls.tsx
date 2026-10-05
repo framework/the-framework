@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { callsSummary, toolCall } from '../lib/tool-calls.js'
+import { callsSummary, summaryWords, toolCall } from '../lib/tool-calls.js'
+import type { FileEdit } from '../lib/turn-changes.js'
+import { LinesChanged } from './ChangedFiles.js'
 import { cn } from '../lib/utils.js'
 import { Markdown } from './Markdown.js'
 
-/** What a tool call gave back: what it printed, cut by the driver, and whether it failed. */
+/** What a tool call gave back: what it printed, cut by the driver, whether it failed, and the files it changed. */
 export interface CallOutput {
   text: string
   failed?: true
   exitCode?: number
+  changed?: readonly FileEdit[]
 }
 
 /** A tool call: its name, what it was given on one line (`detail`) and whole (`whole`), what it gave back. */
@@ -55,12 +58,13 @@ const BOX = 'max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-md px-
 // counts the seconds since it began when it says when that was.
 function CallLine({ label, detail, whole, output, live }: Call & { live?: { since: string | undefined } }) {
   const [open, setOpen] = useState(false)
-  const call = toolCall(label, detail)
+  const call = toolCall(label, detail, output?.changed)
   const given = whole ?? call.detail
   const words = (
     <>
       <span className={cn('shrink-0', live && 'text-shimmer')}>{live ? call.doing : call.verb}</span>
       {call.target !== undefined && <span className={cn('truncate', live ? 'text-shimmer' : 'text-foreground')}>{call.target}</span>}
+      {call.size !== undefined && <LinesChanged {...call.size} />}
       {live?.since !== undefined && <Seconds since={live.since} />}
     </>
   )
@@ -139,8 +143,9 @@ export function LiveLine({ call, word, since }: { call?: Call | undefined; word:
 // further. A lone call is its own line ("Read AGENTS.md"). A run with no call in it draws nothing.
 export function ToolCalls({ steps }: { steps: readonly ToolStep[] }) {
   const [open, setOpen] = useState(false)
-  const calls = steps.flatMap(step => (step.type === 'action' ? [toolCall(step.label, step.detail)] : []))
+  const calls = steps.flatMap(step => (step.type === 'action' ? [toolCall(step.label, step.detail, step.output?.changed)] : []))
   if (calls.length === 0) return null
+  const summary = callsSummary(calls)
   const only = steps.length === 1 ? steps[0] : undefined
   if (only?.type === 'action') {
     return (
@@ -151,8 +156,17 @@ export function ToolCalls({ steps }: { steps: readonly ToolStep[] }) {
   }
   return (
     <div className="min-w-0 flex-1 font-sans text-sm text-muted-foreground">
-      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex items-center gap-1.5 hover:text-foreground">
-        <span>{callsSummary(calls)}</span>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} aria-label={summaryWords(summary)} className="flex items-center gap-1.5 hover:text-foreground">
+        {/* The run in words, part by part, each with the size of its edits when that is known. */}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-left">
+          {summary.map((part, at, parts) => (
+            <span key={at} className="flex items-center gap-1.5">
+              <span>{part.text}</span>
+              {part.size !== undefined && <LinesChanged {...part.size} />}
+              {at < parts.length - 1 && <span className="-ml-1.5">,</span>}
+            </span>
+          ))}
+        </span>
         <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 transition-transform', open && 'rotate-90')} aria-hidden />
       </button>
       {open && (

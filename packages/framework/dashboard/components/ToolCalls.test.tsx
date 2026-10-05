@@ -154,3 +154,29 @@ describe('LiveLine', () => {
     expect(container.querySelector('.dot-wave')).toBeTruthy()
   })
 })
+
+// The files an edit changed, said by its coding agent on the call's output.
+describe('ToolCalls, edits whose files are known', () => {
+  const made = { path: '/ws/docs/DESCRIPTION.md', added: 11, removed: 0, created: true as const }
+  const write: ToolStep = { type: 'action', label: 'Write', detail: made.path, id: 'w1', output: { text: 'ok', changed: [made] } }
+
+  test('the folded line names the file and its size, as Claude Code\'s does, the size in its own colors', () => {
+    render(<ToolCalls steps={[bash('a'), bash('b'), bash('c'), write]} />)
+    const line = screen.getByRole('button', { name: 'Ran 3 commands, created DESCRIPTION.md +11 −0' })
+    expect(line.textContent).toBe('Ran 3 commands,created DESCRIPTION.md+11 −0')
+    expect(line.querySelector('.text-success')!.textContent).toBe('+11')
+    expect(line.querySelector('.text-danger')!.textContent).toBe('−0')
+  })
+
+  test('a lone edit is its own line: "Created", the file\'s name, its size', () => {
+    render(<ToolCalls steps={[write]} />)
+    const line = screen.getByRole('button', { name: 'Created DESCRIPTION.md' })
+    expect(line.textContent).toBe('CreatedDESCRIPTION.md+11 −0')
+  })
+
+  test('a run with no known file reads as before, with no size', () => {
+    render(<ToolCalls steps={[bash('a'), { type: 'action', label: 'Edit', detail: '/ws/a.ts', id: 'e1', output: { text: 'ok' } }]} />)
+    const line = screen.getByRole('button', { name: 'Ran 1 command, edited 1 file' })
+    expect(line.querySelector('.text-success')).toBeNull()
+  })
+})

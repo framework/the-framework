@@ -918,6 +918,12 @@ describe('EventList changed files', () => {
     expect(rows()).toEqual(['A.md+2 −1'])
   })
 
+  test('the folded line of the turn\'s calls names the file and its size too', () => {
+    const events = [prompt('go'), { kind: 'driver', event: { type: 'action', label: 'Bash', detail: 'ls', id: 'b1' } } as FrameworkEvent, ...edit('c1', `${WS}/A.md`, 2, 1), said]
+    render(<EventList events={events} setup={{ workspace: WS }} stick={false} />)
+    expect(screen.getByRole('button', { name: 'Ran 1 command, edited A.md +2 −1' })).toBeTruthy()
+  })
+
   test('a turn that edited no file has no such row', () => {
     render(<EventList events={[prompt('go'), said]} stick={false} />)
     expect(rows()).toEqual([])

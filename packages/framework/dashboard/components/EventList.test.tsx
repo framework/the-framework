@@ -299,6 +299,25 @@ describe('EventList session line', () => {
     expect(ids()).toEqual(['setup', '0'])
   })
 
+  test('while the agent works on its first prompt and nothing has come yet, the line names the step going on, and it is the only moving line', () => {
+    const { rerender } = render(<EventList events={[prompt]} setup={{}} working stick={false} />)
+    expect(screen.getAllByRole('status').map(n => n.textContent)).toEqual(['Starting session'])
+    rerender(<EventList events={[prompt]} setup={{ driver: 'codex' }} working stick={false} />)
+    expect(screen.getAllByRole('status').map(n => n.textContent)).toEqual(['Making the checkout'])
+    rerender(<EventList events={[prompt]} setup={setup} working stick={false} />)
+    expect(screen.getAllByRole('status').map(n => n.textContent)).toEqual(['Starting Codex'])
+    // The agent's first output: set up, and the usual moving line takes over.
+    rerender(<EventList events={[prompt, { kind: 'driver', event: { type: 'thought', text: 'hm' } }]} setup={setup} working stick={false} />)
+    expect(screen.getByRole('button', { name: 'Session set up' })).toBeTruthy()
+    expect(screen.getAllByRole('status').map(n => n.textContent)).toEqual(['Working…'])
+  })
+
+  test('a later prompt is no set-up: the line stays folded and "Starting…" is the moving line', () => {
+    render(<EventList events={[prompt, said, { ...prompt }]} setup={setup} working stick={false} />)
+    expect(screen.getByRole('button', { name: 'Session set up' })).toBeTruthy()
+    expect(screen.getAllByRole('status').map(n => n.textContent)).toEqual(['Starting…'])
+  })
+
   test('with no setup given there is no line', () => {
     render(<EventList events={[prompt, said]} stick={false} />)
     expect(screen.queryByText('Session set up')).toBeNull()

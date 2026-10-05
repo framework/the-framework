@@ -499,9 +499,13 @@ export function EventList({
   // the log has no prompt. It breaks the run of rows like a subagent's row: the row after it
   // shows its badge.
   const setupAt = setup === undefined ? -1 : shown.length > 0 && isTurnBoundary(shown[0]!) ? 1 : 0
+  // The session is being set up: the agent works and its first prompt is all there is. The line
+  // then names the step going on now, and is the one moving line: the "Starting…" line under it
+  // is not drawn.
+  const settingUp = setup !== undefined && working && !written && starting && unfolded.filter(isTurnBoundary).length === 1
   const setupRow = setup !== undefined && (
     <MessageScrollerItem key="setup" messageId="setup" className="-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 empty:hidden">
-      <SessionLine setup={setup} />
+      <SessionLine setup={setup} {...(settingUp ? { live: { since: unfolded[unfolded.length - 1]?.at } } : {})} />
     </MessageScrollerItem>
   )
   return (
@@ -577,7 +581,7 @@ export function EventList({
                 <Reply text={written} />
               </MessageScrollerItem>
             )}
-            {working && !written && (
+            {working && !written && !settingUp && (
               <MessageScrollerItem messageId="working" className="-mx-1.5 flex items-center gap-2 rounded-sm px-1.5">
                 <LiveLine call={current} word={starting ? 'Starting…' : 'Working…'} since={unfolded[unfolded.length - 1]?.at} />
               </MessageScrollerItem>

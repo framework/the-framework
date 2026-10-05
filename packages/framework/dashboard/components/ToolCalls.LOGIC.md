@@ -99,3 +99,5 @@ A second component draws the transcript's last line while the agent works (when 
 - when it is given the moment the line's subject began: the time since then, counted up every second, as "9s" below one minute and "1m 5s" from then on. Without that moment there is no count.
 
 For a reader whose system asks for reduced motion, the dots stand still and the text is plain grey.
+
+The dots and the count of the time are also what the session line is drawn with while the session is being set up (`SessionLine.tsx`).

@@ -148,7 +148,8 @@ export function AgentView({
   const subagent = card?.parent !== undefined
   // What was set up for the agent before it began, off its card: the chat's "Session set up" line.
   const { workspace, branch, base, driver, model } = card ?? {}
-  const setup = useMemo(() => ({ workspace, branch, base, driver, model }), [workspace, branch, base, driver, model])
+  const elsewhere = target !== undefined && target !== 'local'
+  const setup = useMemo(() => ({ workspace, branch, base, driver, model, elsewhere }), [workspace, branch, base, driver, model, elsewhere])
   const [open, setOpen] = useState(false)
   // What the installed modules add to this run's page: a summary in the bar above the message box.
   const { runSlots: mountedSlots } = useMountedModules()

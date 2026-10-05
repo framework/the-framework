@@ -1,6 +1,6 @@
-What the tests cover, for the "⋮" menu of an agent's action bar:
+What the tests cover, for the two menus of an agent's action bar (the agent's menu behind the agent's name, the project's "⋮" menu) and the one "⋮" menu of the project home:
 
-- **One menu for the agent's actions** - a finished agent in a project whose git host names a page offers "Open on GitHub" (the git host's name being GitHub), "Open project folder", "Open in editor" and "Delete session" in the one menu.
+- **What the agent's menu holds** - a finished agent's menu offers "Open project folder", "Open in editor" and "Delete session"; in a project whose git host names a page it offers no "Open on GitHub", and the page is not asked for.
 - **Opening the folder addresses this agent** - the folder item asks the daemon to open the folder for this agent's id, whichever checkout that resolves to.
 - **The folder item names what it opens** - a finished agent whose checkout is gone reads "Open project folder" and never "Open session's folder"; one whose checkout was kept reads "Open session's folder".
 - **The resume command** - when the agent's events carry a driver session id, the id's first eight characters are visible in the menu, "Copy resume command" puts `mkdir -p '<directory>' && cd '<directory>' && claude --resume <session id>` on the clipboard, and the item then reads "Copied".
@@ -10,4 +10,9 @@ What the tests cover, for the "⋮" menu of an agent's action bar:
 - **An ended agent offers no Stop** - once the agent's end has arrived, "Stop agent" is not offered.
 - **The menu for no agent** - it is named "Project actions", never "Session actions"; "Open folder" and "Open in your editor" ask the daemon to open the project itself; it offers no "Stop agent", "Remove worktree" or "Delete session" and draws no rule; a finished agent's menu with "Delete session" draws exactly one rule.
 - **The editor picker** - picking a detected editor stores its command; picking "Default" clears the stored editor; a stored editor that was not detected still has its own row.
-- **Create a repository** - the project menu offers "Create a repository on <host>…" only when the project is offered one; picking it opens a confirmation naming the repository, and nothing is created before "Create and push"; a refusal stays in the dialog in the provider's words; afterwards the offer is asked again; a session's menu never offers it and never asks.
+- **Create a repository** - the menu for no agent offers "Create a repository on <host>…" only when the project is offered one; picking it opens a confirmation naming the repository, and nothing is created before "Create and push"; a refusal stays in the dialog in the provider's words; afterwards the offer is asked again; an agent's menu never offers it and never asks.
+- **The agent's name is the button** - the button of the agent's menu reads the agent's name with a small arrow, and the whole name on hover; a name not known yet is a grey bar in its place, and the menu opens all the same.
+- **Showing and hiding the details** - told of a hidden details strip, the agent's menu offers "Show details" and a click calls the toggle once; told of a shown one, "Hide details"; told of none, no such item.
+- **The size beside Remove** - "Remove worktree" reads the checkout's size on disk ("1.2 MB") beside it.
+- **The project's menu** - for an agent with a kept checkout that could be deleted, in a project whose git host names a page (the git host's name being GitHub), the "⋮" named "Project actions" holds "Open on GitHub" and nothing else, and never asks whether a repository is offered.
+- **No page, no "⋮"** - for a project whose git host names no page, a blank of the button's width is in the place of the "⋮", before the daemon answers and after, and there is no "Project actions" button.

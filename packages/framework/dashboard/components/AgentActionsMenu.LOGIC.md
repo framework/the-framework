@@ -1,8 +1,8 @@
-One "⋮" menu at the end of an agent's [1] action bar, holding everything the user can do to the agent other than its next step [2]: open the project on its git host, open the agent's folder, open it in an editor, open its driver session [3], copy the command that resumes that driver session in a terminal, stop [4] the agent, remove its kept checkout [5], and delete it after a confirmation. Each item is offered only when it can honestly do what it says. The project home's action bar shows the same menu for no agent: the items that open the project itself.
+The menus of a page's top bar, split as Claude Code on the web splits them. An agent's [1] action bar has two. The agent's menu [7] opens from the agent's name and holds everything the user can do to the agent other than its next step [2]: show or hide its details, open the agent's folder, open it in an editor, open its driver session [3], copy the command that resumes that driver session in a terminal, stop [4] the agent, remove its kept checkout [5], and delete it after a confirmation. The project's menu [8], the "⋮" at the end of the bar, holds what belongs to the agent's project: its page on its git host. Each item is offered only when it can honestly do what it says. The project home's action bar shows one "⋮" menu for no agent: the items that open the project itself.
 
 ## Context
 
-**User story**: the user wants to act on an agent without a row of icon buttons that come and go with the agent's state: one menu, always in the same place, whose items say exactly what they will do.
+**User story**: the user wants to act on an agent without a row of icon buttons that come and go with the agent's state: one menu behind the agent's name, always in the same place, whose items say exactly what they will do. What belongs to the project and not to this agent is apart, behind the "⋮" at the end of the bar.
 
 **Problem**: several of these actions address the agent's checkout, and a finished agent usually has none: a clean agent's checkout is removed when it ends, so an "open the agent's folder" would silently open the project root instead. The menu names what it will actually open.
 
@@ -14,17 +14,45 @@ One "⋮" menu at the end of an agent's [1] action bar, holding everything the u
 [4] stop: ending an agent before it finishes: the Stop button or Ctrl-C.
 [5] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [6] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[7] agent's menu: the menu that opens from the agent's name in the action bar, holding what belongs to the agent.
+[8] project's menu: the "⋮" menu at the end of an agent's action bar, holding what belongs to the agent's project.
 
 ## Business logic — TL;DR
 
-- **Opening the agent somewhere** - "Open on <git host name>" when the project's git host names a page; a folder item named for what it will open; an "Open in editor" submenu with the preferred-editor picker; "Open session (<id>)" when the driver session has a real link.
+- **The two menus of an agent's page** - the agent's menu [7] opens from the agent's name with a small "⌄", a grey bar while the name is not known; the project's menu [8] is the "⋮" holding "Open on <git host name>" alone, and a project with no such page has no "⋮", its place kept.
+- **Showing and hiding the details** - when the agent's page has a details strip, the agent's menu starts with "Show details", or "Hide details" while the strip is shown.
+- **Opening the agent somewhere** - a folder item named for what it will open; an "Open in editor" submenu with the preferred-editor picker; "Open session (<id>)" when the driver session has a real link.
 - **Copying the resume command** - when the driver session id is known, one item copies the terminal command that reopens the conversation, or just the id when the directory it ran in is unknown, and confirms with "Copied".
-- **The menu for no agent** - on the project home the same menu, named "Project actions", holds only the items that open the project, and, for a project that lives on this machine only and is offered one, "Create a repository on <host>…": a confirmation names the private repository and says the code leaves the machine, "Create and push" creates it, a refusal stays in the dialog, and the project's git host page and the offer are asked again afterwards.
+- **The menu for no agent** - on the project home one "⋮" menu, named "Project actions", holds only the items that open the project, "Open on <git host name>" among them when the project's git host names a page, and, for a project that lives on this machine only and is offered one, "Create a repository on <host>…": a confirmation names the private repository and says the code leaves the machine, "Create and push" creates it, a refusal stays in the dialog, and the project's git host page and the offer are asked again afterwards.
 - **Stop, while the agent works** - "Stop agent", which reads "Stopping…" until the agent's end arrives. There is no merge here: an agent that is working is still writing its branch.
-- **Remove and delete, once the agent has ended** - "Remove worktree" only while the agent's checkout is kept; "Delete session" only for a finished agent, behind a confirmation that says the history is gone for good while the branch and pull request stay in git.
+- **Remove and delete, once the agent has ended** - "Remove worktree" only while the agent's checkout is kept, with the checkout's size on disk beside it; "Delete session" only for a finished agent, behind a confirmation that says the history is gone for good while the branch and pull request stay in git.
 - **Failures are said in the menu** - a failed action's reason is shown at the bottom of the menu instead of nothing happening.
 
 ## Business logic
+
+### The two menus of an agent's page
+
+#### Context
+
+**User story**: the user looks for what they can do to this agent behind the agent's name, and for the project's own page behind the "⋮", as in Claude Code on the web.
+
+**Problem**: the project's page on its git host is read from the daemon, so for a moment the page does not know whether there is one. A "⋮" that appeared or went when the answer landed would move the error count beside it.
+
+#### Business logic
+
+The agent's menu [7] opens from a button that is the agent's [1] name followed by a small "⌄", named "Session actions". The name is cut short when the bar is tight, and the whole name shows on hover. While the name is not known yet a grey bar holds its place, and the menu opens all the same. The menu holds the items of the sections below, from "Showing and hiding the details" to "Remove and delete, once the agent has ended". It does not hold the project's page on its git host, and asks the daemon neither for that page nor whether a repository is offered.
+
+The project's menu [8] opens from a "⋮" icon button whose hover reads "Project actions". It holds one item: "Open on <git host name>" ("Open on GitHub" for a GitHub project), opening the project's repository page in a new tab. The last known page stays while another project's loads, so the item does not flicker. When the project's git host provider names no page, and until the daemon has answered, there is no button: a blank of the button's width is in its place.
+
+### Showing and hiding the details
+
+#### Context
+
+**User story**: the user wants the facts about this agent [1] (which coding agent ran it, which model, what it cost) on request, not always on the page.
+
+#### Business logic
+
+When the agent's page renders a details strip under the action bar (see `AgentView.tsx`), the first item of the agent's menu [7] reads "Show details" while the strip is hidden and "Hide details" while it is shown, and a click tells the page to toggle it. A page with no such strip gets no such item.
 
 ### Opening the agent somewhere
 
@@ -34,9 +62,8 @@ See `## Context`.
 
 #### Business logic
 
-The menu opens from an icon button whose hover reads "Session actions", or "Project actions" when the menu serves no particular agent, as on the project home. Its first items, in order:
+The next items of the agent's menu [7], in order:
 
-- "Open on <git host name>" ("Open on GitHub" for a GitHub project), opening the project's repository page in a new tab. Offered only when the project's git host provider names a page; the last known page stays while another project's loads, so the item does not flicker.
 - The folder item, which asks the daemon to open the agent's [1] folder in the OS file manager. It is named for what it will open: "Open session's folder" when the agent still has a checkout [5] of its own, which is the case while it runs and, once finished, while its checkout was kept; "Open project folder" when the agent's checkout is gone, since the open then resolves to the project root, with the hover "This session no longer has its own checkout"; and "Open folder" when the menu serves no particular agent.
 - "Open in editor", a submenu: "Open this session's checkout" (or "Open in your editor" without an agent) asks the daemon to open it in the user's editor, and below a separator the "Preferred editor" picker (`PreferredEditorItems.tsx`) stores the editor choice in the preferences [6] without closing the menu.
 - "Open session (<session id>)", opening the driver session [3] in a new tab. Offered only when the driver session's link genuinely opens this session, which is when the link contains the session id (the rule in `lib/session-link.ts`); a generic product page is not worth an action.
@@ -57,11 +84,11 @@ Offered only when the agent's [1] events carry a driver session id. The item sho
 
 #### Context
 
-**User story**: on the project home the user opens the project on its git host, in the file manager or in an editor from the same "⋮" menu, in the same corner, as on an agent's page.
+**User story**: on the project home there is no agent, so the user opens the project on its git host, in the file manager or in an editor from one "⋮" menu, in the same corner as the "⋮" of an agent's page.
 
 #### Business logic
 
-Given no agent, the menu is named "Project actions" and holds only the items that open something: "Open on <git host name>", "Open folder" and "Open in editor" with "Open in your editor" and the preferred-editor picker. Each acts on the project's own checkout. Nothing is offered to stop, remove or delete, and no rule is drawn under the last item: the rule that separates the opening items from the rest is drawn only when one of those follows.
+Given no agent, one menu opens from a "⋮" icon button whose hover reads "Project actions" and holds only the items that open something: "Open on <git host name>" (offered only when the project's git host provider names a page), "Open folder" and "Open in editor" with "Open in your editor" and the preferred-editor picker. Each acts on the project's own checkout. Nothing is offered to stop, remove or delete, and no rule is drawn under the last item: the rule that separates the opening items from the rest is drawn only when one of those follows.
 
 ### Stop, while the agent works
 
@@ -89,7 +116,7 @@ Switching to another agent clears "Stopping…" so one agent's state never paint
 
 Both appear, after a separator, only once the agent has ended and its id is known:
 
-- "Remove worktree", only while the agent's checkout is still kept. It asks the daemon to remove it and, once removed, tells the bar so the item disappears. Failure: "Could not remove the worktree.".
+- "Remove worktree", only while the agent's checkout is still kept, with the checkout's size on disk at the end of the item when the action bar handed one. It asks the daemon to remove it and, once removed, tells the bar so the item disappears. Failure: "Could not remove the worktree.".
 - "Delete session", in the danger color, only when the caller gave the menu somewhere to go after the deletion, which is the case for a finished agent. It opens a confirmation, "Delete this agent?", whose body reads "Deleting <name> removes it from the dashboard for good — its history can't be recovered. Its branch and any pull request stay in git.", naming the agent by its label or, when the label is blank, by its id. The confirm button reads "Delete", then "Deleting…" while in flight. When the daemon refuses, the dialog shows the daemon's reason or "Could not delete the agent."; on success the caller leaves the deleted agent's page.
 
 ### Failures are said in the menu

@@ -428,7 +428,7 @@ const NOTHING_DOING: Record<string, string> = {}
 
 /**
  * Whether an event is a row at all. The agent's session id is plumbing, not conversation: the
- * run's ⋮ menu reads it from the events. A turn's end and what the run has spent are not rows
+ * session's menu reads it from the events. A turn's end and what the run has spent are not rows
  * either: the run's details count the turns and total the spend. A quota reading is worth a row
  * only when the quota is running low or used up; the agent reports it after every turn,
  * "allowed" included.

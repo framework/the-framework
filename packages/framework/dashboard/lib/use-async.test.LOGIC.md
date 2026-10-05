@@ -11,3 +11,4 @@ What the tests cover:
 - **Nothing to read, nothing remembered** - a panel whose read turns off shows its empty state, not the answer remembered from before.
 - **Keeping the previous answer** - a panel that opts to keep the previous answer still shows it after its subject changed, until the new answer lands.
 - **No stale first frame** - every frame drawn after a switch, the first included, shows the new subject's remembered answer or nothing, never the previous subject's.
+- **Reading an answer ahead** - a panel that comes on screen after its answer was read ahead shows that answer in its first frame, counted as read, never its empty state, then reads again and shows the fresh answer; a key is read ahead once while its read is out and never once it holds an answer; a read ahead that fails leaves the panel on its empty state, and the next read ahead asks again; an answer the panel read while the read ahead was out is not replaced by the one read ahead.

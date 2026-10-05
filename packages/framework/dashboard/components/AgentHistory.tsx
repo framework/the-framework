@@ -34,11 +34,18 @@ import { BrandLink } from './BrandLink.js'
 import { ConnectionIndicator } from './ConnectionIndicator.js'
 import { ThemeToggle } from './ThemeToggle.js'
 import { NotificationsMenu } from './NotificationsMenu.js'
+import { readAgentLogAhead } from '../lib/agent-log.js'
 
 // One rendered row of the rail, from either source (a project's own run, or a pooled cross-project
 // recent): the AgentMeta to show, an optional project label (only on the Overview, where the rail
 // pools every project), whether it is the selected row, and what selecting it does.
-type Row = { key: string; agent: AgentMeta; project?: string; active: boolean; onClick: () => void }
+type Row = { key: string; agent: AgentMeta; project?: string; active: boolean; onClick: () => void; onNear?: () => void }
+
+/** What a row does as the pointer or the keyboard reaches it: an ended agent's log is read before the click, so its page opens drawn. A working agent's page reads no saved log. */
+function near(projectId: string | null, agent: AgentMeta): { onNear?: () => void } {
+  if (projectId === null || agent.status === 'running') return {}
+  return { onNear: () => readAgentLogAhead(projectId, agent.id) }
+}
 
 // The Runs rail (#314 second sidebar), now the shadcn Sidebar (#shared-shell): one component on
 // every route, so the home/Overview and a session page share the exact same left column instead of
@@ -181,6 +188,7 @@ export function AgentHistory({
         project: rr.projectName,
         active: rr.projectId === projectId && rr.agent.id === selectedAgentId,
         onClick: () => onSelectRecent?.(rr.projectId, rr.agent.id),
+        ...near(rr.projectId, rr.agent),
       }))
     : agents.map(agent => ({
         key: agent.id,
@@ -189,6 +197,7 @@ export function AgentHistory({
         // `agents` is newest-first, so that is the first with a running status.
         active: agent.id === selectedAgentId,
         onClick: () => onSelect(agent.id),
+        ...near(projectId, agent),
       }))
 
   // New is the active view when a project is open on its launcher (its "New" / Start-a-session
@@ -223,6 +232,7 @@ export function AgentHistory({
       cloudState={cloudRunState(row.agent, Date.now())}
       {...(row.agent.remoteLabel ? { remoteLabel: row.agent.remoteLabel } : {})}
       onClick={row.onClick}
+      onNear={row.onNear}
     />
   )
 
@@ -496,6 +506,7 @@ function AgentHistoryRow({
   subtitle,
   active,
   onClick,
+  onNear,
   driver,
   standIn = false,
   saving = false,
@@ -515,6 +526,8 @@ function AgentHistoryRow({
   driver?: string | undefined
   active: boolean
   onClick: () => void
+  /** The pointer or the keyboard reached the row, before any click. */
+  onNear?: (() => void) | undefined
   /** The row stands in for a run just started, until that run's own row lands. */
   standIn?: boolean
   /** Ended clean, its process still saving its record and cleaning up its checkout (#1455): the row must
@@ -567,6 +580,8 @@ function AgentHistoryRow({
       )}
       {...(standIn ? { 'data-stand-in': '' } : {})}
       onClick={onClick}
+      onPointerEnter={onNear}
+      onFocus={onNear}
     >
       <span className="flex w-full items-center gap-2 px-2">
         {/* The dot means "the agent is working", so a run parked on you gets a still one (#785):

@@ -35,6 +35,28 @@ export function forgetRemembered(key?: string): void {
   else remembered.delete(key)
 }
 
+/** The keys being read ahead now, so a pointer crossing a row twice asks once. */
+const readingAhead = new Set<string>()
+
+/**
+ * Read an answer before the page that shows it is opened, and keep it under its key: the page
+ * then shows it in its first frame, and reads it again all the same. Nothing is read for a key
+ * that already holds an answer.
+ */
+export function readAhead<T>(key: string, load: () => Promise<T>): void {
+  if (remembered.has(key) || readingAhead.has(key)) return
+  readingAhead.add(key)
+  void load()
+    .then(answer => {
+      // The page may have opened and read it meanwhile: its answer is the later one.
+      if (!remembered.has(key)) remember(key, answer)
+    })
+    .catch(() => {
+      // The page makes its own read when it opens.
+    })
+    .finally(() => readingAhead.delete(key))
+}
+
 /**
  * A rejected read keeps the last value rather than blanking it, which is what the usage
  * panel already did deliberately: an empty bar reads as "nothing used" rather than "no
@@ -47,11 +69,14 @@ function useAsyncValue<T>(
   deps: DependencyList,
   keep?: Keep,
 ): { value: T; reload: () => Promise<void>; loaded: boolean } {
-  const [value, setValue] = useState<T>(initial)
+  // A remembered answer is there from the very first frame, also on a page just mounted: the
+  // effect below runs only after that frame is painted.
+  const firstKey = load && typeof keep === 'object' ? keep.remember : undefined
+  const [value, setValue] = useState<T>(() => (firstKey !== undefined && remembered.has(firstKey) ? (remembered.get(firstKey) as T) : initial))
   // Whether `value` is an answer rather than the initial. Only a successful read sets it, so a
   // caller that reads absence as a fact ("is this session gone, or just not fetched yet?", #784)
   // never mistakes a daemon hiccup for an answer.
-  const [loaded, setLoaded] = useState(false)
+  const [loaded, setLoaded] = useState(() => firstKey !== undefined && remembered.has(firstKey))
   // Captured once, like useState's own initial: it is also what a dep change resets to,
   // and callers pass literals like `[]` that would otherwise be a new value every render.
   const initialRef = useRef(initial)

@@ -19,6 +19,7 @@ import { AgentDetails, type AgentDetailsCard } from './AgentDetails.js'
 import { QuestionPanel } from './QuestionPanel.js'
 import { SubagentsBar } from './SubagentLine.js'
 import { holdsMainAgent } from '../lib/subagents.js'
+import { agentLogKey } from '../lib/agent-log.js'
 
 // One session's view, whether it is running or finished (#1026).
 //
@@ -110,7 +111,7 @@ export function AgentView({
     null,
     [projectId, agentId, live, archiveBehind],
     // Going back to an ended run shows its log at once, as last read, while it is read again.
-    { remember: `agent-log:${projectId}:${agentId}` },
+    { remember: agentLogKey(projectId, agentId) },
   )
   // What each working subagent is doing now, read only while one works: an ended one's row says how it ended.
   const workingSubagents = subagents.filter(agent => agent.status === 'running').map(agent => agent.id).join(',')

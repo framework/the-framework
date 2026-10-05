@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useLoaded, usePolled } from './use-async.js'
+import { forgetRemembered, readAhead, useLoaded, usePolled } from './use-async.js'
 
 /** Let queued reads settle and React apply the state they resolved with. */
 const settle = (ms = 0): Promise<void> => act(async () => void (await vi.advanceTimersByTimeAsync(ms)))
@@ -197,5 +197,56 @@ describe('remembering answers per key', () => {
     await settle()
     rerender({ id: 'b' })
     expect(result.current).toBe('data-a')
+  })
+})
+
+describe('reading an answer ahead of its page', () => {
+  beforeEach(() => forgetRemembered())
+
+  test('a page opened after the read shows the answer in its first frame, and reads it again', async () => {
+    readAhead('thing:a', () => Promise.resolve('ahead'))
+    await settle()
+    const frames: string[] = []
+    const { result } = renderHook(() => {
+      const read = usePolled(() => Promise.resolve('fresh'), 'initial', 60_000, ['a'], { remember: 'thing:a' })
+      frames.push(`${read.value}:${read.loaded}`)
+      return read
+    })
+    expect(frames[0]).toBe('ahead:true')
+    await settle()
+    expect(result.current.value).toBe('fresh')
+    expect(frames).not.toContain('initial:false')
+  })
+
+  test('a key is asked for once while its read is out, and never once it holds an answer', async () => {
+    const load = vi.fn(() => Promise.resolve('ahead'))
+    readAhead('thing:a', load)
+    readAhead('thing:a', load)
+    await settle()
+    readAhead('thing:a', load)
+    expect(load).toHaveBeenCalledTimes(1)
+  })
+
+  test('a read ahead that fails keeps nothing, and the next one asks again', async () => {
+    const load = vi.fn<() => Promise<string>>().mockRejectedValueOnce(new Error('down')).mockResolvedValue('ahead')
+    readAhead('thing:a', load)
+    await settle()
+    const { result } = renderHook(() => useLoaded<string>(null, 'initial', ['a'], { remember: 'thing:a' }))
+    expect(result.current).toBe('initial')
+    readAhead('thing:a', load)
+    expect(load).toHaveBeenCalledTimes(2)
+  })
+
+  test('an answer the page read meanwhile is not replaced by the older one read ahead', async () => {
+    let answer!: (value: string) => void
+    readAhead('thing:a', () => new Promise<string>(resolve => (answer = resolve)))
+    const { result, unmount } = renderHook(() => useLoaded(() => Promise.resolve('fresh'), 'initial', ['a'], { remember: 'thing:a' }))
+    await settle()
+    expect(result.current).toBe('fresh')
+    unmount()
+    answer('ahead')
+    await settle()
+    const again = renderHook(() => usePolled(() => new Promise<string>(() => {}), 'initial', 60_000, ['a'], { remember: 'thing:a' }))
+    expect(again.result.current.value).toBe('fresh')
   })
 })

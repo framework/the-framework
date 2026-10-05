@@ -12,6 +12,9 @@ const onProjects = vi.hoisted(() => vi.fn(() => Promise.resolve([])))
 const sendAddProject = vi.hoisted(() => vi.fn())
 const sendPickProjectDirectory = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/projects.js', () => ({ onProjects, sendAddProject, sendPickProjectDirectory }))
+// An ended agent's log, read as the pointer reaches its row.
+const onAgent = vi.hoisted(() => vi.fn((_projectId: string, _agentId: string) => Promise.resolve([])))
+vi.mock('../rpc/reads.js', () => ({ onAgent }))
 
 // The rail now also carries the app chrome moved off the top navbar (#772 follow-up). Three of
 // those pull the preferences/devices RPC stubs into jsdom, which this suite deliberately
@@ -21,6 +24,7 @@ vi.mock('./NotificationsMenu.js', () => ({ NotificationsMenu: () => null }))
 vi.mock('./ConnectionIndicator.js', () => ({ ConnectionIndicator: () => null }))
 
 const { AgentHistory } = await import('./AgentHistory.js')
+const { forgetRemembered } = await import('../lib/use-async.js')
 
 afterEach(cleanup)
 
@@ -583,5 +587,40 @@ describe('the project select (#1513)', () => {
   test('with all projects showing, New asks which project even on a project\'s own page', () => {
     renderRail(<AgentHistory projectId="p2" agents={[]} recentAgents={[]} selectedAgentId={null} onSelect={() => {}} projects={[stranded, idle]} />)
     expect(screen.getByLabelText('New agent').getAttribute('aria-haspopup')).toBeTruthy()
+  })
+})
+
+describe('AgentHistory reads a log ahead', () => {
+  afterEach(() => {
+    onAgent.mockClear()
+    forgetRemembered()
+  })
+
+  test('the pointer reaching an ended agent\'s row reads its log before any click, once', () => {
+    renderRail(<AgentHistory projectId="p1" scope="p1" agents={[agent({ status: 'done' })]} selectedAgentId={null} onSelect={() => {}} />)
+    const row = screen.getByText("replace 'Hello, world!' with 'Welcome!'").closest('button')!
+    expect(onAgent).not.toHaveBeenCalled()
+    fireEvent.pointerEnter(row)
+    fireEvent.pointerEnter(row)
+    expect(onAgent.mock.calls).toEqual([['p1', 'run-1']])
+  })
+
+  test('the keyboard reaching the row reads it too', () => {
+    renderRail(<AgentHistory projectId="p1" scope="p1" agents={[agent({ status: 'failed' })]} selectedAgentId={null} onSelect={() => {}} />)
+    fireEvent.focus(screen.getByText("replace 'Hello, world!' with 'Welcome!'").closest('button')!)
+    expect(onAgent.mock.calls).toEqual([['p1', 'run-1']])
+  })
+
+  test('a working agent\'s row reads nothing: its page shows the live feed, not a saved log', () => {
+    renderRail(<AgentHistory projectId="p1" scope="p1" agents={[agent()]} selectedAgentId={null} onSelect={() => {}} />)
+    fireEvent.pointerEnter(screen.getByText("replace 'Hello, world!' with 'Welcome!'").closest('button')!)
+    expect(onAgent).not.toHaveBeenCalled()
+  })
+
+  test('with every project shown, a row reads the log in its own project', () => {
+    const recent = { projectId: 'p2', projectName: 'other', agent: agent({ status: 'done' }) }
+    renderRail(<AgentHistory projectId={null} scope={null} agents={[]} recentAgents={[recent]} selectedAgentId={null} onSelect={() => {}} />)
+    fireEvent.pointerEnter(screen.getByText("replace 'Hello, world!' with 'Welcome!'").closest('button')!)
+    expect(onAgent.mock.calls).toEqual([['p2', 'run-1']])
   })
 })

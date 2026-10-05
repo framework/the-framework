@@ -4,7 +4,7 @@ import { onAgent, onAgentsDoing, onRetainedWorktrees } from '../rpc/reads.js'
 import { useLoaded, usePolled } from '../lib/use-async.js'
 import { useAgentHandoff } from '../lib/use-agent-handoff.js'
 import { useCheckoutStatus } from '../lib/use-checkout-status.js'
-import { isAgentActive, agentOutcome, pendingChoices } from '../lib/live-state.js'
+import { isAgentActive, agentOutcome, cardOutcome, pendingChoices } from '../lib/live-state.js'
 import { AgentActionBar } from './AgentActionBar.js'
 import { AgentComposer } from './AgentComposer.js'
 import { AgentWorkBar } from './AgentWorkBar.js'
@@ -67,7 +67,7 @@ export function AgentView({
   /** Whether the agent is still running; `null` while the daemon's list of agents has not been read, so it is not known yet. */
   live: boolean | null
   /** What the run's card says, off the runs poll: what the feed cannot carry (the details strip's facts, how the agent was set up, whether it is a subagent, whether its record is being saved). Absent until the card is listed. */
-  card?: (AgentDetailsCard & Pick<AgentMeta, 'saving' | 'parent' | 'workspace' | 'branch' | 'base'>) | undefined
+  card?: (AgentDetailsCard & Pick<AgentMeta, 'status' | 'saving' | 'parent' | 'workspace' | 'branch' | 'base'>) | undefined
   /** The session's own name — the same label the rail shows (#1030). It leads the action bar as
    * the stable identity, so the branch renaming itself near the end of an agent (#736) reads as a
    * detail changing rather than the whole view changing. */
@@ -234,7 +234,9 @@ export function AgentView({
   const commitAsked = isCommitAsk(typeof lastPrompt === 'string' ? lastPrompt : lastPrompt?.kind === 'driver' && lastPrompt.event.type === 'start' ? lastPrompt.event.prompt : undefined)
   const committing = commitAsked && (going || (live === false && !handoff.loaded))
   // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
-  const outcome = working ? undefined : agentOutcome(shown)
+  // How the agent ended: its events say it, and until they are read (or when they hold no ending)
+  // its card does, so the line above the message box is the right one from the first frame.
+  const outcome = working ? undefined : (agentOutcome(shown) ?? (card ? cardOutcome(card.status) : undefined))
   const questions = useMemo(() => pendingChoices(shown), [shown])
   // Until the handoff has actually loaded, a just-stopped agent keeps showing the modules' summaries
   // (the Files module's count of changed files, #1030): the summary swaps once, to the handoff,

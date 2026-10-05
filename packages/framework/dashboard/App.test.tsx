@@ -238,6 +238,16 @@ describe('the project select (#1513)', () => {
     expect(url()).toBe(`/${OTHER.id}/s3?project=${OTHER.id}`)
   })
 
+  test("a jump to another project's agent names it at once, before that project's agents are read", async () => {
+    answerTwo()
+    // The other project's list never answers: the row clicked is all the page has.
+    answers.set('onAgents', (id: unknown) => (id === OTHER.id ? new Promise(() => {}) : []))
+    render(<App />)
+    fireEvent.click(await screen.findByText('site ran'))
+    expect(url()).toBe(`/${OTHER.id}/s3`)
+    await waitFor(() => expect(document.querySelector('main span[title="site ran"], span.font-medium[title="site ran"]')).toBeTruthy())
+  })
+
   test('New agent starts in the picked project; picking another on the launcher moves to its launcher, and all keeps the page', async () => {
     answerTwo()
     window.history.replaceState(null, '', `/?project=${OTHER.id}`)

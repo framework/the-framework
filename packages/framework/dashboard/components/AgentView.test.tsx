@@ -54,7 +54,14 @@ vi.mock('./AgentWorkBar.js', () => ({
   ),
 }))
 // The composer shows only what the view tells it about the run going: the one fact of it under test here.
-vi.mock('./AgentComposer.js', () => ({ AgentComposer: ({ live }: { live: boolean }) => <span data-testid="composer-live">{String(live)}</span> }))
+vi.mock('./AgentComposer.js', () => ({
+  AgentComposer: ({ live, outcome }: { live: boolean; outcome?: unknown }) => (
+    <>
+      <span data-testid="composer-live">{String(live)}</span>
+      <span data-testid="composer-outcome">{JSON.stringify(outcome ?? null)}</span>
+    </>
+  ),
+}))
 
 const { AgentView } = await import('./AgentView.js')
 
@@ -277,12 +284,12 @@ describe('AgentView branch read', () => {
     // offered in that window turned into "Branch gone" moments later.
     onAgent.mockResolvedValue(ARCHIVED)
     onAgentHandoff.mockResolvedValue({ ...PUSHED, empty: true, pushed: false })
-    const { rerender } = render(view({ card: { saving: true } }))
+    const { rerender } = render(view({ card: { status: 'done', saving: true } }))
     await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledWith('p1', 'run-1'))
     expect(screen.queryByRole('button', { name: 'Open PR' })).toBeNull()
     const reads = onAgentHandoff.mock.calls.length
     onAgentHandoff.mockResolvedValue(PUSHED)
-    rerender(view({ card: {} }))
+    rerender(view({ card: { status: 'done' } }))
     await waitFor(() => expect(onAgentHandoff.mock.calls.length).toBeGreaterThan(reads))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open PR' })).toBeTruthy())
   })
@@ -290,7 +297,7 @@ describe('AgentView branch read', () => {
   test('a branch with commits, pushed or not, is offered while the card still says saving: the clean-up keeps it', async () => {
     onAgent.mockResolvedValue(ARCHIVED)
     onAgentHandoff.mockResolvedValue({ ...PUSHED, pushed: false })
-    render(view({ card: { saving: true } }))
+    render(view({ card: { status: 'done', saving: true } }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open PR' })).toBeTruthy())
   })
 })
@@ -301,18 +308,18 @@ describe('the next step of a run whose subagents still work', () => {
   test('Open PR is not offered while a subagent works, and is once none does', async () => {
     onAgent.mockResolvedValue(ARCHIVED)
     onAgentHandoff.mockResolvedValue(PUSHED)
-    const { rerender } = render(view({ card: {}, subagents: [sub({ status: 'running' })] }))
+    const { rerender } = render(view({ card: { status: 'done' }, subagents: [sub({ status: 'running' })] }))
     await waitFor(() => expect(onAgentHandoff).toHaveBeenCalledWith('p1', 'run-1'))
     await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'))
     expect(screen.queryByRole('button', { name: 'Open PR' })).toBeNull()
-    rerender(view({ card: {}, subagents: [sub({ status: 'done', endedAt: '2026-10-01T10:02:00.000Z' })] }))
+    rerender(view({ card: { status: 'done' }, subagents: [sub({ status: 'done', endedAt: '2026-10-01T10:02:00.000Z' })] }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open PR' })).toBeTruthy())
   })
 
   test('nor right after a subagent ended: its main agent is about to go on', async () => {
     onAgent.mockResolvedValue(ARCHIVED)
     onAgentHandoff.mockResolvedValue(PUSHED)
-    render(view({ card: {}, subagents: [sub({ status: 'done', endedAt: new Date().toISOString() })] }))
+    render(view({ card: { status: 'done' }, subagents: [sub({ status: 'done', endedAt: new Date().toISOString() })] }))
     await waitFor(() => expect(screen.getByTestId('bar-ready').textContent).toBe('true'))
     expect(screen.queryByRole('button', { name: 'Open PR' })).toBeNull()
   })
@@ -322,12 +329,12 @@ describe('a subagent’s own page', () => {
   test('a run started for another run is offered no pull request: it says whether it is landed, and nothing of pushed', async () => {
     onAgent.mockResolvedValue(ARCHIVED)
     onAgentHandoff.mockResolvedValue(PUSHED)
-    const { rerender } = render(view({ card: { parent: 'run-0' } }))
+    const { rerender } = render(view({ card: { status: 'done', parent: 'run-0' } }))
     await waitFor(() => expect(screen.getByText('not landed')).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Open PR' })).toBeNull()
     expect(screen.queryByText('· pushed')).toBeNull()
     // The same branch on a run nobody started for another is offered its pull request.
-    rerender(view({ card: {} }))
+    rerender(view({ card: { status: 'done' } }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open PR' })).toBeTruthy())
     expect(screen.queryByText('not landed')).toBeNull()
   })
@@ -335,6 +342,24 @@ describe('a subagent’s own page', () => {
 
 // The Resume offer (#1391) moved into the composer's submit slot (#1455): its when-offered rules
 // are AgentComposer's now, tested there — AgentView only hands `outcome` down.
+
+describe('how the agent ended, for the message box', () => {
+  test("the card says it until the agent's events are read, then the events do", async () => {
+    let log: (v: unknown) => void = () => {}
+    onAgent.mockReturnValue(new Promise(resolve => (log = resolve)))
+    render(view({ card: { status: 'waiting' } }))
+    // From the first frame, with no event read yet.
+    expect(screen.getByTestId('composer-outcome').textContent).toBe('{"ok":false,"stopped":false,"waiting":true}')
+    log([...ARCHIVED, { kind: 'end', ok: false, stopped: true }])
+    await waitFor(() => expect(screen.getByTestId('composer-outcome').textContent).toBe('{"ok":false,"stopped":true}'))
+  })
+
+  test('with no card and no event it says nothing', () => {
+    onAgent.mockReturnValue(new Promise(() => {}))
+    render(view())
+    expect(screen.getByTestId('composer-outcome').textContent).toBe('null')
+  })
+})
 
 describe('the bar shows its facts together (run switch)', () => {
   test("an ended run's bar is ready once its log and its branch are read, not before", async () => {
@@ -511,12 +536,12 @@ describe('a run just started', () => {
     const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }] as FrameworkEvent[]
     const { rerender } = render(view({ live: true, events }))
     expect(screen.queryByText('Session set up')).toBeNull()
-    rerender(view({ live: true, events, card: { workspace: '/repo/.branches/agent-1', branch: 'agent-1', driver: 'codex' } }))
+    rerender(view({ live: true, events, card: { status: 'done', workspace: '/repo/.branches/agent-1', branch: 'agent-1', driver: 'codex' } }))
     fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
     expect(screen.getByText('/repo/.branches/agent-1')).toBeTruthy()
     expect(screen.getByText('agent-1')).toBeTruthy()
     expect(screen.queryByText(/Started from the branch/)).toBeNull()
-    rerender(view({ live: true, events, card: { workspace: '/repo/.branches/agent-1', branch: 'agent-1', base: 'my/work', driver: 'codex' } }))
+    rerender(view({ live: true, events, card: { status: 'done', workspace: '/repo/.branches/agent-1', branch: 'agent-1', base: 'my/work', driver: 'codex' } }))
     expect(screen.getByText(/Started from the branch/).textContent).toBe('Started from the branch my/work, not from the main branch.')
   })
 
@@ -581,9 +606,9 @@ describe('AgentView: while the agent commits', () => {
     let answer: (handoff: unknown) => void = () => {}
     onAgentHandoff.mockReturnValue(new Promise(resolve => (answer = resolve)) as never)
     onAgent.mockResolvedValue(over)
-    rerender(view({ events: over, live: false, card: { saving: true } }))
+    rerender(view({ events: over, live: false, card: { status: 'done', saving: true } }))
     expect(screen.getByText('Committing…')).toBeTruthy()
-    rerender(view({ events: over, live: false, card: {} }))
+    rerender(view({ events: over, live: false, card: { status: 'done' } }))
     await new Promise(resolve => setTimeout(resolve, 20))
     expect(screen.getByText('Committing…')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull()

@@ -109,7 +109,7 @@ An agent is still going when its current segment holds at least one event and no
 
 #### Business logic
 
-The outcome is read off the first `end` event of the current segment: whether it succeeded, whether the user stopped [5] it (only when the end says so explicitly; an end that does not say counts as not stopped), whether it ended waiting on a question (it then reads as waiting, not as failed), and the end's detail text when it carries one. While the current segment has no `end`, because the agent is still going or has just been resumed, there is no outcome at all. The agent view reads the outcome only for an agent that is no longer live.
+The outcome is read off the first `end` event of the current segment: whether it succeeded, whether the user stopped [5] it (only when the end says so explicitly; an end that does not say counts as not stopped), whether it ended waiting on a question (it then reads as waiting, not as failed), and the end's detail text when it carries one. While the current segment has no `end`, because the agent is still going or has just been resumed, there is no outcome at all. The agent view reads the outcome only for an agent that is no longer live. The agent's record gives the same answer from its status alone (`running`: no outcome; `done`: succeeded; `failed`: failed; `stopped`: stopped; `waiting`: ended waiting on an answer), for a caller that has not read the events yet or whose events hold no ending.
 
 ### The GitHub Actions run link
 

@@ -400,7 +400,7 @@ export function foldSteps(
     const output = outputOf(e)
     if (output) {
       const call = calls.get(output.id)
-      if (call) call.output = { text: output.text, ...(output.failed ? { failed: true } : {}), ...(output.exitCode !== undefined ? { exitCode: output.exitCode } : {}) }
+      if (call) call.output = { text: output.text, ...(output.failed ? { failed: true } : {}), ...(output.exitCode !== undefined ? { exitCode: output.exitCode } : {}), ...(output.changed ? { changed: output.changed } : {}) }
       continue
     }
     const step = stepOf(e)

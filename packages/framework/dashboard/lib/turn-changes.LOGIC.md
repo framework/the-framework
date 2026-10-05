@@ -1,10 +1,12 @@
-Reads, off an agent's [1] events [2], the files each turn's [3] edits [4] changed: per turn, each file once, with the lines its edits added and removed.
+Reads, off an agent's [1] events [2], the files each turn's [3] edits [4] changed: per turn, each file once, with the lines its edits added and removed. The rule that sums edits into files is also given on its own, for any list of edits.
 
 ## Context
 
 **User story**: at the end of each turn, the agent's transcript shows a row for each file the turn changed, with the lines added and removed, as Claude Code on the web does (`components/EventList.tsx`, `components/ChangedFiles.tsx`). A click on a row shows that file's change in the side panel's Changes tab.
 
 **Business logic story**: the tool that runs the coding agent writes, on the output of each tool call that edited files, the files the call changed: each file's path, the lines added, the lines removed, and whether the call made the file. Nothing else is read here: no git read is made, so the rows are the same while the agent works, after a reload and once the agent's checkout is gone.
+
+**Business logic story**: the folded line of the coding agent's tool calls names the files its edits changed and their lines (`tool-calls.ts`). It sums the edits of one call, and of one run of calls, by the same rule as a turn's, so a file reads the same way in both places.
 
 **Problem**: the coding agents name a file by its whole path on the machine, and the Changes tab names it by its path in the agent's checkout. Asked for by its whole path, the file would not be found there.
 
@@ -18,8 +20,8 @@ Reads, off an agent's [1] events [2], the files each turn's [3] edits [4] change
 ## Business logic — TL;DR
 
 - **One list per turn** - the files of a turn [3] a later prompt ended are kept under that prompt; the files of the last turn, which no prompt has ended yet, are kept apart; a turn that changed no file has no list.
-- **Each file once, its edits summed** - a file edited several times in a turn is one file, in the order first changed, with the lines added and the lines removed summed.
-- **A file the turn made** - it holds the lines added less the lines removed again, never below zero, and removed none.
+- **Each file once, its edits summed** - a file edited several times in a turn is one file, in the order first changed, with the lines added and the lines removed summed; the same rule sums any other list of edits.
+- **A file the edits made** - it holds the lines added less the lines removed again, never below zero, and removed none.
 - **A path said from the agent's checkout** - a path inside the folder of the agent's checkout is said from that folder; any other path is left as it is; the file's name is the path's last part.
 - **Only edits** - a file changed by a shell command is not there.
 
@@ -49,7 +51,9 @@ The events are read in order. Every prompt ends the turn before it and starts th
 
 Within a turn, a file is known by its path as said from the agent's checkout. Each output that says files it changed adds, for each of them, its lines added and its lines removed to that file of the turn. The files are in the order each was first changed in the turn. So "+2 −1" then "+3 −2" on one file is that file once, "+5 −3". Each turn starts from nothing: a file changed in two turns is in both lists, each with that turn's lines alone.
 
-### A file the turn made
+The same rule, with the one of "A file the edits made", sums any list of edits given to it, a turn's or not: the edits of one tool call, or of one run of tool calls (`tool-calls.ts`). Given no folder of the agent's checkout, each file is known by its path as the coding agent said it.
+
+### A file the edits made
 
 #### Context
 
@@ -57,7 +61,7 @@ Within a turn, a file is known by its path as said from the agent's checkout. Ea
 
 #### Business logic
 
-A file is one the turn made when at least one of the turn's edits says it made the file. Such a file's lines added are the sum of the lines added less the sum of the lines removed, zero when that is below zero, and its lines removed are zero: "+3 −0" then "+2 −1" reads "+4 −0". A file that was there before the turn keeps its sums as they are. A file made in an earlier turn was there before a later turn, which sums its edits as they are.
+A file is one the turn made when at least one of the turn's edits says it made the file. Such a file's lines added are the sum of the lines added less the sum of the lines removed, zero when that is below zero, and its lines removed are zero: "+3 −0" then "+2 −1" reads "+4 −0". A file that was there before the turn keeps its sums as they are. A file made in an earlier turn was there before a later turn, which sums its edits as they are. For a list of edits that is not a turn's, the list stands where the turn does: a file is one the edits made when at least one edit of the list says it made the file.
 
 ### A path said from the agent's checkout
 

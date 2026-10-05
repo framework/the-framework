@@ -2,7 +2,7 @@ Draws what the coding agent [3] did between two of its messages in an agent's [1
 
 ## Context
 
-**User story**: the user reads the agent's messages and, between them, one short grey line saying what the coding agent did ("Ran 2 commands"), as Claude Code on the web draws it. The user opens the line to see each tool call [2], and opens a call to see its command or its file's whole path and what the call printed.
+**User story**: the user reads the agent's messages and, between them, one short grey line saying what the coding agent did ("Ran 2 commands"), as Claude Code on the web draws it, with the file an edit changed and its size ("Ran 3 commands, created DESCRIPTION.md +11 −0"). The user opens the line to see each tool call [2], and opens a call to see its command or its file's whole path and what the call printed.
 
 **Problem**: the transcript showed one row per tool call and one "Thinking" row per thought. A turn of fifty calls was fifty rows between the user's question and the agent's answer.
 
@@ -12,12 +12,13 @@ Draws what the coding agent [3] did between two of its messages in an agent's [1
 [2] tool call: one use of a tool by the coding agent (running a command, reading a file, editing a file, searching), reported as a label and, when the call has one, a detail: the one argument that says what it did (the command, the file, the address), on one line and cut short. A call may also carry that argument whole, and what it gave back: its output [5].
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [4] step: a tool call, or a thought of the coding agent as its CLI summarizes it.
-[5] output: what a tool call printed, cut to a size limit by the tool that runs the coding agent, with whether the call failed and, for a command whose CLI reports one, its exit code. The output of a call that edited files may also say the files the call changed, each with its lines added and removed; this component draws none of that (the transcript's rows of changed files do, `ChangedFiles.tsx`).
+[5] output: what a tool call printed, cut to a size limit by the tool that runs the coding agent, with whether the call failed and, for a command whose CLI reports one, its exit code. The output of a call that edited files may also say the files the call changed, each with its lines added and removed, and whether the call made the file: the call's line and the run's line then name the files and say their size [6].
+[6] size: the lines added and the lines removed, drawn as "+11 −0": "+" and the lines added in green, a space, "−" and the lines removed in red, as the transcript's rows of changed files draw them (`ChangedFiles.tsx`).
 
 ## Business logic — TL;DR
 
-- **A run of steps is one line** - the calls counted by kind, folded; opened, a bordered box with one line per step, in order.
-- **A lone call is its own line** - the verb in grey and what it was done to in dark, with no count.
+- **A run of steps is one line** - the calls counted by kind, the edits whose files are known said by their files and their size [6], folded; opened, a bordered box with one line per step, in order.
+- **A lone call is its own line** - the verb in grey and what it was done to in dark, then its size [6] when its output says the files it changed, with no count.
 - **A call opens to its detail and its output** - a call opens to its detail whole, a command with "$" in front, and under it what it printed, in a box that scrolls; a failed call says so; a call with neither does not open.
 - **A thought is inside the box** - no line of the transcript; in the opened box it reads "Thought" and opens to the thought.
 - **Thoughts alone draw nothing** - a run with no call in it has no line.
@@ -33,7 +34,7 @@ See `## Context`.
 
 #### Business logic
 
-The component is given the steps [4] of one run, in order (which steps make a run is the transcript's rule, `EventList.tsx`). It draws one grey line in the page's own font: the calls counted by kind (the wording in `lib/tool-calls.ts`, "Ran 2 commands, read 1 file") and a chevron pointing right. The line starts folded. A click opens, under the line, a box with a border and round corners holding one line per step, in the order they happened, and turns the chevron to point down; a click on the line again folds the box away.
+The component is given the steps [4] of one run, in order (which steps make a run is the transcript's rule, `EventList.tsx`). It draws one grey line in the page's own font: the calls counted by kind (the wording in `lib/tool-calls.ts`, "Ran 2 commands, read 1 file") and a chevron pointing right. Each call is read with the files its output [5] says it changed, so the edits whose files are known are said by their files, with their size [6] drawn right after the words of their part and before the comma: "Ran 3 commands, created DESCRIPTION.md +11 −0" (which files, which verb and which lines are `lib/tool-calls.ts`'s). A run in which no output says a file has no size. The line is a button whose accessible name is the whole line, its sizes included; a line too long for the row wraps. The line starts folded. A click opens, under the line, a box with a border and round corners holding one line per step, in the order they happened, and turns the chevron to point down; a click on the line again folds the box away.
 
 ### A lone call is its own line
 
@@ -43,7 +44,7 @@ The component is given the steps [4] of one run, in order (which steps make a ru
 
 #### Business logic
 
-A run that is exactly one tool call [2], with no thought, is drawn as that call's line, with no count and no box: the verb in grey, then the target in the dark text color, cut with an ellipsis when it does not fit the row (the verb and the target are `lib/tool-calls.ts`'s: "Read AGENTS.md"). The same line is how each call reads inside an opened box.
+A run that is exactly one tool call [2], with no thought, is drawn as that call's line, with no count and no box: the verb in grey, then the target in the dark text color, cut with an ellipsis when it does not fit the row (the verb and the target are `lib/tool-calls.ts`'s: "Read AGENTS.md"). A call whose output [5] says the files it changed reads by them: "Created" or "Edited", the files' names, then the call's size [6] ("Created DESCRIPTION.md +11 −0"). The same line is how each call reads inside an opened box.
 
 ### A call opens to its detail and its output
 
@@ -53,7 +54,7 @@ A run that is exactly one tool call [2], with no thought, is drawn as that call'
 
 #### Business logic
 
-A call's line with a detail or an output [5] ends with a chevron pointing right and is a button whose accessible name is the verb and the target. A click turns the chevron to point down and opens, under the line, in order:
+A call's line with a detail or an output [5] ends with a chevron pointing right and is a button whose accessible name is the verb and the target, without the size [6]. A click turns the chevron to point down and opens, under the line, in order:
 
 - the detail in a grey box in a monospace font, wrapping instead of being cut: the argument whole when the call carries it (a command of several lines keeps its lines), else the detail. A command (Claude Code's `Bash`, Codex's `commandExecution`) has "$" in grey in front of it; any other call has none.
 - the output, when the call has one whose text is not empty: a box with a border, in the same font, wrapping.

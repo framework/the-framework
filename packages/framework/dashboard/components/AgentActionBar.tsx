@@ -56,9 +56,6 @@ export function AgentActionBar({
     <div className="@container flex items-center gap-2 overflow-hidden px-4 py-2">
       {/* Which session this is (#798/#809): its project, its name, and its worktree's size on disk. */}
       <GitStatusBar
-        projectId={projectId}
-        agentId={agentId}
-        inline
         label={label}
         projectName={projectName}
         ready={ready}

@@ -1,76 +1,53 @@
-The one line of git facts about the checkout [1] in play, shown on the project home for the project's own checkout (its branch, whether it is clean or dirty, and the linked pull request) and in the action bar at the top of an agent's [2] page for that agent's checkout (the agent's name and the checkout's size on disk), kept current on a clock. An agent's state, whether its checkout is clean or dirty, its branch and its pull request are not said in this line: the feed and the message box say whether the agent works and how it ended, and the rest is in the bar above the message box (`AgentWorkBar.tsx`). It renders nothing when there is no repository or checkout to report, except the agent's name, which shows from the first frame.
+The line that names an agent [2], at the start of the action bar at the top of the agent's page (`AgentActionBar.tsx`): the agent's name, its project as a breadcrumb before it, and the size on disk of the agent's checkout [1]. An agent's state, whether its checkout is clean or dirty, its branch and its pull request are not said in this line: the feed and the message box say whether the agent works and how it ended, and the rest is in the bar above the message box (`AgentWorkBar.tsx`). The line asks the daemon nothing: its caller hands it the checkout. The project home has no such line.
 
 ## Context
 
-**User story**: on a project's page the user sees which branch the project is on, whether there are uncommitted changes and whether the branch has a pull request. On an agent's [2] page the same line names the agent by its label with its project as a breadcrumb, then how much disk its checkout [1] takes; clicking the line opens the detail below it. The agent's branch, what the branch holds (uncommitted work included) and the pull request it opened are right above the message box, beside the next step (`AgentWorkBar.tsx`).
+**User story**: on an agent's [2] page the line names the agent by its label with its project as a breadcrumb, then how much disk its checkout [1] takes; clicking the line opens the detail below it. The agent's branch, what the branch holds (uncommitted work included) and the pull request it opened are right above the message box, beside the next step (`AgentWorkBar.tsx`).
 
 ## Glossary
 
-[1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout".
+[1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 
 ## Business logic — TL;DR
 
-- **Whose checkout** - with an agent selected the line reads that agent's checkout and says only its size; otherwise it says the project's own checkout: branch, clean or dirty, pull request; nothing renders when there is no checkout to report.
-- **Kept current** - the facts are re-read every 10 seconds, or every 0.3 seconds while the daemon's pull request lookup is still in flight (`lib/use-checkout-status.ts`); a caller that already read the checkout hands it in, and the line reads nothing itself.
-- **Switching agents** - the facts are remembered per checkout for as long as the page is open: going back to an agent shows its facts from the first frame while they are read again; an agent never shown has no facts until its own are read, never the previous agent's. Until then, and while the caller says its own facts are not in yet, the agent's name and project show alone.
-- **The agent's name, or the branch** - given the agent's name it leads in bold, prefixed by "<project> ›", which stays in view (capped) however long the name is, and no branch is shown; the branch is the identity only on the project home, with the full branch in its tooltip; an agent's line never says a branch, also while its name is not given.
-- **Clean or dirty, neutrally** - for the project's own checkout only: a dot and the word "clean" in neutral gray or "dirty" in amber; the tooltip reads "Clean" or "Uncommitted changes"; an agent's line shows neither.
-- **The size** - an agent's checkout's size on disk shows after the name once the daemon could measure it; the size drops out as the bar narrows.
-- **The pull request link** - on the project home: "PR #<number>" with its state in a pill, opening the pull request in a new tab, its title in the tooltip; on an agent's line, no link.
-- **A disclosure when there is detail below** - when the caller renders detail under the bar, the facts become a button with a chevron that turns when expanded; the chevron is drawn, dimmed, even while the name shows alone, so the name never moves when the facts land.
+- **Handed the checkout** - the caller hands the line the agent's checkout as it read it; the line reads nothing itself and says one fact of the checkout, its size.
+- **The name first, the size with the facts** - the agent's name and project show from the first frame; the size waits until the caller says the agent's facts are ready and the checkout has answered.
+- **The agent's name, never the branch** - the name leads in bold, prefixed by "<project> ›", which stays in view (capped) however long the name is; no branch is shown, also while the name is not given.
+- **The size** - the checkout's size on disk shows after the name once the daemon could measure it; the size drops out as the bar narrows.
+- **A disclosure when there is detail below** - when the caller renders detail under the bar, the line becomes a button with a chevron that turns when expanded; the chevron is drawn, dimmed, even while the name shows alone, so the name never moves when the size lands.
 
 ## Business logic
 
-### Whose checkout
+### Handed the checkout
 
 #### Context
-
-See `## Context`.
-
-#### Business logic
-
-With an agent [2] selected, the line reads that agent's checkout [1] and says one fact of it: its size on disk. It says neither the agent's branch, nor whether the checkout is clean or dirty, nor its pull request. Once the agent has ended and its checkout is gone there is no size, and the line is the agent's name alone: the project's own checkout is the user's, and its facts are never shown as the agent's. Without an agent, it asks about the project's own checkout and says its branch, dirty or clean, and its pull request. When the daemon has nothing to report, because there is no repository or no such agent, the line renders nothing at all.
-
-### Kept current
-
-#### Context
-
-**Problem**: the project's checkout changes while the user watches (a commit, another branch, a pull request opened), and an agent's checkout grows; and the daemon's pull request lookup, while still in flight, answers within a second, which is worth asking again for rather than showing a gap for ten seconds.
 
 **Problem**: an agent's page says the agent's checkout [1] in two bars, this line in the action bar at its top and the bar above the message box. Read by each for itself, the two could disagree for a moment, and the daemon was asked twice.
 
 #### Business logic
 
-The read is `lib/use-checkout-status.ts`'s. The facts are re-read every 10 seconds; while the daemon reports its pull request lookup as still pending, every 0.3 seconds. When the selected agent changes, the line never shows the previous agent's facts under the new agent's name: that read as this agent's own for the moment the read took. Instead the facts are remembered per checkout (each agent's checkout, and the project's own checkout, under their own key) for as long as the page is open. Going back to an agent seen before shows its remembered facts from the first frame, and they are read again at once, so the fresh answer replaces them as soon as it lands. An agent never shown before shows only its name and its "<project> ›" breadcrumb until its facts are read.
+The caller hands the line the agent's [2] checkout [1] as it read it, or says that its read has not answered yet (the agent's page reads the checkout once for both bars, see `AgentView.tsx` and `lib/use-checkout-status.ts`). The line asks the daemon nothing. It says one fact of the checkout: its size on disk. It says neither the agent's branch, nor whether the checkout is clean or dirty, nor its pull request, and it links no pull request. Once the agent has ended and its checkout is gone there is no size, and the line is the agent's name alone.
 
-A caller that already read the checkout hands it to the line, or says that its read has not answered yet (the agent's page does: it reads the agent's checkout once for both bars, see `AgentView.tsx`). The line then asks the daemon nothing, shows what it was handed, and shows the name alone while the read has not answered.
-
-The caller can also hold the facts back while its own facts about the agent are still being read (the agent's page does, see `AgentView.tsx`): until it says they are ready, the name and breadcrumb show alone, so the whole line of facts appears together rather than in pieces.
-
-An agent's [2] line does not wait for its checkout's answer once the caller says the facts are ready: it shows the name as a working disclosure at once, and the size when the checkout has answered. A new agent's checkout is read up to ten seconds after it starts. The project's own line shows nothing until its read has answered.
-
-### The agent's name, or the branch
+### The name first, the size with the facts
 
 #### Context
 
-**Problem**: for the moment an agent's name was not known yet, its line showed the branch in the name's place, or "no branch", and the name replaced it a moment later.
+**User story**: switching between agents, the user sees the new agent's name at once, and its facts together a moment later, never in pieces.
+
+#### Business logic
+
+The caller says whether its own facts about the agent [2] have been read (the agent's page does, see `AgentView.tsx`). Until it says they are ready, the name and breadcrumb show alone, whatever checkout was handed in. Once ready, the line does not wait for the checkout's answer: it shows the name as a working disclosure at once, and the size when the checkout has answered. A new agent's checkout is read up to ten seconds after it starts. A caller that says nothing counts as ready.
+
+### The agent's name, never the branch
+
+#### Context
 
 **Problem**: the agent [2] renames its branch near the end of its work, while its label does not change under the user. And the agent's branch is what the next step acts on, so it is said beside the next step, above the message box, and not a second time here.
 
 #### Business logic
 
-When the caller gives the agent's label, it leads in bold and is the last element to truncate, so the identity never disappears. A project name given with it is prefixed as a muted "<project> ›" breadcrumb that is always shown (`›`, not `/`, so a label that is a command, such as `/update-tickets`, never reads as a doubled slash): it keeps its width up to a cap of 8rem (about 16 characters), a longer project name is cut there with "…", and a long agent name is what gives up the rest of the row. Given a label, no branch is shown in this line. On the project home (no label and no agent) the branch is the identity, in bold, capped at 16 rem, its tooltip reading "branch <branch>"; a checkout on no branch reads "no branch". For an agent's checkout [1] no branch is shown, with a label or without one: an agent's line shown without a label holds the size alone.
-
-### Clean or dirty, neutrally
-
-#### Context
-
-**Problem**: green means "added", "new" or "done" everywhere else in the dashboard, and the file tree's green dot one pane away says a folder has changes; a green dot for "nothing changed" would give the same color to opposite facts. A clean tree is the unremarkable default and has nothing to announce.
-
-#### Business logic
-
-On the project's own checkout, a dot and a word: "clean" with a neutral gray dot, or "dirty" with an amber dot. The tooltip reads "Clean" when clean and "Uncommitted changes" when dirty. An agent's [2] line shows neither the dot nor the word, whatever its checkout [1] holds: the bar above the message box (`AgentWorkBar.tsx`) says what an agent's branch holds.
+The agent's label leads in bold and is the last element to truncate, so the identity never disappears. A project name given with it is prefixed as a muted "<project> ›" breadcrumb that is always shown (`›`, not `/`, so a label that is a command, such as `/update-tickets`, never reads as a doubled slash): it keeps its width up to a cap of 8rem (about 16 characters), a longer project name is cut there with "…", and a long agent name is what gives up the rest of the row. No branch is shown, with a label or without one: a line shown without a label holds the size alone.
 
 ### The size
 
@@ -80,17 +57,7 @@ On the project's own checkout, a dot and a word: "clean" with a neutral gray dot
 
 #### Business logic
 
-The checkout's [1] size on disk, rendered as a short byte count such as "5 MB", sits after the agent's name. It shows only for an agent's checkout and only once the daemon has measured it, which it does not while something is still writing to it; its tooltip reads "This agent's worktree on disk", and an unmeasured size shows nothing, not a placeholder. As the bar narrows, the size drops out, so the line never wraps or collides; only the label, or the branch when there is no label, truncates with an ellipsis. On a pane too narrow even for that, the line is cut off rather than painted over the controls beside it.
-
-### The pull request link
-
-#### Context
-
-See `## Context`.
-
-#### Business logic
-
-On the project home, when the branch has a pull request, a link reads "PR #<number>" followed by the pull request's state in lowercase inside a small pill ("open", "merged", "closed"); it opens the pull request in a new tab and shows the pull request's title in its tooltip. On the full-width row it sits at the far right; inline, it follows the facts. An agent's [2] line shows no pull request link: the bar above the message box links it (`AgentWorkBar.tsx`).
+The checkout's [1] size on disk, rendered as a short byte count such as "5 MB", sits after the agent's name. It shows only once the daemon has measured it, which it does not while something is still writing to the checkout; its tooltip reads "This agent's worktree on disk", and an unmeasured size shows nothing, not a placeholder. As the bar narrows, the size drops out, so the line never wraps or collides; only the label truncates with an ellipsis. On a pane too narrow even for that, the line is cut off rather than painted over the controls beside it.
 
 ### A disclosure when there is detail below
 
@@ -100,4 +67,4 @@ On the project home, when the branch has a pull request, a link reads "PR #<numb
 
 #### Business logic
 
-When the caller offers a toggle, the facts become a button, preceded by a chevron that points right while collapsed and down while expanded, and clicking it toggles the detail the caller renders below; the pull request link, where there is one, stays outside the button, being a link in its own right. Without a toggle no chevron shows, so the bar never advertises a disclosure it does not have. Inline, the bar renders as a compact span for an action bar; otherwise as a full-width row with a bottom border. While the facts are not shown yet (not read, or the caller not ready), the chevron is still drawn in the same place, dimmed, before the name: the line is laid out the same way before and after, so the name keeps its position and only the size appears beside it. It used to appear with the facts and shift the whole line.
+When the caller offers a toggle, the line becomes a button, preceded by a chevron that points right while collapsed and down while expanded, and clicking it toggles the detail the caller renders below. Without a toggle no chevron shows, so the bar never advertises a disclosure it does not have. While the caller's facts are not ready, the name is not a button yet, and the chevron is still drawn in the same place, dimmed, before the name: the line is laid out the same way before and after, so the name keeps its position and only the size appears beside it.

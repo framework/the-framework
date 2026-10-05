@@ -13,7 +13,7 @@ const onBridgeQuestion = vi.fn(async () => null as unknown)
 const onBridgeEvents = vi.fn(async () => [] as unknown)
 const onBridgeAnswer = vi.fn(async () => null as unknown)
 const onAgentWorktree = vi.fn(async () => ({ branch: 'agent-x' }) as unknown)
-vi.mock('../rpc/reads.js', () => ({ onAgent, onRetainedWorktrees, onAgentHandoff, onAgentsDoing, onBridgeQuestion, onBridgeEvents, onBridgeAnswer, onAgentWorktree, onGitStatus: vi.fn(async () => null) }))
+vi.mock('../rpc/reads.js', () => ({ onAgent, onRetainedWorktrees, onAgentHandoff, onAgentsDoing, onBridgeQuestion, onBridgeEvents, onBridgeAnswer, onAgentWorktree }))
 const sendMessage = vi.fn(async () => ({ ok: true }) as unknown)
 vi.mock('../rpc/control.js', () => ({
   sendMessage,

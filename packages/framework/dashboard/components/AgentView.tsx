@@ -222,7 +222,7 @@ export function AgentView({
   // for a branch with commits of its own, which the clean-up keeps.
   // The agent's checkout (its branch, its pull request, clean or dirty, its size), read once for
   // the top bar and for the bar above the message box, and again the moment a turn starts or ends.
-  const checkout = useCheckoutStatus(projectId, agentId, true, active) as AgentWorktree | null
+  const checkout = useCheckoutStatus(projectId, agentId, active)
   const read = useAgentHandoff(projectId, agentId, live === false && !going, card?.saving === true, going)
   const kept = read.handoff !== null && read.handoff.exists && !read.handoff.empty
   const handoff = card?.saving && !kept ? { ...read, handoff: null, loaded: false } : read

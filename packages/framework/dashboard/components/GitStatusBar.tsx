@@ -1,58 +1,39 @@
-import type { GitStatus, AgentWorktree } from '../../src/index.js'
-import { ChevronRight, GitBranch } from 'lucide-react'
-import { useCheckoutStatus } from '../lib/use-checkout-status.js'
+import type { AgentWorktree } from '../../src/index.js'
+import { ChevronRight } from 'lucide-react'
 import { formatBytes } from '../../src/client.js'
 import { cn } from '../lib/utils.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
-// The checkout in play (#491, part of #488): active branch, a clean/dirty dot, the linked PR.
-// Polled, so it tracks an agent committing or branching. Hidden when there is no git repo.
+// Which agent this is, at the start of the agent's top bar (AgentActionBar): the agent's name,
+// its project as a breadcrumb before it, and the size on disk of its worktree.
 //
-// One component for both pages (#809). Without an `agentId` it reads the project's checkout and
-// says its branch, clean or dirty, and its pull request. With one it reads that session's own
-// worktree and says only the session's name and the worktree's size on disk.
-//
-// `inline` renders just the status (for an action bar); otherwise a full-width row.
-//
-// An agent's row says nothing of its state or of its tree: whether it works and how it ended are
+// It says nothing of the agent's state or of its tree: whether it works and how it ended are
 // said by the feed and the message box, and its branch, what the branch holds and its pull request
 // in the bar above the message box (`AgentWorkBar.tsx`), beside the next step. `onToggle` makes
 // the name a disclosure for the detail the caller renders below.
+//
+// It reads nothing itself: the agent's page reads the checkout once and hands it in.
 export function GitStatusBar({
-  projectId,
-  agentId: agentId,
-  inline = false,
   label,
   projectName,
   expanded = false,
   onToggle,
   ready = true,
-  checkout: given,
+  checkout,
 }: {
-  projectId: string
-  /** The session whose worktree to report; absent reports the project's checkout. */
-  agentId?: string | null | undefined
-  inline?: boolean
-  /** The session's name (#1030). Given, it leads as the bold identity and the branch drops to
-   * muted git context beside it; absent (the project home), the branch stays the identity. */
+  /** The session's name (#1030): the bold identity of the line. */
   label?: string | undefined
   /** The project the session belongs to. Given alongside a label, it prefixes the name as a
-   * `project / session` breadcrumb; it gives up width first, so the session name truncates last. */
+   * `project / session` breadcrumb; it keeps its width up to a cap, so the session name truncates. */
   projectName?: string | null | undefined
   expanded?: boolean
   /** Given, the name reads as a disclosure for the detail the caller renders below. */
   onToggle?: (() => void) | undefined
   /** False while the caller's own facts are still being read: the label shows alone until then. */
   ready?: boolean
-  /** The checkout as the caller already read it (`null`: not answered yet). Given, this bar reads nothing itself. */
-  checkout?: GitStatus | AgentWorktree | null | undefined
+  /** The agent's checkout as the caller read it (`null`: not answered yet). */
+  checkout: AgentWorktree | null
 }) {
-  // Two reads: the project's carries its branch, its clean/dirty and its PR; the session's its
-  // checkout, of which this bar says the size, while it still has one. A caller that reads it for
-  // more than this bar hands its answer in (`checkout`), and nothing is read here.
-  const read = useCheckoutStatus(projectId, agentId, given === undefined)
-  const status = given === undefined ? read : given
-
   // The session's name, with its project as a breadcrumb: shown from the first frame, alone until
   // the facts beside it are there to show.
   const title = label && (
@@ -93,67 +74,22 @@ export function GitStatusBar({
       />
     )
 
-  // An agent's line waits only for `ready`, not for its checkout's answer: a new agent's checkout
-  // is read up to ten seconds after it starts, and the line is laid out the same with or without it.
-  if (!ready || (!status && !agentId)) {
-    if (!title) return null
-    // Laid out as the disclosure below is (chevron, then name, same gap), so the facts landing
-    // beside the name is the only change.
-    const alone = (
-      <span className="flex min-w-0 items-center gap-2 overflow-hidden">
-        {chevron(false)}
-        {title}
-      </span>
-    )
-    return inline ? (
-      <span className="flex min-w-0 items-center gap-2 overflow-hidden text-xs">{alone}</span>
-    ) : (
-      <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs">{alone}</div>
-    )
-  }
+  // The line waits only for `ready`, not for the checkout's answer: a new agent's checkout is read
+  // up to ten seconds after it starts, and the line is laid out the same with or without it.
+  // Only once nothing is writing to the worktree is there a size to show (#798).
+  const size = ready ? formatBytes(checkout?.checkout?.sizeBytes, '') : ''
 
-  // The project's own facts: its branch, whether its tree is clean, its pull request. An agent's
-  // line says none of them.
-  const project = agentId ? undefined : (status as GitStatus)
-  // Only a session has a worktree of its own to size, and only while it still has one.
-  const size = agentId ? formatBytes((status as AgentWorktree | null)?.checkout?.sizeBytes, '') : ''
-
-  // One flat row so exactly one element gives up width: the label (or, with no label, the branch).
-  // Everything else is shrink-0 and drops out at a container width instead of squeezing to mush.
+  // One flat row so exactly one element gives up width: the label. The size is shrink-0 and drops
+  // out at a container width instead of squeezing to mush.
   const facts = (
     <>
-      {/* The chevron only appears where there is something to open, so a bar without a
-          disclosure doesn't advertise one. */}
-      {chevron(true)}
+      {/* Drawn only where there is something to open, so a bar without a disclosure doesn't
+          advertise one. */}
+      {chevron(ready)}
       {/* The session's name leads (#1030): it is what the rail calls this run and it does not
           change under you, unlike the branch, which the agent renames near the end (#736). It is
           the one element that shrinks, so it truncates last and the identity never disappears. */}
       {title}
-      {/* The branch is the identity on the project home. An agent's branch is said in the bar above
-          the message box, never here: not even for the moment its name is not known yet. */}
-      {project && !label && (
-        <span className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-hidden text-muted-foreground">
-          <GitBranch className="h-3.5 w-3.5 shrink-0" />
-          <Tooltip>
-            <TooltipTrigger render={<span className="max-w-[16rem] truncate font-medium text-foreground" />}>{project.branch ?? 'no branch'}</TooltipTrigger>
-            <TooltipContent>{`branch ${project.branch}`}</TooltipContent>
-          </Tooltip>
-        </span>
-      )}
-      {/* Clean is neutral, not green. Green means "added / new / done" everywhere else, so a
-          green dot for "nothing changed" sat one pane away from the file tree's green dot for
-          "this folder HAS changes": the same colour for opposite facts. A clean tree is the
-          unremarkable default and has nothing to announce. */}
-      {project && (
-        <Tooltip>
-          <TooltipTrigger render={<span className="flex shrink-0 items-center gap-1.5" />}>
-            <span className={cn('h-2 w-2 rounded-full', project.dirty ? 'bg-warning' : 'bg-muted-foreground')} />
-            <span className="text-muted-foreground">{project.dirty ? 'dirty' : 'clean'}</span>
-          </TooltipTrigger>
-          <TooltipContent>{project.dirty ? 'Uncommitted changes' : 'Clean'}</TooltipContent>
-        </Tooltip>
-      )}
-      {/* Only a worktree has a size worth showing, and only once nothing is writing to it (#798). */}
       {size && (
         <Tooltip>
           <TooltipTrigger render={<span className="hidden shrink-0 text-muted-foreground @4xl:inline" />}>
@@ -165,11 +101,14 @@ export function GitStatusBar({
     </>
   )
 
-  const content = (
-    <>
-      {/* A disclosure wraps only the facts: the PR link and the copy button are interactive in
-          their own right and can't sit inside a button. */}
-      {onToggle ? (
+  // `overflow-hidden`: on a pane too narrow for even the name, it is cut off rather than painted
+  // over the buttons beside it (#1026).
+  return (
+    <span className="flex min-w-0 items-center gap-2 overflow-hidden text-xs">
+      {/* Until the facts are in, the name is not a button: there is no detail to open yet. It is
+          laid out as the disclosure is (chevron, then name, same gap), so the size landing beside
+          the name is the only change. */}
+      {onToggle && ready ? (
         <button
           type="button"
           onClick={onToggle}
@@ -179,34 +118,8 @@ export function GitStatusBar({
           {facts}
         </button>
       ) : (
-        facts
+        <span className="flex min-w-0 items-center gap-2 overflow-hidden">{facts}</span>
       )}
-      {project?.pr && !label && (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <a
-                href={project.pr.url}
-                target="_blank"
-                rel="noreferrer"
-                className={cn('flex shrink-0 items-center gap-1.5 text-primary hover:underline', !inline && 'ml-auto')}
-              />
-            }
-          >
-            <span>PR #{project.pr.number}</span>
-            <span className="rounded-full border border-border px-1.5 text-[10px] uppercase text-muted-foreground">
-              {project.pr.state.toLowerCase()}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{project.pr.title}</TooltipContent>
-        </Tooltip>
-      )}
-    </>
+    </span>
   )
-
-  // `overflow-hidden`: on a pane too narrow for even the branch, it is cut off rather than
-  // painted over the buttons beside it (#1026).
-  if (inline) return <span className="flex min-w-0 items-center gap-2 overflow-hidden text-xs">{content}</span>
-
-  return <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs">{content}</div>
 }

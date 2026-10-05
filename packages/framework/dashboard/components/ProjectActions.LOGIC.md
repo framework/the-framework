@@ -1,4 +1,6 @@
-The action bar at the top of the project home [1]: the project's name first, since with all projects showing in the sidebar nothing else on the page says which project an agent will start in, then the project's git status on the left (`GitStatusBar.tsx`) and the "⋮" menu of actions on the right (`AgentActionsMenu.tsx`): open the project on its git host, its folder, or in an editor. Both halves are the same ones an agent's [2] page shows; here they are given no agent, so they report on and act on the project's own checkout rather than an agent's.
+The bar at the top of the project home [1]. It holds one thing: the "⋮" menu of actions on the project (`AgentActionsMenu.tsx`), which opens the project on its git host, its folder, or in an editor. The menu is at the end of the row, and the row has the padding and the height of the action bar at the top of an agent's [2] page (`AgentActionBar.tsx`), with no line under it, so the menu is in the same place on both pages. The bar shows no project name, no branch, and not whether the project's checkout is clean or dirty. It asks the daemon nothing.
+
+The menu is the same one an agent's page shows. Here it is given no agent, so it acts on the project's own checkout.
 
 ## Glossary
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import type { AgentWorktree, FrameworkEvent } from '../../src/index.js'
 
@@ -6,14 +6,9 @@ import type { AgentWorktree, FrameworkEvent } from '../../src/index.js'
 // name and the checkout's facts are drawn for real, so what the bar leaves out is checked on
 // what is really on screen.
 vi.mock('./AgentActionsMenu.js', () => ({ AgentActionsMenu: () => <button type="button">Agent actions</button> }))
-const onGitStatus = vi.fn(async () => null as unknown)
-const onAgentWorktree = vi.fn(async () => null as unknown)
-vi.mock('../rpc/reads.js', () => ({ onGitStatus, onAgentWorktree }))
 
 const { AgentActionBar } = await import('./AgentActionBar.js')
-const { GitStatusBar } = await import('./GitStatusBar.js')
 
-beforeEach(() => vi.clearAllMocks())
 afterEach(cleanup)
 
 const session = { kind: 'session', driver: 'claude-code', workspace: '/w' }
@@ -34,7 +29,6 @@ describe('AgentActionBar', () => {
     // All the bar says, word for word: nothing of the agent's state, of its tree, of its branch.
     expect(container.textContent).toBe('gemstack›Dark mode5 MBAgent actions')
     expect(screen.getByRole('button', { name: 'Agent actions' })).toBeTruthy()
-    expect(onAgentWorktree).not.toHaveBeenCalled()
   })
 
   test('the count of errors is still said, for a running agent and for one that ended', () => {
@@ -59,11 +53,5 @@ describe('AgentActionBar', () => {
     expect(name.getAttribute('aria-expanded')).toBe('false')
     name.click()
     expect(onToggle).toHaveBeenCalledTimes(1)
-  })
-
-  test("the project's own bar still says its branch, clean or dirty, and its pull request", () => {
-    const pr = { number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', title: 'Dark mode' }
-    const { container } = render(<GitStatusBar projectId="p1" inline checkout={{ branch: 'main', dirty: true, pr }} />)
-    expect(container.textContent).toBe('maindirtyPR #7open')
   })
 })

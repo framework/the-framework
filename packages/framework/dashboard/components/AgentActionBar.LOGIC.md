@@ -30,7 +30,7 @@ One agent's [1] action bar, the bar at the top of the agent's page, one row that
 
 #### Business logic
 
-The row is always one line. Its start is the line of git facts (`GitStatusBar.tsx`), rendered inline and given: the agent's [1] label as the leading identity, its project name as a "<project> ›" breadcrumb, and, when the caller renders a detail under the bar (the agent's page renders the details strip, `AgentDetails.tsx`), the toggle that makes the line a disclosure with an expanded and collapsed state. For an agent, that line says the size of the agent's checkout [4] and nothing else of it. A spacer between the line and the controls grows but never shrinks, so on a tight row the name truncates and the controls keep their width.
+The row is always one line. Its start is the line that names the agent (`GitStatusBar.tsx`), given: the agent's [1] label as the leading identity, its project name as a "<project> ›" breadcrumb, and, when the caller renders a detail under the bar (the agent's page renders the details strip, `AgentDetails.tsx`), the toggle that makes the line a disclosure with an expanded and collapsed state. That line says the size of the agent's checkout [4] and nothing else of it. A spacer between the line and the controls grows but never shrinks, so on a tight row the name truncates and the controls keep their width.
 
 ### One read of the checkout
 
@@ -40,7 +40,7 @@ The row is always one line. Its start is the line of git facts (`GitStatusBar.ts
 
 #### Business logic
 
-The caller hands the bar the agent's checkout as it read it (the agent's page reads it once for both bars, see `AgentView.tsx`), or says that the read has not answered yet. The bar passes it on to the line of git facts (`GitStatusBar.tsx`), which then reads nothing itself.
+The caller hands the bar the agent's checkout as it read it (the agent's page reads it once for both bars, see `AgentView.tsx`), or says that the read has not answered yet. The bar passes it on to the line that names the agent (`GitStatusBar.tsx`), which reads nothing itself.
 
 ### No status word, no clean or dirty
 

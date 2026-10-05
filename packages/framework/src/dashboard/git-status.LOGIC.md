@@ -6,7 +6,6 @@ Reads the git status bar of a project or of an agent's [1] checkout [2]: the cur
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is the project's checkout.
 [3] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [4] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
-[5] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used for live chat).
 [6] agent view: one agent's page.
 [7] git host provider: the package of the project that declares it provides the git host (`"framework": { "git-host": "<command>" }`); The Framework reads and moves pull requests through the command that package declares (`../store/git-host.ts`, `pull-requests.ts`). A project with none has no pull requests.
 
@@ -22,7 +21,7 @@ Reads the git status bar of a project or of an agent's [1] checkout [2]: the cur
 
 #### Context
 
-**User story**: the user sees, on project home [5] and on the agent view [6], which branch the checkout [2] is on and whether it holds uncommitted changes.
+**User story**: the user sees, on the agent view [6], which branch the checkout [2] is on and whether it holds uncommitted changes.
 
 #### Business logic
 

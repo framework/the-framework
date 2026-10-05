@@ -162,7 +162,7 @@ The files are every file git sees in the checkout, tracked and untracked, honori
 
 #### Context
 
-**User story**: the git status bar shows the branch, whether there are uncommitted changes, and the linked pull request; the project links to its page on the git host, labelled with the git host's name.
+**User story**: a client of the daemon can ask for the branch, whether there are uncommitted changes, and the linked pull request of a project's checkout or of an agent's; no page of the dashboard asks for this read, an agent's page asks where the agent is working instead ("Where an agent is working" above). The project links to its page on the git host, labelled with the git host's name.
 
 #### Business logic
 

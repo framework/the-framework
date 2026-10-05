@@ -29,7 +29,7 @@ export function ProjectHome({
   errors,
 }: {
   projectId: string
-  /** The project's name, for the bar at the top and the launcher's chip; absent until the projects are read. */
+  /** The project's name, for the launcher's chip; absent until the projects are read. */
   projectName?: string | null | undefined
   /** The project picked in the sidebar (#1513), or null for all: the open questions shown are its only. */
   scope?: string | null
@@ -49,7 +49,7 @@ export function ProjectHome({
 }) {
   return (
     <>
-      <ProjectActions projectId={projectId} projectName={projectName} />
+      <ProjectActions projectId={projectId} />
       {/* Above everything, because an agent started on a project whose agent-data branch cannot
           reach origin (#1599) works from stale tickets and a queue nobody else will see. */}
       <ProjectErrorBanner errors={errors} />

@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 
 export const DISCORD_URL = 'https://discord.gg/qc8zvdzWNR'
-export const GITHUB_URL = 'https://github.com/framework/the-framework'
+export const GITHUB_URL = 'https://github.com/openagt/openagent'
 export const NPM_URL = 'https://www.npmjs.com/package/framework'
 
 export const mono = "'IBM Plex Mono', monospace" as const

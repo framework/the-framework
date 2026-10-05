@@ -24,9 +24,9 @@ import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
  * command may be in flight at once, across every machine that shares the repository. `off` lists
  * a command that runs only on a machine where a person switched it on; every other command runs
  * unless a person switched it off there. The switches are per machine, in the tool's state.
- * `publish` says how far a run of the command publishes its work: push its `branch`, open its
- * `pr`, or set the request to `merge` once its checks pass; a line that says nothing publishes
- * nothing, as a person's run does. The level is the team's default: a person may pick another for
+ * `publish` says how far a run of the command takes its work: `commit` it, and from there push its
+ * `branch`, open its `pr`, or set the request to `merge` once its checks pass; a line that says
+ * nothing commits and publishes nothing, as a run given no level does. The level is the team's default: a person may pick another for
  * one command on their machine, kept in the tool's state like the switches.
  *
  * Every other line — headings, blank lines, prose — is the person's, and is not read. A list line
@@ -86,7 +86,7 @@ export function parseSchedule(md: string): Schedule {
 
 /**
  * The clauses after the name, in any order, each at most once: `every <N><m|h|d>`, `when \`…\``,
- * `cap <N>`, `off`, `publish <branch|pr|merge>`. At least one of `every` and `when`, else nothing
+ * `cap <N>`, `off`, `publish <commit|branch|pr|merge>`. At least one of `every` and `when`, else nothing
  * says when. `every 0` is refused rather than read as "always", which is the clause being absent.
  */
 function parseRule(name: string, rule: string, line: number): ScheduledCommand | undefined {

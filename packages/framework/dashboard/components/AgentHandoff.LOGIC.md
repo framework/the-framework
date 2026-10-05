@@ -66,7 +66,7 @@ The line does not wait for the pull request lookup: no rule of a subagent's read
 
 #### Context
 
-**User story**: an agent [2] has ended and its work is on this machine only, as the work of every agent nobody asked to publish is; publishing the work to a shared remote under the user's name should be one deliberate click, offered without being looked for, beside words that say nothing is published yet. Most often the user wants the pull request; sometimes a draft pull request, for work a person should look at before it asks for review; sometimes only the branch on the remote, with no pull request yet. And an agent that shows no control says why only when it left something the user may act on; an agent that changed nothing shows nothing, since an agent with work always shows its button.
+**User story**: an agent [2] has ended and its work is on this machine only, as the work of an agent started at "Nothing" or "Commit" is; publishing the work to a shared remote under the user's name should be one deliberate click, offered without being looked for, beside words that say nothing is published yet. Most often the user wants the pull request; sometimes a draft pull request, for work a person should look at before it asks for review; sometimes only the branch on the remote, with no pull request yet. And an agent that shows no control says why only when it left something the user may act on; an agent that changed nothing shows nothing, since an agent with work always shows its button.
 
 **Problem**: opening a second pull request for a branch that already has one is the one mistake this must not make. Once a pull request exists, the bar links it and the interventions [4] feed has picked it up.
 
@@ -88,7 +88,7 @@ Shown once the agent has ended (the caller's decision, in `AgentView.tsx`); an a
   - "Create draft PR", always: it pushes the branch and opens its pull request as a draft; the main part reads "Opening PR…" while that is in flight.
   - "Publish branch", only while the branch is not on the remote: it pushes the branch and opens no pull request; the main part reads "Publishing…" while that is in flight. Once the branch is on the remote the push alone is no choice any more, and the item is gone.
 
-  The other choices are in the menu, never a second button beside the first: the ready pull request is what the user most often wants. While the branch is not on the remote, "not published" is said before the button: an agent publishes nothing by itself, so work still only on this machine is the usual answer and must not read as silence, and "Open PR" does not itself say that it pushes.
+  The other choices are in the menu, never a second button beside the first: the ready pull request is what the user most often wants. While the branch is not on the remote, "not published" is said before the button: an agent started at "Nothing" or "Commit" pushes nothing, so work still only on this machine is an ordinary answer and must not read as silence, and "Open PR" does not itself say that it pushes.
 
 A reason is capped in width and truncated with an ellipsis, so a long file name never widens the row. Every button, and the arrow, is disabled while an action is in flight. A failed action reports "Could not merge the pull request.", "Could not open the pull request." or "Could not push the branch." unless the daemon answered with a more specific error, and the reason reaches the bar's summary line beside the verdict rather than nothing happening. After an action succeeds, the branch is read again so the bar shows the new state.
 

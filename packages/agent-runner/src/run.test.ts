@@ -503,9 +503,10 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
 
 test('the prompt an agent gets: as written with no publish level, one sentence after it with one, the hold sentence whenever a follow-up is coming', () => {
   assert.equal(agentPrompt('Fix the typo', undefined, undefined), 'Fix the typo', 'no level: the prompt as written')
-  assert.equal(agentPrompt('Fix the typo', 'branch', undefined), 'Fix the typo\n\nWhen you finish, if you committed anything, push your branch and open no pull request.')
-  assert.equal(agentPrompt('Fix the typo', 'pr', undefined), 'Fix the typo\n\nWhen you finish, if you committed anything, push your branch and open its pull request.')
-  assert.equal(agentPrompt('Fix the typo', 'merge', undefined), 'Fix the typo\n\nWhen you finish, if you committed anything, push your branch and open its pull request, set to merge on its own once its checks pass.')
+  assert.equal(agentPrompt('Fix the typo', 'commit', undefined), 'Fix the typo\n\nWhen you finish, if you changed any file, commit your work.')
+  assert.equal(agentPrompt('Fix the typo', 'branch', undefined), 'Fix the typo\n\nWhen you finish, if you changed any file, commit your work, push your branch and open no pull request.')
+  assert.equal(agentPrompt('Fix the typo', 'pr', undefined), 'Fix the typo\n\nWhen you finish, if you changed any file, commit your work, push your branch and open its pull request.')
+  assert.equal(agentPrompt('Fix the typo', 'merge', undefined), 'Fix the typo\n\nWhen you finish, if you changed any file, commit your work, push your branch and open its pull request, set to merge on its own once its checks pass.')
   assert.equal(agentPrompt('/work-queue', 'merge', '/post-merge-cleanup'), `/work-queue\n\n${HOLD_MERGE_LINE}`, 'a follow-up is coming: the merge is this tool\'s, whatever the level')
   assert.equal(agentPrompt('/work-queue', undefined, '/post-merge-cleanup'), `/work-queue\n\n${HOLD_MERGE_LINE}`)
 })

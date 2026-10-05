@@ -16,10 +16,11 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
  * One run (#1774): a checkout from the branches package, a session from agent-driver, the prompt
  * once, and the agent's own loop to the end. No system prompt and no gates: the
  * command's skill file is the whole instruction, and the agent publishes its own work, when asked
- * to, through the skills in its checkout. How far it publishes is the run's publish level
- * (`run --publish <branch|pr|merge>`), said in one sentence after the prompt: push the branch, open
- * its pull request, or set it to merge once its checks pass. A run with no level gets its prompt as
- * written. This process records the run and reclaims the checkout when the
+ * to, through the skills in its checkout. How far it takes its work is the run's publish level
+ * (`run --publish <commit|branch|pr|merge>`), said in one sentence after the prompt: commit the work,
+ * and from there push the branch, open its pull request, or set it to merge once its checks pass.
+ * A run with no level gets its prompt as written, and its agent commits only when the prompt asks.
+ * This process records the run and reclaims the checkout when the
  * agent stops; a run that dies is caught by the sweep, which a scheduler runs on every tick.
  *
  * The session keeps the run's live record itself, the card and the diary under `.the-framework/`
@@ -61,10 +62,12 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
 /** The detail a stopped run's record carries. */
 export const STOPPED_DETAIL = 'stopped by a signal to its process'
 
-const PUBLISH_OPENING = 'When you finish, if you committed anything, push your branch'
+const COMMIT_OPENING = 'When you finish, if you changed any file, commit your work'
+const PUBLISH_OPENING = `${COMMIT_OPENING}, push your branch`
 
-/** The sentence after a prompt that says how far to publish; how is the business of the skills in the checkout. */
+/** The sentence after a prompt that says how far to take the work, every level starting with the commit; how is the business of the skills in the checkout. */
 export const PUBLISH_LINES: Readonly<Record<Publish, string>> = {
+  commit: `${COMMIT_OPENING}.`,
   branch: `${PUBLISH_OPENING} and open no pull request.`,
   pr: `${PUBLISH_OPENING} and open its pull request.`,
   merge: `${PUBLISH_OPENING} and open its pull request, set to merge on its own once its checks pass.`,

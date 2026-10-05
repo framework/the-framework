@@ -135,7 +135,7 @@ export interface StartHookInput {
   model?: string
   /** A fresh agent's prompt once the run ends done with a pull request; the merge waits for it. */
   then?: string
-  /** How far the run publishes when its agent finishes: `branch`, `pr` or `merge`. */
+  /** How far the run takes its work when its agent finishes: `commit`, `branch`, `pr` or `merge`. */
   publish?: string
   /** The branch the run's own branch starts from; origin's default branch when absent. */
   base?: string

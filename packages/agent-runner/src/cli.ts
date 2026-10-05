@@ -14,12 +14,12 @@ import { isPublish, PUBLISH_LEVELS } from './records.js'
 
 export const USAGE = `usage: agent-runner <command>
 
-  run <prompt> [--model <id>] [--driver <claude-code|codex>] [--then <prompt>] [--publish <branch|pr|merge>] [--parent <id>] [--base <ref>]
+  run <prompt> [--model <id>] [--driver <claude-code|codex>] [--then <prompt>] [--publish <commit|branch|pr|merge>] [--parent <id>] [--base <ref>]
                                 one run of <prompt> in its own checkout, now, recorded; on Claude Code unless --driver says Codex,
                                 on the coding agent's own default model unless --model names one;
                                 with --then, once it ends done with a pull request, a fresh agent on its branch gets that prompt and the run's id, and the merge waits for it;
-                                with --publish, the agent is told, in one sentence after the prompt, how far to publish when it finishes: push its branch, open its pull request,
-                                or set the request to merge once its checks pass; without it the prompt goes as written, and nothing is published unless the prompt asks;
+                                with --publish, the agent is told, in one sentence after the prompt, how far to take its work when it finishes: commit it, and from there push its branch,
+                                open its pull request, or set the request to merge once its checks pass; without it the prompt goes as written, and nothing is committed or published unless the prompt asks;
                                 with --parent, the run <id> is told when this one ends: which run, how it ended, its last words, as its next prompt;
                                 with --base, the run's branch starts from <ref> instead of origin's default branch
   run --detach <prompt>         the same run in its own process, answered at once with its id: what a dashboard's start hook runs

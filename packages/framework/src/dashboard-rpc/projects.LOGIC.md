@@ -80,7 +80,7 @@ The daemon answers with the directory it is running in, and with that directory'
 
 #### Context
 
-**User story**: a project's launcher [2] lists every command [3] the project has under `/` and in its Commands menu; on a project with no start hook [7], Start is off and the launcher says why; on a project where no package provides a git host, the launcher's publish menu offers "Nothing" and "Publish branch" only; the launcher shows a chip that says which branch the agent starts from, the project's main branch or the user's own local branch, and lets the user pick.
+**User story**: a project's launcher [2] lists every command [3] the project has under `/` and in its Commands menu; on a project with no start hook [7], Start is off and the launcher says why; on a project where no package provides a git host, the launcher's publish menu offers "Nothing", "Commit" and "Publish branch" only; the launcher shows a chip that says which branch the agent starts from, the project's main branch or the user's own local branch, and lets the user pick.
 
 **Problem**: a project's start line is written once and kept, so a line written before the pick existed, or a person's own line, may not pass the picked branch on to the tool. A pick shown there would silently do nothing.
 

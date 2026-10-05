@@ -126,10 +126,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   downloads whatever package holds the name on npm when the project has not installed it.
 - The line gets the prompt, and the coding agent, the model and how far to publish when the
   person picked them; anything else is the line's own business. The publish pick is one menu
-  beside Start: Nothing, Publish branch, Open PR, Merge on green. It is saved like the coding
-  agent. A project with no git host package is offered Nothing and Publish branch only. A project
-  with no remote can publish nothing, so it is offered no menu, and a saved pick starts its
-  run publishing nothing.
+  beside Start: Nothing, Commit, Publish branch, Open PR, Merge on green. It is saved like the
+  coding agent. Until a person picks, it is Publish branch. A project with no git host package
+  is offered Nothing, Commit and Publish branch only. A project with no remote can publish
+  nothing, so it is offered Nothing and Commit, and Commit is its pick until a person picks
+  and for a saved pick it is not offered.
   Picked over handing over every option the launcher once had, which is how the options
   became the thing to maintain.
 - The line also gets the branch to start from, when the person picked their own local branch

@@ -13,8 +13,8 @@ import { deleteRun, writeRun, type AnyDiaryLine, type LogsDeps, type RunCard } f
  * it. A machine that never comes back leaves its card running, on purpose: nothing here guesses that a run it cannot see is dead.
  */
 
-/** How far a run publishes its work when its agent finishes: its branch, its pull request, or the request set to merge once its checks pass. */
-export const PUBLISH_LEVELS = ['branch', 'pr', 'merge'] as const
+/** How far a run takes its work when its agent finishes: a commit, its branch pushed, its pull request, or the request set to merge once its checks pass. */
+export const PUBLISH_LEVELS = ['commit', 'branch', 'pr', 'merge'] as const
 export type Publish = (typeof PUBLISH_LEVELS)[number]
 
 export function isPublish(value: unknown): value is Publish {
@@ -29,7 +29,7 @@ export interface RunnerMark {
   pid?: number
   /** The prompt a fresh agent is given once the run ends done with a pull request, the run's id after it (`run --then`). */
   then?: string
-  /** How far the run publishes when its agent finishes (`run --publish`): the branch, its pull request, or the request set to merge; absent, only what its prompt asks. */
+  /** How far the run takes its work when its agent finishes (`run --publish`): a commit, the branch, its pull request, or the request set to merge; absent, only what its prompt asks. */
   publish?: Publish
   /** The run this one was started for, told when this one ends (`run --parent`). */
   parent?: string

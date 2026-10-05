@@ -10,6 +10,7 @@ import type { Publish } from 'agent-runner'
 /** The publish picks a person can make for a scheduled command, in the menu's order, with their labels. */
 export const PUBLISH_LABELS: Readonly<Record<PublishPick, string>> = {
   nothing: 'Nothing',
+  commit: 'Commit',
   branch: 'Publish branch',
   pr: 'Open PR',
   merge: 'Merge on green',
@@ -147,9 +148,9 @@ export async function saveSpendOffset(host: ModuleHost, projects: readonly Modul
   return failed.length ? { ok: false, error: failed.join('; ') } : { ok: true }
 }
 
-/** The picks a scheduled command's publish menu lists after "As the file says": all four where the project has a git host package, else Nothing and Publish branch, since no pull request can be opened; and the pick already saved when the project is no longer offered it. */
+/** The picks a scheduled command's publish menu lists after "As the file says": every one where the project has a git host package, else Nothing, Commit and Publish branch, since no pull request can be opened; and the pick already saved when the project is no longer offered it. */
 export function publishChoices(gitHost: boolean, saved: PublishPick | undefined): readonly PublishPick[] {
-  const offered: readonly PublishPick[] = gitHost ? PUBLISH_PICKS : ['nothing', 'branch']
+  const offered: readonly PublishPick[] = gitHost ? PUBLISH_PICKS : ['nothing', 'commit', 'branch']
   return saved !== undefined && !offered.includes(saved) ? [...offered, saved] : offered
 }
 
@@ -163,6 +164,7 @@ export function pace(command: SchedulerCommand): string {
 /** How far a scheduled command's runs publish on this machine, in words: the person's pick here, else what its schedule line says, nothing when it says none. */
 export function publishes(command: SchedulerCommand): string {
   const level = command.publishPick ?? command.publish
+  if (level === 'commit') return 'commits its work'
   if (level === 'branch') return 'publishes its branch'
   if (level === 'pr') return 'opens a pull request'
   if (level === 'merge') return 'opens a pull request that merges on green'

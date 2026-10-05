@@ -45,12 +45,13 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   through the command the project's git host package declares, never through a git host's
   own client. Picked over the run opening the
   request from the branch's commits, and over the agent leaving a title and body in a file.
-- How far a run publishes is one sentence after its prompt: push the branch, open its pull
-  request, or set it to merge once its checks pass (`run --publish <branch|pr|merge>`). With
-  no level the prompt goes as written, and the agent publishes only what the prompt itself
-  asks. The record keeps the level, so a resumed run says it again. Picked over the skills
-  naming a level, where whoever started the run had no say, and over the tool publishing
-  after the agent, which would be the tool doing the agent's work.
+- How far a run takes its work is one sentence after its prompt: commit it, and from there
+  push the branch, open its pull request, or set it to merge once its checks pass
+  (`run --publish <commit|branch|pr|merge>`). Every level starts with the commit. With no
+  level the prompt goes as written, and the agent commits and publishes only what the prompt
+  itself asks. The record keeps the level, so a resumed run says it again. Picked over the
+  skills naming a level, where whoever started the run had no say, and over the tool
+  publishing after the agent, which would be the tool doing the agent's work.
 - A run with a follow-up tells its agent, in a line after the prompt, to publish its work
   without arming the pull request's merge, and the tool merges it through the git host
   once the follow-up ends done. Picked over a hold on the checkout that the agent's publish honoured, which put the

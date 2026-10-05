@@ -8,5 +8,5 @@ What the tests cover:
 - **Saving the cushion** - `offset -- <points>` runs in every project, a negative fraction after the `--`; with one project failing the answer names it and why.
 - **A row's leading status** - "on" in green, "on, not running" when the process is gone, "off" when the scheduler is off.
 - **The pace in words** - an interval alone is "every 1d", a check alone "when its check finds work", both "every 6h at most, when its check finds work".
-- **How far a command publishes, in words** - no level is "publishes nothing", `branch` "publishes its branch", `pr` "opens a pull request", `merge` "opens a pull request that merges on green"; this machine's pick stands in for the line's level in both directions.
-- **The publish menu's picks** - all four with a git host package, "Nothing" and "Publish branch" without; a saved pull request pick the project is no longer offered is still listed.
+- **How far a command publishes, in words** - no level is "publishes nothing", `commit` "commits its work", `branch` "publishes its branch", `pr` "opens a pull request", `merge` "opens a pull request that merges on green"; this machine's pick stands in for the line's level in both directions.
+- **The publish menu's picks** - all five with a git host package, "Nothing", "Commit" and "Publish branch" without; a saved pull request pick the project is no longer offered is still listed.

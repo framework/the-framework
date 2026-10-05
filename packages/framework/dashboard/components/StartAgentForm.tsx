@@ -39,10 +39,11 @@ const STARTING = 'Starting session'
 // so with a device picked there is no chip and the Start names no branch.
 // The "Auto" menu, under the box at the left (the model menu is at the right): what the agent
 // does by itself when it finishes. Its button reads the picks, so nothing is hidden.
-// In it, how far the run publishes its work: Nothing, Publish branch, Open PR, Merge on green. The
-// level is handed to the start hook as `PUBLISH`; Nothing, the pick until the person makes one,
-// hands it none. Saved, so the pick holds for every next run. A project with no git host package
-// is offered Nothing and Publish branch only, and one with no remote none at all.
+// In it, how far the run takes its work: Nothing, Commit, Publish branch, Open PR, Merge on green.
+// The level is handed to the start hook as `PUBLISH`; Nothing hands it none. Until the person
+// picks, the button shows the pick the daemon will start the run at: Publish branch, or Commit
+// with no remote. Saved, so the pick holds for every next run. A project with no git host package
+// is offered Nothing, Commit and Publish branch only, and one with no remote Nothing and Commit.
 // In it too, the "Post-merge cleanup" box, where the project has that command: ticked, the run is
 // followed by a fresh agent running the command on its branch before its pull request merges. The
 // box writes the same saved setting as Settings → Agent, so its state is every next run's default.
@@ -92,7 +93,7 @@ export function StartAgentForm({
   // own project is not read at all, so both are offered every pick; the daemon that starts the run
   // holds a pull request pick to the branch where its project has no git host.
   const gitHost = remoteDevice ? true : (launcher?.gitHost ?? true)
-  // A project with no remote can publish nothing: the menu would hold one pick, so it lists none.
+  // A project with no remote can publish nothing: its picks stop at the commit.
   const remote = remoteDevice ? true : (launcher?.remote ?? true)
   const publishPick = publishPickIn(preferences.publish, gitHost, remote)
   // The two branches the agent can start from, where the pick is offered at all.
@@ -130,7 +131,7 @@ export function StartAgentForm({
     if (busy) return
     setNote(STARTING)
     const result = await start(projectId, promptWithContext(text, context), {
-      ...startPicks({ ...preferences, publish: publishPick }),
+      ...startPicks(preferences),
       ...cleanupPick(preferences, commands),
       ...(startFrom && startFromPick === 'local' ? { base: startFrom.local } : {}),
       ...(remoteDevice ? { remote: { url: remoteDevice.url, token: remoteDevice.token, label: remoteDevice.label } } : {}),
@@ -184,7 +185,7 @@ export function StartAgentForm({
           />
           <AutoMenu
             publish={publishPick}
-            picks={remote ? offeredPublishPicks(gitHost, remote) : []}
+            picks={offeredPublishPicks(gitHost, remote)}
             onPublish={pick => updatePreferences({ publish: pick })}
             cleanup={offersCleanup ? (preferences.postMergeCleanup ?? false) : undefined}
             onCleanup={next => updatePreferences({ postMergeCleanup: next })}

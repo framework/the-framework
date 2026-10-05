@@ -22,7 +22,7 @@ The rules and the processes of `agent-scheduler`: the schedule [1] a person writ
 [12] reclaim: removing a finished agent's checkout once its branch holds everything in it.
 [13] command: a schedule line's name, a skill folder's name under `.claude/skills/` and at most one word the skill takes as its argument (`triage quick`), which the coding agent's harness expands from the slash command `/<name>`.
 [14] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the schedule. The schedule line is the default where nobody switched the command: on, unless the line says `off`.
-[15] publish level: how far a run of a command publishes its work, said by the `publish` clause of its schedule line: `branch` (push the branch and open no pull request), `pr` (push the branch and open its pull request) or `merge` (push the branch and open its pull request, set to merge on its own once its checks pass). A line that says nothing publishes nothing.
+[15] publish level: how far a run of a command publishes its work, said by the `publish` clause of its schedule line: `commit` (commit the work and push nothing), `branch` (commit it, push the branch and open no pull request), `pr` (commit it, push the branch and open its pull request) or `merge` (commit it, push the branch and open its pull request, set to merge on its own once its checks pass). A line that says nothing publishes nothing.
 
 ## Business logic — TL;DR
 

@@ -22,7 +22,7 @@ export const USAGE = `usage: agent-scheduler <command>
   model <id>                    the model every scheduled run starts on (this user)
   offset <points>               how far past the spend boundary a run may still start (this user)
   switch <command> <on|off>     whether a command of agent-schedule.md runs on this machine, the command as its line names it (quoted when it has a word after it)
-  publish <command> <file|nothing|branch|pr|merge>
+  publish <command> <file|nothing|commit|branch|pr|merge>
                                 how far this machine's runs of a command of agent-schedule.md publish, in place of what its line says; file takes the pick back
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`

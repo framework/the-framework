@@ -16,10 +16,11 @@ import {
 } from './ui/dropdown-menu.js'
 
 const PUBLISH_DESCRIPTIONS: Readonly<Record<PublishPick, string>> = {
-  nothing: 'It publishes nothing. You decide after.',
-  branch: 'It pushes its branch.',
-  pr: 'It pushes its branch and opens a pull request.',
-  merge: 'It opens a pull request set to merge once its checks pass.',
+  nothing: 'It commits and publishes nothing. You decide after.',
+  commit: 'It commits its work on its branch.',
+  branch: 'It commits and pushes its branch.',
+  pr: 'It commits, pushes its branch and opens a pull request.',
+  merge: 'It commits, pushes its branch and opens a pull request set to merge once its checks pass.',
 }
 
 // The launcher's "Auto" menu, under the box: what the agent does by itself when it finishes. It
@@ -36,7 +37,7 @@ export function AutoMenu({
 }: {
   /** The publish pick in force. */
   publish: PublishPick
-  /** The publish picks the project is offered; none where it has no remote. */
+  /** The publish picks the project is offered. */
   picks: readonly PublishPick[]
   onPublish: (pick: PublishPick) => void
   /** Whether "Post-merge cleanup" is ticked; undefined where the project does not have the command. */
@@ -44,10 +45,8 @@ export function AutoMenu({
   onCleanup: (next: boolean) => void
   busy: boolean
 }) {
-  const offersPublish = picks.length > 0
   const offersCleanup = cleanup !== undefined
-  if (!offersPublish && !offersCleanup) return null
-  const label = `Auto${offersPublish ? `: ${PUBLISH_LABELS[publish]}` : ''}${cleanup ? ' · cleanup' : ''}`
+  const label = `Auto: ${PUBLISH_LABELS[publish]}${cleanup ? ' · cleanup' : ''}`
   return (
     <DropdownMenu>
       <Tooltip>
@@ -82,7 +81,7 @@ export function AutoMenu({
           ))}
           {offersCleanup && (
             <>
-              {offersPublish && <DropdownMenuSeparator />}
+              <DropdownMenuSeparator />
               <DropdownMenuCheckboxItem className="items-start" checked={cleanup} onCheckedChange={onCleanup}>
                 <OptionLabel
                   label="Post-merge cleanup"

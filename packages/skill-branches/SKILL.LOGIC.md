@@ -2,7 +2,7 @@ The instructions every agent [1] reads as its `branches` skill [2]: its work goe
 
 ## Context
 
-**User story**: an agent [1] starts in a checkout [3] with no explanation of the layout it sits in. The user later sees its branch as `agent-<session name>`, the dashboard labels the agent by that session name [4], and the branch stays on this machine: nothing is published until the user says so, by publishing the branch themselves or by asking the agent to.
+**User story**: an agent [1] starts in a checkout [3] with no explanation of the layout it sits in. The user later sees its branch as `agent-<session name>`, the dashboard labels the agent by that session name [4], and the branch stays on this machine until it is published: by the agent, when its start or the user asked it to, or by the user themselves.
 
 **Problem**: the agent is a coding agent [5] driven as a black box, so the only way to make it behave in its checkout is to tell it, in text it reads when it starts. Left untold, it cannot know that the dependency files and skill directories in its checkout are links to the user's copies, that a branch differing from its directory's name means it was continued and already named, or that an uncommitted file keeps its checkout from ever being reclaimed [6].
 

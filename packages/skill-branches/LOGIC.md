@@ -2,7 +2,7 @@ The `branches` skill [1], one of the four skills every agent [2] is taught: one 
 
 ## Context
 
-**User story**: the user starts agents [2] from the dashboard and each works in a checkout [3] of its own while the user's working copy stays untouched; the agent names its work and the dashboard labels it by that session name [5]; when the agent is done and its work is committed, its checkout goes away on its own and its branch stays on this machine, so the user never loses work to that removal; nothing is published until the user says so.
+**User story**: the user starts agents [2] from the dashboard and each works in a checkout [3] of its own while the user's working copy stays untouched; the agent names its work and the dashboard labels it by that session name [5]; when the agent is done and its work is committed, its checkout goes away on its own and its branch stays on this machine, so the user never loses work to that removal; this package publishes nothing on its own: a branch is pushed only when the agent or the user asks.
 
 ## Glossary
 

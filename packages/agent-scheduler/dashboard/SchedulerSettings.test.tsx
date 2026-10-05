@@ -51,7 +51,7 @@ describe('Settings → Scheduler', () => {
     show(host)
     const queue = (await screen.findByLabelText('What /work-queue publishes')) as HTMLSelectElement
     const cleanup = screen.getByLabelText('What /post-merge-cleanup publishes') as HTMLSelectElement
-    expect(options(queue)).toEqual(['As the file says (Merge on green)', 'Nothing', 'Publish branch', 'Open PR', 'Merge on green'])
+    expect(options(queue)).toEqual(['As the file says (Merge on green)', 'Nothing', 'Commit', 'Publish branch', 'Open PR', 'Merge on green'])
     expect(queue.value).toBe('nothing')
     expect(options(cleanup)[0]).toBe('As the file says (Nothing)')
     expect(cleanup.value, 'nobody picked here: the file decides').toBe('')
@@ -64,11 +64,11 @@ describe('Settings → Scheduler', () => {
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['publish', 'work-queue', 'file']))
   })
 
-  test('a project with no git host package is offered Nothing and Publish branch only, beside what the file says', async () => {
+  test('a project with no git host package is offered Nothing, Commit and Publish branch only, beside what the file says', async () => {
     const { host } = scheduler()
     show(host, [OTHER])
     const cleanup = (await screen.findByLabelText('What /post-merge-cleanup publishes')) as HTMLSelectElement
-    expect(options(cleanup)).toEqual(['As the file says (Nothing)', 'Nothing', 'Publish branch'])
+    expect(options(cleanup)).toEqual(['As the file says (Nothing)', 'Nothing', 'Commit', 'Publish branch'])
   })
 
   test('a save the command refused says which and why', async () => {

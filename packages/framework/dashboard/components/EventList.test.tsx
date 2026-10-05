@@ -278,6 +278,60 @@ describe('EventList tool calls', () => {
   })
 })
 
+// A question in the flow, as Claude Code on the web draws it: a grey "Asking …" line while it
+// waits, and, once answered, a small box holding the question and the answer.
+describe('EventList question and answer', () => {
+  const asked: FrameworkEvent[] = [
+    { kind: 'driver', event: { type: 'start', prompt: 'Ask me which color' } },
+    { kind: 'driver', event: { type: 'text', text: 'Which color do you prefer?\n\n```await-choices\n{ "title": "Which color do you prefer?" }\n```' } },
+    { kind: 'choice', id: 'await-choices', title: 'Which color do you prefer?', options: [{ id: 'opt:0', label: 'Red' }, { id: 'opt:1', label: 'Blue' }] },
+    { kind: 'end', ok: false, waiting: true },
+  ] as FrameworkEvent[]
+  const resumed = (prompt: string): FrameworkEvent[] =>
+    [...asked, { kind: 'driver', event: { type: 'start', prompt } }, { kind: 'driver', event: { type: 'text', text: 'Red it is.' } }, { kind: 'end', ok: true }] as FrameworkEvent[]
+
+  test('a question that waits is one grey line, "Asking" and its title, opening to the choices', () => {
+    render(<EventList events={asked} projectId="p1" stick={false} />)
+    const line = screen.getByRole('button', { name: 'Asking Which color do you prefer?' })
+    expect(line.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText('Red')).toBeNull()
+    fireEvent.click(line)
+    expect(screen.getByText('Red')).toBeTruthy()
+    expect(screen.getByText('Blue')).toBeTruthy()
+  })
+
+  test('answered, the prompt that resumed the agent is a box with the question and the answer, not my message, and the question is said once', () => {
+    render(<EventList events={resumed('You paused to ask: "Which color do you prefer?". The user chose: Red. Continue with that decision.')} projectId="p1" stick={false} />)
+    const box = screen.getByRole('group', { name: 'Your answer' })
+    expect(Array.from(box.children).map(n => n.textContent)).toEqual(['Which color do you prefer?', 'Red'])
+    // The sentence the agent was sent is not shown, and only the first prompt is my message.
+    expect(screen.queryByText(/You paused to ask/)).toBeNull()
+    expect(screen.getAllByRole('group', { name: 'Your message' })).toHaveLength(1)
+    // No "Asking" line and no list of the choices any more.
+    expect(screen.queryByRole('button', { name: /^Asking/ })).toBeNull()
+    expect(screen.queryByText(/○ Red/)).toBeNull()
+  })
+
+  test('an agent that asks twice under one id: each answered question is said once, by its box', () => {
+    const second: FrameworkEvent[] = [
+      ...resumed('You paused to ask: "Which color do you prefer?". The user chose: Red. Continue with that decision.'),
+      { kind: 'choice', id: 'await-choices', title: 'Which size?', options: [{ id: 'opt:0', label: 'Small' }] },
+      { kind: 'end', ok: false, waiting: true },
+      { kind: 'driver', event: { type: 'start', prompt: 'You paused to ask: "Which size?". The user chose: Small. Continue with that decision.' } },
+    ] as FrameworkEvent[]
+    render(<EventList events={second} projectId="p1" stick={false} />)
+    expect(screen.getAllByRole('group', { name: 'Your answer' }).map(n => n.textContent)).toEqual(['Which color do you prefer?Red', 'Which size?Small'])
+    expect(screen.queryByText(/\? Which/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Asking/ })).toBeNull()
+  })
+
+  test('an answer in my own words stays my message', () => {
+    render(<EventList events={resumed('Green, please.')} projectId="p1" stick={false} />)
+    expect(screen.queryByRole('group', { name: 'Your answer' })).toBeNull()
+    expect(screen.getAllByRole('group', { name: 'Your message' })).toHaveLength(2)
+  })
+})
+
 // The "Session set up" line: what was made for the agent before it began, under the first prompt.
 describe('EventList session line', () => {
   const setup = { workspace: '/repo/.branches/agent-1', branch: 'agent-1', driver: 'codex' }
@@ -411,12 +465,13 @@ describe('EventList choice rows', () => {
   })
   const resolved = (id = 'gate-1'): FrameworkEvent => ({ kind: 'choice-resolved', id, picked: 'work', by: 'user' })
 
-  test('an open gate is no row: the question is asked above the message box, not in the flow', () => {
+  test('an open gate is one "Asking" line: its choices are asked above the message box, not in the flow', () => {
     const said: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'Here is the plan.' } }
     render(<EventList events={[said, gate()]} stick={false} projectId="p1" />)
     expect(screen.getByText('Here is the plan.')).toBeTruthy()
-    expect(screen.queryByText(/Start the next backlog item\?|Work on it/)).toBeNull()
-    expect(document.querySelectorAll('[data-message-id]')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Asking Start the next backlog item?' })).toBeTruthy()
+    expect(screen.queryByText(/Work on it/)).toBeNull()
+    expect(document.querySelectorAll('[data-message-id]')).toHaveLength(2)
   })
 
   test('without a projectId the row keeps the formatter text', () => {
@@ -450,19 +505,23 @@ describe('EventList choice rows', () => {
     expect(screen.getByText(/Start the next backlog item\?/)).toBeTruthy()
   })
 
-  test('a run that ended waiting on its question keeps the question out of the flow; once the agent went on with no recorded pick, the question is its text (#1774)', () => {
+  test('a run that ended waiting on its question says it in the "Asking" line; once the agent went on with no recorded pick, the question is its text (#1774)', () => {
     const waiting: FrameworkEvent = { kind: 'end', ok: false, waiting: true }
     const { rerender } = render(<EventList events={[gate(), waiting]} stick={false} projectId="p1" />)
-    expect(screen.queryByText(/Start the next backlog item\?/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Asking Start the next backlog item?' })).toBeTruthy()
+    expect(screen.queryByText(/\? Start the next backlog item\?/)).toBeNull()
     // The person's own message resumed the run: no pick was recorded, so the question stays as text.
     const next: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'On it.' } }
     rerender(<EventList events={[gate(), waiting, next]} stick={false} projectId="p1" />)
+    expect(screen.queryByRole('button', { name: /^Asking/ })).toBeNull()
     expect(screen.getByText(/Start the next backlog item\?/)).toBeTruthy()
   })
 
   test('of a re-fired gate only the latest firing is the open question: the earlier one keeps its text', () => {
     render(<EventList events={[gate(), gate()]} stick={false} projectId="p1" />)
-    expect(screen.getAllByText(/Start the next backlog item\?/)).toHaveLength(1)
+    // The earlier firing as text, the latest as the one "Asking" line.
+    expect(screen.getAllByText(/\? Start the next backlog item\?/)).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Asking Start the next backlog item?' })).toHaveLength(1)
   })
 })
 

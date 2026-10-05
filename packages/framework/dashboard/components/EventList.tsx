@@ -1,8 +1,10 @@
 import type { AgentMeta, ChoiceRequest, FrameworkEvent } from '../../src/index.js'
 import { formatFrameworkEvent } from '../../src/client.js'
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { pendingChoices } from '../lib/live-state.js'
 import { startedBefore, subagentEnd, subagentStartedAt, type SubagentEnd } from '../lib/subagents.js'
+import { answeredQuestion } from '../lib/answered-question.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
 import { InlineScreen, isLoopbackScreen } from './InlineScreen.js'
 import { Markdown } from './Markdown.js'
@@ -27,8 +29,8 @@ import {
 //     (#476/#520). The user's own prompt is a grey box on the right, as in a chat.
 //   - The agent's steps between two messages (`driver` `action` and `thought`): one folded line
 //     for the whole run of them (ToolCalls), opening to one line per step.
-//   - Choice gates, when the log knows its project: an open gate is no row (the agent's page asks
-//     it above the message box); a resolved one collapses to the AnsweredChoice ✓ card and hides
+//   - Choice gates, when the log knows its project: an open gate is one "Asking" line (the agent's page
+//     asks it above the message box); a resolved one collapses to the AnsweredChoice ✓ card and hides
 //     its "✓ chose" line.
 //   - Screens: the newest open `screen` line at an address, before the run's end, is the live
 //     screen itself (InlineScreen); an earlier one stays its one line, and an `ended` one is hidden.
@@ -124,17 +126,18 @@ function formatTime(at: string): string {
   return new Date(at).toLocaleTimeString()
 }
 
-/** An answered gate's row: the collapsed ✓ card of the question and what was picked. */
-type ChoiceRow = { choice: ChoiceRequest; pick: string | readonly string[] }
+/** A question's row: answered through its gate (`pick`), or still waiting for its answer. */
+type ChoiceRow = { choice: ChoiceRequest; pick?: string | readonly string[] }
 
 /**
  * Fold the log's choice traffic: which gates are a ✓ card, and which lines are no row.
  *
  * Only the LAST firing of a gate id is special — `pendingChoices` replaces a re-fired gate in
  * place, so an earlier firing is history and keeps its text. An open gate (no resolution, no
- * `end` after it) is no row: the question is asked above the message box (QuestionPanel), not
- * in the flow. A resolved one collapses to the ✓ card, and the `choice-resolved` line that told
- * its story is hidden — the card says it better. A gate closed by `end` without an answer (#1359: its audience is gone) stays text —
+ * `end` after it) is one grey line, "Asking <title>": the question itself is asked above the
+ * message box (QuestionPanel), not in the flow. A resolved one collapses to the ✓ card, and the
+ * `choice-resolved` line that told its story is hidden — the card says it better. One answered by
+ * the prompt that resumed the agent is no row: that prompt is drawn as the question and its answer. A gate closed by `end` without an answer (#1359: its audience is gone) stays text —
  * a control nobody reads must not look answerable. Earlier firings' "✓ chose" lines stay put:
  * they are the only record of a superseded decision.
  */
@@ -150,12 +153,17 @@ function foldChoiceRows(events: FrameworkEvent[]): {
     if (e.kind === 'choice') lastFiring.set(e.id, { e, at })
     else if (e.kind === 'choice-resolved') lastResolved.set(e.id, { e, at })
   })
+  // A question answered in the panel: every firing of it, not only the last. A local agent's
+  // questions all share one id, so an earlier question is an earlier firing.
+  const answered = new Set(events.flatMap(e => (isTurnBoundary(e) ? [answeredQuestion((e as { event: { prompt: string } }).event.prompt)?.question] : [])))
+  for (const e of events) if (e.kind === 'choice' && answered.has(e.title)) hidden.add(e)
   const open = new Set(pendingChoices(events).map(c => c.id))
   for (const [id, firing] of lastFiring) {
+    if (hidden.has(firing.e)) continue
     const { kind: _kind, ...choice } = firing.e as { kind: 'choice' } & ChoiceRequest
     const resolved = lastResolved.get(id)
     if (open.has(id)) {
-      hidden.add(firing.e)
+      rows.set(firing.e, { choice })
     } else if (resolved && resolved.at > firing.at) {
       // A resolution from BEFORE this firing answered an earlier gate, not this one — a gate
       // re-fired and then closed by `end` must not wear a pick it never received.
@@ -242,6 +250,42 @@ const PROMPT_CHARS = 600
 
 function isTall(text: string): boolean {
   return text.length > PROMPT_CHARS || text.trim().split('\n').length > PROMPT_LINES
+}
+
+// A question the agent waits on, in the flow: one grey line, as Claude Code on the web says
+// "Asking …" while its question is open. It opens to the choices; the answer is given in the panel
+// above the message box.
+function Asking({ choice }: { choice: ChoiceRequest }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="min-w-0 flex-1 font-sans text-sm text-muted-foreground">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} aria-label={`Asking ${choice.title}`} className="flex max-w-full items-center gap-1.5 hover:text-foreground">
+        <span className="shrink-0">Asking</span>
+        <span className="truncate text-foreground">{choice.title}</span>
+        <ChevronRight className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden />
+      </button>
+      {open && (
+        <ul className="mt-1.5 flex flex-col gap-1 rounded-lg border border-border px-3 py-2">
+          {choice.options.map(option => (
+            <li key={option.id} className="text-foreground">
+              {option.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// A question and the answer the person gave it: a small box on the left, the question in grey and
+// the answer under it, in place of the sentence the agent was resumed with.
+function Answer({ question, answer }: { question: string; answer: string }) {
+  return (
+    <div role="group" aria-label="Your answer" className="max-w-[85%] min-w-0 rounded-lg border border-border px-3.5 py-2 font-sans text-sm">
+      <div className="text-muted-foreground">{question}</div>
+      <div className="text-foreground">{answer}</div>
+    </div>
+  )
 }
 
 // The user's own message: a grey box on the right, as Markdown in the page's font. No label says
@@ -418,7 +462,7 @@ export function EventList({
   /** Pinned after the last row, inside the scroller (#1265): the log's "and then…" — a web agent's
    *  live mirror box — that must scroll (and stick) with the log rather than float over it. */
   tail?: ReactNode
-  /** The log's own project: with it, an open gate is no row (its page asks the question above
+  /** The log's own project: with it, an open gate is one "Asking" line (its page asks the question above
    *  the message box) and a resolved one is the collapsed ✓ card. Without it, every `choice` row
    *  keeps the formatter's text. */
   projectId?: string | undefined
@@ -524,6 +568,8 @@ export function EventList({
               const at = e.at
               // The user's own message: a prompt that is not a subagent's end.
               const own = isTurnBoundary(e) && !end
+              // The prompt the agent was resumed with after an answer in the panel: a box, not a message.
+              const answer = own && message !== null ? answeredQuestion(message) : undefined
               return (
                 <Fragment key={idOf(e)}>
                 {passedAbove.get(e)?.map(placeOf)}
@@ -532,7 +578,9 @@ export function EventList({
                 {/* Every row carries the same -mx/px pair so a washed row's band and a plain row's
                     text share the exact same columns; only the background differs. */}
                 <MessageScrollerItem messageId={idOf(e)} scrollAnchor={e === anchor} className={`group/row -mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${end ? '' : rowWash(e)}`}>
-                  {own && message !== null ? (
+                  {answer ? (
+                    <Answer {...answer} />
+                  ) : own && message !== null ? (
                     <Prompt text={message} at={at} />
                   ) : end ? (
                     // A subagent ended: which one and how, then what the run was told about it.
@@ -545,7 +593,9 @@ export function EventList({
                     <Reply text={message} />
                   ) : steps.has(e) ? (
                     <ToolCalls steps={steps.get(e)!} />
-                  ) : choiceRow ? (
+                  ) : choiceRow && choiceRow.pick === undefined ? (
+                    <Asking choice={choiceRow.choice} />
+                  ) : choiceRow?.pick !== undefined ? (
                     // What was asked and what was picked. font-sans: a card, not log text.
                     <div className="min-w-0 flex-1 font-sans">
                       <AnsweredChoice choice={choiceRow.choice} pick={choiceRow.pick} />

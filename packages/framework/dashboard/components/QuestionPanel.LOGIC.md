@@ -4,7 +4,7 @@ The question an agent's [1] turn ended on (a gate [2]), asked as a panel above t
 
 **User story**: the agent stops on "Which database?" with two options. The user reads the question right above the box they type in, as Claude Code on the web asks one: they pick an option with a click or its number key and press Submit, or type their own answer in the "Other" row, or press Skip. The agent goes on with that answer.
 
-**Business logic story**: an agent that stops on a gate does not stay alive: it ends waiting, and the answer resumes it (the daemon's side). An option's pick [3] is sent as a pick, which the daemon checks against the question still open and hands to the agent as the chosen labels. Words of the user's own, and a skip, are sent as the user's message, which resumes the agent like any message typed in the message box; nothing the user did not see is sent.
+**Business logic story**: an agent that stops on a gate does not stay alive: it ends waiting, and the answer resumes it (the daemon's side). An option's pick [3] is sent as a pick, which the daemon checks against the question still open and hands to the agent as the chosen labels; the transcript then shows the question and those labels in a small box named "Your answer" (`EventList.tsx`). While the question waits, the transcript says it in one "Asking" line, which takes no answer: the panel is where it is answered. Words of the user's own, and a skip, are sent as the user's message, which resumes the agent like any message typed in the message box; nothing the user did not see is sent.
 
 ## Glossary
 

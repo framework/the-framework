@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DiffStat, useModuleHost, type ModuleRunProps } from 'framework/module'
+import { DiffStat, useModuleHost, type ModuleRunProps } from '@openagt/dashboard/module'
 import type { FileChange } from '../src/diff.js'
 import { readChanges } from './reads.js'
 

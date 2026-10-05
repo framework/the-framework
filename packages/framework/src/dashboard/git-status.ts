@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { cachedPrView, cachedPrsForBranch, pickAgentPr, type LinkedPr, type PrLookup } from './pull-requests.js'
 
 // The project panel's git status (#491, part of #488): the active branch, whether the tree is

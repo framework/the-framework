@@ -1,4 +1,4 @@
-Everything of The Framework that executes in Node: the `the-framework` command, the daemon [1] it runs in the foreground, the reading of a project's agents [2] from the files their tools write, the starting of an agent through the project's own start hook [3], and the server side of the dashboard. The browser app is the sibling `dashboard/` directory; this directory serves it and answers it. Each source file has a `LOGIC.md` beside it; a `*.test.ts` file's says what its tests cover.
+Everything of The Framework that executes in Node: the `openagent` command, the daemon [1] it runs in the foreground, the reading of a project's agents [2] from the files their tools write, the starting of an agent through the project's own start hook [3], and the server side of the dashboard. The browser app is the sibling `dashboard/` directory; this directory serves it and answers it. Each source file has a `LOGIC.md` beside it; a `*.test.ts` file's says what its tests cover.
 
 ## Context
 

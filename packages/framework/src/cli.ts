@@ -41,7 +41,7 @@ export function frameworkVersion(): string {
 const HELP = `The Framework — turnkey AI orchestration that wraps a coding agent (Claude Code or Codex).
 
 Usage:
-  framework              Serve the dashboard in the foreground. Ctrl+C closes it; the server
+  openagent              Serve the dashboard in the foreground. Ctrl+C closes it; the server
                          logs stream to this terminal.
 
 Options:
@@ -115,7 +115,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   const args = parseArgs(argv)
   if (args.error) {
     io.err(args.error)
-    io.err('Run `framework --help` for usage.')
+    io.err('Run `openagent --help` for usage.')
     return 2
   }
   if (args.help) {
@@ -126,7 +126,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     io.out(frameworkVersion())
     return 0
   }
-  // Everything else is bare `framework`: serve the dashboard in the foreground until Ctrl-C.
+  // Everything else is bare `openagent`: serve the dashboard in the foreground until Ctrl-C.
   return runForegroundDaemonCmd(args, io)
 }
 
@@ -152,7 +152,7 @@ async function runForegroundDaemonCmd(args: CliArgs, io: CliIO): Promise<number>
           printNonLoopbackAccess(io, state.host ?? DEFAULT_DAEMON_HOST, state.url, token)
         }
         io.out('  Ctrl+C to stop the dashboard. Server logs stream below.')
-        // #312 asks bare `framework` to print the commands + version too. onListening is sync and
+        // #312 asks bare `openagent` to print the commands + version too. onListening is sync and
         // runDaemon then blocks until signalled, so this is fire-and-forget by necessity: the
         // update line lands a moment later, above the server logs.
         void printStartupFooter(io)
@@ -184,7 +184,7 @@ function printNonLoopbackAccess(io: CliIO, host: string, url: string, token: str
  * and then — once npm answers — whether that version is the latest.
  *
  * The update line is deliberately not awaited before the static lines. #312 asks for the static
- * info first, and the foreground path (bare `framework`) blocks on the server forever, so a line
+ * info first, and the foreground path (bare `openagent`) blocks on the server forever, so a line
  * printed after the await would never appear there at all. `checkForUpdate` is already forgiving:
  * offline or slow (2.5s cap) resolves to 'unknown', which prints nothing.
  */
@@ -192,7 +192,7 @@ export function printStartupFooter(io: CliIO, opts: { fetchLatest?: VersionFetch
   const version = frameworkVersion()
   io.out('')
   io.out('Type a prompt on the dashboard to start an agent, or use:')
-  io.out('  framework --help              All options')
+  io.out('  openagent --help              All options')
   io.out('')
   io.out(`The Framework v${version}`)
   return checkForUpdate(version, opts.fetchLatest ?? nodeVersionFetcher())

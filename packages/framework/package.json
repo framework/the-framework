@@ -1,6 +1,6 @@
 {
-  "name": "framework",
-  "version": "0.7.0",
+  "name": "@openagt/dashboard",
+  "version": "0.8.0",
   "description": "The (AI) Framework: a local dashboard and daemon for coding agents. It starts an agent through the project's own start hook and shows every agent from the files it keeps; it runs no coding agent itself.",
   "keywords": [
     "ai",
@@ -30,7 +30,7 @@
     "dist"
   ],
   "bin": {
-    "the-framework": "dist/bin.js"
+    "openagent": "dist/bin.js"
   },
   "exports": {
     "./module": {
@@ -57,14 +57,14 @@
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
-    "@agent-driver/claude": "workspace:*",
-    "@agent-driver/codex": "workspace:*",
+    "@openagt/agent-driver-claude": "workspace:*",
+    "@openagt/agent-driver-codex": "workspace:*",
     "@base-ui-components/react": "1.0.0-rc.0",
-    "@gemstack/agent-data": "workspace:*",
-    "@gemstack/files": "workspace:*",
-    "@gemstack/skill-branches": "workspace:*",
-    "@gemstack/skill-github": "workspace:*",
-    "@gemstack/skill-logs": "workspace:*",
+    "@openagt/agent-data": "workspace:*",
+    "@openagt/files": "workspace:*",
+    "@openagt/skill-branches": "workspace:*",
+    "@openagt/skill-github": "workspace:*",
+    "@openagt/skill-logs": "workspace:*",
     "@puppeteer/browsers": "3.2.1",
     "@shadcn/react": "^0.2.1",
     "@tiptap/core": "^2.10.0",
@@ -72,8 +72,8 @@
     "@tiptap/react": "^2.10.0",
     "@tiptap/starter-kit": "^2.10.0",
     "@tiptap/suggestion": "^2.10.0",
-    "agent-driver": "workspace:*",
-    "agent-runner": "workspace:*",
+    "@openagt/agent-driver": "workspace:*",
+    "@openagt/agent-runner": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.469.0",
@@ -84,8 +84,8 @@
     "yaml": "^2.5.0"
   },
   "devDependencies": {
-    "@gemstack/skill-queue": "workspace:*",
-    "@gemstack/skill-tickets": "workspace:*",
+    "@openagt/skill-queue": "workspace:*",
+    "@openagt/skill-tickets": "workspace:*",
     "@tailwindcss/vite": "^4.0.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
@@ -100,5 +100,8 @@
     "vite": "^8.0.0",
     "vitest": "^4.1.10"
   },
-  "author": "Suleiman Shahbari"
+  "author": "Suleiman Shahbari",
+  "publishConfig": {
+    "access": "public"
+  }
 }

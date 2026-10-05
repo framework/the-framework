@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { cn, formatRelative, useModuleHost, usePolled, type ModulePanelProps } from 'framework/module'
+import { cn, formatRelative, useModuleHost, usePolled, type ModulePanelProps } from '@openagt/dashboard/module'
 import type { ProjectTree } from '../src/server.js'
 import type { AgentCommit, AgentTree, FileMark } from '../src/tree.js'
 import { commitKey, commitsKey, projectKey, treeKey } from './keys.js'

@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { fileBranchRepo, readBranchFile, DATA_BRANCH } from '@gemstack/agent-data'
+import { fileBranchRepo, readBranchFile, DATA_BRANCH } from '@openagt/agent-data'
 import { QUEUE_FILE } from './names.js'
 import { resolveQueueDeps, type QueueDeps } from './store.js'
 

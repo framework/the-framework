@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from 'node:fs/promises'
-import { nodeGitRunner, BRANCHES_DIR } from '@gemstack/agent-data'
+import { nodeGitRunner, BRANCHES_DIR } from '@openagt/agent-data'
 import { reconcileBranchLinks, type LinksFs } from './branch-links.js'
 import { addWorktree, worktreePath, type WorktreeDirEntry } from './index.js'
 

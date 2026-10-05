@@ -1,7 +1,7 @@
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { logCardFile, logDiaryFile } from 'agent-driver'
-import { parseDiary, parseRunCard, type AnyDiaryLine, type RunCard, type RunStatus } from '@gemstack/skill-logs'
+import { logCardFile, logDiaryFile } from '@openagt/agent-driver'
+import { parseDiary, parseRunCard, type AnyDiaryLine, type RunCard, type RunStatus } from '@openagt/skill-logs'
 import { runnerMark } from './records.js'
 
 /**

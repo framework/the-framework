@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ElementType, type ReactNode } from 'react'
 import { Check, FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react'
-import { cn, useModuleHost, usePolled, type ModulePanelProps } from 'framework/module'
+import { cn, useModuleHost, usePolled, type ModulePanelProps } from '@openagt/dashboard/module'
 import type { ProjectTree } from '../src/server.js'
 import type { AgentTree, FileMark } from '../src/tree.js'
 import { projectKey, treeKey } from './keys.js'

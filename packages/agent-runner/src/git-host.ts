@@ -1,4 +1,4 @@
-import { readProvidedCommand, runPackageCommand } from '@gemstack/agent-data'
+import { readProvidedCommand, runPackageCommand } from '@openagt/agent-data'
 
 /**
  * The project's git host (#1820), reached by declaration: whichever of the project's packages

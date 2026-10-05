@@ -5,7 +5,7 @@ description: A real browser you drive from the shell, to see or act on a web pag
 
 # The browser
 
-A headless Chrome of your own, on an empty profile: nobody's logins are in it. Drive it with the `browser` command, a dependency of this repository (`@gemstack/skill-browser`), run as `npx browser`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. It needs Chrome on the machine, or `CHROME_PATH` set to a Chrome or Chromium executable.
+A headless Chrome of your own, on an empty profile: nobody's logins are in it. Drive it with the `browser` command, a dependency of this repository (`@openagt/skill-browser`), run as `npx browser`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. It needs Chrome on the machine, or `CHROME_PATH` set to a Chrome or Chromium executable.
 
 ```
 npx browser open <address>       open the address, starting the browser if none is open

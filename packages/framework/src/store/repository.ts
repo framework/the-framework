@@ -1,4 +1,4 @@
-import { runPackageCommand } from '@gemstack/agent-data'
+import { runPackageCommand } from '@openagt/agent-data'
 import { providedCommand } from '../built-in.js'
 
 /**

@@ -1,4 +1,4 @@
-import type { ModuleReadInput, ModuleServer, ModuleServerHost } from 'framework/module-server'
+import type { ModuleReadInput, ModuleServer, ModuleServerHost } from '@openagt/dashboard/module-server'
 import { listFiles } from './list.js'
 import { readFileStatuses, type FileGitStatus } from './status.js'
 import { readFileChanges, readFileDiff, type FileChange, type FileDiff } from './diff.js'

@@ -46,7 +46,7 @@ See `## Context`.
 
 #### Business logic
 
-The agent [1] reads the record with the `logs` command, a dependency of the repository (`@gemstack/skill-logs`): it runs `npx logs`, and when that fails for a missing `node_modules` it installs with the lockfile's package manager (`npm install` for a `package-lock.json`) and runs it again. The agent is told that it only reads, since the program that ran an agent records its run [2] at its end, and that the command's `delete` and `patch` and its `--local` and `--full` flags are for the dashboard that shows the runs, never for it; that a refusal exits 1 with a line on stderr; and that a wrong command line exits 2 with the usage.
+The agent [1] reads the record with the `logs` command, a dependency of the repository (`@openagt/skill-logs`): it runs `npx logs`, and when that fails for a missing `node_modules` it installs with the lockfile's package manager (`npm install` for a `package-lock.json`) and runs it again. The agent is told that it only reads, since the program that ran an agent records its run [2] at its end, and that the command's `delete` and `patch` and its `--local` and `--full` flags are for the dashboard that shows the runs, never for it; that a refusal exits 1 with a line on stderr; and that a wrong command line exits 2 with the usage.
 
 ### The two reads
 

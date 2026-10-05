@@ -1,4 +1,4 @@
-import { DATA_BRANCH, nodeBranchFileFs, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchWrite } from '@gemstack/agent-data'
+import { DATA_BRANCH, nodeBranchFileFs, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchWrite } from '@openagt/agent-data'
 
 // Where the queue lives, bound to the branch: `TODO_AGENTS.md` at the root of the `agent-data`
 // branch of the project's repository, checked out under `.branches/agent-data` for a long-lived

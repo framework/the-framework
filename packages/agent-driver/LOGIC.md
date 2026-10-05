@@ -16,7 +16,7 @@ The driver family: one contract for driving a coding agent [1] as a black box, a
 
 ## Business logic — TL;DR
 
-- **The contract** (`core/`) - the `agent-driver` npm package: what every driver [2] promises, the three parts of the person's own setup every local driver takes, the pieces every driver shares, the readiness check each driver feeds its own CLI questions, and a scripted fake; told in `core/LOGIC.md`.
-- **Claude Code on this machine** (`claude/`) - the `@agent-driver/claude` npm package: Claude Code as a driver, its output reader, its switches for the person's own setup, whether `claude` can start, and the account's quota; told in `claude/LOGIC.md`.
-- **Codex on this machine** (`codex/`) - the `@agent-driver/codex` npm package: Codex as a driver, its switches for the person's own setup through a Codex home of its own, and whether `codex` can start; told in `codex/LOGIC.md`.
-- **A coding agent on a GitHub Actions runner** (`github-actions/`) - the `@agent-driver/github-actions` npm package: each turn one run of the project's agent workflow, its transcript read back and replayed; Claude Code today, read with `@agent-driver/claude`'s output reader; told in `github-actions/LOGIC.md`.
+- **The contract** (`core/`) - the `@openagt/agent-driver` npm package: what every driver [2] promises, the three parts of the person's own setup every local driver takes, the pieces every driver shares, the readiness check each driver feeds its own CLI questions, and a scripted fake; told in `core/LOGIC.md`.
+- **Claude Code on this machine** (`claude/`) - the `@openagt/agent-driver-claude` npm package: Claude Code as a driver, its output reader, its switches for the person's own setup, whether `claude` can start, and the account's quota; told in `claude/LOGIC.md`.
+- **Codex on this machine** (`codex/`) - the `@openagt/agent-driver-codex` npm package: Codex as a driver, its switches for the person's own setup through a Codex home of its own, and whether `codex` can start; told in `codex/LOGIC.md`.
+- **A coding agent on a GitHub Actions runner** (`github-actions/`) - the `@openagt/agent-driver-github-actions` npm package: each turn one run of the project's agent workflow, its transcript read back and replayed; Claude Code today, read with `@openagt/agent-driver-claude`'s output reader; told in `github-actions/LOGIC.md`.

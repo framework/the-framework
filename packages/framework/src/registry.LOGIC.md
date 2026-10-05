@@ -2,7 +2,7 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 
 ## Context
 
-**User story**: the user runs `the-framework` inside a repository, and that repository is a project of the dashboard from then on. The user changes a setting on Settings [3] and finds it unchanged after restarting the daemon. On a second machine nothing carries over: the file is per machine and the user's to re-create there.
+**User story**: the user runs `openagent` inside a repository, and that repository is a project of the dashboard from then on. The user changes a setting on Settings [3] and finds it unchanged after restarting the daemon. On a second machine nothing carries over: the file is per machine and the user's to re-create there.
 
 **Problem**: the file is written by the daemon from several places at once, written by the browser through Settings, and open to hand edits. So nothing it holds is trusted on read, a write must never leave a half-written file behind, and two writes must never lose each other's changes.
 
@@ -57,7 +57,7 @@ A project's id is derived from its absolute path and never changes: the folder's
 
 #### Context
 
-**User story**: running `the-framework` inside a repository registers it; running it again does not register it twice.
+**User story**: running `openagent` inside a repository registers it; running it again does not register it twice.
 
 #### Business logic
 

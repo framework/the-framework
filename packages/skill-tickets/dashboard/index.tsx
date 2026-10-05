@@ -7,7 +7,7 @@
 // holder as a run, a plan's author, the actions other modules offer on a ticket as a link —
 // comes from the dashboard's own services, and names no other skill.
 import { Ticket } from 'lucide-react'
-import { defineModule } from 'framework/module'
+import { defineModule } from '@openagt/dashboard/module'
 import { TicketsModulePage } from './TicketsModulePage.js'
 import { HotTicketsCard } from './HotTicketsCard.js'
 import './dashboard.css'

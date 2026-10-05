@@ -2,7 +2,7 @@ The daemon's one HTTP server on its port. It serves the built dashboard and the 
 
 ## Context
 
-**User story**: the user runs `the-framework` and opens the printed URL. With `--host` set to a non-loopback address, the printed URL carries a token: a browser that follows it once is let in for good, and any request without the token gets 401.
+**User story**: the user runs `openagent` and opens the printed URL. With `--host` set to a non-loopback address, the printed URL carries a token: a browser that follows it once is let in for good, and any request without the token gets 401.
 
 **Problem**: the daemon runs the shell lines a project names for itself, so anything that can call it can start an agent [5] — and run that line — on the user's machine. On a loopback bind the only caller to fear is a browser, and a browser always says which origin and which host name it is calling for. On a network bind the caller can be anyone who finds the port, so a secret is required.
 

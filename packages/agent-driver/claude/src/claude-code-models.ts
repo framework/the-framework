@@ -1,5 +1,5 @@
 import { spawn as nodeSpawn } from 'node:child_process'
-import type { DriverModel, SpawnLike } from 'agent-driver'
+import type { DriverModel, SpawnLike } from '@openagt/agent-driver'
 
 /** How long {@link readClaudeModels} waits for the CLI's answer. */
 export const MODELS_TIMEOUT_MS = 30_000

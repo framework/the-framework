@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util'
 import { join } from 'node:path'
-import { checkoutRoot, gitReason, listBranchDir, nodeBranchFileFs, nodeGitRunner, openBranchReader, readBranchFile, writeFileBranchDetached, type BranchReader, type GitRunner, DATA_BRANCH } from '@gemstack/agent-data'
+import { checkoutRoot, gitReason, listBranchDir, nodeBranchFileFs, nodeGitRunner, openBranchReader, readBranchFile, writeFileBranchDetached, type BranchReader, type GitRunner, DATA_BRANCH } from '@openagt/agent-data'
 import { isTicketFile, isTicketPath, META_FILE, TICKETS_DIR, ticketLockName, ticketPlanName, ticketStem } from './names.js'
 import { readTicket, readTickets, readTicketsMeta, type TicketsFs } from './tickets.js'
 import { applyClaims, applyRelease, claimHistory, claimMessage, lockHolder, releaseMessage } from './locks.js'

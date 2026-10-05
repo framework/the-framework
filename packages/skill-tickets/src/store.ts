@@ -1,5 +1,5 @@
 import { join, relative } from 'node:path'
-import { DATA_BRANCH, excludeFromGit, fileBranchPath, nodeBranchFileFs, nodeGitRunner, pullFileBranch, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchSync, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
+import { DATA_BRANCH, excludeFromGit, fileBranchPath, nodeBranchFileFs, nodeGitRunner, pullFileBranch, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchSync, type FileBranchWrite, type GitRunner } from '@openagt/agent-data'
 import { TICKETS_DIR } from './names.js'
 
 // Where the tickets live, bound to the branch: the `agent-data` branch of the project's repository,

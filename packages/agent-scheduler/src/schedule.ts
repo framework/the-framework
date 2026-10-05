@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { PUBLISH_LEVELS, type Publish } from 'agent-runner'
+import { PUBLISH_LEVELS, type Publish } from '@openagt/agent-runner'
 import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
 
 /**

@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { Readable, Writable } from 'node:stream'
 import { parseInitializeLine, readClaudeModels } from './claude-code-models.js'
 import { ClaudeCodeDriver } from './claude-code.js'
-import type { SpawnLike, SpawnedProcess } from 'agent-driver'
+import type { SpawnLike, SpawnedProcess } from '@openagt/agent-driver'
 
 /** The CLI's answer to `initialize`, cut to the fields read and one field ignored, as a real one reads. */
 const ANSWER = JSON.stringify({

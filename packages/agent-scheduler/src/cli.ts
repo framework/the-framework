@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util'
-import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
-import { projectRoot } from '@gemstack/skill-branches'
+import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
+import { projectRoot } from '@openagt/skill-branches'
 import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
 import { PUBLISH_PICKS, updateState, withPublish, withSwitch, type PublishPick } from './state.js'

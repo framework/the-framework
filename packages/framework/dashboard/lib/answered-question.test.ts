@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { continuationPrompt } from 'agent-driver'
+import { continuationPrompt } from '@openagt/agent-driver'
 import { answeredQuestion } from './answered-question.js'
 
 test('it reads the question and the answer out of the prompt the driver writes', () => {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { StreamJsonParser } from '@agent-driver/claude'
+import { StreamJsonParser } from '@openagt/agent-driver-claude'
 import { readZip } from './actions-zip.js'
-import { combineFraming, makeEmit, promptSent, startEvent, finishTurn, attachLog, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn } from 'agent-driver'
+import { combineFraming, makeEmit, promptSent, startEvent, finishTurn, attachLog, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn } from '@openagt/agent-driver'
 
 /**
  * A {@link Driver} that runs the agent on **GitHub Actions** instead of on this

@@ -1,5 +1,5 @@
 {
-  "name": "@gemstack/skill-logs",
+  "name": "@openagt/skill-logs",
   "version": "0.0.1",
   "description": "The agent logs for coding agents: the record of every run made on a project, its card and its diary, kept on a branch of the project's repository and read with the logs command.",
   "license": "MIT",
@@ -47,7 +47,7 @@
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
-    "@gemstack/agent-data": "workspace:*"
+    "@openagt/agent-data": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

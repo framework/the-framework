@@ -14,7 +14,7 @@
  * whatever starts unattended work, which puts its own stop line on the usage bar.
  */
 
-import type { DriverQuotaWindow } from 'agent-driver'
+import type { DriverQuotaWindow } from '@openagt/agent-driver'
 
 /** The quota week, in ms. */
 export const QUOTA_WEEK_MS = 7 * 24 * 60 * 60 * 1000

@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 
 /**
  * The project's page on GitHub (#489, #1820): derived from the `origin` remote, so the dashboard's

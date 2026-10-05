@@ -31,7 +31,7 @@ const FILES: MountedPanel = {
     shown(props)
     return <div>files</div>
   },
-  package: '@gemstack/files',
+  package: '@openagt/files',
   projects: ['p1'],
 }
 const mounted = (panels: MountedPanel[]): MountedModules => ({ pages: [], cards: [], linkActions: [], panels, runSlots: [], settings: [], loaded: true })
@@ -310,7 +310,7 @@ describe('RightRail, a changed file asked for from the chat', () => {
     help: 'What changed',
     changes: true,
     Panel: (props: ModulePanelProps) => <div>changes: {props.reveal?.path ?? 'none asked'}</div>,
-    package: '@gemstack/files',
+    package: '@openagt/files',
     projects: ['p1'],
   }
 

@@ -37,7 +37,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   a cloud session (a hosted agent run, started on a branch) cannot start on a slashed ref.
   The package renames and deletes only `agent-*` branches. `attach` takes the caller's
   branch as given, slash or not.
-- `agent-data` is `@gemstack/agent-data`'s data branch, checked out as
+- `agent-data` is `@openagt/agent-data`'s data branch, checked out as
   `.branches/agent-data` by the program that keeps that branch checked out (a daemon), not
   by this package. Never listed, renamed or deleted; `data` is refused as an id, and an
   agent naming itself `data` gets `agent-data-2`.

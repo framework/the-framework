@@ -13,7 +13,7 @@ The instructions an agent [1] reads before using the browser: what the browser i
 
 ## Business logic — TL;DR
 
-- **What the browser is and how to reach it** - a headless Chrome of the agent's own on an empty profile, with nobody's logins; run as `npx browser` from the repository's dependency `@gemstack/skill-browser`, installing with the lockfile's package manager when `node_modules` is missing; it needs a Chrome on the machine or `CHROME_PATH`.
+- **What the browser is and how to reach it** - a headless Chrome of the agent's own on an empty profile, with nobody's logins; run as `npx browser` from the repository's dependency `@openagt/skill-browser`, installing with the lockfile's package manager when `node_modules` is missing; it needs a Chrome on the machine or `CHROME_PATH`.
 - **The commands** - `open <address>`, `read`, `click <n>`, `type <n> <text>` (a date or time field given as `2024-01-31`, `13:45`, `2024-01`), `press <key>` (nine keys), `screenshot [file]`, `eval <script>` (an expression, `await` allowed, an element printing as `{}`), `close`; a text or script with spaces is quoted as one argument.
 - **How a page reads back** - `open`, `read`, `click`, `type` and `press` print the page once loaded, or after 10 seconds as it stands: title, address, the first 10,000 characters of text, then the first 300 elements numbered `[n]`, the numbers written on the page's elements as `data-browser-ref`; nothing inside an iframe or a shadow root is printed, `eval` reaches it; the numbers are those of the last print and change with the page; an address without `http://` or `https://` gets `http://`, and no other kind opens; a dialog the page opens is accepted at once and named at the top of the next print.
 - **One browser per project** - the browser belongs to the project's git root, so every command runs from inside the same project.
@@ -31,7 +31,7 @@ The instructions an agent [1] reads before using the browser: what the browser i
 
 #### Business logic
 
-The agent is told the browser is a headless Chrome of its own on an empty profile, so nobody's logins are in it. It runs the `browser` command, a dependency of the repository (`@gemstack/skill-browser`), as `npx browser`; when that fails for a missing `node_modules`, it installs with the lockfile's package manager (`npm install` for `package-lock.json`) and runs it again. The browser needs Chrome on the machine, or `CHROME_PATH` set to a Chrome or Chromium executable.
+The agent is told the browser is a headless Chrome of its own on an empty profile, so nobody's logins are in it. It runs the `browser` command, a dependency of the repository (`@openagt/skill-browser`), as `npx browser`; when that fails for a missing `node_modules`, it installs with the lockfile's package manager (`npm install` for `package-lock.json`) and runs it again. The browser needs Chrome on the machine, or `CHROME_PATH` set to a Chrome or Chromium executable.
 
 ### The commands
 

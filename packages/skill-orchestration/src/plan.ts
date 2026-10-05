@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
-import { DATA_BRANCH, fileBranchPath, nodeBranchFileFs, withFileBranch, type GitRunner } from '@gemstack/agent-data'
-import { worktreePath } from '@gemstack/skill-branches'
-import { personDir, runCardFile, RUNS_DIR } from '@gemstack/skill-logs'
-import { continuationPrompt } from 'agent-driver'
-import { readLiveDiary } from 'agent-runner'
+import { DATA_BRANCH, fileBranchPath, nodeBranchFileFs, withFileBranch, type GitRunner } from '@openagt/agent-data'
+import { worktreePath } from '@openagt/skill-branches'
+import { personDir, runCardFile, RUNS_DIR } from '@openagt/skill-logs'
+import { continuationPrompt } from '@openagt/agent-driver'
+import { readLiveDiary } from '@openagt/agent-runner'
 
 /**
  * A main agent's plan: one markdown file beside its run record on the data branch, and the

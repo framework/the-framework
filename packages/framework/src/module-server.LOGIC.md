@@ -1,4 +1,4 @@
-`framework/module-server`: the contract between the daemon and a module's [1] server part, as types only, published for module authors. A server part imports nothing from The Framework at run time; its file default-exports a plain object of named reads, and each read is given the project's folder and what the core knows about the project's agents [2], and answers JSON.
+`@openagt/dashboard/module-server`: the contract between the daemon and a module's [1] server part, as types only, published for module authors. A server part imports nothing from The Framework at run time; its file default-exports a plain object of named reads, and each read is given the project's folder and what the core knows about the project's agents [2], and answers JSON.
 
 ## Glossary
 

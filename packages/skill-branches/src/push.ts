@@ -1,4 +1,4 @@
-import { nodeGitRunner, pushBranch, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, pushBranch, type GitRunner } from '@openagt/agent-data'
 import { currentBranch, isWorktreeRoot, projectRoot, worktreeBranch, worktreeClean, worktreeDirEntries } from './worktree.js'
 
 /**

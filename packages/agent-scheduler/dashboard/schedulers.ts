@@ -1,6 +1,6 @@
-import type { ModuleHost, ModuleProject } from 'framework/module'
+import type { ModuleHost, ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick, TickDecision } from '../src/state.js'
-import type { Publish } from 'agent-runner'
+import type { Publish } from '@openagt/agent-runner'
 
 // What the module shows of each project's scheduler: the answer of `agent-scheduler status`, the
 // state file as it stands plus whether the scheduler's process is alive. Forgiving: a field that is
@@ -19,7 +19,7 @@ export const PUBLISH_LABELS: Readonly<Record<PublishPick, string>> = {
 const PUBLISH_PICKS = Object.keys(PUBLISH_LABELS) as PublishPick[]
 
 /** How far the spend offset reaches either side of the quota boundary, in percentage points: the reach of the usage bar's handle. */
-import { MAX_SPEND_OFFSET } from 'framework/module'
+import { MAX_SPEND_OFFSET } from '@openagt/dashboard/module'
 export { MAX_SPEND_OFFSET }
 
 /** One command of the project's schedule, as the scheduler's last tick read it, with this machine's switch and publish pick. */

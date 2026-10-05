@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { PERSONAL_PARTS, type PersonalSetup } from 'agent-driver'
+import { PERSONAL_PARTS, type PersonalSetup } from '@openagt/agent-driver'
 import { parseDocument } from 'yaml'
 import { RUNNER_CONFIG, RUNNER_DIR } from './names.js'
 

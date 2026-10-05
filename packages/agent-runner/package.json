@@ -1,5 +1,5 @@
 {
-  "name": "agent-runner",
+  "name": "@openagt/agent-runner",
   "version": "0.0.1",
   "description": "Run one coding agent from start to end: its own checkout, one prompt, the agent's own loop, a run record on the project's agent-data branch; resume a run that ended on a question; and the sweep a scheduler runs to record the runs whose process died.",
   "license": "MIT",
@@ -37,16 +37,19 @@
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
-    "@agent-driver/claude": "workspace:*",
-    "@agent-driver/codex": "workspace:*",
-    "@gemstack/agent-data": "workspace:*",
-    "@gemstack/skill-branches": "workspace:*",
-    "@gemstack/skill-logs": "workspace:*",
-    "agent-driver": "workspace:*",
+    "@openagt/agent-driver-claude": "workspace:*",
+    "@openagt/agent-driver-codex": "workspace:*",
+    "@openagt/agent-data": "workspace:*",
+    "@openagt/skill-branches": "workspace:*",
+    "@openagt/skill-logs": "workspace:*",
+    "@openagt/agent-driver": "workspace:*",
     "yaml": "^2.5.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^7.0.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

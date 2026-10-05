@@ -56,16 +56,17 @@ test('runCli --help prints usage and exits 0', async () => {
   const { io, out } = capture()
   const code = await runCli(['--help'], io)
   assert.equal(code, 0)
-  assert.match(out.join('\n'), /Usage:/)
+  assert.match(out.join('\n'), /Usage:\n  openagent /)
 })
 
 test('runCli usage error exits 2', async () => {
-  const { io } = capture()
+  const { io, err } = capture()
   assert.equal(await runCli(['--bogus'], io), 2)
+  assert.ok(err.includes('Run `openagent --help` for usage.'))
 })
 
 // The CLI is foreground-only, so there is no `--daemon`, no `stop`, and no background dashboard
-// for a bare `framework` to defer to. Bare `framework` binds a port and blocks until Ctrl-C, which
+// for a bare `openagent` to defer to. Bare `openagent` binds a port and blocks until Ctrl-C, which
 // is `runDaemon`'s own contract, covered in daemon.test.ts rather than here.
 test('runCli rejects the retired flags and verbs as usage errors (D4/D4b)', async () => {
   // The verbs go with the flags: the dashboard is where a session, a doctor report and a worktree
@@ -80,14 +81,15 @@ test('the startup footer prints the commands and the version (#312)', async () =
   const { io, out } = capture()
   await printStartupFooter(io, { fetchLatest: async () => frameworkVersion() })
   assert.ok(out.includes('Type a prompt on the dashboard to start an agent, or use:'))
+  assert.ok(out.includes('  openagent --help              All options'))
   assert.ok(out.includes(`The Framework v${frameworkVersion()}`))
   assert.ok(out.includes(`✅ Up to date (v${frameworkVersion()})`))
 })
 
-test('the footer offers no `framework stop`: Ctrl-C is how the foreground dashboard ends (#312)', async () => {
+test('the footer offers no `openagent stop`: Ctrl-C is how the foreground dashboard ends (#312)', async () => {
   const { io, out } = capture()
   await printStartupFooter(io, { fetchLatest: async () => undefined })
-  assert.ok(!out.some(l => l.includes('framework stop')))
+  assert.ok(!out.some(l => l.includes('openagent stop')))
   assert.ok(out.includes(`The Framework v${frameworkVersion()}`))
 })
 
@@ -101,7 +103,7 @@ test('the version prints before npm answers, and a newer release is announced af
   const { io, out } = capture()
   let release: (v: string) => void = () => {}
   const pending = printStartupFooter(io, { fetchLatest: () => new Promise<string>(resolve => (release = resolve)) })
-  // The static half is out while the registry call is still in flight — bare `framework` blocks on
+  // The static half is out while the registry call is still in flight — bare `openagent` blocks on
   // the server forever, so anything held back until after the await would never be printed there.
   assert.ok(out.includes(`The Framework v${frameworkVersion()}`))
   assert.ok(!out.some(l => l.includes('Update available')))

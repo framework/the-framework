@@ -1,4 +1,4 @@
-import type { CodingAgent, SettingsOption } from 'framework/module'
+import type { CodingAgent, SettingsOption } from '@openagt/dashboard/module'
 import type { Runner } from '../src/levels.js'
 
 // A level's menu: one choice is one coding agent and one model, since a model is always one

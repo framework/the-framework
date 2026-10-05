@@ -1,4 +1,4 @@
-import type { ModuleHost } from 'framework/module'
+import type { ModuleHost } from '@openagt/dashboard/module'
 import type { ProjectTree } from '../src/server.js'
 import type { AgentCommit, AgentTree, FileMark } from '../src/tree.js'
 import type { FileChange, FileDiff } from '../src/diff.js'

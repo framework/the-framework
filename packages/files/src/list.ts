@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 
 /**
  * Every file git sees in the checkout at `cwd`, tracked and untracked, honoring .gitignore:

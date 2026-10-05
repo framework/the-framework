@@ -1,5 +1,5 @@
 {
-  "name": "@agent-driver/claude",
+  "name": "@openagt/agent-driver-claude",
   "version": "0.0.1",
   "description": "Claude Code behind the agent-driver contract, on this machine; plus the reader of the account's quota.",
   "license": "MIT",
@@ -29,10 +29,13 @@
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
-    "agent-driver": "workspace:*"
+    "@openagt/agent-driver": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^7.0.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

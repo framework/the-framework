@@ -1,7 +1,7 @@
 import { realpath } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { declaring, lookupProvidedCommand, packageBins, projectPackages, readManifest, runPackageCommand, type ProjectPackage, type ProvidedCommand, type ProvidedCommandLookup } from '@gemstack/agent-data'
+import { declaring, lookupProvidedCommand, packageBins, projectPackages, readManifest, runPackageCommand, type ProjectPackage, type ProvidedCommand, type ProvidedCommandLookup } from '@openagt/agent-data'
 
 /**
  * The packages the framework ships for every project, by name: dependencies of the framework
@@ -11,7 +11,7 @@ import { declaring, lookupProvidedCommand, packageBins, projectPackages, readMan
  * its hook lines by its `framework` key. This list is the one place the framework names a
  * package, and a project's own copy of any of them wins.
  */
-export const BUILT_IN_PACKAGES: readonly string[] = ['@gemstack/files', '@gemstack/skill-branches', '@gemstack/skill-github', '@gemstack/skill-logs', 'agent-runner']
+export const BUILT_IN_PACKAGES: readonly string[] = ['@openagt/files', '@openagt/skill-branches', '@openagt/skill-github', '@openagt/skill-logs', '@openagt/agent-runner']
 
 let resolved: Promise<ProjectPackage[]> | undefined
 

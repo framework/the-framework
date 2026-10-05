@@ -1,4 +1,4 @@
-import { useModuleHost, usePolled, formatRelative, cn, type ModulePageProps, type ModuleProject } from 'framework/module'
+import { useModuleHost, usePolled, formatRelative, cn, type ModulePageProps, type ModuleProject } from '@openagt/dashboard/module'
 import type { RunCard } from '../src/run.js'
 
 /** How many runs each project lists: the command's own default page is 20; the page shows more. */

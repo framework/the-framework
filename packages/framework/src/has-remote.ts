@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 
 /**
  * Whether the repository at `cwd` has an `origin` remote: the one every push and pull request

@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle, Tooltip, TooltipContent, TooltipTrigger, cn, formatAge, formatDateTime, useModuleHost, usePolled, type ModuleCardProps } from 'framework/module'
+import { Card, CardContent, CardHeader, CardTitle, Tooltip, TooltipContent, TooltipTrigger, cn, formatAge, formatDateTime, useModuleHost, usePolled, type ModuleCardProps } from '@openagt/dashboard/module'
 import { readSchedulers, schedulerStatus, type SchedulerRow } from './schedulers.js'
 
 // The Overview's Scheduler card: the scheduler of every project that has this package, read with

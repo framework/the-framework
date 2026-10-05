@@ -1,4 +1,4 @@
-import { runPackageCommand, type ProvidedCommand } from '@gemstack/agent-data'
+import { runPackageCommand, type ProvidedCommand } from '@openagt/agent-data'
 import { providedCommand } from '../built-in.js'
 
 /**
@@ -14,7 +14,7 @@ import { providedCommand } from '../built-in.js'
  * `--local` reads the copy on this machine, no network: the framework polls.
  *
  * That is the whole contract. Writing the queue is not the framework's: a module the queue package
- * brings acts on it through its own command (`framework/module`'s link actions), and the framework
+ * brings acts on it through its own command (`@openagt/dashboard/module`'s link actions), and the framework
  * only re-reads.
  *
  * The shape, owned here: an entry is one string, the task a future agent is started with, as the

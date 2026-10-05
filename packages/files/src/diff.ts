@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import type { FileGitStatus } from './status.js'
 import { cutToPreview, readConfinedFile, safeRepoPath } from './read.js'
 

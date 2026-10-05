@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { DATA_BRANCH } from '@gemstack/agent-data/names'
+import { DATA_BRANCH } from '@openagt/agent-data/names'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /**

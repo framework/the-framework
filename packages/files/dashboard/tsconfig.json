@@ -17,8 +17,8 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "framework/module": ["../../framework/dashboard/module/index.ts"],
-      "framework/module-server": ["../../framework/src/module-server.d.ts"]
+      "@openagt/dashboard/module": ["../../framework/dashboard/module/index.ts"],
+      "@openagt/dashboard/module-server": ["../../framework/src/module-server.d.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"]

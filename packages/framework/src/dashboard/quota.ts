@@ -1,7 +1,7 @@
 import { QuotaPoller } from '../quota-poller.js'
 import { weekBoundary, type QuotaBoundary } from '../quota-boundary.js'
-import { ClaudeCodeDriver } from '@agent-driver/claude'
-import type { DriverQuotaUnavailableReason, DriverQuotaWindow } from 'agent-driver'
+import { ClaudeCodeDriver } from '@openagt/agent-driver-claude'
+import type { DriverQuotaUnavailableReason, DriverQuotaWindow } from '@openagt/agent-driver'
 
 /**
  * Everything the dashboard needs to draw the usage panel (#533): the account's

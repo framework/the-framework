@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner, BRANCHES_DIR, excludeFromGit } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner, BRANCHES_DIR, excludeFromGit } from '@openagt/agent-data'
 import { agentBranchName } from './branch-names.js'
 import { addWorktree, attachWorktree, type AddedWorktree } from './worktree.js'
 import { linkDependencies } from './worktree-deps.js'

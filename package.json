@@ -22,16 +22,16 @@
     "website:test": "cd packages/the-framework.ai/ && echo 'no tests yet'"
   },
   "devDependencies": {
-    "@gemstack/skill-branches": "workspace:*",
-    "@gemstack/skill-github": "workspace:*",
-    "@gemstack/skill-tickets": "workspace:*",
-    "@gemstack/skill-queue": "workspace:*",
-    "@gemstack/skill-logs": "workspace:*",
-    "@gemstack/skill-browser": "workspace:*",
-    "@gemstack/skill-discord": "workspace:*",
-    "@gemstack/skill-orchestration": "workspace:*",
-    "agent-runner": "workspace:*",
-    "agent-scheduler": "workspace:*",
+    "@openagt/skill-branches": "workspace:*",
+    "@openagt/skill-github": "workspace:*",
+    "@openagt/skill-tickets": "workspace:*",
+    "@openagt/skill-queue": "workspace:*",
+    "@openagt/skill-logs": "workspace:*",
+    "@openagt/skill-browser": "workspace:*",
+    "@openagt/skill-discord": "workspace:*",
+    "@openagt/skill-orchestration": "workspace:*",
+    "@openagt/agent-runner": "workspace:*",
+    "@openagt/agent-scheduler": "workspace:*",
     "typescript": "^7.0.2"
   }
 }

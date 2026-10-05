@@ -1,4 +1,4 @@
-# framework
+# @openagt/dashboard
 
 **The Framework** — autonomous AI programming: humans make the important decisions
 while coding agents run unattended.
@@ -8,16 +8,16 @@ checkout of the repo, does its work, and hands the result off as a pull request.
 checkout is never touched.
 
 ```bash
-npm i -g framework
+npm i -g @openagt/dashboard
 
 cd ~/code/my-repo
-the-framework      # serves the dashboard at http://127.0.0.1:4200
+openagent          # serves the dashboard at http://127.0.0.1:4200
 ```
 
 ## The CLI is four options and no verbs
 
 ```
-the-framework          Serve the dashboard in the foreground. Ctrl+C closes it; the
+openagent              Serve the dashboard in the foreground. Ctrl+C closes it; the
                        agents it started go on to their own end.
 
   --port <n>           Dashboard port (default: 4200).

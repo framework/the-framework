@@ -1,12 +1,12 @@
 /**
- * CLI "up-to-date?" check (#312): after the bare-`framework` version footer,
+ * CLI "up-to-date?" check (#312): after the bare-`openagent` version footer,
  * tell the user whether a newer version is published on npm. Display only;
  * auto-update is a separate, deferred concern. Same seam + node-adapter +
  * forgiving-on-error convention as `project.ts` (#380).
  */
 
 /** The npm package this CLI ships as; the registry key for the version check. */
-export const PACKAGE_NAME = 'framework'
+export const PACKAGE_NAME = '@openagt/dashboard'
 
 /** Fetches the latest published version of `pkg`, or undefined on any failure. Injectable for tests. */
 export type VersionFetcher = (pkg: string) => Promise<string | undefined>

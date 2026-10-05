@@ -1,5 +1,5 @@
 {
-  "name": "@agent-driver/github-actions",
+  "name": "@openagt/agent-driver-github-actions",
   "version": "0.0.1",
   "description": "A coding agent on a GitHub Actions runner behind the agent-driver contract: each turn one workflow run, its transcript replayed. Claude Code today.",
   "license": "MIT",
@@ -29,11 +29,14 @@
     "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
-    "@agent-driver/claude": "workspace:*",
-    "agent-driver": "workspace:*"
+    "@openagt/agent-driver-claude": "workspace:*",
+    "@openagt/agent-driver": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^7.0.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

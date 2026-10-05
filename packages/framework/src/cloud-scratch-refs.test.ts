@@ -9,7 +9,7 @@ import {
   type ScratchFs,
   type ScratchSweepResult,
 } from './cloud-scratch-refs.js'
-import type { GitRunner } from '@gemstack/agent-data'
+import type { GitRunner } from '@openagt/agent-data'
 import type { LinkedPr } from './dashboard/pull-requests.js'
 import type { AgentMeta } from './store/index.js'
 

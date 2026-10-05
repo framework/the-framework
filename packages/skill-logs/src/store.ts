@@ -1,5 +1,5 @@
 import { dirname, join } from 'node:path'
-import { DATA_BRANCH, fileBranchPath, nodeBranchFileFs, nodeGitRunner, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchWrite, type GitRunner } from '@gemstack/agent-data'
+import { DATA_BRANCH, fileBranchPath, nodeBranchFileFs, nodeGitRunner, withFileBranch, type BranchFileFs, type CommitMessage, type FileBranchWrite, type GitRunner } from '@openagt/agent-data'
 import { RUNS_DIR } from './names.js'
 import {
   formatDiary,

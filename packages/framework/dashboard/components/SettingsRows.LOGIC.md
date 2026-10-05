@@ -1,4 +1,4 @@
-The Settings page's building blocks: a section, a row, and a row picked from a drop-down. The page's own sections are made of them (`SettingsPage.tsx`), and so is a section a module [1] brings, through `framework/module`, so every section of the page looks alike.
+The Settings page's building blocks: a section, a row, and a row picked from a drop-down. The page's own sections are made of them (`SettingsPage.tsx`), and so is a section a module [1] brings, through `@openagt/dashboard/module`, so every section of the page looks alike.
 
 ## Glossary
 

@@ -1,5 +1,5 @@
 {
-  "name": "@gemstack/skill-maintainability",
+  "name": "@openagt/skill-maintainability",
   "version": "0.0.1",
   "description": "The maintainability command for coding agents: refactor a part of the code to make it as maintainable as possible. A skill file only, no code.",
   "license": "MIT",

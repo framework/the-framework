@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { excludeFromGit, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
-import { isDriverName } from 'agent-runner'
+import { excludeFromGit, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
+import { isDriverName } from '@openagt/agent-runner'
 import { LEVELS, isLevel, type Level, type Runner, type Settings } from './levels.js'
 
 export { DEFAULT_AT_ONCE, LEVELS, isLevel, type Level, type Runner, type Settings } from './levels.js'

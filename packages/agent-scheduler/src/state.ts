@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { excludeFromGit, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
-import { PUBLISH_LEVELS, type Publish } from 'agent-runner'
+import { excludeFromGit, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
+import { PUBLISH_LEVELS, type Publish } from '@openagt/agent-runner'
 import { DEFAULT_MODEL, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE } from './names.js'
 
 /**

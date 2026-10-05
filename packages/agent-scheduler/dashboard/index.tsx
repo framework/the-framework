@@ -2,7 +2,7 @@
 // Scheduler section to the Settings page, the Scheduler card to the Overview, and the stop line on
 // the usage bar. Its data is the `agent-scheduler` command's own, run in each project by the
 // dashboard: `status` to read, `offset`, `switch` and `publish` to save.
-import { defineModule } from 'framework/module'
+import { defineModule } from '@openagt/dashboard/module'
 import { SchedulerCard } from './SchedulerCard.js'
 import { SchedulerSettings } from './SchedulerSettings.js'
 import { loosestSpendOffset, readSchedulers, saveSpendOffset } from './schedulers.js'

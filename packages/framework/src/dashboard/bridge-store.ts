@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { continuationPrompt } from 'agent-driver'
+import { continuationPrompt } from '@openagt/agent-driver'
 import type { BridgeEvent, BridgeHello, BridgeQuestion, BridgeSessionStatus } from './bridge-endpoints.js'
 import { CLOUD_SESSION_WINDOW_MS } from '../cloud-run-state.js'
 

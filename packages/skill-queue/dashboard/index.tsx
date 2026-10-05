@@ -5,7 +5,7 @@
 // run in each project by the dashboard: the module reads exactly what an agent reads with
 // `npx queue`, and writes exactly the line an agent writes with `npx queue add`.
 import { ListTodo } from 'lucide-react'
-import { defineModule } from 'framework/module'
+import { defineModule } from '@openagt/dashboard/module'
 import { QueuePage } from './QueuePage.js'
 import { QueueCard } from './QueueCard.js'
 import { ADD_TO_QUEUE } from './add-to-queue.js'

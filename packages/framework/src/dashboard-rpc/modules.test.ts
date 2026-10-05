@@ -56,8 +56,8 @@ test('the dashboard\'s modules are every registered project\'s, one per package,
 
     // The built-in modules (Files, the logs package's) are every project's, from the first; then the projects' own.
     assert.deepEqual(await onModules(), [
-      { package: '@gemstack/files', url: `/_modules/${projectId(a)}/%40gemstack%2Ffiles/dashboard.js`, projects: [projectId(a), projectId(b)] },
-      { package: '@gemstack/skill-logs', url: `/_modules/${projectId(a)}/%40gemstack%2Fskill-logs/dashboard.js`, projects: [projectId(a), projectId(b)] },
+      { package: '@openagt/files', url: `/_modules/${projectId(a)}/%40openagt%2Ffiles/dashboard.js`, projects: [projectId(a), projectId(b)] },
+      { package: '@openagt/skill-logs', url: `/_modules/${projectId(a)}/%40openagt%2Fskill-logs/dashboard.js`, projects: [projectId(a), projectId(b)] },
       { package: 'logs', url: `/_modules/${projectId(a)}/logs/w.js`, projects: [projectId(a), projectId(b)] },
       { package: 'queue', url: `/_modules/${projectId(b)}/queue/w.js`, projects: [projectId(b)] },
     ])
@@ -116,7 +116,7 @@ test('a module reads through its own server part, in its own project; nothing el
     assert.deepEqual(await readModule('nowhere-1', 'reader', 'where', {}), { ok: false, error: 'unknown project' })
     // The built-in Files module reads the project's own files.
     await writeFile(join(a, 'hello.txt'), 'hi')
-    const files = await readModule(projectId(a), '@gemstack/files', 'project', {})
+    const files = await readModule(projectId(a), '@openagt/files', 'project', {})
     assert.equal(files.ok, true)
     assert.ok(files.ok && (files.output as { files: string[] }).files !== undefined)
   } finally {

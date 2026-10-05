@@ -1,6 +1,6 @@
 import { lstat, mkdir, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
-import { excludeFromGit, nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { excludeFromGit, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { CLI_BIN_DIR } from './bin-dir.js'
 
 /**

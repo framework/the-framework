@@ -158,8 +158,8 @@ describe('Settings sections a module brings (#1902)', () => {
     render(
       <ModulesContext.Provider
         value={mounted([
-          { id: 'subagents', Section: Subagents, package: '@gemstack/skill-orchestration', projects: ['p1', 'gone'] },
-          { id: 'broken', Section: Broken, package: '@gemstack/skill-broken', projects: ['p2'] },
+          { id: 'subagents', Section: Subagents, package: '@openagt/skill-orchestration', projects: ['p1', 'gone'] },
+          { id: 'broken', Section: Broken, package: '@openagt/skill-broken', projects: ['p2'] },
         ])}
       >
         <SettingsPage onAgentStarted={() => {}} onSelectProject={() => {}} />

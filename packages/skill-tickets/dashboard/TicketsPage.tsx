@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Button, LinkActions, ScrollArea, usePolled, useAction, useModuleHost, type ProjectLinks, type ModuleLink, type ModuleProject } from 'framework/module'
+import { Button, LinkActions, ScrollArea, usePolled, useAction, useModuleHost, type ProjectLinks, type ModuleLink, type ModuleProject } from '@openagt/dashboard/module'
 import { heldBack, holderAgent, planLink, planTicketPrompt, readListed, ticketLink, workOnTicketPrompt } from '../src/module.js'
 import type { ProjectTickets, WorkspaceTicket } from './lib/types.js'
 import {

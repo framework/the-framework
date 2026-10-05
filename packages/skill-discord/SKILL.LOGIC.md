@@ -14,7 +14,7 @@ The instructions an agent [1] reads before posting to Discord: what the `discord
 
 ## Business logic — TL;DR
 
-- **How to reach it** - run as `npx discord` from the repository's dependency `@gemstack/skill-discord`, installing with the lockfile's package manager when `node_modules` is missing.
+- **How to reach it** - run as `npx discord` from the repository's dependency `@openagt/skill-discord`, installing with the lockfile's package manager when `node_modules` is missing.
 - **The commands the agent runs** - `send "<message>"` posts the message to this machine's webhook [3]; `status` says whether this machine has one and where it comes from.
 - **How a message goes out** - quoted as one argument; posted as a Discord message, so Discord's markdown formats it (`*`, `_`, backticks), up to 2,000 characters, a longer one cut and saying so; mentions such as `@everyone` ping nobody.
 - **The webhook is a person's** - a person sets it (`setup <webhook>` for this user on this machine, `setup --clear` to forget it, `DISCORD_WEBHOOK` winning over the saved one); the agent never asks for it, never prints it and never writes it into the repository, because anyone holding it can post to the channel.

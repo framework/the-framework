@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { SettingsSection, SettingsSelectRow, useCodingAgents, useModuleHost, usePolled, type ModuleSettingsProps } from 'framework/module'
+import { SettingsSection, SettingsSelectRow, useCodingAgents, useModuleHost, usePolled, type ModuleSettingsProps } from '@openagt/dashboard/module'
 import { DEFAULT_AT_ONCE, type Level, type Settings } from '../src/levels.js'
 import { runnerChoices, runnerOf, runnerValue } from './choices.js'
 

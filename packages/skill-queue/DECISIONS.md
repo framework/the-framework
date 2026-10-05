@@ -48,7 +48,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   result and every refusal is an object with `ok`.
 - The command's write is one commit per command, pushed straight to origin through a
   throwaway worktree at origin's tip; a push that loses a race is re-applied on the new
-  tip by `@gemstack/agent-data`.
+  tip by `@openagt/agent-data`.
 - `queue done` takes the entry as `queue` printed it, trimmed, removes the first such
   line, and refuses a line the queue does not have, an empty one included, decided inside
   the write.

@@ -1,4 +1,4 @@
-import { cn } from 'framework/module'
+import { cn } from '@openagt/dashboard/module'
 import type { FileContent } from '../src/read.js'
 import type { FileDiff } from '../src/diff.js'
 

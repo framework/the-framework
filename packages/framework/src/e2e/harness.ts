@@ -14,10 +14,10 @@ import { setDashboardContext } from '../dashboard-rpc/context.js'
 import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
 import { registryPreferencesStore, projectId } from '../registry.js'
 import { fromDiaryLine, projectBranches, projectRuns, resolveAgentDiary, type AgentMeta, type AgentStatus, type AnyDiaryLine } from '../store/index.js'
-import { withFileBranch, DATA_BRANCH } from '@gemstack/agent-data'
-import { worktreePath } from '@gemstack/skill-branches'
-import { TICKETS_DIR } from '@gemstack/skill-tickets'
-import { QUEUE_FILE } from '@gemstack/skill-queue'
+import { withFileBranch, DATA_BRANCH } from '@openagt/agent-data'
+import { worktreePath } from '@openagt/skill-branches'
+import { TICKETS_DIR } from '@openagt/skill-tickets'
+import { QUEUE_FILE } from '@openagt/skill-queue'
 import { tailAgentEvents } from '../dashboard-rpc/events-tail.js'
 import { sendAddProject } from '../dashboard-rpc/projects.js'
 import { sendStart, sendStop } from '../dashboard-rpc/control.js'
@@ -32,10 +32,10 @@ import type { QuotaView } from '../dashboard/quota.js'
  * tickets package (the tickets provider) and the branches package (the branches provider, which
  * lists the checkouts the stand-in tool makes with that same package's library).
  */
-const LOGS_PACKAGE = '@gemstack/skill-logs'
-const QUEUE_PACKAGE = '@gemstack/skill-queue'
-const TICKETS_PACKAGE = '@gemstack/skill-tickets'
-const BRANCHES_PACKAGE = '@gemstack/skill-branches'
+const LOGS_PACKAGE = '@openagt/skill-logs'
+const QUEUE_PACKAGE = '@openagt/skill-queue'
+const TICKETS_PACKAGE = '@openagt/skill-tickets'
+const BRANCHES_PACKAGE = '@openagt/skill-branches'
 const packageDir = (name: string): string => resolve(dirname(fileURLToPath(import.meta.resolve(name))), '..')
 const PROVIDER_PACKAGES: Record<string, string> = {
   [LOGS_PACKAGE]: packageDir(LOGS_PACKAGE),
@@ -229,7 +229,7 @@ export async function makeWorld(): Promise<StoryWorld> {
       await writeFile(join(cwd, 'package.json'), JSON.stringify({ name: 'story-fixture', private: true, devDependencies: Object.fromEntries(Object.keys(PROVIDER_PACKAGES).map(name => [name, '*'])) }, null, 2) + '\n')
       await git(cwd, 'add', '-A')
       await git(cwd, 'commit', '-q', '-m', 'seed')
-      await mkdir(join(cwd, 'node_modules', '@gemstack'), { recursive: true })
+      await mkdir(join(cwd, 'node_modules', '@openagt'), { recursive: true })
       for (const [name, dir] of Object.entries(PROVIDER_PACKAGES)) await symlink(dir, join(cwd, 'node_modules', name))
       await appendFile(join(cwd, '.git', 'info', 'exclude'), 'node_modules\n')
       if (onBranch.length) {

@@ -1,5 +1,5 @@
 {
-  "name": "@gemstack/skill-suggest-tickets-to-work-on",
+  "name": "@openagt/skill-suggest-tickets-to-work-on",
   "version": "0.0.1",
   "description": "The suggest-tickets-to-work-on command for coding agents: pick and rank the tickets worth working on next, each with the priority it should get on the agent queue. Changes nothing. A skill file only, no code.",
   "license": "MIT",

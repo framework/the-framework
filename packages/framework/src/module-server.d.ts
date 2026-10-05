@@ -1,4 +1,4 @@
-// `framework/module-server`: what the daemon offers a module's server part.
+// `@openagt/dashboard/module-server`: what the daemon offers a module's server part.
 //
 // A module's server part is the file its package exports as `./server`. The daemon imports it once,
 // in its own process, and calls one of its reads when the module's browser part asks for it

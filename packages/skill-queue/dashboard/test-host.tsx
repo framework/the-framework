@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import { render as rtlRender, type RenderResult } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import { ModuleHostContext, type ModuleCommandResult, type ModuleHost } from 'framework/module'
+import { ModuleHostContext, type ModuleCommandResult, type ModuleHost } from '@openagt/dashboard/module'
 import { ModulesContext, type MountedModules } from '../../framework/dashboard/lib/use-modules.js'
 
 // The dashboard as the module's card sees it, faked: every service a spy, the module's commands
@@ -26,7 +26,7 @@ export function fakeHost(answers: Answers = {}): FakeHost {
   }
   let runs = 0
   return {
-    package: '@gemstack/skill-queue',
+    package: '@openagt/skill-queue',
     runCommand: vi.fn(answer),
     act: vi.fn(answer),
     read: vi.fn(async () => ({ ok: false as const, error: 'this module has no server part' })),

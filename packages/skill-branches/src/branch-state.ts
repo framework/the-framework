@@ -1,4 +1,4 @@
-import { nodeGitRunner, type GitRunner } from '@gemstack/agent-data'
+import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { basename } from 'node:path'
 import { agentIdFromWorktreeDir, sessionNameOf } from './branch-names.js'
 import { repoHasRemote, worktreeBranch, worktreeDirEntries } from './worktree.js'

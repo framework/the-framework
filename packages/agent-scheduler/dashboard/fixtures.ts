@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { ModuleCommandResult, ModuleHost } from 'framework/module'
+import type { ModuleCommandResult, ModuleHost } from '@openagt/dashboard/module'
 
 // What the module's tests share: a fake dashboard host, and what the command prints.
 
@@ -7,7 +7,7 @@ import type { ModuleCommandResult, ModuleHost } from 'framework/module'
 export function hostAnswering(answer: (projectId: string, args: string[]) => ModuleCommandResult) {
   const runCommand = vi.fn(async (projectId: string, args: string[]) => answer(projectId, args))
   const host: ModuleHost = {
-    package: 'agent-scheduler',
+    package: '@openagt/agent-scheduler',
     runCommand,
     act: runCommand,
     read: vi.fn(async () => ({ ok: false as const, error: 'no server part' })),

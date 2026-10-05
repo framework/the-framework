@@ -5,7 +5,7 @@
 ## Significant
 
 - Auto-planning => auto quick-win/low-uncertainty
-- [Auto Maintenance](https://github.com/framework/the-framework/discussions/1674) (TODO/soon)
+- [Auto Maintenance](https://github.com/openagt/openagent/discussions/1674) (TODO/soon)
 - MEMORY.md
 
 ## Niceties
@@ -27,7 +27,7 @@
 
 ## Candidates
 
-- [Let users drive agents via GitHub](https://github.com/framework/the-framework/discussions/1676)
+- [Let users drive agents via GitHub](https://github.com/openagt/openagent/discussions/1676)
 - 10x better better PR descriptions: one-sentence description, TLDR, problems, solutions, flows (business logic), details
   - Maybe via enhanced system prompt?
 - Advanced planning (like Traycer)
@@ -36,13 +36,13 @@
 ## Open Questions
 
 - "Programs" => mix of skills/loops/on-going-work/routines
-- [Modularity](https://github.com/framework/the-framework/discussions/1681)
+- [Modularity](https://github.com/openagt/openagent/discussions/1681)
 - Make most features headless: no need for dashboard, nor TF's code — new agent capabilities are simply teached via AGENTS.md
 
 ## Postponed
 
-- [Better Claude Code Web](https://github.com/framework/the-framework/discussions/1672)
-- [Autonomous Product Management](https://github.com/framework/the-framework/discussions/1673)
+- [Better Claude Code Web](https://github.com/openagt/openagent/discussions/1672)
+- [Autonomous Product Management](https://github.com/openagt/openagent/discussions/1673)
 - For large codebases: `CODEBASE_OVERVIEW.md`
-- [Discord Bot](https://github.com/framework/the-framework/discussions/1675)
-- [Native app for the dashboard](https://github.com/framework/the-framework/issues/411), beside `localhost`
+- [Discord Bot](https://github.com/openagt/openagent/discussions/1675)
+- [Native app for the dashboard](https://github.com/openagt/openagent/issues/411), beside `localhost`

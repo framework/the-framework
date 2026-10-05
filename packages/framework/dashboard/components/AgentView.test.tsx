@@ -731,13 +731,13 @@ describe('AgentView: while the agent commits', () => {
     expect(screen.queryByText('Committing…')).toBeNull()
   })
 
-  test('a working agent whose last prompt is the Commit ask says "Committing…", also with a publish sentence after it; any other prompt says nothing, and so does an agent that ended', async () => {
+  test('a working agent whose last prompt is the Commit ask says "Committing…", also with a sentence added after it; any other prompt says nothing, and so does an agent that ended', async () => {
     onAgent.mockResolvedValue(ended)
     onAgentHandoff.mockResolvedValue(LEFT)
-    const asked = (prompt: string) => [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt } }] as FrameworkEvent[]
+    const asked = (prompt: string, added?: string) => [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt, ...(added !== undefined ? { added } : {}) } }] as FrameworkEvent[]
     const { rerender } = render(view({ events: asked('Commit your work.'), live: true }))
     await waitFor(() => expect(screen.getByText('Committing…')).toBeTruthy())
-    rerender(view({ events: asked('Commit your work.\n\nWhen you finish, if you changed any file, commit your work, push your branch and open no pull request.'), live: true }))
+    rerender(view({ events: asked('Commit your work.', 'When you finish, if you changed any file, commit your work, push your branch and open no pull request.'), live: true }))
     expect(screen.getByText('Committing…')).toBeTruthy()
     rerender(view({ events: asked('Commit your work. Then add a footer.'), live: true }))
     expect(screen.queryByText('Committing…')).toBeNull()

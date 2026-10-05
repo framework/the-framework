@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readClaudeQuota } from './claude-code-quota.js'
 import { readClaudeModels } from './claude-code-models.js'
-import { combineFraming, combineSignals, makeEmit, readWorkspaceFile, cutOutput, callArgument, lineCount, patchSize, runCliSession, checkCliReady, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, finishTurn, agentEnv, oneLine, attachLog, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type FileChange, type DriverModel, type DriverPromptOptions, type DriverQuota, type DriverRateLimit, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
+import { combineFraming, combineSignals, makeEmit, promptSent, readWorkspaceFile, cutOutput, callArgument, lineCount, patchSize, runCliSession, checkCliReady, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, finishTurn, agentEnv, oneLine, attachLog, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type FileChange, type DriverModel, type DriverPromptOptions, type DriverQuota, type DriverRateLimit, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /** Claude Code permission modes we pass through to the CLI. */
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
@@ -146,7 +146,8 @@ export class ClaudeCodeSession implements DriverSession {
         cwd: this.cwd,
         env: agentEnv(this.config.env ?? process.env, this.log),
         prompt: text,
-        stdin: stdinLines(text),
+        ...(opts.added !== undefined ? { added: opts.added } : {}),
+        stdin: stdinLines(promptSent(text, opts.added)),
         spawn: this.config.spawn ?? (nodeSpawn as unknown as SpawnLike),
         emit: emitFn,
         signals,

@@ -41,9 +41,13 @@ function Step({ label, value }: { label: string; value?: string }) {
 // to start from a branch other than the main one says so, in a sentence: a person's local branch,
 // or, for a subagent, its main agent's. A card that says none of them draws nothing.
 //
+// The last row is what was added after each message the agent was sent (`added`): the sentence of the pick
+// under "Auto", word for word. The person's message in the chat shows only their own words, so
+// this is where the rest of what the agent was told is read.
+//
 // An agent seen at work before its card was read says the same words, with nothing to open yet:
 // its first row is there, so it was set up, and the line does not land after that row.
-export function SessionLine({ setup, live, working = false }: { setup: SessionSetup; live?: { since?: string | undefined } | undefined; working?: boolean }) {
+export function SessionLine({ setup, live, working = false, added }: { setup: SessionSetup; live?: { since?: string | undefined } | undefined; working?: boolean; added?: string | undefined }) {
   const [open, setOpen] = useState(false)
   const picked = driverFromImpl(setup.driver)
   const models = useModels()
@@ -80,6 +84,11 @@ export function SessionLine({ setup, live, working = false }: { setup: SessionSe
             </div>
           )}
           {agent !== undefined && <Step label={`Started ${agent}`} {...(model ? { value: model } : {})} />}
+          {added !== undefined && (
+            <div className="min-w-0">
+              Auto adds after each message: <span className="text-foreground">“{added}”</span>
+            </div>
+          )}
         </div>
       )}
     </div>

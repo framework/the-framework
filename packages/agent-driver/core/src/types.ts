@@ -162,6 +162,12 @@ export interface DriverPromptOptions {
    * come: a later line is for a new session resumed by its id.
    */
   inbox?: string
+  /**
+   * A sentence the caller adds after the prompt, and after every inbox line this prompt goes on
+   * to send: the agent reads the two as one message, the sentence after an empty line. The `start`
+   * event names it apart from the prompt, so a reader can show who said what.
+   */
+  added?: string
 }
 
 /** The outcome of one {@link DriverSession.prompt} turn. */
@@ -322,8 +328,8 @@ export interface FileChange {
  * which tool the agent reached for.
  */
 export type DriverEvent =
-  /** A prompt was sent; the agent's loop is starting. */
-  | { type: 'start'; prompt: string }
+  /** A prompt was sent; the agent's loop is starting. `added` is the sentence the caller put after it ({@link DriverPromptOptions.added}): the agent got both. */
+  | { type: 'start'; prompt: string; added?: string }
   /**
    * The agent announced its session id, at the start of the turn (#1322). `result` repeats it,
    * but a turn that never settles — a manual Stop, an error, a kill — used to take the id down

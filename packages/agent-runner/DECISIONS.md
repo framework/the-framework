@@ -49,7 +49,10 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   push the branch, open its pull request, or set it to merge once its checks pass
   (`run --publish <commit|branch|pr|merge>`). Every level starts with the commit. With no
   level the prompt goes as written, and the agent commits and publishes only what the prompt
-  itself asks. The record keeps the level, so a resumed run says it again. Picked over the
+  itself asks. The record keeps the level, so a resumed run says it again. The sentence follows
+  every message the agent is sent, a queued one too, and the diary keeps it apart from the
+  message, so a reader shows a person's words as the person wrote them. Picked over gluing
+  it into the prompt, where it read as the person's own words and a queued message got none. Picked over the
   skills naming a level, where whoever started the run had no say, and over the tool
   publishing after the agent, which would be the tool doing the agent's work.
 - A run with a follow-up tells its agent, in a line after the prompt, to publish its work

@@ -16,7 +16,7 @@ Draws the line of an agent's [1] transcript that says what is set up for the age
 
 - **One moving line while the session is being set up** - moving dots, the step going on now ("Starting session", "Making the checkout", "Starting Claude Code") and the seconds since the prompt; no chevron, nothing to open.
 - **One folded line** - once set up, "Session set up" with a chevron; a click opens a bordered box, a click again folds it.
-- **What the box says** - a row with a green check per step that was done: the checkout's folder, the branch, the coding agent and its model; and a sentence naming the branch the agent was started from when its card [3] names one; a fact the card does not say is no line.
+- **What the box says** - a row with a green check per step that was done: the checkout's folder, the branch, the coding agent and its model; a sentence naming the branch the agent was started from when its card [3] names one; and, last, the sentence added after each of the user's messages, word for word, when the agent's start added one; a fact the card does not say is no line.
 - **Nothing known: plain words for an agent at work, else nothing** - once set up, a card that says none of the three draws the words "Session set up" with nothing to open for an agent at work on this machine, and no line at all otherwise.
 
 ## Business logic
@@ -61,12 +61,13 @@ See `## Context`.
 
 #### Business logic
 
-The box holds up to four lines, in this order. Three are a step that was done: a green check, what was done in the dark text color, then what it made in grey, cut with an ellipsis when it does not fit and whole in a tooltip. The third is a sentence, with no check:
+The box holds up to five lines, in this order. Three are a step that was done: a green check, what was done in the dark text color, then what it made in grey, cut with an ellipsis when it does not fit and whole in a tooltip. The third is a sentence, with no check:
 
 - "Made the checkout" and the folder of the agent's checkout, when the card [3] says it;
 - "Made the branch" and the branch's name, when the card says it;
 - "Started from the branch <name>, not from the main branch.", the name in the dark text color, the sentence cut with an ellipsis when it does not fit and the name whole in a tooltip, when the card names the branch the agent was told to start from (`base`). The tool that starts an agent writes it only for an agent told where to start: one started from the launcher's "My local branch" option, and a subagent, which starts from its main agent's branch. An agent started from the project's main branch has no such line;
-- "Started Claude Code": "Started" and the coding agent's [2] name ("Claude Code", "Codex"; a coding agent the dashboard has no name for reads as the card names it), followed by the model when the card says one. The model reads by the name its coding agent lists it under ("Opus 5.5"), and by its id while that list is not known or does not hold it (the naming rule in `lib/models.ts`).
+- "Started Claude Code": "Started" and the coding agent's [2] name ("Claude Code", "Codex"; a coding agent the dashboard has no name for reads as the card names it), followed by the model when the card says one. The model reads by the name its coding agent lists it under ("Opus 5.5"), and by its id while that list is not known or does not hold it (the naming rule in `lib/models.ts`);
+- "Auto adds after each message: “<sentence>”", the sentence in the dark text color, with no check, when the caller hands one over: what the tool that runs the agent added after the user's messages, the sentence of the pick under the launcher's "Auto" menu. The user's message in the transcript shows only their own words (`EventList.tsx`), so this row is where the rest of what the agent was told is read. An agent with nothing added has no such row.
 
 ### Nothing known: plain words for an agent at work, else nothing
 

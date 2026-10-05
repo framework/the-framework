@@ -1,5 +1,5 @@
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
-import { makeEmit } from './session-support.js'
+import { makeEmit, promptSent, startEvent } from './session-support.js'
 import { finishTurn } from './inbox.js'
 import { attachLog, type SessionLog } from './session-log.js'
 
@@ -77,10 +77,11 @@ export class FakeDriverSession implements DriverSession {
       return Promise.reject(new Error('fake prompt aborted'))
     }
     const i = this.index++
-    this.prompts.push(text)
-    const turn = this.resolveTurn(text, i)
+    const sent = promptSent(text, opts.added)
+    this.prompts.push(sent)
+    const turn = this.resolveTurn(sent, i)
 
-    this.emit({ type: 'start', prompt: text })
+    this.emit(startEvent(text, opts.added))
     if (this.config.model !== undefined) this.emit({ type: 'model', model: this.config.model })
     for (const label of turn.actions ?? []) this.emit({ type: 'action', label })
     if (turn.text) this.emit({ type: 'text', text: turn.text })

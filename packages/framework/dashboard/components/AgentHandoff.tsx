@@ -85,9 +85,9 @@ function mainBranchName(base: string | undefined): string {
   return base !== undefined && !/^[0-9a-f]{40}$/.test(base) ? base.replace(/^origin\//, '') : 'the main branch'
 }
 
-/** Whether a prompt is the Commit button's ask: as sent, or with the run's publish sentence after it. */
+/** Whether a prompt is the Commit button's ask. */
 export function isCommitAsk(prompt: string | undefined): boolean {
-  return prompt !== undefined && (prompt === COMMIT_MESSAGE || prompt.startsWith(`${COMMIT_MESSAGE}\n`))
+  return prompt === COMMIT_MESSAGE
 }
 
 /** Where the next step would be, while the agent does what the Commit button asked of it. */

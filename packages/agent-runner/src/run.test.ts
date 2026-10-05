@@ -2,12 +2,12 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { AgentExitError, appendInbox, FakeDriver, type Driver, type DriverSession, type DriverStartOptions, type FakeDriverSession } from 'agent-driver'
+import { AgentExitError, appendInbox, FakeDriver, promptSent, type Driver, type DriverSession, type DriverStartOptions, type FakeDriverSession } from 'agent-driver'
 import { worktreePath } from '@gemstack/skill-branches'
 import { findRun, patchRun, readDiary } from '@gemstack/skill-logs'
 import { inboxPath, readLiveCard } from './live-card.js'
 import { acquireRunLock, lockHolder, releaseRunLock } from './run-lock.js'
-import { agentPrompt, HOLD_MERGE_LINE, PUBLISH_LINES, resumeRun, runCommand, STOPPED_DETAIL } from './run.js'
+import { addedLine, HOLD_MERGE_LINE, PUBLISH_LINES, resumeRun, runCommand, STOPPED_DETAIL } from './run.js'
 import { recordRun, runnerMark } from './records.js'
 import type { GitHost } from './git-host.js'
 import { sweep } from './sweep.js'
@@ -45,7 +45,7 @@ function fakeGitHost(branch: string, hook?: () => Promise<void>): GitHost & { op
 }
 
 
-/** A fake session with something done before each prompt: the spread of a class instance loses its methods, so the wrapper is explicit. */
+/** A fake session with something done before each prompt, handed the prompt as the agent is sent it, the added sentence after it: the spread of a class instance loses its methods, so the wrapper is explicit. */
 function wrap(fake: FakeDriverSession, before: (text: string) => Promise<void>): DriverSession & { prompts: string[] } {
   return {
     id: fake.id,
@@ -53,7 +53,7 @@ function wrap(fake: FakeDriverSession, before: (text: string) => Promise<void>):
     prompts: fake.prompts,
     ...(fake.log ? { log: fake.log } : {}),
     prompt: async (text, opts) => {
-      await before(text)
+      await before(promptSent(text, opts?.added))
       return fake.prompt(text, opts)
     },
     dispose: () => fake.dispose(),
@@ -318,7 +318,7 @@ test("the person's ended line runs when a run ends waiting and when it ends done
   }
 })
 
-test('a line already in the inbox when the turn ends becomes the next turn of the same run', async () => {
+test('a line already in the inbox when the turn ends becomes the next turn of the same run, told the run\'s sentence like the first', async () => {
   const repo = await testRepo()
   try {
     const chatty: Driver = {
@@ -330,10 +330,11 @@ test('a line already in the inbox when the turn ends becomes the next turn of th
         })
       },
     }
-    const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: chatty, now: () => NOW, gitHost: noGitHost })
+    const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', publish: 'commit', driver: chatty, now: () => NOW, gitHost: noGitHost })
     assert.equal(outcome.status, 'done')
     const diary = await readUntimedDiary(repo, outcome.id)
     assert.deepEqual(diary.filter(l => l.kind === 'start').map(l => l['prompt']), ['/work-queue', 'also add a test'])
+    assert.deepEqual(diary.filter(l => l.kind === 'start').map(l => l['added']), [PUBLISH_LINES.commit, PUBLISH_LINES.commit], 'the sentence is written apart from each message')
     assert.deepEqual(diary.filter(l => l.kind === 'said').map(l => l['text']), ['First turn done.', 'Second turn done.'])
   } finally {
     await removeRepo(repo)
@@ -501,14 +502,14 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
   }
 })
 
-test('the prompt an agent gets: as written with no publish level, one sentence after it with one, the hold sentence whenever a follow-up is coming', () => {
-  assert.equal(agentPrompt('Fix the typo', undefined, undefined), 'Fix the typo', 'no level: the prompt as written')
-  assert.equal(agentPrompt('Fix the typo', 'commit', undefined), 'Fix the typo\n\nWhen you finish, if you changed any file, commit your work.')
-  assert.equal(agentPrompt('Fix the typo', 'branch', undefined), 'Fix the typo\n\nWhen you finish, if you changed any file, commit your work, push your branch and open no pull request.')
-  assert.equal(agentPrompt('Fix the typo', 'pr', undefined), 'Fix the typo\n\nWhen you finish, if you changed any file, commit your work, push your branch and open its pull request.')
-  assert.equal(agentPrompt('Fix the typo', 'merge', undefined), 'Fix the typo\n\nWhen you finish, if you changed any file, commit your work, push your branch and open its pull request, set to merge on its own once its checks pass.')
-  assert.equal(agentPrompt('/work-queue', 'merge', '/post-merge-cleanup'), `/work-queue\n\n${HOLD_MERGE_LINE}`, 'a follow-up is coming: the merge is this tool\'s, whatever the level')
-  assert.equal(agentPrompt('/work-queue', undefined, '/post-merge-cleanup'), `/work-queue\n\n${HOLD_MERGE_LINE}`)
+test('the sentence a run adds after its prompts: none with no publish level, that of its level with one, the hold sentence whenever a follow-up is coming', () => {
+  assert.equal(addedLine(undefined, undefined), undefined, 'no level: the prompt as written')
+  assert.equal(addedLine('commit', undefined), 'When you finish, if you changed any file, commit your work.')
+  assert.equal(addedLine('branch', undefined), 'When you finish, if you changed any file, commit your work, push your branch and open no pull request.')
+  assert.equal(addedLine('pr', undefined), 'When you finish, if you changed any file, commit your work, push your branch and open its pull request.')
+  assert.equal(addedLine('merge', undefined), 'When you finish, if you changed any file, commit your work, push your branch and open its pull request, set to merge on its own once its checks pass.')
+  assert.equal(addedLine('merge', '/post-merge-cleanup'), HOLD_MERGE_LINE, 'a follow-up is coming: the merge is this tool\'s, whatever the level')
+  assert.equal(addedLine(undefined, '/post-merge-cleanup'), HOLD_MERGE_LINE)
 })
 
 test('a run with a publish level: its agent is told the sentence, the record keeps the level, and a resumed run is told again; a run with none is told nothing', async () => {
@@ -521,6 +522,9 @@ test('a run with a publish level: its agent is told the sentence, the record kee
     assert.deepEqual(prompts, [`Fix the typo\n\n${PUBLISH_LINES.pr}`])
     const recorded = await findRun(repo, first.id)
     assert.equal(recorded?.intent, 'Fix the typo', 'the record keeps the bare prompt')
+    const started = (await readDiary(repo, first.id))?.find(line => line.kind === 'start')
+    assert.equal(started?.['prompt'], 'Fix the typo', 'the diary keeps the prompt as written')
+    assert.equal(started?.['added'], PUBLISH_LINES.pr, 'and the sentence apart from it')
     assert.deepEqual(recorded?.caller?.['runner'], { host: 'this-box', pid: 4242, publish: 'pr', baseCommit: (await git(['rev-parse', 'origin/main'], repo)).trim() })
 
     const resumed = await resumeRun(repo, { id: first.id, text: 'Go on.', driver: listening('Done.'), host: 'this-box', pid: 4243, now: ticking(), gitHost: noGitHost })

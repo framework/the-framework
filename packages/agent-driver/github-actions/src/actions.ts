@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { StreamJsonParser } from '@agent-driver/claude'
 import { readZip } from './actions-zip.js'
-import { combineFraming, makeEmit, finishTurn, attachLog, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn } from 'agent-driver'
+import { combineFraming, makeEmit, promptSent, startEvent, finishTurn, attachLog, type SessionLog, type Driver, type DriverEvent, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn } from 'agent-driver'
 
 /**
  * A {@link Driver} that runs the agent on **GitHub Actions** instead of on this
@@ -135,8 +135,9 @@ export class ActionsSession implements DriverSession {
     // `--append-system-prompt` would have to survive shell-quoting inside the
     // workflow, and a system prompt is not worth an injection seam.
     const framing = combineFraming(this.startOpts.system, opts.system)
-    const prompt = framing ? `${framing}\n\n${text}` : text
-    emit({ type: 'start', prompt })
+    const framed = framing ? `${framing}\n\n${text}` : text
+    const prompt = promptSent(framed, opts.added)
+    emit(startEvent(framed, opts.added))
 
     // How we find our run: the dispatch API returns no run id, so the workflow echoes this
     // into its run-name and artifact name and we match on it. It must be unique per run (the

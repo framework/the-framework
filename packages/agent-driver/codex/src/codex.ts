@@ -2,7 +2,7 @@ import { execFile, spawn as nodeSpawn } from 'node:child_process'
 import { copyFile, lstat, mkdir, readlink, readdir, realpath, rename, rm, stat, symlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, readWorkspaceFile, oneLine, cutOutput, callArgument, lineCount, patchSize, hunkLines, checkCliReady, type AgentCliParser, type CliIo, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type FileChange, type DriverModel, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
+import { runCliSession, finishTurn, agentEnv, attachLog, combineFraming, combineSignals, makeEmit, promptSent, readWorkspaceFile, oneLine, cutOutput, callArgument, lineCount, patchSize, hunkLines, checkCliReady, type AgentCliParser, type CliIo, type CliSpec, type DriverReadiness, type DriverReadyOptions, type PersonalSetup, type SpawnLike, type SessionLog, type Driver, type DriverEvent, type FileChange, type DriverModel, type DriverPromptOptions, type DriverSession, type DriverStartOptions, type DriverTurn, type DriverUsage } from 'agent-driver'
 
 /**
  * Codex's sandbox policy for the shell commands the model writes.
@@ -257,11 +257,12 @@ export class CodexSession implements DriverSession {
       cwd: this.cwd,
       env: agentEnv(this.config.env ?? process.env, this.log),
       prompt: text,
+      ...(opts.added !== undefined ? { added: opts.added } : {}),
       spawn: this.config.spawn ?? (nodeSpawn as unknown as SpawnLike),
       emit,
       signals: combineSignals(this.startOpts.signal, opts.signal),
       parser: new CodexAppServerParser({
-        text,
+        text: promptSent(text, opts.added),
         cwd: this.cwd,
         sandbox: this.config.sandbox ?? 'workspace-write',
         ...(framing ? { framing } : {}),

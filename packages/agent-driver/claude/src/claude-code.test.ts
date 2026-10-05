@@ -141,6 +141,14 @@ test('ClaudeCodeDriver asks for thinking text, then sends the prompt, both as st
   const [control, message] = written.trim().split('\n').map(l => JSON.parse(l))
   assert.deepEqual(control.request, { subtype: 'set_max_thinking_tokens', max_thinking_tokens: null, thinking_display: 'summarized' })
   assert.deepEqual(message, { type: 'user', message: { role: 'user', content: 'Fix the bug' } })
+
+  // A sentence added after the prompt goes to the agent with it, and the start event names it apart.
+  written = ''
+  const events: DriverEvent[] = []
+  const told = await new ClaudeCodeDriver({ spawn }).start({ cwd: process.cwd(), onEvent: e => events.push(e) })
+  await told.prompt('Fix the bug', { added: 'Commit your work.' })
+  assert.deepEqual(JSON.parse(written.trim().split('\n')[1]!).message, { role: 'user', content: 'Fix the bug\n\nCommit your work.' })
+  assert.deepEqual(events.find(e => e.type === 'start'), { type: 'start', prompt: 'Fix the bug', added: 'Commit your work.' })
 })
 
 test('StreamJsonParser pulls token + cost usage off the result line (#322)', () => {

@@ -21,6 +21,7 @@ The dashboard's left column, present on every page: the brand mark, the project 
 [15] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [16] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent.
 [17] picked project: the one project the project select, the menu at the top of this column, names. Every page then shows only that project's data. When the select says "All projects", no project is picked and every page shows every project's data.
+[18] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
 
 ## Business logic — TL;DR
 
@@ -35,6 +36,7 @@ The dashboard's left column, present on every page: the brand mark, the project 
 - **What a row shows** - one status word with a dot, the project and the relative start time, the agent's title, and a cluster of glyphs for another machine's daemon, a device, a cloud session and the coding agent.
 - **The status word** - "waiting", "in cloud", "merged", "saving…" or the stored status, ranked so a row never says "done" about work still moving and never says "in cloud" about work that landed.
 - **Long titles** - a title that overflows the column fades at its end and shows the full text on hover; one that fits gets no tooltip.
+- **Reading an ended agent ahead** - as the pointer or the keyboard focus reaches the row of an agent that is not running, before any click, the agent's archive [18] is read in the row's own project, so the agent's page opens with its feed drawn; the row of a running agent reads nothing.
 
 ## Business logic
 
@@ -184,3 +186,19 @@ The word, by the first rule that applies:
 #### Business logic
 
 A title wider than the column is clipped with a fade at its end and shows the full text in a tooltip to the right on hover, wrapped and never wider than a readable paragraph. A title that fits is plain text with no tooltip at all.
+
+### Reading an ended agent ahead
+
+#### Context
+
+**User story**: the user moves the pointer onto an ended agent's [1] row and clicks; the agent's page opens with the feed already drawn.
+
+**Problem**: the archive [18] was read only once the agent's page was open, so the feed was blank for the frames that read took.
+
+#### Business logic
+
+When the pointer enters a row, or the keyboard focus lands on it, and the row's agent has a stored status other than "running", the agent's archive [18] is read from the daemon and remembered for the agent's page (`lib/agent-log.ts`), which then shows it from its first frame and reads it again all the same.
+
+- The row of an agent whose stored status is "running" reads nothing: its page shows the live event stream, not the archive.
+- The archive is read in the project the row belongs to: the picked project [17], or, in the pooled list, the project the row names.
+- The pointer crossing the same row again reads nothing more while the first read is out, or once the archive is remembered (the rules in `lib/use-async.ts`).

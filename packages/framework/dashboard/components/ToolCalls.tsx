@@ -24,7 +24,7 @@ export interface Call {
 export type ToolStep = ({ type: 'action' } & Call) | { type: 'thought'; text: string }
 
 // How long ago `since` was, counted up every second: "9s", then "1m 5s".
-function Seconds({ since }: { since: string }) {
+export function Seconds({ since }: { since: string }) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 1000)
@@ -35,7 +35,7 @@ function Seconds({ since }: { since: string }) {
 }
 
 // Three dots moving in a wave: the agent is at it.
-function Dots() {
+export function Dots() {
   return (
     <span className="dot-wave shrink-0" aria-hidden>
       <span />

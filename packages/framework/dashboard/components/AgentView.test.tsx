@@ -522,10 +522,10 @@ describe('a question the agent stopped on', () => {
 
 // A run just started writes its prompt line seconds later: the page shows it at once, and says it is starting.
 describe('a run just started', () => {
-  test('its prompt shows before any event, with "Starting…" under it, until its own prompt line arrives', () => {
+  test('its prompt shows before any event, with "Starting session" under it, until its own prompt line arrives', () => {
     const { rerender } = render(view({ live: true, events: [], startedWith: 'Say hi' }))
     expect(screen.getByText('Say hi')).toBeTruthy()
-    expect(screen.getByText('Starting…')).toBeTruthy()
+    expect(screen.getByText('Starting session')).toBeTruthy()
     const started = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'thought', text: 'hm' } }] as FrameworkEvent[]
     rerender(view({ live: true, events: started, startedWith: 'Say hi' }))
     expect(screen.getAllByText('Say hi')).toHaveLength(1)
@@ -533,7 +533,7 @@ describe('a run just started', () => {
   })
 
   test('the chat says what was set up for the agent, off its card, and says nothing of it before the card is listed', () => {
-    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }] as FrameworkEvent[]
+    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'text', text: 'Hi.' } }] as FrameworkEvent[]
     const { rerender } = render(view({ live: true, events }))
     expect(screen.queryByText('Session set up')).toBeNull()
     rerender(view({ live: true, events, card: { status: 'done', workspace: '/repo/.branches/agent-1', branch: 'agent-1', driver: 'codex' } }))

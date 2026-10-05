@@ -24,10 +24,12 @@ describe('SessionLine', () => {
     const { container } = render(<SessionLine setup={setup} />)
     fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
     expect(Array.from(container.querySelectorAll('.border > div')).map(n => n.textContent)).toEqual([
-      'Checkout made/repo/.branches/agent-1',
-      'Branchagent-1',
-      'Coding agent startedClaude Code · Opus 5.5',
+      'Made the checkout/repo/.branches/agent-1',
+      'Made the branchagent-1',
+      'Started Claude CodeOpus 5.5',
     ])
+    // A green check in front of each step that was done.
+    expect(container.querySelectorAll('.border svg.text-success')).toHaveLength(3)
     fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
     expect(container.querySelector('.border')).toBeNull()
   })
@@ -36,10 +38,10 @@ describe('SessionLine', () => {
     const { container } = render(<SessionLine setup={{ ...setup, base: 'my/work' }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
     expect(Array.from(container.querySelectorAll('.border > div')).map(n => n.textContent)).toEqual([
-      'Checkout made/repo/.branches/agent-1',
-      'Branchagent-1',
+      'Made the checkout/repo/.branches/agent-1',
+      'Made the branchagent-1',
       'Started from the branch my/work, not from the main branch.',
-      'Coding agent startedClaude Code · Opus 5.5',
+      'Started Claude CodeOpus 5.5',
     ])
   })
 
@@ -52,11 +54,37 @@ describe('SessionLine', () => {
   test('a fact the card does not say is no line, and a coding agent with no model is named alone', () => {
     const { container } = render(<SessionLine setup={{ driver: 'codex' }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Session set up' }))
-    expect(Array.from(container.querySelectorAll('.border > div')).map(n => n.textContent)).toEqual(['Coding agent startedCodex'])
+    expect(Array.from(container.querySelectorAll('.border > div')).map(n => n.textContent)).toEqual(['Started Codex'])
   })
 
   test('a card that says none of them draws nothing', () => {
     const { container } = render(<SessionLine setup={{}} />)
     expect(container.firstChild).toBeNull()
+  })
+
+  test('while the session is set up it is one moving line naming the step going on, with the seconds, and no button', () => {
+    const since = new Date(Date.now() - 3_000).toISOString()
+    const { rerender } = render(<SessionLine setup={{}} live={{ since }} />)
+    // No card yet.
+    expect(screen.getByRole('status').textContent).toBe('Starting session3s')
+    expect(screen.queryByRole('button')).toBeNull()
+    // The card is there and names the coding agent: its checkout is being made.
+    rerender(<SessionLine setup={{ driver: 'claude-code' }} live={{ since }} />)
+    expect(screen.getByRole('status').textContent).toBe('Making the checkout3s')
+    // An agent that runs elsewhere has no checkout made here.
+    rerender(<SessionLine setup={{ driver: 'claude-code', elsewhere: true }} live={{ since }} />)
+    expect(screen.getByRole('status').textContent).toBe('Starting session3s')
+    // The card names the branch: the checkout is made, the coding agent is being started.
+    rerender(<SessionLine setup={{ driver: 'claude-code', branch: 'agent-1' }} live={{ since }} />)
+    expect(screen.getByRole('status').textContent).toBe('Starting Claude Code3s')
+    // Set up: the folded line.
+    rerender(<SessionLine setup={{ driver: 'claude-code', branch: 'agent-1' }} />)
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Session set up' })).toBeTruthy()
+  })
+
+  test('with no time to count from, the moving line has no seconds', () => {
+    render(<SessionLine setup={{}} live={{}} />)
+    expect(screen.getByRole('status').textContent).toBe('Starting session')
   })
 })

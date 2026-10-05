@@ -53,7 +53,9 @@ describe('AgentActionBar', () => {
     expect(name!.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(chip.compareDocumentPosition(project!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     // The chip is the part a narrow bar drops, and it is cut at a cap: the name keeps its room.
-    expect(chip.className).toContain('hidden')
+    // Shown unless the bar is narrow: never hidden by itself.
+    expect(chip.className.split(' ')).toContain('@max-md:hidden')
+    for (const shown of ['hidden', 'inline', 'inline-block', 'block']) expect(chip.className.split(' ')).not.toContain(shown)
     expect(chip.className).toContain('truncate')
   })
 

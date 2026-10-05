@@ -62,7 +62,10 @@ export function AgentActionBar({
     <div className="@container flex items-center gap-2 overflow-hidden px-4 py-2">
       {/* Which session this is, as Claude Code on the web says it: its name, which is the button of
           its menu, and a grey chip with where it runs and its project. The name is the one part
-          that gives up width; the chip is cut at a cap and drops out of a bar too narrow for it. */}
+          that gives up width; the chip is cut at a cap and drops out of a bar too narrow for it. It is
+          shown by default and hidden by the narrow bar's own rule, with no class that sets how it
+          is shown: a module's stylesheet carries its own copy of such classes (`hidden`), which
+          comes later and won over the rule that showed the chip again, so it never showed. */}
       <AgentActionsMenu
         part="session"
         projectId={projectId}
@@ -75,7 +78,7 @@ export function AgentActionBar({
         {...(onToggle ? { details: { open: expanded, onToggle } } : {})}
         size={size}
       />
-      <span data-testid="runs-on" className="hidden max-w-64 shrink-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground @md:inline" title={projectName ? `${runsOn} · ${projectName}` : runsOn}>
+      <span data-testid="runs-on" className="max-w-64 shrink-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground @max-md:hidden" title={projectName ? `${runsOn} · ${projectName}` : runsOn}>
         {projectName ? `${runsOn} · ${projectName}` : runsOn}
       </span>
       {/* What the session IS sits at the start; what belongs to its project sits at the end. The

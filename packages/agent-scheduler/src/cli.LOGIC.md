@@ -1,4 +1,4 @@
-The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Nine commands: `tick`, `init`, `start [--keep-alive]`, `stop [--unless-keep-alive]`, `status`, `model <id>`, `offset <points>`, `switch <command> <on|off>`, `publish <command> <file|nothing|branch|pr|merge>`.
+The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Nine commands: `tick`, `init`, `start [--keep-alive]`, `stop [--unless-keep-alive]`, `status`, `model <id>`, `offset <points>`, `switch <command> <on|off>`, `publish <command> <file|nothing|commit|branch|pr|merge>`.
 
 ## Context
 
@@ -11,7 +11,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 [1] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches [3] and publish picks [4], the scheduler's pid, the last tick's decisions.
 [2] tick: one pass of the scheduler: pull the `agent-data` branch, sweep, then one decision per scheduled command.
 [3] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the schedule (`agent-schedule.md`). The schedule line is the default where nobody switched the command: on, unless the line says `off`.
-[4] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: `nothing`, or one of the levels a schedule line may say (`branch`, `pr`, `merge`); kept in the state, not in the schedule. It stands in for the `publish` clause of the command's schedule line until the person takes it back.
+[4] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: `nothing`, or one of the levels a schedule line may say (`commit`, `branch`, `pr`, `merge`); kept in the state, not in the schedule. It stands in for the `publish` clause of the command's schedule line until the person takes it back.
 
 ## Business logic — TL;DR
 
@@ -22,7 +22,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 - **`start`, `stop`, `status`** - the state answered after each; `start --foreground` makes this process the scheduler's; `start --keep-alive` writes keep-alive on; `stop --unless-keep-alive` leaves a keep-alive scheduler running, says so on stderr, and answers `kept: true`.
 - **`model <id>`, `offset <points>`** - the state's model (the one every scheduled run starts on) or spend cushion written for this user and the state answered; `offset` with something that is not a number is a usage error, `<value> is not a number of percentage points`.
 - **`switch <command> <on|off>`** - this machine's schedule switch [3] for one command of `agent-schedule.md`, named as its line names it (quoted when it holds a word after the folder: `switch "triage quick" on`), written and the state answered; refused `no-schedule` without the file and `not-scheduled` when it has no line for the command; a value neither `on` nor `off` is a usage error.
-- **`publish <command> <file|nothing|branch|pr|merge>`** - this machine's publish pick [4] for one command of `agent-schedule.md`, named as its line names it, written and the state answered; `file` takes the pick back, so the line decides again; refused `no-schedule` without the file and `not-scheduled` when it has no line for the command; any other value is a usage error.
+- **`publish <command> <file|nothing|commit|branch|pr|merge>`** - this machine's publish pick [4] for one command of `agent-schedule.md`, named as its line names it, written and the state answered; `file` takes the pick back, so the line decides again; refused `no-schedule` without the file and `not-scheduled` when it has no line for the command; any other value is a usage error.
 
 ## Business logic
 
@@ -96,7 +96,7 @@ See `## Context`.
 
 `switch` takes exactly two arguments: a command's name and `on` or `off`; any other value is a usage error, `<value> is neither on nor off`, exit 2. With no `agent-schedule.md` in the repository it refuses `{"ok":false,"reason":"no-schedule"}` with `no agent-schedule.md in this repository` on stderr, exit 1; when the schedule has no readable line for the command it refuses `{"ok":false,"reason":"not-scheduled","command":<name>}` with `agent-schedule.md has no line for <name>` on stderr, exit 1. Otherwise it writes this machine's schedule switch [3] for the command by `state.ts`'s rule (kept only where it differs from what the line says) and answers the state with `ok: true`.
 
-### `publish <command> <file|nothing|branch|pr|merge>`
+### `publish <command> <file|nothing|commit|branch|pr|merge>`
 
 #### Context
 
@@ -104,4 +104,4 @@ See `## Context`.
 
 #### Business logic
 
-`publish` takes exactly two arguments: a command's name and one of `file`, `nothing`, `branch`, `pr`, `merge`; any other value is a usage error, `<value> is none of file, nothing, branch, pr, merge`, exit 2. With no `agent-schedule.md` in the repository it refuses `{"ok":false,"reason":"no-schedule"}` with `no agent-schedule.md in this repository` on stderr, exit 1; when the schedule has no readable line for the command it refuses `{"ok":false,"reason":"not-scheduled","command":<name>}` with `agent-schedule.md has no line for <name>` on stderr, exit 1. Otherwise, for `file` it removes this machine's publish pick [4] for the command, and for any other value it writes that value as the pick, by `state.ts`'s rule (a pick is kept even when it says what the line says); it answers the state with `ok: true`.
+`publish` takes exactly two arguments: a command's name and one of `file`, `nothing`, `commit`, `branch`, `pr`, `merge`; any other value is a usage error, `<value> is none of file, nothing, commit, branch, pr, merge`, exit 2. With no `agent-schedule.md` in the repository it refuses `{"ok":false,"reason":"no-schedule"}` with `no agent-schedule.md in this repository` on stderr, exit 1; when the schedule has no readable line for the command it refuses `{"ok":false,"reason":"not-scheduled","command":<name>}` with `agent-schedule.md has no line for <name>` on stderr, exit 1. Otherwise, for `file` it removes this machine's publish pick [4] for the command, and for any other value it writes that value as the pick, by `state.ts`'s rule (a pick is kept even when it says what the line says); it answers the state with `ok: true`.

@@ -51,7 +51,7 @@ For each project, every agent [2] with a checkout whose status is `waiting` is l
 
 #### Context
 
-**Problem**: an agent [2] that committed real code and stopped produces neither a pull request nor a gate, and nothing would tell anyone. An agent publishes nothing by itself, so every finished agent with work of its own reaches here until a person publishes it, or the agent does on their ask. The feed only says that a decision is waiting; it does not take it.
+**Problem**: an agent [2] that committed real code and stopped produces neither a pull request nor a gate, and nothing would tell anyone. An agent pushes its branch only when its Start or a person asked it to, so every finished agent whose work is still only on this machine reaches here until a person publishes it, or the agent does on their ask. The feed only says that a decision is waiting; it does not take it.
 
 #### Business logic
 

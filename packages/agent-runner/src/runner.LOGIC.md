@@ -12,7 +12,7 @@ The tool's process side: a run [1] in this process, the same run detached in its
 [2] marker: a run record written before the agent exists: `status: running`, the tool's mark, an empty diary.
 [3] the run's lock: `.agent-runner/runs/<id>.lock` at the repository root, holding the pid of the one process of the run at work on it; a pid that is not a live process holds nothing (`run-lock.ts`).
 [4] the tool's mark: `caller.runner` on a card: the machine that started the run, the run's process on that machine while it runs, and, each when the run has one, the follow-up's prompt and the publish level [5] (`records.ts`).
-[5] publish level: how far a run's agent publishes its work when it finishes, given with `run --publish`: `branch` (push the branch and open no pull request), `pr` (push the branch and open its pull request) or `merge` (push the branch and open its pull request, set to merge on its own once its checks pass). A run given none publishes only what its prompt asks.
+[5] publish level: how far a run's agent publishes its work when it finishes, given with `run --publish`: `commit` (commit the work and push nothing), `branch` (commit it, push the branch and open no pull request), `pr` (commit it, push the branch and open its pull request) or `merge` (commit it, push the branch and open its pull request, set to merge on its own once its checks pass). A run given none commits and publishes only what its prompt asks.
 
 ## Business logic — TL;DR
 

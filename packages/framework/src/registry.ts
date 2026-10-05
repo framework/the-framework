@@ -71,7 +71,7 @@ export interface Preferences {
   model?: string
   /** Which coding agent a run starts on (#650): `claude-code` or `codex`, handed to the project's start hook. Absent = the hook's own default. */
   driver?: string
-  /** How far a run started from the dashboard publishes its work: `nothing`, or the level handed to the project's start hook, `branch`, `pr` or `merge`. The launcher's menu shows it and writes it. Absent = nothing. */
+  /** How far a run started from the dashboard publishes its work: `nothing`, or the level handed to the project's start hook, `commit`, `branch`, `pr` or `merge`. The launcher's menu shows it and writes it. Absent = none saved: the daemon decides where a Start goes. */
   publish?: PublishPick
   /**
    * Where an agent started from the launcher starts, per project: the projects, by id, whose

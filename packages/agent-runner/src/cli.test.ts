@@ -53,7 +53,7 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
     assert.match(followed.err, /--resume takes no --then/)
     const unknownLevel = await run(repo, 'run', 'Read the docs', '--publish', 'push')
     assert.equal(unknownLevel.code, 2)
-    assert.match(unknownLevel.err, /unknown publish level "push"; the levels are branch, pr, merge/)
+    assert.match(unknownLevel.err, /unknown publish level "push"; the levels are commit, branch, pr, merge/)
     const relevelled = await run(repo, 'run', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--publish', 'pr')
     assert.equal(relevelled.code, 2)
     assert.match(relevelled.err, /--resume takes no --publish/)

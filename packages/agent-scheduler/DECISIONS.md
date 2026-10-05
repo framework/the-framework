@@ -45,11 +45,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   empty), over the tool reading the queue (the tool would know a skill), and over a bare
   clock (empty runs). A list line the parser cannot read is skipped and named, never
   guessed.
-- A schedule line may say `publish <branch|pr|merge>`; a line that says nothing publishes
-  nothing, as a person's run does. The line is the team's default, in the tracked schedule
-  like the cap. A person may override it for one command on their machine, in the state file
-  like the on/off switch; the scheduler's own Settings section shows the level in force and
-  changes it.
+- A schedule line may say `publish <commit|branch|pr|merge>`; a line that says nothing
+  publishes nothing, as a run given no level does. The line is the team's default, in the
+  tracked schedule like the cap. A person may override it for one command on their machine,
+  in the state file like the on/off switch; the scheduler's own Settings section shows the
+  level in force and changes it.
   Picked over the level being the file's alone, where changing it on one machine meant
   editing a tracked file.
 - A schedule line paces a command two ways, alone or together: `when` says there is work

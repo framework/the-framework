@@ -34,7 +34,7 @@ export interface ScheduleLine {
   when?: string
   /** Whether the line runs it on a machine where nobody switched it. */
   on: boolean
-  /** How far a run of the command publishes, when the line says: `branch`, `pr` or `merge`. */
+  /** How far a run of the command publishes, when the line says: `commit`, `branch`, `pr` or `merge`. */
   publish?: Publish
 }
 

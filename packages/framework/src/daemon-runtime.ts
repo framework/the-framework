@@ -110,9 +110,10 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
     // The branch to start from ends up on the line's command line: only a branch name goes there.
     // Refused, not dropped: a run started from the main branch instead would be a silent swap.
     if (options.base !== undefined && !isBranchName(options.base)) return { ok: false, error: `not a branch name: ${String(options.base)}` }
-    // A project with no git host package can open no pull request: the furthest its run publishes is
-    // the branch. One with no remote can publish nothing, whatever pick the start carries.
-    const publish = options.publish !== undefined ? publishLevelOf(publishPickIn(options.publish, (await projectGitHost(projectCwd).catch(() => undefined)) !== undefined, await hasRemote(projectCwd))) : undefined
+    // The pick in force is decided here, so every Start goes the same way whichever page sent it:
+    // with none saved, or one the project is not offered, the run goes as far as the project does
+    // with no pull request: its branch pushed, or its work committed where there is no remote.
+    const publish = publishLevelOf(publishPickIn(options.publish, (await projectGitHost(projectCwd).catch(() => undefined)) !== undefined, await hasRemote(projectCwd)))
     const started = await runStartHook(projectCwd, {
       prompt,
       ...(options.driver !== undefined ? { driver: options.driver } : {}),

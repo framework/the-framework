@@ -20,8 +20,8 @@ One tick [1]: pull the `agent-data` branch [2], sweep [3], read the schedule [4]
 [10] marker: a run record written before the agent exists: `status: running`, `agent-runner`'s mark, an empty diary.
 [11] check: the shell command a schedule line puts after `when`, run at the repository root; its output says whether the command is due.
 [12] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the schedule. The schedule line is the default where nobody switched the command: on, unless the line says `off`.
-[13] publish level: how far a run of a command publishes its work, said by the `publish` clause of its schedule line: `branch` (push the branch and open no pull request), `pr` (push the branch and open its pull request) or `merge` (push the branch and open its pull request, set to merge on its own once its checks pass). A line that says nothing publishes nothing.
-[14] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: `nothing`, or one of the levels a schedule line may say (`branch`, `pr`, `merge`); kept in the state, not in the schedule. It stands in for the `publish` clause of the command's schedule line until the person takes it back.
+[13] publish level: how far a run of a command publishes its work, said by the `publish` clause of its schedule line: `commit` (commit the work and push nothing), `branch` (commit it, push the branch and open no pull request), `pr` (commit it, push the branch and open its pull request) or `merge` (commit it, push the branch and open its pull request, set to merge on its own once its checks pass). A line that says nothing publishes nothing.
+[14] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: `nothing`, or one of the levels a schedule line may say (`commit`, `branch`, `pr`, `merge`); kept in the state, not in the schedule. It stands in for the `publish` clause of the command's schedule line until the person takes it back.
 
 ## Business logic — TL;DR
 

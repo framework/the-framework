@@ -134,7 +134,7 @@ From any directory, the root of the checkout [2] containing it is found through 
 
 #### Context
 
-**User story**: nothing is published until the user says so, so the user must be able to see, for any branch, whether its work has reached the remote yet. `branches status` answers it for the agent's own checkout as `onRemote` (`cli.ts`).
+**User story**: an agent's branch is pushed only when the agent was asked to, so the user must be able to see, for any branch, whether its work has reached the remote yet. `branches status` answers it for the agent's own checkout as `onRemote` (`cli.ts`).
 
 #### Business logic
 

@@ -89,6 +89,7 @@ describe('in words', () => {
 
   test('how far a scheduled command publishes: this machine\'s pick, else what its line says, nothing when it says none', () => {
     expect(publishes({ command: 'a', on: true })).toBe('publishes nothing')
+    expect(publishes({ command: 'a', on: true, publish: 'commit' })).toBe('commits its work')
     expect(publishes({ command: 'a', on: true, publish: 'branch' })).toBe('publishes its branch')
     expect(publishes({ command: 'a', on: true, publish: 'pr' })).toBe('opens a pull request')
     expect(publishes({ command: 'a', on: true, publish: 'merge' })).toBe('opens a pull request that merges on green')
@@ -96,9 +97,9 @@ describe('in words', () => {
     expect(publishes({ command: 'a', on: true, publishPick: 'pr' })).toBe('opens a pull request')
   })
 
-  test('the publish menu: all four with a git host package, Nothing and Publish branch without; a saved pick no longer offered is still listed', () => {
-    expect(publishChoices(true, 'pr')).toEqual(['nothing', 'branch', 'pr', 'merge'])
-    expect(publishChoices(false, undefined)).toEqual(['nothing', 'branch'])
-    expect(publishChoices(false, 'pr')).toEqual(['nothing', 'branch', 'pr'])
+  test('the publish menu: every pick with a git host package, Nothing, Commit and Publish branch without; a saved pick no longer offered is still listed', () => {
+    expect(publishChoices(true, 'pr')).toEqual(['nothing', 'commit', 'branch', 'pr', 'merge'])
+    expect(publishChoices(false, undefined)).toEqual(['nothing', 'commit', 'branch'])
+    expect(publishChoices(false, 'pr')).toEqual(['nothing', 'commit', 'branch', 'pr'])
   })
 })

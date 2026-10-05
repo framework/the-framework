@@ -69,7 +69,7 @@ export interface ProjectLauncher {
   startHook: boolean
   /** Whether one of the project's packages provides a git host; without one no pull request can be opened, so the publish menu stops at the branch. */
   gitHost: boolean
-  /** Whether the project's repository has an `origin` remote; without one nothing can be published, so the publish menu is not offered. */
+  /** Whether the project's repository has an `origin` remote; without one nothing can be published, so the publish menu stops at the commit. */
   remote: boolean
   /**
    * The two branches an agent can start from here, for the launcher's "start from" chip: `main`,

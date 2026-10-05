@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import type { FrameworkEvent } from '../../src/index.js'
 import { ModulesContext, type MountedModules } from '../lib/use-modules.js'
@@ -492,13 +492,15 @@ describe('a question the agent stopped on', () => {
     { kind: 'end', ok: false, waiting: true },
   ] as FrameworkEvent[]
 
-  test('it is a panel above the message box, and the chat holds no question row', async () => {
+  test('it is a panel above the message box, and the chat holds one "Asking" line and none of the choices', async () => {
     onAgent.mockResolvedValue(asked)
     render(view({ events: asked }))
     const panel = await screen.findByRole('region', { name: 'Which database?' })
     expect(panel.compareDocumentPosition(screen.getByTestId('composer-live')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByLabelText('Agent output').contains(panel)).toBe(false)
-    expect(screen.getByLabelText('Agent output').textContent).not.toContain('Which database?')
+    const chat = screen.getByLabelText('Agent output')
+    expect(within(chat).getByRole('button', { name: 'Asking Which database?' })).toBeTruthy()
+    expect(chat.textContent).not.toContain('Postgres')
   })
 
   test('an answer in one\'s own words shows in the chat at once, as the message it is', async () => {

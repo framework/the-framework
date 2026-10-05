@@ -71,7 +71,7 @@ The rule is the daemon's own, shared with it (`../../src/open-choices.ts`), so t
 - A `choice-resolved` event with the same id closes that gate; records from before agents ended on their questions carry these.
 - Any other `end` — done, stopped, failed — closes every open gate: nobody would read the pick.
 
-The result is the list of gates still open. The transcript uses it to tell an open gate card from an answered one (`EventList.tsx`), and a gate card is keyed by its id so a re-asked gate starts afresh.
+The result is the list of gates still open. The transcript uses it to tell an open gate, which it draws as an "Asking" line, from an answered one (`EventList.tsx`), and a gate card is keyed by its id so a re-asked gate starts afresh.
 
 ### Views
 

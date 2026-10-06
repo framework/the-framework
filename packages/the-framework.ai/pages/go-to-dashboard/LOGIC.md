@@ -2,5 +2,5 @@ The "Go to dashboard" page (`/go-to-dashboard`): the answer the public site give
 
 ## Business logic — TL;DR
 
-- **The three commands** (`+Page.tsx`) - "Run" `the-framework` when installed, "Install" a global install, "One-time run" a run without installing; the last two follow the site-wide package manager choice, and every command copies on click.
-- **The page title** (`+config.ts`) - "Go to dashboard — The Framework".
+- **The three commands** (`+Page.tsx`) - "Run" `openagent` when installed, "Install" a global install, "One-time run" a run without installing; the last two follow the site-wide package manager choice, and every command copies on click.
+- **The page title** (`+config.ts`) - "Go to dashboard — OpenAgent".

@@ -3,13 +3,13 @@ import { useCopy } from './copy'
 import { kickerStyle, mono } from './ui'
 
 export const PMS = {
-  npm: { try: 'npx framework', install: 'npm i -g framework' },
-  pnpm: { try: 'pnpm dlx framework', install: 'pnpm add -g framework' },
-  bun: { try: 'bunx framework', install: 'bun add -g framework' },
+  npm: { try: 'npx @openagt/dashboard', install: 'npm i -g @openagt/dashboard' },
+  pnpm: { try: 'pnpm dlx @openagt/dashboard', install: 'pnpm add -g @openagt/dashboard' },
+  bun: { try: 'bunx @openagt/dashboard', install: 'bun add -g @openagt/dashboard' },
   // `yarn dlx` is Yarn 2+ (Berry), which removed `yarn global add` — so the install line
   // falls back to npm, which every yarn user has, rather than pairing two commands no
   // single yarn generation can both run.
-  yarn: { try: 'yarn dlx framework', install: 'npm i -g framework' },
+  yarn: { try: 'yarn dlx @openagt/dashboard', install: 'npm i -g @openagt/dashboard' },
 } as const
 export type Pm = keyof typeof PMS
 
@@ -239,7 +239,7 @@ export function Hero() {
           Or install:
           <span
             className="install-chip"
-            onClick={(e) => installCopy.copy(`${PMS[currentPm()].install} && the-framework`, e)}
+            onClick={(e) => installCopy.copy(`${PMS[currentPm()].install} && openagent`, e)}
             style={{
               position: 'relative',
               cursor: 'pointer',

@@ -23,7 +23,7 @@ A script that runs before the page renders reads the saved choice from the brows
 
 #### Context
 
-**User story**: a visitor pastes a link to the site into a chat or a social network and the card that unfurls shows The Framework's banner.
+**User story**: a visitor pastes a link to the site into a chat or a social network and the card that unfurls shows OpenAgent's banner.
 
 #### Business logic
 

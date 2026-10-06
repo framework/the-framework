@@ -131,8 +131,8 @@ export default function Page() {
           <p style={pStyle}>The dashboard runs 100% locally — you open it from your terminal.</p>
         </div>
         <Step kicker="Run">
-          <p style={pStyle}>If The Framework is installed, run it:</p>
-          <Cmd body="the-framework" resolve={() => 'the-framework'} />
+          <p style={pStyle}>If OpenAgent is installed, run it:</p>
+          <Cmd body="openagent" resolve={() => 'openagent'} />
         </Step>
         <Step kicker="Install">
           <p style={pStyle}>Not installed yet? Install it globally:</p>

@@ -4,8 +4,8 @@ import type { Config } from 'vike/types'
 export default {
   extends: vikeReact,
   prerender: true,
-  title: 'The Framework',
+  title: 'OpenAgent',
   description:
-    'Make the important decisions, let AI do the rest. The Framework turns AI agents into autonomous teammates that handle work end-to-end — while you stay in control of key decisions.',
+    'Make the important decisions, let AI do the rest. OpenAgent turns AI agents into autonomous teammates that handle work end-to-end — while you stay in control of key decisions.',
   favicon: '/assets/logo.svg',
 } satisfies Config

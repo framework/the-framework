@@ -28,13 +28,13 @@ const PROBLEMS: { title: string; desc?: string; rows: Row[] }[] = [
       ),
       good(
         <>
-          <b>Divide-and-conquer</b>: The Framework instructs AI to split large tasks into smaller subtasks. By
+          <b>Divide-and-conquer</b>: OpenAgent instructs AI to split large tasks into smaller subtasks. By
           focusing on one unit of work at a time, AI spends significantly more effort overall, resulting in much
           higher-quality output.
         </>,
       ),
       good(
-        <><b>Coverage guarantees</b>: The Framework lets AI enumerate everything that needs to be done before writing code. AI then works through that checklist, ensuring comprehensive coverage and preventing lazy shortcuts.</>,
+        <><b>Coverage guarantees</b>: OpenAgent lets AI enumerate everything that needs to be done before writing code. AI then works through that checklist, ensuring comprehensive coverage and preventing lazy shortcuts.</>,
       ),
     ],
   },
@@ -68,7 +68,7 @@ const PROBLEMS: { title: string; desc?: string; rows: Row[] }[] = [
       bad('Tell AI "don\'t do this, research alternatives".'),
       good(
         <>
-        The Framework makes AI <b>self-gauge its confidence</b> before starting to work.
+        OpenAgent makes AI <b>self-gauge its confidence</b> before starting to work.
         </>,
       ),
       good(

@@ -1,4 +1,4 @@
-The top navigation shown on every page of the site: the logo and the name "The Framework" on the left, and "Discord" and "GitHub" buttons on the right, linking to the community's Discord server and the product's GitHub repository (the addresses live in `ui.tsx`). There is deliberately no dashboard button: the dashboard is served by the daemon on the visitor's own machine, which a public page can neither detect nor open.
+The top navigation shown on every page of the site: the logo and the name "OpenAgent" on the left, and "Discord" and "GitHub" buttons on the right, linking to the community's Discord server and the product's GitHub repository (the addresses live in `ui.tsx`). There is deliberately no dashboard button: the dashboard is served by the daemon on the visitor's own machine, which a public page can neither detect nor open.
 
 ## Business logic — TL;DR
 

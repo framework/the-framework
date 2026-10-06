@@ -3,4 +3,4 @@ The press page (`/press`): the press kit — the logo on dark and light backgrou
 ## Business logic — TL;DR
 
 - **The press kit** (`+Page.tsx`) - the "Logo", "Name", "Banner" and "Brand assets" sections.
-- **The page title** (`+config.ts`) - "Press — The Framework".
+- **The page title** (`+config.ts`) - "Press — OpenAgent".

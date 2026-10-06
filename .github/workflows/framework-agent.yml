@@ -44,6 +44,12 @@ jobs:
           # Full history: the agent reads the log to understand what it is changing.
           fetch-depth: 0
 
+      # A fresh clone keeps the agents' records to itself, and this one vanishes with the job:
+      # what the agent writes with `tickets` or `queue` goes to the remote, as the person who
+      # dispatched the run asked by sharing the project's records.
+      - name: Share the agents' records
+        run: git config agent-data.share true
+
       # Built from environment variables rather than by interpolating ${{ }} into the shell,
       # so a crafted input cannot become a command. The driver validates them too.
       - name: Compose agent arguments

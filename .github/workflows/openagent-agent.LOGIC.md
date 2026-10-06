@@ -36,10 +36,10 @@ See `## Context`.
 
 #### Business logic
 
-The workflow, named "framework-agent", never runs on a push or a pull request: it runs only when dispatched by hand or through GitHub's API, which is how the driver [3] starts it. It takes five inputs:
+The workflow, named "openagent-agent", never runs on a push or a pull request: it runs only when dispatched by hand or through GitHub's API, which is how the driver [3] starts it. It takes five inputs:
 
 - `prompt` (required): what the agent [1] should do this turn [2]. The driver sends the driver session's framing (its standing instructions) and the prompt as one text, the framing first.
-- `correlation_id` (required): the correlation id [5]. The run's display name is "framework-agent " followed by it.
+- `correlation_id` (required): the correlation id [5]. The run's display name is "openagent-agent " followed by it.
 - `model` (optional): the model id to run on; empty means the action's default.
 - `resume_session_id` (optional): the session id of a prior driver session [7] to continue instead of starting fresh.
 - `branch` (optional): the branch the run pushes its work to, so the driver can read the work back and run the next turn on it.
@@ -86,8 +86,8 @@ The prompt is handed to the action as an input, verbatim and never through a she
 
 The push step runs even when the coding agent [4] step failed. When no branch was requested, the step logs "no run branch requested" and does nothing. Otherwise:
 
-1. The git identity is set to "framework-agent".
-2. Anything the coding agent left uncommitted is committed as "framework agent run (<branch>)", so it is not lost with the runner.
+1. The git identity is set to "openagent-agent".
+2. Anything the coding agent left uncommitted is committed as "openagent agent run (<branch>)", so it is not lost with the runner.
 3. When the checkout's tip is still the commit the run started from (the dispatched ref's tip on the remote), nothing is pushed, so a turn [2] that changed nothing creates no empty branch. When that ref cannot be resolved, the run errs toward pushing.
 4. The tip is pushed to the requested branch, creating or advancing it. The push authenticates explicitly with the workflow's own token through a tokenized URL: the coding agent's step runs its own git setup and leaves the checkout's persisted credentials unusable, so a plain push would fail with "Authentication failed".
 
@@ -101,14 +101,14 @@ The branch name is recorded as the step's output only when a push happened.
 
 #### Business logic
 
-The collect step runs even when the coding agent [4] step failed. It assembles a directory `framework-run/` holding:
+The collect step runs even when the coding agent [4] step failed. It assembles a directory `openagent-run/` holding:
 
 - `execution.json`: the transcript the action produced, a JSON array of the coding agent's messages. When the action produced none, the file holds an empty array, so a crashed coding agent yields an empty turn [2] rather than a driver error.
 - `meta.json`: the name of the branch the run actually pushed (empty when nothing was pushed) and the coding agent's session id.
 
 The directory is not dot-prefixed on purpose: the upload drops every file under a hidden path, and a hidden directory would upload nothing, leaving the driver [3] no artifact to read.
 
-The directory is uploaded as one artifact named `framework-run-<correlation id>`, kept for 7 days, whether or not the coding agent succeeded.
+The directory is uploaded as one artifact named `openagent-run-<correlation id>`, kept for 7 days, whether or not the coding agent succeeded.
 
 ### How the driver and the run correlate
 

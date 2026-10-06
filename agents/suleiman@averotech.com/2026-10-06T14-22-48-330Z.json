@@ -6,7 +6,6 @@
   "intent": "ask me what color i like, give me choices",
   "driver": "claude-code",
   "model": "claude-sonnet-5-5",
-  "branch": "agent-2026-10-06T14-22-48-330Z",
   "cost": 0.077189,
   "caller": {
     "runner": {

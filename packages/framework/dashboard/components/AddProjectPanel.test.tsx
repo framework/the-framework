@@ -23,6 +23,10 @@ describe('AddProjectPanel (#1150)', () => {
     // The picked path is shown back for the trust gate (#439); nothing is registered yet.
     await screen.findByText('/Users/dev/my-repo')
     expect(sendAddProject).not.toHaveBeenCalled()
+    // What the add will do to the folder is said here, before the button that does it.
+    const dialog = screen.getByRole('dialog', { name: 'Add project' })
+    expect(dialog.textContent).toContain('makes no commit on your branch and pushes nothing')
+    expect(dialog.textContent).toContain('Your files and your branch stay as they are.')
     fireEvent.click(screen.getByRole('button', { name: 'I trust it, add it' }))
     await screen.findByText('Project added')
     // The records stay on this machine unless the person picks the other answer.

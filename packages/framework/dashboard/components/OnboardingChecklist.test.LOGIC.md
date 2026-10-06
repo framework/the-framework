@@ -8,5 +8,6 @@ What the tests cover:
 - **A refused start** - the refusal's reason ("already active") is shown and the user is moved nowhere.
 - **Configure first** - the chevron's "Configure first, then run" opens the target project's launcher, starts nothing, and leaves the update-tickets prompt as the pending draft.
 - **"Add <folder> as project…" asks first** - with the daemon's folder not yet a project, the button adds nothing itself: it opens the "Add project" dialog on that folder, with no system folder dialog and "Keep them on this machine" picked; the project is added, with the records kept, only on "I trust it, add it".
+- **What adding does, said first** - with no project yet, the first step shows what adding a project does to the folder ("makes no commit on your branch and pushes nothing", the empty first commit) before anything is pressed, and nothing is added; with a project registered it shows only the sentence on what a project is.
 - **A folder that is already a project** - is not offered again: no "… as project" button.
 - **No project yet** - there is no "Update tickets" to press: no project provides tickets.

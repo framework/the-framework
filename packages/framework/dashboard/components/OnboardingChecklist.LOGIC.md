@@ -32,7 +32,7 @@ The "Onboarding" card: the four things a new install needs (fewer while no proje
 
 #### Business logic
 
-The card re-reads the dashboard's cross-project state every 10 seconds (slower than the Overview's [4] own refresh, since onboarding changes at human speed) and the daemon's working-directory suggestion every 30 seconds. Each step's tick is derived from that state, as listed per step below. A done step shows a checked box (named "Done") and its label struck through, and hides its action; an open step shows an empty box (named "Not done", a square rather than a circle so the rows read as independent things to tick, not one choice among several) and its action on the right. Under each label sits a one-line description. A step nothing breaks without carries an "Optional" badge; only "Add a project" and "Populate the queue of AI tasks" are essential.
+The card re-reads the dashboard's cross-project state every 10 seconds (slower than the Overview's [4] own refresh, since onboarding changes at human speed) and the daemon's working-directory suggestion every 30 seconds. Each step's tick is derived from that state, as listed per step below. A done step shows a checked box (named "Done") and its label struck through, and hides its action; an open step shows an empty box (named "Not done", a square rather than a circle so the rows read as independent things to tick, not one choice among several) and its action on the right. Under each label sits a description: one line, except the first step's while no project is registered. A step's action sits at the end of its row, and drops under the description when the row cannot hold both at a readable width (a long folder name on the first step's button). A step nothing breaks without carries an "Optional" badge; only "Add a project" and "Populate the queue of AI tasks" are essential.
 
 ### The card, its count and its dismissal
 
@@ -52,7 +52,7 @@ The card is titled "Onboarding" with "<done> of 4 set up." under it. On the Over
 
 #### Business logic
 
-- Description: "A project is a git repo OpenAgent may work in." Done once at least one project is registered.
+- Description, while no project is registered: what adding a project does to the folder, said before any button is pressed (`AddProjectEffects.tsx`): it makes no commit on the user's branch and pushes nothing, the product keeps its own files there in hidden folders and the agents' records on a local `agent-data` branch, the records stay on this machine unless shared, the user's files and branch stay as they are, and a folder with no git, or a repository with no commit yet, gets one empty first commit. Once at least one project is registered the step is done and the description is the one sentence "A project is a git repo OpenAgent may work in."; that sentence also stands until the card's first read lands, so a user who has projects never sees the longer text appear and go.
 - When the daemon can name the directory it runs in and that directory is not registered yet, a primary button reads "Add <directory> as project…". It adds nothing by itself: it opens the add-project panel (`AddProjectPanel.tsx`) with that directory handed in, so the system folder dialog is skipped and the panel starts at its trust confirmation and its question on the agents' records; a refused add is said in the panel.
 - "Select & add project directory" opens the same panel with no directory, which then asks for one through the system folder dialog.
 - When a project is added in the panel, either way, the card re-reads its state and the suggestion.

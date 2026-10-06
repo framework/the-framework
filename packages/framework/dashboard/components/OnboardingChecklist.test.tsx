@@ -170,6 +170,23 @@ describe('the tickets import lands on the session it starts (#1169)', () => {
     await waitFor(() => expect(sendAddProject).toHaveBeenCalledWith('/Users/dev/here', false))
   })
 
+  test('before anything is pressed, the first step says what adding a project does to the folder; once a project is added it says only what a project is', async () => {
+    onDashboard.mockResolvedValue(EMPTY)
+    onOnboarding.mockResolvedValue({ cwd: '/Users/dev/here', cwdProjectId: null })
+    const { container } = render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={vi.fn()} />)
+    await screen.findByRole('button', { name: 'Add /Users/dev/here as project\u2026' })
+    await waitFor(() => expect(container.textContent).toContain('makes no commit on your branch and pushes nothing'))
+    expect(container.textContent).toContain('A folder with no git, or a repository with no commit yet, gets one empty first commit.')
+    expect(sendAddProject).not.toHaveBeenCalled()
+    cleanup()
+
+    onDashboard.mockResolvedValue(WITH_PROJECT)
+    onOnboarding.mockResolvedValue({ cwd: '/Users/dev/here', cwdProjectId: 'p1' })
+    const added = render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={vi.fn()} />)
+    await waitFor(() => expect(added.container.textContent).toContain('A project is a git repo OpenAgent may work in.'))
+    expect(added.container.textContent).not.toContain('makes no commit on your branch')
+  })
+
   test('a folder that is already a project is not offered again', async () => {
     onDashboard.mockResolvedValue(WITH_PROJECT)
     onOnboarding.mockResolvedValue({ cwd: '/Users/dev/here', cwdProjectId: 'p1' })

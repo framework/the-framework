@@ -3,8 +3,8 @@
 # The driver cannot learn a run id from the dispatch API (it answers 204 with no body), so
 # the correlation id it generates is echoed into `run-name` and into the artifact name. That
 # is how the driver finds its own run, and it is why both must keep interpolating it.
-name: framework-agent
-run-name: framework-agent ${{ inputs.correlation_id }}
+name: openagent-agent
+run-name: openagent-agent ${{ inputs.correlation_id }}
 
 on:
   workflow_dispatch:
@@ -95,12 +95,12 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "$RUN_BRANCH" ]; then echo "no run branch requested"; exit 0; fi
-          git config user.name "framework-agent"
-          git config user.email "framework-agent@users.noreply.github.com"
+          git config user.name "openagent-agent"
+          git config user.email "openagent-agent@users.noreply.github.com"
           # Commit anything the agent left uncommitted so it is not lost with the runner.
           if [ -n "$(git status --porcelain)" ]; then
             git add -A
-            git commit -m "framework agent run ($RUN_BRANCH)" --quiet
+            git commit -m "openagent agent run ($RUN_BRANCH)" --quiet
           fi
           # Don't create an empty branch for a no-op turn: only push when the run advanced
           # past the ref it checked out. If that ref can't be resolved, err toward pushing.
@@ -125,21 +125,21 @@ jobs:
         run: |
           set -euo pipefail
           # Not dot-prefixed: upload-artifact@v4 defaults include-hidden-files to false and
-          # drops every file under a hidden path segment, so a `.framework-run/` dir uploads
+          # drops every file under a hidden path segment, so a `.openagent-run/` dir uploads
           # nothing and the driver finds no artifact to read.
-          mkdir -p framework-run
+          mkdir -p openagent-run
           # An empty array still parses, so a crashed action yields an empty turn, not a driver error.
           if [ -n "$EXECUTION_FILE" ] && [ -f "$EXECUTION_FILE" ]; then
-            cp "$EXECUTION_FILE" framework-run/execution.json
+            cp "$EXECUTION_FILE" openagent-run/execution.json
           else
-            echo '[]' > framework-run/execution.json
+            echo '[]' > openagent-run/execution.json
           fi
           jq -n --arg branch "$BRANCH" --arg session_id "$SESSION_ID" \
-            '{branch: $branch, session_id: $session_id}' > framework-run/meta.json
+            '{branch: $branch, session_id: $session_id}' > openagent-run/meta.json
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: framework-run-${{ inputs.correlation_id }}
-          path: framework-run
+          name: openagent-run-${{ inputs.correlation_id }}
+          path: openagent-run
           retention-days: 7

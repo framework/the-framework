@@ -12,7 +12,7 @@ The project home [1]: a project's own page, laid out as the agent view [5] is. T
 
 ## Business logic — TL;DR
 
-- **The project's actions first** (`ProjectActions.tsx`) - the bar at the top holds the "⋮" menu of actions on the project itself and nothing else, laid out as the action bar at the top of the agent view [5] is. It does not name the project: the launcher's [2] chip does.
+- **The project's actions first** (`ProjectActions.tsx`) - the bar at the top holds the "⋮" menu of actions on the project itself and nothing else, laid out as the action bar at the top of the agent view [5] is. It does not name the project: the launcher's [2] chip does. The page hands the bar what the dashboard wants told once the user removes the project from that menu, so the dashboard can leave the page (`App.tsx`).
 - **The error banner at the top** (`ProjectErrorBanner.tsx`) - what the daemon currently finds wrong with the project is shown above everything else on the page, so nobody starts an agent [3] on a project whose `agent-data` branch [6] cannot reach the remote without seeing it: such an agent would work from stale tickets and fill a queue nobody else will see.
 - **The agents overview** (`AgentOverview.tsx`) - shown only when the project has events to build it from.
 - **Open questions** (`OpenQuestions.tsx`) - the agents that wait on an open question [4] across all projects, one row each; a row opens its agent, where the question is answered, and may switch to another project's agent. With a project picked in the sidebar's project select, only that project's questions show.

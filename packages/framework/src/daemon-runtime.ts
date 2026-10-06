@@ -1,13 +1,14 @@
 import { resolve } from 'node:path'
+import { hostname } from 'node:os'
 import { stat } from 'node:fs/promises'
-import { fromDiaryLine, projectBranches, resolveAgentDiary, type AgentMeta, type AnyDiaryLine } from './store/index.js'
+import { fromDiaryLine, isPidAlive, projectBranches, readLiveMetas, resolveAgentDiary, type AgentMeta, type AnyDiaryLine } from './store/index.js'
 import type { FrameworkEvent } from './events.js'
-import type { StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
+import type { StartAgentOptions, StartAgentResult, AddProjectResult, RemoveProjectResult } from './dashboard/index.js'
 import type { EventsSource, RemoteAgents } from './dashboard/rpc-serve.js'
 import { RelayedAgents, startRemoteAgent } from './dashboard/remote-run.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailAgentEvents } from './dashboard-rpc/events-tail.js'
-import { addProject, listProjects, projectId } from './registry.js'
+import { addProject, listProjects, projectId, removeProject } from './registry.js'
 import { writeHookLines } from './built-in.js'
 import { installProject } from './install.js'
 import { writeSharing } from '@openagt/agent-data'
@@ -16,6 +17,7 @@ import { publishLevelOf, publishPickIn } from './publish-levels.js'
 import { isBranchName } from './branch-name.js'
 import { hasRemote } from './has-remote.js'
 import { projectGitHost } from './store/git-host.js'
+import { providedDataChanged } from './store/provided.js'
 
 /**
  * What the daemon does for a project (#393): start a run, add a project, and relay a run to and
@@ -36,6 +38,7 @@ export interface ProjectRuntimeOptions {
 export interface ProjectRuntime {
   onStart: (prompt: string, options?: StartAgentOptions, targetProjectId?: string) => Promise<StartAgentResult>
   onAddProject: (path: string, share: boolean) => Promise<AddProjectResult>
+  onRemoveProject: (projectId: string) => Promise<RemoveProjectResult>
   /** The live event stream for an agent this daemon is relaying from a device (#1067), else undefined
    *  so `onEvents` falls back to tailing the on-disk log. Wired as the dashboard's events source. */
   remoteEventsSource: EventsSource
@@ -158,6 +161,30 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
     return { ok: true, alreadyActivated: result.alreadyActivated === true, ...(share && !shared ? { noRemote: true as const } : {}) }
   }
 
+  // Remove a project: it leaves the Projects list and nothing in its folder is deleted. Found in
+  // the list by its id and not through its folder, so a project whose folder is gone goes too.
+  const onRemoveProject = async (id: string): Promise<RemoveProjectResult> => {
+    const record = (await listProjects(undefined, env).catch(() => [])).find(project => project.id === id)
+    if (!record) return { ok: false, error: 'no project with that id is on the list' }
+    const here = await stat(record.path).then(s => s.isDirectory()).catch(() => false)
+    if (here) {
+      // The checkouts are read fresh: a run started a moment ago must be seen.
+      projectBranches.changed(record.path)
+      // An agent at work would go on working in a project the dashboard no longer shows. A card
+      // left "running" by a process that died does not count: nothing is working there.
+      const working = (await readLiveMetas(record.path).catch(() => [])).some(
+        agent => agent.status === 'running' && agent.pid !== undefined && agent.host === hostname() && isPidAlive(agent.pid),
+      )
+      if (working) return { ok: false, error: 'An agent is working in this project. Stop it, then remove the project.' }
+      // The project's close hooks, the ones a shutdown would have run for it: once it is off the
+      // list no shutdown names it, and what its open hooks started (a scheduler) would run on.
+      await runProjectHooks(record.path, 'close', { log: console.log })
+    }
+    await removeProject(id, undefined, env)
+    providedDataChanged(record.path)
+    return { ok: true }
+  }
+
   // The dashboard's events source (#1067): a stream for an agent this daemon is relaying from a device,
   // else undefined so `onEvents` tails the on-disk log as usual for an ordinary local agent.
   const remoteEventsSource: EventsSource = (_projectId, agentId) => relayedAgents.get(agentId)
@@ -175,5 +202,5 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
     relayedAgents.dispose()
   }
 
-  return { onStart, onAddProject, remoteEventsSource, tailRelayEvents, remoteAgents, onRelayRpc, dispose }
+  return { onStart, onAddProject, onRemoveProject, remoteEventsSource, tailRelayEvents, remoteAgents, onRelayRpc, dispose }
 }

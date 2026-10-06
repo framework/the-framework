@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises'
-import { join, relative, isAbsolute } from 'node:path'
+import { join } from 'node:path'
 import { OPENAGENT_DIR } from './framework-dir.js'
 import { startDashboard, type Dashboard } from './dashboard/index.js'
 import { createProjectRuntime } from './daemon-runtime.js'
@@ -8,8 +8,7 @@ import { defaultModelsSource } from './dashboard/models.js'
 import { startBackgroundServices } from './daemon-services.js'
 import { projectErrorStore } from './project-errors.js'
 import { resolveDashboardBundle } from './dashboard/bundle.js'
-import { isActivated } from './project.js'
-import { addProject, ensureDaemonToken, listProjects, nodeRegistryFs, readPreferences, registryPreferencesStore, type Preferences } from './registry.js'
+import { ensureDaemonToken, listProjects, nodeRegistryFs, readPreferences, registryPreferencesStore, type Preferences } from './registry.js'
 import { isLoopbackHost } from './loopback-host.js'
 import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
 import { bridgeQuestions } from './dashboard/bridge-store.js'
@@ -64,27 +63,6 @@ function daemonDir(cwd: string): string {
   return join(cwd, OPENAGENT_DIR)
 }
 
-/** True when `child` lives strictly inside `parent` (not equal, not outside). */
-export function isNestedWithin(child: string, parent: string): boolean {
-  const rel = relative(parent, child)
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
-}
-
-/**
- * Make sure an activated home workspace shows up in the Projects list (#392). Best-effort
- * and idempotent (addProject dedupes by path), so it never blocks the daemon coming up.
- *
- * Skips a cwd that lives inside an already-tracked project (#647): the daemon creates
- * `.openagent/` for its own state, so running it from a subfolder of a repo (e.g. the
- * package dir the binary lives in) would otherwise keep re-adding a nested duplicate.
- */
-export async function registerHomeProject(cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
-  if (!(await isActivated(cwd).catch(() => false))) return
-  const existing = await listProjects(undefined, env).catch(() => [])
-  if (existing.some(p => isNestedWithin(cwd, p.path))) return
-  await addProject(cwd, new Date().toISOString(), undefined, env).catch(() => {})
-}
-
 /** True when a process with this id is still running (best-effort, signal 0). The store's
  * {@link isPidAlive} under the daemon's historical public name -- the two were byte-identical. */
 export { isPidAlive as isProcessAlive } from './store/index.js'
@@ -131,9 +109,6 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // very first command in a fresh workspace, before any run has made the directory.
   await mkdir(daemonDir(cwd), { recursive: true })
 
-  // Multi-project (#392): make sure an activated home repo shows up in the Projects list.
-  await registerHomeProject(cwd, env)
-
   // Everything the dashboard drives per project (a run's start, project install, the device
   // relay) lives in the runtime, so this body stays about the daemon's own lifecycle.
   const runtime = createProjectRuntime({ cwd, env })
@@ -174,6 +149,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     models: defaultModelsSource(),
     onStart: runtime.onStart,
     onAddProject: runtime.onAddProject,
+    onRemoveProject: runtime.onRemoveProject,
     // Relay an agent to/from a connected device (#1067): the events source streams an agent this daemon
     // is relaying, `remote` lets the read RPCs forward a remote agent's reads/steer/push to its device
     // (slice 2), and the `/_relay/*` endpoints let another daemon run + read + steer a session here.

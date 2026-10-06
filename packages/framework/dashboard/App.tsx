@@ -365,6 +365,11 @@ export function App() {
           toggleContext={toggleContext}
           onOpenAgent={selectAgentInProject}
           errors={project?.errors}
+          // The project is off the list: read the list again and leave its page for the Overview.
+          onProjectRemoved={() => {
+            setProjectsKey(k => k + 1)
+            showDashboard()
+          }}
         />
       )
     }

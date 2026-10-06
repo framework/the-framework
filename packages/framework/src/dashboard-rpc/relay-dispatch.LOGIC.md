@@ -45,7 +45,7 @@ See `## Context`.
 
 #### Business logic
 
-The first argument of every relayed call is the relaying daemon's project id, meaningless on this device [1]; it is replaced with the device's own home project id — the project the device's daemon registered at start — and the remaining arguments (a path, an agent id [8], and so on) carry through unchanged. A relayed call therefore only ever addresses the device's home checkout [4], never another project registered there, and resolves its path through the same registry [9] the device's own browser calls do.
+The first argument of every relayed call is the relaying daemon's project id, meaningless on this device [1]; it is replaced with the device's own home project id — the id of the directory the device's daemon was started in, which is a registered project only when the device's user added it there — and the remaining arguments (a path, an agent id [8], and so on) carry through unchanged. A relayed call therefore only ever addresses the device's home checkout [4], never another project registered there, and resolves its path through the same registry [9] the device's own browser calls do.
 
 ### An unknown name is refused
 

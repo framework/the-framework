@@ -120,3 +120,8 @@ export function contextStartAgent(): DashboardContext['startAgent'] {
 export function contextAddProject(): DashboardContext['addProject'] {
   return fromContext('addProject')
 }
+
+/** Take a project off the list, which only the daemon can do: it runs the project's close hooks first. */
+export function contextRemoveProject(): DashboardContext['removeProject'] {
+  return fromContext('removeProject')
+}

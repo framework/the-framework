@@ -6,8 +6,6 @@ import { basename, join, resolve } from 'node:path'
 import {
   isProcessAlive,
   runDaemon,
-  registerHomeProject,
-  isNestedWithin,
   type DaemonState,
   type RunDaemonOptions,
 } from './daemon.js'
@@ -126,6 +124,8 @@ test('runDaemon comes up on a fresh workspace with no .openagent yet', async () 
 test("a project's open hooks run once the dashboard listens, its close hooks at shutdown, each line in the project (#1774)", async () => {
   const cwd = await realpath(await tmpWorkspace())
   const env = await configEnv(cwd)
+  // On the list because a person added it: the daemon runs the hooks of listed projects only.
+  await addProject(cwd, new Date().toISOString(), undefined, env)
   await writeFile(
     join(cwd, OPENAGENT_DIR, 'hooks.yml'),
     'open:\n  - echo open-1 >> hooks.log\n  - pwd -P >> hooks.log\n  - exit 3\n  - echo open-2 >> hooks.log\nclose:\n  - echo close >> hooks.log\n',
@@ -190,46 +190,18 @@ test('a Start runs the project\'s own start hook with the prompt and the picks, 
   }
 })
 
-test('isNestedWithin flags a child path, not equal/sibling/parent (#647)', () => {
-  assert.equal(isNestedWithin('/repo/packages/framework', '/repo'), true)
-  assert.equal(isNestedWithin('/repo', '/repo'), false) // equal is not nested
-  assert.equal(isNestedWithin('/repo', '/repo/packages'), false) // parent is not nested
-  assert.equal(isNestedWithin('/other/framework', '/repo'), false) // sibling tree
-  assert.equal(isNestedWithin('/repo-x', '/repo'), false) // prefix but not a path child
-})
-
-test('registerHomeProject skips a cwd nested inside an already-tracked project (#647)', async () => {
-  const parent = await mkdtemp(join(tmpdir(), 'framework-parent-'))
-  const env = await configEnv(parent)
+test('a folder is on the list only when a person adds it: the daemon does not add its own start folder, so a removed project stays removed', async () => {
+  const cwd = await tmpWorkspace() // activated, as a project that was added and then removed still is
+  const env = await configEnv(cwd)
+  const ac = new AbortController()
   try {
-    await addProject(parent, new Date().toISOString(), undefined, env)
-    // A nested, activated subfolder (like packages/framework inside the repo).
-    const nested = join(parent, 'packages', 'framework')
-    await activate(nested)
-
-    await registerHomeProject(nested, env)
-
-    const projects = await listProjects(undefined, env)
-    assert.deepEqual(
-      projects.map(p => p.path),
-      [parent],
-      'the nested subfolder must not be added as a second project',
-    )
+    const { done, state } = await startDaemon(cwd, { port: 0, signal: ac.signal, env })
+    assert.deepEqual(await listProjects(undefined, env), [])
+    ac.abort()
+    await done
   } finally {
-    await rm(parent, { recursive: true, force: true })
-  }
-})
-
-test('registerHomeProject still adds an activated cwd that is not nested (#647)', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'framework-home-'))
-  const env = await configEnv(home)
-  try {
-    await activate(home)
-    await registerHomeProject(home, env)
-    const projects = await listProjects(undefined, env)
-    assert.deepEqual(projects.map(p => p.path), [home])
-  } finally {
-    await rm(home, { recursive: true, force: true })
+    ac.abort()
+    await rm(cwd, { recursive: true, force: true })
   }
 })
 

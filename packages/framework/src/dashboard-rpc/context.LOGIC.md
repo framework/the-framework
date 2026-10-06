@@ -30,11 +30,11 @@ Gives every call the dashboard makes the daemon's own capabilities, wired once w
 
 #### Context
 
-**Problem**: the calls need things only the daemon has: its start (the project's start hook, or the start forwarded to a device), the ability to install and register a repository, the live quota [4] reading, the models each coding agent offers, the errors its sweeps [5] found, its bridge browser [6]. There is exactly one host serving the dashboard and it has all of them, so a call never has to cope with "this capability is not available here".
+**Problem**: the calls need things only the daemon has: its start (the project's start hook, or the start forwarded to a device), the ability to install and register a repository and to remove a project, the live quota [4] reading, the models each coding agent offers, the errors its sweeps [5] found, its bridge browser [6]. There is exactly one host serving the dashboard and it has all of them, so a call never has to cope with "this capability is not available here".
 
 #### Business logic
 
-The capabilities the daemon wires, once, when it comes up: starting an agent, adding a project, the preferences [3] store over the registry, the quota source behind the usage panel, the models source behind the agent and model menu, what each project currently suffers from as the daemon's sweeps last recorded it, the daemon's own bridge browser, and the two facts about relayed [7] agents described below. A call that reads a capability nobody wired fails with an error naming it ("the dashboard's RPC context has no …") instead of silently answering as if nothing were configured: an unwired capability is a wiring bug, not a legitimate state of the product.
+The capabilities the daemon wires, once, when it comes up: starting an agent, adding a project, removing a project, the preferences [3] store over the registry, the quota source behind the usage panel, the models source behind the agent and model menu, what each project currently suffers from as the daemon's sweeps last recorded it, the daemon's own bridge browser, and the two facts about relayed [7] agents described below. A call that reads a capability nobody wired fails with an error naming it ("the dashboard's RPC context has no …") instead of silently answering as if nothing were configured: an unwired capability is a wiring bug, not a legitimate state of the product.
 
 ### A project id resolves through the registry
 

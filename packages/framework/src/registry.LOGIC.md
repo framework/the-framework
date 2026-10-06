@@ -2,7 +2,7 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.open
 
 ## Context
 
-**User story**: the user runs `openagent` inside a repository, and that repository is a project of the dashboard from then on. The user changes a setting on Settings [3] and finds it unchanged after restarting the daemon. On a second machine nothing carries over: the file is per machine and the user's to re-create there.
+**User story**: the user adds a repository in the dashboard, and that repository is a project of the dashboard from then on, until the user removes it. The user changes a setting on Settings [3] and finds it unchanged after restarting the daemon. On a second machine nothing carries over: the file is per machine and the user's to re-create there.
 
 **Problem**: the file is written by the daemon from several places at once, written by the browser through Settings, and open to hand edits. So nothing it holds is trusted on read, a write must never leave a half-written file behind, and two writes must never lose each other's changes.
 
@@ -21,6 +21,7 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.open
 - **Where the file lives** - one file, under `$XDG_CONFIG_HOME` when that is set, else dotted under `$HOME`.
 - **A project's id** - derived from the project's absolute path: its folder name made URL-safe plus a short hash of the whole path, stable forever.
 - **Registering a project** - by normalized absolute path, once: a path already registered keeps its record and its registration time.
+- **Removing a project** - by its id: the project's record leaves the list, and nothing else in the file and nothing in the project's folder changes.
 - **Reading forgivingly** - a missing, unreadable or malformed file reads as an empty registry, and every value read is validated.
 - **The on/off preferences** - each kept only as a true or false, each with its own meaning when absent.
 - **The choice preferences** - the model, the driver, the publish menu's option, the editor and the theme, each constrained to the values the dashboard offers.
@@ -57,11 +58,21 @@ A project's id is derived from its absolute path and never changes: the folder's
 
 #### Context
 
-**User story**: running `openagent` inside a repository registers it; running it again does not register it twice.
+**User story**: adding a repository in the dashboard registers it; adding it again does not register it twice.
 
 #### Business logic
 
 A project is registered by path. The path is first made absolute and normalized, so a trailing slash or a `..` segment does not make a different project. A path already registered returns its existing record untouched, registration time included. Otherwise a record with the id, the absolute path and the registration time given is appended, and the file is written back with the preferences [2] and the token preserved.
+
+### Removing a project
+
+#### Context
+
+**User story**: the user picks "Remove project…" in a project's menu and the project leaves the dashboard's list; their folder is as it was, and adding the folder again brings the project back.
+
+#### Business logic
+
+A project is removed by its id. Its record is taken off the list and the file is written back, with the other projects, the preferences [2] and the token preserved; the answer is the record that was removed. An id no project has changes nothing, and the answer says no project was removed. Only the registry [1] changes: nothing in the project's folder is read or touched, so a project whose folder is gone is removed like any other. A folder added again after its project was removed is the same project, because the id is derived from its path.
 
 ### Reading forgivingly
 
@@ -155,7 +166,7 @@ Preferences [2] are saved in one of two ways. A save replaces the whole block wi
 
 #### Business logic
 
-The file is written as indented JSON; the token is written only when present. Each write goes to a temporary file beside the real one (the file's name plus the writing process's id and `.tmp`), has its permission narrowed to owner read and write only (`0600`) while it is still the temporary file, and is then renamed over the real file. A reader therefore sees the whole old file or the whole new one, never a mixture, and the real path is never readable by others. A write that fails part way damages only the temporary file, which is left behind. The permission narrowing is best-effort: a filesystem that cannot express it (Windows, a FAT volume) still gets the write. Every mutation of the file (registering a project, saving or patching preferences [2], creating the token) runs after the previous one has finished, so a write is never computed from a read taken before another write landed; a mutation that fails hands its error to its caller and does not block the next.
+The file is written as indented JSON; the token is written only when present. Each write goes to a temporary file beside the real one (the file's name plus the writing process's id and `.tmp`), has its permission narrowed to owner read and write only (`0600`) while it is still the temporary file, and is then renamed over the real file. A reader therefore sees the whole old file or the whole new one, never a mixture, and the real path is never readable by others. A write that fails part way damages only the temporary file, which is left behind. The permission narrowing is best-effort: a filesystem that cannot express it (Windows, a FAT volume) still gets the write. Every mutation of the file (registering a project, removing one, saving or patching preferences [2], creating the token) runs after the previous one has finished, so a write is never computed from a read taken before another write landed; a mutation that fails hands its error to its caller and does not block the next.
 
 ### The daemon token
 

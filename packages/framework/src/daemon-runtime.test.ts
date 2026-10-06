@@ -2,12 +2,12 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createProjectRuntime } from './daemon-runtime.js'
 import { PROJECT_HOOKS_FILE } from './project-hooks.js'
 import { OPENAGENT_DIR } from './framework-dir.js'
-import { addProject } from './registry.js'
+import { addProject, listProjects } from './registry.js'
 import { readSharing } from '@openagt/agent-data'
 
 // A Start, as the daemon does it (#1774): the project's own start hook line, nothing else. The
@@ -135,6 +135,88 @@ test('adding a project writes the runner\'s start, resume and check lines, an em
     const again = await readFile(join(folder, PROJECT_HOOKS_FILE), 'utf8')
     assert.match(again, /^start: my-own-tool "\$PROMPT"$/m)
     assert.match(again, /^resume: agent-runner /m)
+  } finally {
+    await runtime.dispose()
+    for (const [key, value] of Object.entries(before)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    await rm(folder, { recursive: true, force: true })
+    await rm(cfg, { recursive: true, force: true })
+  }
+})
+
+test('removing a project runs its close hooks and takes it off the list, and deletes nothing in its folder; an id not on the list is refused', async () => {
+  const folder = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-')))
+  const cfg = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-cfg-')))
+  const env = { XDG_CONFIG_HOME: cfg, GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' }
+  const before = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]))
+  Object.assign(process.env, env)
+  // The daemon runs elsewhere: the project is not its own start folder.
+  const runtime = createProjectRuntime({ cwd: cfg, env })
+  try {
+    assert.deepEqual(await runtime.onAddProject(folder, false), { ok: true, alreadyActivated: false })
+    const [project] = await listProjects(undefined, env)
+    assert.equal(project?.path, folder)
+    await writeFile(join(folder, PROJECT_HOOKS_FILE), 'close:\n  - echo closed > closed.txt\n')
+    await writeFile(join(folder, 'mine.txt'), 'mine\n')
+    const kept = execFileSync('git', ['log', '--format=%H'], { cwd: folder, encoding: 'utf8' })
+
+    assert.deepEqual(await runtime.onRemoveProject('nope-123'), { ok: false, error: 'no project with that id is on the list' })
+    assert.equal((await listProjects(undefined, env)).length, 1)
+
+    assert.deepEqual(await runtime.onRemoveProject(project!.id), { ok: true })
+    assert.deepEqual(await listProjects(undefined, env), [])
+    assert.equal(await readFile(join(folder, 'closed.txt'), 'utf8'), 'closed\n', 'the close line ran, in the project')
+    // Nothing of the folder is deleted: the person's file, OpenAgent's directory, the commits.
+    assert.equal(await readFile(join(folder, 'mine.txt'), 'utf8'), 'mine\n')
+    assert.match(await readFile(join(folder, PROJECT_HOOKS_FILE), 'utf8'), /^close:/)
+    assert.equal(execFileSync('git', ['log', '--format=%H'], { cwd: folder, encoding: 'utf8' }), kept)
+
+    // Removed twice: the second time there is no such project.
+    assert.deepEqual(await runtime.onRemoveProject(project!.id), { ok: false, error: 'no project with that id is on the list' })
+  } finally {
+    await runtime.dispose()
+    for (const [key, value] of Object.entries(before)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    await rm(folder, { recursive: true, force: true })
+    await rm(cfg, { recursive: true, force: true })
+  }
+})
+
+test('a project with an agent at work is not removed, a card left "running" by a dead process does not count, and a project whose folder is gone is removed', async () => {
+  const folder = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-busy-')))
+  const cfg = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-busy-cfg-')))
+  const env = { XDG_CONFIG_HOME: cfg, GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' }
+  const before = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]))
+  Object.assign(process.env, env)
+  const runtime = createProjectRuntime({ cwd: cfg, env })
+  try {
+    assert.deepEqual(await runtime.onAddProject(folder, false), { ok: true, alreadyActivated: false })
+    const [project] = await listProjects(undefined, env)
+    // A run's checkout with its live card: this process stands in for the agent at work.
+    const id = '2026-10-06T10-00-00-000Z'
+    const checkout = join(folder, '.branches', `agent-${id}`)
+    execFileSync('git', ['worktree', 'add', '-q', '-b', `agent-${id}`, checkout], { cwd: folder })
+    await mkdir(join(checkout, '.openagent'), { recursive: true })
+    const card = (pid: number): string => JSON.stringify({ id, status: 'running', startedAt: '2026-10-06T10:00:00.000Z', intent: 'x', caller: { pid, host: hostname() } })
+    await writeFile(join(checkout, '.openagent', `${id}.json`), card(process.pid))
+
+    assert.deepEqual(await runtime.onRemoveProject(project!.id), { ok: false, error: 'An agent is working in this project. Stop it, then remove the project.' })
+    assert.equal((await listProjects(undefined, env)).length, 1, 'still on the list')
+
+    // The process died and nothing healed the card: nothing is working there.
+    await writeFile(join(checkout, '.openagent', `${id}.json`), card(2 ** 31 - 1))
+    assert.deepEqual(await runtime.onRemoveProject(project!.id), { ok: true })
+    assert.deepEqual(await listProjects(undefined, env), [])
+
+    // A project whose folder was deleted by hand can still be taken off the list.
+    assert.deepEqual(await runtime.onAddProject(folder, false), { ok: true, alreadyActivated: true })
+    await rm(folder, { recursive: true, force: true })
+    assert.deepEqual(await runtime.onRemoveProject(project!.id), { ok: true })
+    assert.deepEqual(await listProjects(undefined, env), [])
   } finally {
     await runtime.dispose()
     for (const [key, value] of Object.entries(before)) {

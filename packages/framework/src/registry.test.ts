@@ -8,6 +8,7 @@ import {
   projectId,
   readDaemonToken,
   readPreferences,
+  removeProject,
   readRegistry,
   registryPreferencesStore,
   registryPath,
@@ -147,6 +148,25 @@ test('addProject appends a record and writes pretty JSON that parses back', asyn
 
   await addProject('/repos/app-b', APP_B.addedAt, fs, ENV)
   assert.deepEqual(await listProjects(fs, ENV), [APP_A, APP_B])
+})
+
+test('removeProject takes one project off the list by its id, answers its record, and keeps the others and the preferences', async () => {
+  const fs = memFs()
+  await addProject('/repos/app-a', APP_A.addedAt, fs, ENV)
+  await addProject('/repos/app-b', APP_B.addedAt, fs, ENV)
+  await writePreferences({ model: 'opus' }, fs, ENV)
+
+  assert.deepEqual(await removeProject(APP_A.id, fs, ENV), APP_A)
+  assert.deepEqual(await listProjects(fs, ENV), [APP_B])
+  assert.deepEqual(await readPreferences(fs, ENV), { model: 'opus' })
+
+  // An id no project has changes nothing and says so.
+  const before = fs.files.get(FILE)
+  assert.equal(await removeProject('nope-123', fs, ENV), undefined)
+  assert.equal(fs.files.get(FILE), before)
+
+  // Added again, the folder is the same project: the id is its path's.
+  assert.equal((await addProject('/repos/app-a', '2027-01-01T00:00:00.000Z', fs, ENV)).id, APP_A.id)
 })
 
 test('addProject is idempotent by resolved path and keeps the original addedAt', async () => {

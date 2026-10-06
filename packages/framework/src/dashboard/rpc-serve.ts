@@ -9,7 +9,7 @@ import type { QuotaSource } from './quota.js'
 import type { ModelsSource } from './models.js'
 import type { BridgeBrowserOwner } from '../bridge-browser.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
-import type { AddProjectResult, StartAgentOptions, StartAgentResult } from './types.js'
+import type { AddProjectResult, RemoveProjectResult, StartAgentOptions, StartAgentResult } from './types.js'
 import type { AgentMeta } from '../store/index.js'
 
 /** Wired by the daemon so `sendStart` can reach the daemon's own `startAgent` closure. */
@@ -21,6 +21,9 @@ export type StartAgentHandler = (
 
 /** Wired by the daemon so `sendAddProject` can install + register a repo (#433). */
 export type AddProjectHandler = (path: string, share: boolean) => AddProjectResult | Promise<AddProjectResult>
+
+/** Wired by the daemon so `sendRemoveProject` can take a project off the list, by its id. */
+export type RemoveProjectHandler = (projectId: string) => RemoveProjectResult | Promise<RemoveProjectResult>
 
 /** Resolve an agent to its live event stream: the relay feeds `onEvents` from its own in-memory stream
  * rather than a file on disk (#426), and the daemon feeds an agent it is relaying from a device (#1067).
@@ -47,6 +50,7 @@ export interface RemoteAgents {
 export interface DashboardContext {
   startAgent: StartAgentHandler
   addProject: AddProjectHandler
+  removeProject: RemoveProjectHandler
   /** The in-memory event stream for an agent relayed from a connected device (#1067), else undefined. */
   eventsSource: EventsSource
   /** The relayed-agent lookup (#1067 slice 2), so a run-scoped RPC can tell a local agent from one

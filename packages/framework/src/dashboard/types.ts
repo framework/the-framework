@@ -20,6 +20,9 @@ export type AddProjectResult =
   | { ok: true; alreadyActivated: boolean; noRemote?: true }
   | { ok: false; error: string }
 
+/** The outcome of removing a project from the list: gone from it, or why not. */
+export type RemoveProjectResult = { ok: true } | { ok: false; error: string }
+
 /**
  * What the Onboarding checklist (#958) needs and no other read carries: the server's own
  * working directory, offered as the one-click first project.

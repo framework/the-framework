@@ -439,6 +439,26 @@ export async function addProject(
   })
 }
 
+/**
+ * Take a project off the list, by id. Answers the record that was removed, or `undefined` when
+ * no project has that id. Only the list changes: nothing in the project's folder is touched, so
+ * a project whose folder is gone is removed like any other.
+ */
+export async function removeProject(
+  id: string,
+  fs: RegistryFs = nodeRegistryFs(),
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<ProjectRecord | undefined> {
+  return serialize(async () => {
+    const registry = await readRegistry(fs, env)
+    const removed = registry.projects.find(project => project.id === id)
+    if (!removed) return undefined
+    registry.projects = registry.projects.filter(project => project.id !== id)
+    await writeRegistry(registry, fs, env)
+    return removed
+  })
+}
+
 /** The user's dashboard preferences (#410), or `{}` when none are stored. */
 export async function readPreferences(
   fs: RegistryFs = nodeRegistryFs(),

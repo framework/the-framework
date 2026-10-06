@@ -10,7 +10,7 @@ import { serveClientBundle } from './static.js'
 import { makeRpcMount, RPC_PREFIX, isSameOriginRequest, isExpectedHost } from './rpc-serve.js'
 import { requestPathname } from '../request-path.js'
 import { MODULES_PREFIX, serveModuleFile } from './module-serve.js'
-import type { AddProjectResult, StartAgentOptions, StartAgentResult } from './types.js'
+import type { AddProjectResult, RemoveProjectResult, StartAgentOptions, StartAgentResult } from './types.js'
 import type { EventsSource, RemoteAgents } from './rpc-serve.js'
 import { handleRelayRequest, RELAY_PREFIX, type RelayHandlers } from './relay-endpoints.js'
 import { BRIDGE_PREFIX, EXPECTED_EXTENSION_VERSION, handleBridgeRequest, type BridgeHandlers } from './bridge-endpoints.js'
@@ -38,6 +38,8 @@ export interface DashboardOptions {
    * the wired dashboard context. Wire it to install the repo and register it.
    */
   onAddProject: (path: string, share: boolean) => Promise<AddProjectResult> | AddProjectResult
+  /** Called when the browser removes a project: the `sendRemoveProject` RPC reaches this through the wired dashboard context. */
+  onRemoveProject: (projectId: string) => Promise<RemoveProjectResult> | RemoveProjectResult
   /**
    * The user-preferences store (#410): the `onPreferences` / `savePreferences` RPCs read and
    * write it through the wired dashboard context.
@@ -141,6 +143,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
     {
       startAgent: opts.onStart,
       addProject: opts.onAddProject,
+      removeProject: opts.onRemoveProject,
       eventsSource: opts.eventsSource,
       remote: opts.remote,
       preferences: opts.preferences,

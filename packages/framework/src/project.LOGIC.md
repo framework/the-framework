@@ -2,7 +2,7 @@ Two read-only facts about a repository on disk: whether it is activated as a pro
 
 ## Context
 
-**User story**: the user runs `openagent` inside an activated repository and it appears in the Projects list on its own; the composer's `#` file picker offers the files of the project or of an agent's [2] checkout [3].
+**User story**: the Projects list says of each project whether it is still activated; the composer's `#` file picker offers the files of the project or of an agent's [2] checkout [3].
 
 ## Glossary
 
@@ -12,5 +12,5 @@ Two read-only facts about a repository on disk: whether it is activated as a pro
 
 ## Business logic — TL;DR
 
-- **Activated means the ignore file exists** - a repository is an activated project [1] when `.openagent/.gitignore` exists as a file, the same marker activation itself checks before doing nothing twice; the daemon uses it to list the directory it was started in as a project.
+- **Activated means the ignore file exists** - a repository is an activated project [1] when `.openagent/.gitignore` exists as a file, the same marker activation itself checks before doing nothing twice; the Projects list uses it to say whether a registered project is still activated (`dashboard/projects.ts`).
 - **The files git sees** - tracked and untracked files, minus what the ignore rules exclude, as sorted, deduplicated repository-relative paths; any failure lists nothing and never throws.

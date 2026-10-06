@@ -9,7 +9,7 @@ import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { OPENAGENT_DIR } from '../framework-dir.js'
 import { projectErrorStore } from '../project-errors.js'
 import { provideTestContext } from './test-context.js'
-import { onCommands, onProjects, onRecordsReach, sendAddProject, sendShareRecords } from './projects.js'
+import { onCommands, onProjects, onRecordsReach, sendAddProject, sendRemoveProject, sendShareRecords } from './projects.js'
 
 // Against the real registry, pointed at a temp $XDG_CONFIG_HOME so the user's own is never touched.
 async function registered(): Promise<{ dir: string; restore: () => Promise<void> }> {
@@ -161,4 +161,18 @@ test('sendAddProject hands the person\u2019s answer on the records to the daemon
   await sendAddProject('/repos/c', 'yes' as unknown as boolean)
   assert.deepEqual(seen, [['/repos/a', true], ['/repos/b', false], ['/repos/c', false]])
   assert.deepEqual(await sendAddProject('  ', true), { ok: false, error: 'a project path is required' })
+})
+
+test('sendRemoveProject hands the project’s id to the daemon and answers what it answers; no id is refused before the daemon is asked', async () => {
+  const asked: string[] = []
+  provideTestContext({
+    removeProject: id => {
+      asked.push(id)
+      return id === 'busy-1' ? { ok: false, error: 'An agent is working in this project. Stop it, then remove the project.' } : { ok: true }
+    },
+  })
+  assert.deepEqual(await sendRemoveProject('app-1'), { ok: true })
+  assert.deepEqual(await sendRemoveProject('busy-1'), { ok: false, error: 'An agent is working in this project. Stop it, then remove the project.' })
+  assert.deepEqual(await sendRemoveProject(''), { ok: false, error: 'a project id is required' })
+  assert.deepEqual(asked, ['app-1', 'busy-1'])
 })

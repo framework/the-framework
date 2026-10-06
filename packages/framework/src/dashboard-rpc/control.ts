@@ -175,7 +175,7 @@ export async function sendStart(projectId: string, prompt: string, options: Star
 export async function sendOpenInApp(projectId: string, target: OpenTarget, agentId?: string): Promise<OpenResult> {
   const cwd = agentId ? await resolveAgentPath(projectId, agentId) : await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
-  // #727: honour the stored editor preference; absent falls back to $FRAMEWORK_EDITOR, then `code`.
+  // #727: honour the stored editor preference; absent falls back to $OPENAGENT_EDITOR, then `code`.
   const editor =
     target === 'editor' ? (await contextPreferences()?.read().catch((): Preferences => ({})))?.editor : undefined
   return openInApp(cwd, target, undefined, editor)

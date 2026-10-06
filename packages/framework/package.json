@@ -48,7 +48,7 @@
     "preview": "node dist/bin.js",
     "dev": "tsc -p tsconfig.build.json --watch",
     "dev:dashboard": "cd dashboard && vite",
-    "dev:daemon": "cd dashboard && FRAMEWORK_DEV_DAEMON=1 vite",
+    "dev:daemon": "cd dashboard && OPENAGENT_DEV_DAEMON=1 vite",
     "design:build": "tsx dashboard/design/build.mts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p dashboard/tsconfig.json",
     "test": "pnpm test:node && pnpm test:dashboard",

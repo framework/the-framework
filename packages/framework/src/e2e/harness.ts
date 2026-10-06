@@ -161,7 +161,7 @@ export async function release(project: StoryProject, agentId: string): Promise<v
 export async function makeWorld(): Promise<StoryWorld> {
   const home = mkdtempSync(join(tmpdir(), 'framework-e2e-home-'))
   const startsFile = join(home, 'hook-calls.jsonl')
-  process.env.FRAMEWORK_E2E_STARTS_FILE = startsFile
+  process.env.OPENAGENT_E2E_STARTS_FILE = startsFile
   const fakeRun = fileURLToPath(new URL('./fake-run-bin.js', import.meta.url))
 
   const runtime = createProjectRuntime({ cwd: home, env: process.env })
@@ -324,7 +324,7 @@ export async function makeWorld(): Promise<StoryWorld> {
         ).catch(() => {})
       }
       await runtime.dispose().catch(() => {})
-      delete process.env.FRAMEWORK_E2E_STARTS_FILE
+      delete process.env.OPENAGENT_E2E_STARTS_FILE
       await rm(home, { recursive: true, force: true }).catch(() => {})
       for (const repo of repos) await rm(repo, { recursive: true, force: true }).catch(() => {})
     },

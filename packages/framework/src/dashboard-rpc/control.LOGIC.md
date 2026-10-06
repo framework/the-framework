@@ -129,7 +129,7 @@ Same project check and same lock as removing a checkout. The checks and what is 
 
 #### Business logic
 
-Localhost-only by nature: the daemon spawns a local command against a registered path, never a path from the browser. When the project is unknown here the answer is "this project has no local path on this server". With an agent id the agent's own checkout is opened (the project's root when the agent has none); without one, the project's checkout. For the editor, the launcher used is the editor the preferences name, else `$FRAMEWORK_EDITOR`, else `code` (the fallback is `dashboard/open-in-app.ts`'s); a preferences read that fails counts as no preference. A launcher that is not installed comes back as a failure naming it ("… was not found on PATH"); any other failure to launch comes back as its message.
+Localhost-only by nature: the daemon spawns a local command against a registered path, never a path from the browser. When the project is unknown here the answer is "this project has no local path on this server". With an agent id the agent's own checkout is opened (the project's root when the agent has none); without one, the project's checkout. For the editor, the launcher used is the editor the preferences name, else `$OPENAGENT_EDITOR`, else `code` (the fallback is `dashboard/open-in-app.ts`'s); a preferences read that fails counts as no preference. A launcher that is not installed comes back as a failure naming it ("… was not found on PATH"); any other failure to launch comes back as its message.
 
 ### Opening a pull request
 

@@ -17,7 +17,7 @@ export interface EditorInfo {
 
 /**
  * The editors the picker can offer (#727), probed by their CLI launcher on PATH. Order is the
- * display order. `$FRAMEWORK_EDITOR` and a hand-typed value stay valid beyond this list; this is
+ * display order. `$OPENAGENT_EDITOR` and a hand-typed value stay valid beyond this list; this is
  * only what auto-detection looks for.
  */
 export const KNOWN_EDITORS: EditorInfo[] = [
@@ -99,8 +99,8 @@ export function fileManagerCommand(path: string, os: NodeJS.Platform = platform(
   return { command: 'xdg-open', args: [path] }
 }
 
-/** The command to open a path in an editor: `$FRAMEWORK_EDITOR` when set, else the VS Code CLI. */
-export function editorCommand(path: string, editor = process.env.FRAMEWORK_EDITOR): { command: string; args: string[] } {
+/** The command to open a path in an editor: `$OPENAGENT_EDITOR` when set, else the VS Code CLI. */
+export function editorCommand(path: string, editor = process.env.OPENAGENT_EDITOR): { command: string; args: string[] } {
   const bin = editor && editor.trim() ? editor.trim() : 'code'
   return { command: bin, args: [path] }
 }
@@ -108,7 +108,7 @@ export function editorCommand(path: string, editor = process.env.FRAMEWORK_EDITO
 /**
  * Open the project at `cwd` in the file manager or an editor. Failures are values, never throws.
  * `editor` (#727) is the stored preference; when unset {@link editorCommand} falls back to
- * `$FRAMEWORK_EDITOR`, then `code`.
+ * `$OPENAGENT_EDITOR`, then `code`.
  */
 export async function openInApp(
   cwd: string,

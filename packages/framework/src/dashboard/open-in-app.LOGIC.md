@@ -7,7 +7,7 @@ The project panel's actions to open the project in an editor or reveal its folde
 ## Business logic — TL;DR
 
 - **Which editors the picker offers** - a fixed list of known editors, each offered when its launcher is found on the `PATH`, in a fixed display order, without running anything.
-- **Which command opens the project** - for the editor, the stored preference, else `$FRAMEWORK_EDITOR`, else VS Code's `code`; for the folder, the operating system's own opener.
+- **Which command opens the project** - for the editor, the stored preference, else `$OPENAGENT_EDITOR`, else VS Code's `code`; for the folder, the operating system's own opener.
 - **Launching, and what a failure says** - the command counts as opened the moment it launches, and a launcher missing from the `PATH` or failing to start is reported as a message, never as a crash.
 
 ## Business logic
@@ -20,7 +20,7 @@ The project panel's actions to open the project in an editor or reveal its folde
 
 #### Business logic
 
-The known editors, in the order the picker shows them, are VS Code (`code`), VS Code Insiders (`code-insiders`), Cursor (`cursor`), Windsurf (`windsurf`), Zed (`zed`), Sublime Text (`subl`), WebStorm (`webstorm`), IntelliJ IDEA (`idea`), Neovim (`nvim`), Vim (`vim`) and Emacs (`emacs`). An editor is offered when its launcher exists as an executable in one of the directories on the `PATH`; on Windows the launcher may carry any of the `PATHEXT` suffixes (`.EXE`, `.CMD`, `.BAT`, `.COM` when `PATHEXT` is unset) and only has to exist. Detection is a lookup and starts no program. The list only bounds auto-detection: `$FRAMEWORK_EDITOR` and a value the user typed stay valid beyond it.
+The known editors, in the order the picker shows them, are VS Code (`code`), VS Code Insiders (`code-insiders`), Cursor (`cursor`), Windsurf (`windsurf`), Zed (`zed`), Sublime Text (`subl`), WebStorm (`webstorm`), IntelliJ IDEA (`idea`), Neovim (`nvim`), Vim (`vim`) and Emacs (`emacs`). An editor is offered when its launcher exists as an executable in one of the directories on the `PATH`; on Windows the launcher may carry any of the `PATHEXT` suffixes (`.EXE`, `.CMD`, `.BAT`, `.COM` when `PATHEXT` is unset) and only has to exist. Detection is a lookup and starts no program. The list only bounds auto-detection: `$OPENAGENT_EDITOR` and a value the user typed stay valid beyond it.
 
 ### Which command opens the project
 
@@ -30,7 +30,7 @@ See the section above.
 
 #### Business logic
 
-To open the project in an editor, the launcher is the editor stored in the preferences [1] when there is one, else `$FRAMEWORK_EDITOR` when it is set and not blank, else `code`, run with the project's path as its one argument. To reveal the folder, the launcher is `open` on macOS, `explorer` on Windows and `xdg-open` elsewhere, with the path as its one argument.
+To open the project in an editor, the launcher is the editor stored in the preferences [1] when there is one, else `$OPENAGENT_EDITOR` when it is set and not blank, else `code`, run with the project's path as its one argument. To reveal the folder, the launcher is `open` on macOS, `explorer` on Windows and `xdg-open` elsewhere, with the path as its one argument.
 
 ### Launching, and what a failure says
 

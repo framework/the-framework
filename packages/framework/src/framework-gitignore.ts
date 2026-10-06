@@ -17,5 +17,5 @@ export function gitignorePath(cwd: string): string {
 
 /** The whole file: everything under `.openagent/` stays out of git (#1582). */
 export function frameworkGitignore(): string {
-  return `# The Framework: agent state is transient; the lasting records live on the ${DATA_BRANCH} branch.\n*\n!.gitignore\n`
+  return `# OpenAgent: agent state is transient; the lasting records live on the ${DATA_BRANCH} branch.\n*\n!.gitignore\n`
 }

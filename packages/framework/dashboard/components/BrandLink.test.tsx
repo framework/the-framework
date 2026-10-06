@@ -4,7 +4,7 @@ import { BrandLink } from './BrandLink.js'
 
 afterEach(cleanup)
 
-const brand = () => screen.getByRole('link', { name: /The Framework/ })
+const brand = () => screen.getByRole('link', { name: /OpenAgent/ })
 
 // #909: the mark is the way home. These pin both halves of that — the client-side navigation on a
 // plain click, and that it is still a real link, which is what cmd-click and "copy link address"
@@ -45,7 +45,7 @@ describe('BrandLink', () => {
     // its responsive classes, so a future tidy-up cannot silently bring the overflow back. The mark
     // stays visible either way, and it is still the link home (#909).
     const { container } = render(<BrandLink working={false} onNavigate={vi.fn()} />)
-    const wordmark = screen.getByText('The Framework')
+    const wordmark = screen.getByText('OpenAgent')
     expect(wordmark.className).toContain('hidden')
     expect(wordmark.className).toContain('sm:inline')
     expect(container.querySelector('svg')).not.toBeNull() // the mark is not hidden

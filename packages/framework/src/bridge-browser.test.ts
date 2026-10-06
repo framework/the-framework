@@ -57,10 +57,10 @@ test('the extension comes from the checkout first, then from the package’s dis
   await manifest(join(root, 'chrome-extension'), 'Some other package')
   assert.equal(bridgeExtensionSource(moduleUrl), undefined, 'a foreign chrome-extension folder is not the bridge')
 
-  await manifest(join(root, 'framework/dist/chrome-extension'), 'The Framework: Claude web bridge')
+  await manifest(join(root, 'framework/dist/chrome-extension'), 'OpenAgent: Claude web bridge')
   assert.deepEqual(bridgeExtensionSource(moduleUrl), { dir: join(root, 'framework/dist/chrome-extension/'), checkout: false })
 
-  await manifest(join(root, 'chrome-extension'), 'The Framework: Claude web bridge')
+  await manifest(join(root, 'chrome-extension'), 'OpenAgent: Claude web bridge')
   assert.deepEqual(bridgeExtensionSource(moduleUrl), { dir: join(root, 'chrome-extension/'), checkout: true })
 })
 

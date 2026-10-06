@@ -7,7 +7,7 @@ Opens the operating system's own choose-a-folder dialog on the daemon's machine,
 ## Business logic — TL;DR
 
 - **One dialog per operating system** - macOS shows the standard folder sheet; Windows shows the folder browser that ships with the system, with its "new folder" button hidden and the user's shell startup script kept from printing into the answer; Linux shows the desktop's own helper, `zenity` on GTK desktops or `kdialog` on KDE, whichever is installed, opening in the home directory.
-- **When no dialog can open** - a Linux daemon with no display session answers "The machine running The Framework has no desktop session, so no folder dialog can open there."; a Linux machine with neither helper installed answers "The folder dialog needs zenity or kdialog, which the machine running The Framework does not have installed."; any other platform answers "The system folder picker is not available on <platform>.".
+- **When no dialog can open** - a Linux daemon with no display session answers "The machine running OpenAgent has no desktop session, so no folder dialog can open there."; a Linux machine with neither helper installed answers "The folder dialog needs zenity or kdialog, which the machine running OpenAgent does not have installed."; any other platform answers "The system folder picker is not available on <platform>.".
 - **Reading the answer** - a dismissed dialog is a pick of nothing; the picked path is what the dialog printed, without macOS's trailing slash, since the registry stores paths without one; an empty answer is "The folder dialog returned no path."; any other failure surfaces the dialog's own error text, or "The folder dialog could not be opened." when it said nothing.
 
 ## Business logic
@@ -30,7 +30,7 @@ The dialog is chosen by the platform the daemon runs on. On macOS it is the stan
 
 #### Business logic
 
-On Linux without a display session, the answer is the reason "The machine running The Framework has no desktop session, so no folder dialog can open there." and nothing is spawned. On Linux with a display but neither helper installed, the answer is "The folder dialog needs zenity or kdialog, which the machine running The Framework does not have installed.". On any platform other than macOS, Windows and Linux, the answer is "The system folder picker is not available on <platform>.".
+On Linux without a display session, the answer is the reason "The machine running OpenAgent has no desktop session, so no folder dialog can open there." and nothing is spawned. On Linux with a display but neither helper installed, the answer is "The folder dialog needs zenity or kdialog, which the machine running OpenAgent does not have installed.". On any platform other than macOS, Windows and Linux, the answer is "The system folder picker is not available on <platform>.".
 
 ### Reading the answer
 

@@ -52,7 +52,7 @@ The card is titled "Onboarding" with "<done> of 4 set up." under it. On the Over
 
 #### Business logic
 
-- Description: "A project is a git repo The Framework may work in." Done once at least one project is registered.
+- Description: "A project is a git repo OpenAgent may work in." Done once at least one project is registered.
 - When the daemon can name the directory it runs in and that directory is not registered yet, a primary button reads "Add <directory> as project…". It adds nothing by itself: it opens the add-project panel (`AddProjectPanel.tsx`) with that directory handed in, so the system folder dialog is skipped and the panel starts at its trust confirmation and its question on the agents' records; a refused add is said in the panel.
 - "Select & add project directory" opens the same panel with no directory, which then asks for one through the system folder dialog.
 - When a project is added in the panel, either way, the card re-reads its state and the suggestion.

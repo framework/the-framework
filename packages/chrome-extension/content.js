@@ -1138,11 +1138,11 @@ function ensureOverlay() {
     'align-items:center', 'justify-content:center', 'padding:32px', 'box-sizing:border-box', 'overflow:auto',
   ].join(';')
   const heading = document.createElement('h1')
-  heading.textContent = 'The Framework Driver'
+  heading.textContent = 'OpenAgent Driver'
   heading.style.cssText = 'font-size:32px;margin:0 0 12px;color:#a7c080;font-weight:600'
   const phrase = document.createElement('p')
   phrase.textContent =
-    'The Framework is using this tab to watch your Claude Code sessions and to type your answers into them. Use another tab for claude.ai. Closing this tab pauses the bridge; the extension’s options page reopens it.'
+    'OpenAgent is using this tab to watch your Claude Code sessions and to type your answers into them. Use another tab for claude.ai. Closing this tab pauses the bridge; the extension’s options page reopens it.'
   phrase.style.cssText = 'max-width:560px;text-align:center;margin:0 0 16px;color:#aab2c0'
   const status = document.createElement('div')
   status.className = 'tf-driver-status'
@@ -1346,7 +1346,7 @@ if (!IS_TOP) {
     head.style.cssText = `display:flex;align-items:center;gap:8px${collapsed ? '' : ';margin-bottom:6px'}`
     const title = document.createElement('span')
     const version = typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : '?'
-    const fullTitle = `The Framework bridge v${version}`
+    const fullTitle = `OpenAgent bridge v${version}`
     // Folded, the label shrinks to "TF": the fold exists to give the corner back, so the full
     // name and version retreat to the tooltip.
     title.textContent = collapsed ? 'TF' : fullTitle

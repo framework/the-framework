@@ -38,7 +38,7 @@ export function frameworkVersion(): string {
   return cachedVersion
 }
 
-const HELP = `The Framework — turnkey AI orchestration that wraps a coding agent (Claude Code or Codex).
+const HELP = `OpenAgent — turnkey AI orchestration that wraps a coding agent (Claude Code or Codex).
 
 Usage:
   openagent              Serve the dashboard in the foreground. Ctrl+C closes it; the server
@@ -194,7 +194,7 @@ export function printStartupFooter(io: CliIO, opts: { fetchLatest?: VersionFetch
   io.out('Type a prompt on the dashboard to start an agent, or use:')
   io.out('  openagent --help              All options')
   io.out('')
-  io.out(`The Framework v${version}`)
+  io.out(`OpenAgent v${version}`)
   return checkForUpdate(version, opts.fetchLatest ?? nodeVersionFetcher())
     .then(status => {
       const line = formatUpdateStatus(status)

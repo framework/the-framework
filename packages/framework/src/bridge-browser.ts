@@ -63,7 +63,7 @@ export function bridgeBrowserLaunchArgs(port: number, profileDir: string): strin
 }
 
 /** The extension's name in its manifest: what tells its folder apart from any other `chrome-extension` folder. */
-const BRIDGE_EXTENSION_NAME = 'The Framework: Claude web bridge'
+const BRIDGE_EXTENSION_NAME = 'OpenAgent: Claude web bridge'
 
 /** Where the extension's files are, and whether that is a checkout, where they are edited in place. */
 export interface BridgeExtensionSource {

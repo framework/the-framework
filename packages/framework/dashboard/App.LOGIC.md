@@ -198,7 +198,7 @@ The Context [18] (`lib/use-context-set.ts`) is held here, once, and handed to th
 
 #### Business logic
 
-The tab title is `(N) <project> — The Framework`: the intervention [7] count, omitted when zero, then the selected project's name, else the picked project's [21], omitted when there is neither (composed in `lib/document-title.ts`). The tab icon is the animated brand mark while any agent [1] in any project is running and the still mark otherwise, deliberately not scoped to the selected project: an agent left going elsewhere still means the AI is working for the user (`lib/favicon.ts`).
+The tab title is `(N) <project> — OpenAgent`: the intervention [7] count, omitted when zero, then the selected project's name, else the picked project's [21], omitted when there is neither (composed in `lib/document-title.ts`). The tab icon is the animated brand mark while any agent [1] in any project is running and the still mark otherwise, deliberately not scoped to the selected project: an agent left going elsewhere still means the AI is working for the user (`lib/favicon.ts`).
 
 ### The daemon-unreachable banner
 

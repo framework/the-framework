@@ -228,7 +228,7 @@ See `## Context`.
 
 #### Business logic
 
-What the agent [1] was asked for at the start, which is all The Framework knows on its own. Then, after a blank line, "Opened from The Framework session `<agent id [9]>`." Nothing else.
+What the agent [1] was asked for at the start, which is all The Framework knows on its own. Then, after a blank line, "Opened from OpenAgent session `<agent id [9]>`." Nothing else.
 
 ### What a handoff reports
 

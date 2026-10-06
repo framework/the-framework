@@ -20,7 +20,7 @@ export function BrandLink({ working, href = '/', onNavigate }: { working: boolea
       <Logo className="h-6 w-auto shrink-0" working={working} />
       {/* Below sm the wordmark folds away so the nav fits a narrow viewport (#980); the mark stays,
           and it is still the link home (#909). */}
-      <span className="hidden shrink-0 font-semibold sm:inline">The Framework</span>
+      <span className="hidden shrink-0 font-semibold sm:inline">OpenAgent</span>
     </a>
   )
 }

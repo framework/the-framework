@@ -2,7 +2,7 @@ The "Devices" section of Settings: the devices [1] saved in this browser, each r
 
 ## Context
 
-**User story**: the user pairs a second machine running The Framework by pasting the URL that machine prints when it starts. From then on the composer's "Run on" list offers that device [1], so the next agent [2] can be relayed [3] to it, and Settings lists the device under "Devices" so the user can see whether it is reachable and drop it when it is gone.
+**User story**: the user pairs a second machine running OpenAgent by pasting the URL that machine prints when it starts. From then on the composer's "Run on" list offers that device [1], so the next agent [2] can be relayed [3] to it, and Settings lists the device under "Devices" so the user can see whether it is reachable and drop it when it is gone.
 
 **Problem**: a device is reached with its own token, a per-browser secret; keeping the roster in the daemon's registry would hand that token to every browser the dashboard serves. A settings row is normally assumed to follow the user to their next browser, and this one does not, so the section says so.
 
@@ -29,7 +29,7 @@ See `## Context`.
 
 #### Business logic
 
-The section is titled "Devices" and explains itself: "Other machines running The Framework that you can run a session on. Saved in this browser, not on the server, because each one is reached with its own token." The roster is read from this browser's storage (the storage rules in `lib/profiles.ts`), newest first; each row shows the device's [1] label and, under it, its URL. Nothing in this section is a preference: it never reaches the daemon's registry.
+The section is titled "Devices" and explains itself: "Other machines running OpenAgent that you can run a session on. Saved in this browser, not on the server, because each one is reached with its own token." The roster is read from this browser's storage (the storage rules in `lib/profiles.ts`), newest first; each row shows the device's [1] label and, under it, its URL. Nothing in this section is a preference: it never reaches the daemon's registry.
 
 ### Each device shows its online state
 

@@ -19,9 +19,9 @@ What the tests cover, against synthetic claude.ai pages, with no browser and no 
 [1] question block: the JSON object with a `title` and `options` that an agent writes into its final message when it stops at a gate; claude.ai renders it as a code block in the session's transcript.
 [2] transcript mirror: the copy of a cloud session's transcript the content script sends to the daemon, one entry per conversation turn keyed by the turn's position.
 [3] answer: the text the daemon composes from a pick for the extension to type into the cloud session; it is queued in the dashboard until a Driver tab collects it, then marked sent or failed as the extension reports.
-[4] corner panel: the diagnostic box the content script draws in the bottom-right corner of every claude.ai page that is not the Driver tab, titled "The Framework bridge v<version>".
+[4] corner panel: the diagnostic box the content script draws in the bottom-right corner of every claude.ai page that is not the Driver tab, titled "OpenAgent bridge v<version>".
 [5] list status: what claude.ai's own session list says a session is doing, as the Driver tab reads it off the status icon beside the session's row: `awaiting`, `unread`, `idle`, `running`, `landed`, `missing` or `unknown`.
 [6] Driver tab: the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
-[7] overlay: the full-page cover the content script draws over the Driver tab, titled "The Framework Driver".
+[7] overlay: the full-page cover the content script draws over the Driver tab, titled "OpenAgent Driver".
 [8] session request: the daemon's request that the extension create a cloud session on claude.ai for a hands-off agent: a repository, a branch, a prompt and optionally a model; queued on the daemon, claimed by the worker that reads it, and reported back as created or failed.
 [9] survey: one read of a claude.ai page by the content script: it looks for the question block, mirrors the transcript and redraws what it shows.

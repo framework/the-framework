@@ -60,7 +60,7 @@ test('installProject on a clean repo seeds the ignore file and makes exactly one
   assert.equal(fs.files.get(gitignorePath(CWD)), frameworkGitignore())
 
   const commits = calls.filter(args => args[0] === 'commit')
-  assert.deepEqual(commits, [['commit', '-m', '[The Framework] install The Framework']])
+  assert.deepEqual(commits, [['commit', '-m', '[OpenAgent] install OpenAgent']])
 })
 
 test('installProject seeds .openagent/.gitignore ignoring everything transient (#313/#1582)', async () => {
@@ -84,7 +84,7 @@ test('installProject on a dirty repo leaves the user’s changes alone and adds 
 
   assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true })
 
-  assert.deepEqual(calls.filter(args => args[0] === 'commit').map(args => args[2]), ['[The Framework] install The Framework'])
+  assert.deepEqual(calls.filter(args => args[0] === 'commit').map(args => args[2]), ['[OpenAgent] install OpenAgent'])
   assert.deepEqual(calls.filter(args => args[0] === 'add'), [['add', '.openagent']], 'never `add -A`: the user’s file.ts is theirs')
 })
 
@@ -118,5 +118,5 @@ test('installProject initializes a git repo when the folder is not one yet, then
   assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true, initialized: true })
   assert.ok(calls.some(args => args[0] === 'init'), 'ran git init')
   const commits = calls.filter(args => args[0] === 'commit').map(args => args[2])
-  assert.deepEqual(commits, ['[The Framework] install The Framework'])
+  assert.deepEqual(commits, ['[OpenAgent] install OpenAgent'])
 })

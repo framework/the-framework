@@ -262,7 +262,7 @@ export function TicketsPage({ projects }: { projects: ModuleProject[] }) {
                 disabled={busy}
                 tooltip={
                   <>
-                    {`Every ${hasSelection ? 'selected ' : ''}ticket joins the queue — the work the framework picks up on its own, worked highest priority first and, within a priority, in the order shown below. A ticket already queued stays as it is.`}
+                    {`Every ${hasSelection ? 'selected ' : ''}ticket joins the queue — the work OpenAgent picks up on its own, worked highest priority first and, within a priority, in the order shown below. A ticket already queued stays as it is.`}
                     {hasSelection && ' The rest of the shown set stays put.'}
                     {claimedShown === 1 && ` The claimed ticket ${hasSelection ? 'selected' : 'shown'} is left to the agent holding it.`}
                     {claimedShown > 1 && ` The ${claimedShown} claimed tickets ${hasSelection ? 'selected' : 'shown'} are left to the agents holding them.`}

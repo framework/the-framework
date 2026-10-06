@@ -27,7 +27,7 @@ Runs the extension's worker [1], the half of the Claude web bridge [2] that hold
 [11] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [12] question block: the JSON object with a `title` and `options` that an agent writes into its final message when it stops at a gate; claude.ai renders it as a code block in the session's transcript.
 [13] transcript mirror: the copy of a cloud session's transcript the content script sends to the daemon, one entry per conversation turn keyed by the turn's position.
-[14] overlay: the full-page cover the content script draws over the Driver tab, titled "The Framework Driver".
+[14] overlay: the full-page cover the content script draws over the Driver tab, titled "OpenAgent Driver".
 [15] bridge browser: the Chrome for Testing the daemon runs for it.
 [16] list status: what claude.ai's own session list says a session is doing, as the Driver tab reads it off the status icon beside the session's row: `awaiting`, `unread`, `idle`, `running`, `landed`, `missing` or `unknown`.
 [17] survey: one read of a claude.ai page by the content script: it looks for the question block, mirrors the transcript and redraws what it shows.
@@ -164,7 +164,7 @@ The session request [7] travels to the Driver tab [8] as repository, branch, pro
 
 #### Context
 
-**User story**: the user closes the pinned "The Framework Driver" tab to make it stop, and it does not reappear half a minute later; "Open the Driver tab now" on the options page brings it back.
+**User story**: the user closes the pinned "OpenAgent Driver" tab to make it stop, and it does not reappear half a minute later; "Open the Driver tab now" on the options page brings it back.
 
 #### Business logic
 

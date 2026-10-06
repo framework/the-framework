@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { resolveAgentCheckout, resolveAgentDiary } from './agent-checkout.js'
 import type { BranchesFor, Checkout } from './branches.js'
-import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../framework-dir.js'
 import { noRuns } from './runs.js'
 import { testRuns } from './test-runs.js'
 import { testBranches } from './test-branches.js'
@@ -16,7 +16,7 @@ const DIARY = [{ kind: 'said', text: 'Reading.' }, { kind: 'ended', status: 'don
 const CHECKOUT: Checkout = { id: RUN_ID, path: join(CWD, '.branches', `agent-${RUN_ID}`), branch: `agent-${RUN_ID}` }
 
 /** Where the run's diary is while it has a checkout: written there by the run's tool. */
-const liveDiary = join(CHECKOUT.path, THE_FRAMEWORK_DIR, `${RUN_ID}.jsonl`)
+const liveDiary = join(CHECKOUT.path, OPENAGENT_DIR, `${RUN_ID}.jsonl`)
 
 const withCheckout = () => testBranches({ [CWD]: [CHECKOUT] })
 const noCheckout = () => testBranches({ [CWD]: [] })

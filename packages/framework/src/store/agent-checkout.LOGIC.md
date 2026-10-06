@@ -10,7 +10,7 @@ Decides which checkout [1] an agent id [2] addresses, and where the diary [3] a 
 
 [1] checkout: an agent's own working copy of the project, where it works; the branches provider [6] says where it is. The user's own working copy is "the project's checkout".
 [2] agent id: an agent's stable id, derived from the moment it started; it names the agent's card and diary, and its branch until the agent names it.
-[3] card / diary: an agent's record in two shapes, whose definition is The Framework's (`runs.ts`): the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.the-framework/`, written by the tool that runs it; a finished agent's are what the runs provider [5] answers.
+[3] card / diary: an agent's record in two shapes, whose definition is The Framework's (`runs.ts`): the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.openagent/`, written by the tool that runs it; a finished agent's are what the runs provider [5] answers.
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [5] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents (`runs.ts`).
 [6] branches provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's checkouts, in its own package.json under `"framework": { "branches": "<command>" }` (the `branches` skill's package declares its `branches` command); it lists the checkouts, tells what a branch holds, pushes and opens a branch's pull request, lands one, and reclaims a checkout (`store/branches.ts`).
@@ -44,7 +44,7 @@ See `## Context`.
 #### Business logic
 
 - No agent id [2], or an id that is not path-safe, has no diary to tail.
-- While the branches provider [6] lists a checkout for the agent (asked once more fresh on a miss, as above, unless the reader asks from cached reads only: a feed waiting on a finished agent, asking for as long as it is open whether the agent was resumed), the diary is `<agent id>.jsonl` under that checkout's `.the-framework/`, whether or not the file is there yet.
+- While the branches provider [6] lists a checkout for the agent (asked once more fresh on a miss, as above, unless the reader asks from cached reads only: a feed waiting on a finished agent, asking for as long as it is open whether the agent was resumed), the diary is `<agent id>.jsonl` under that checkout's `.openagent/`, whether or not the file is there yet.
 - With no checkout, the finished agent's diary, every line, is the answer when the runs provider [5] has the agent finished (the lookup in `agent-store.ts`).
 - With neither, the diary is nowhere yet: the agent was started a moment ago and its checkout is not made, even if its record already says `running`. The answer says so ("pending"), and the tail asks again on its own cadence until the diary has a home (`../dashboard-rpc/events-tail.ts`). A project with no runs provider answers the same for a finished agent, where nothing more comes.
 

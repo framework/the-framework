@@ -12,8 +12,8 @@ Telling a run's [1] parent [2] that the run ended: one line saying which run, ho
 
 [1] run: one agent this tool starts: a process of the tool's own (`agent-runner run`), a checkout, one prompt to the coding agent, and a run record when it ends.
 [2] parent: the run another run was started for (`run --parent <id>`), named on that run's record for its whole life; the run started for it is its child.
-[3] inbox: `.the-framework/inbox.jsonl` in a run's checkout: the lines from outside the agent, messages and answers, the session sends into the conversation when a turn ends.
-[4] live card: the card `<id>.json` under `.the-framework/` in a run's checkout, written by the session as the agent works; carries the tool's mark with the run's pid and host.
+[3] inbox: `.openagent/inbox.jsonl` in a run's checkout: the lines from outside the agent, messages and answers, the session sends into the conversation when a turn ends.
+[4] live card: the card `<id>.json` under `.openagent/` in a run's checkout, written by the session as the agent works; carries the tool's mark with the run's pid and host.
 
 ## Business logic — TL;DR
 

@@ -13,18 +13,18 @@ import { HOOK_LINES, initHooks, writeHookLines } from './init.js'
 
 async function project(dashboard: boolean, hooks?: string): Promise<string> {
   const repo = await realpath(await mkdtemp(join(tmpdir(), 'agent-runner-init-')))
-  if (dashboard) await mkdir(join(repo, '.the-framework'))
-  if (hooks !== undefined) await writeFile(join(repo, '.the-framework', 'hooks.yml'), hooks)
+  if (dashboard) await mkdir(join(repo, '.openagent'))
+  if (hooks !== undefined) await writeFile(join(repo, '.openagent', 'hooks.yml'), hooks)
   return repo
 }
 
-const hooksOf = async (repo: string): Promise<string> => readFile(join(repo, '.the-framework', 'hooks.yml'), 'utf8')
+const hooksOf = async (repo: string): Promise<string> => readFile(join(repo, '.openagent', 'hooks.yml'), 'utf8')
 
 test('a project the dashboard knows, with no hooks file, gets every line', async () => {
   const repo = await project(true)
   try {
     const outcome = await initHooks(repo)
-    assert.deepEqual(outcome, { ok: true, file: join(repo, '.the-framework', 'hooks.yml'), added: ['start', 'resume', 'check'], kept: [] })
+    assert.deepEqual(outcome, { ok: true, file: join(repo, '.openagent', 'hooks.yml'), added: ['start', 'resume', 'check'], kept: [] })
     assert.deepEqual(parse(await hooksOf(repo)), HOOK_LINES)
   } finally {
     await rm(repo, { recursive: true, force: true })
@@ -82,7 +82,7 @@ test('no dashboard directory, or a file that is not YAML, is refused and nothing
     const none = await initHooks(bare)
     assert.equal(none.ok, false)
     assert.equal(!none.ok && none.reason, 'no-dashboard')
-    await assert.rejects(readFile(join(bare, '.the-framework', 'hooks.yml')))
+    await assert.rejects(readFile(join(bare, '.openagent', 'hooks.yml')))
 
     const unreadable = await initHooks(broken)
     assert.equal(!unreadable.ok && unreadable.reason, 'unreadable')

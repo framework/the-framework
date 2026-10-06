@@ -2,7 +2,7 @@ The project panel's actions to open the project in an editor or reveal its folde
 
 ## Glossary
 
-[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 
 ## Business logic — TL;DR
 

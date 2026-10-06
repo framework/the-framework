@@ -10,7 +10,7 @@ Keeps the list of devices [1] this browser can hop to, and performs the device h
 
 [1] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [2] device hop: navigating this browser from one machine's dashboard to another's, carrying that device's token for the one request that authenticates it.
-[3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[3] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [4] composer: the prompt editor on a project's page, also used for live chat.
 
 ## Business logic — TL;DR

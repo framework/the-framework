@@ -14,8 +14,8 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [6] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption.
-[7] start hook: the one shell line under `start` in a project's `.the-framework/hooks.yml`, which the daemon runs when the user presses Start.
-[8] check hook: the one shell line under `check` in a project's `.the-framework/hooks.yml`, which the daemon runs when the launcher asks what would stop an agent; it answers a list of problems and a list of warnings.
+[7] start hook: the one shell line under `start` in a project's `.openagent/hooks.yml`, which the daemon runs when the user presses Start.
+[8] check hook: the one shell line under `check` in a project's `.openagent/hooks.yml`, which the daemon runs when the launcher asks what would stop an agent; it answers a list of problems and a list of warnings.
 
 ## Business logic — TL;DR
 
@@ -101,7 +101,7 @@ The daemon answers with the directory it is running in, and with that directory'
 
 #### Business logic
 
-For a given project [1] the daemon answers three things, read fresh each time: the project's commands (the rule is `project-commands.ts`'s: the skills written to be run by a person, each with its name and description), and whether the project's `.the-framework/hooks.yml` names a `start` line (`project-hooks.ts`; a hooks file that is missing or refused counts as no start line), and whether one of the project's packages declares that it provides the git host (`../store/git-host.ts`; a declaration that cannot be read counts as none): without one no pull request can be opened, so the launcher's publish menu stops at "Publish branch".
+For a given project [1] the daemon answers three things, read fresh each time: the project's commands (the rule is `project-commands.ts`'s: the skills written to be run by a person, each with its name and description), and whether the project's `.openagent/hooks.yml` names a `start` line (`project-hooks.ts`; a hooks file that is missing or refused counts as no start line), and whether one of the project's packages declares that it provides the git host (`../store/git-host.ts`; a declaration that cannot be read counts as none): without one no pull request can be opened, so the launcher's publish menu stops at "Publish branch".
 
 It also answers the two branches an agent can start from, `startFrom`: `main`, the name of origin's default branch (`main` for `origin/main`), and `local`, the name of the branch the project's folder has checked out now, which is the same name when the folder is on the default branch itself. Both are read from the local repository, never fetched (`originDefaultBranch` of `@openagt/agent-data`, and the branch read of `../dashboard/git-status.ts`). `startFrom` is answered only when all of these hold, and is absent otherwise, so the launcher shows the chip only where the pick is obeyed: the project's start line mentions `$BASE` or `${BASE` (`project-hooks.ts`), the repository has an `origin` remote with a default branch this clone knows, and the folder is on a branch (a folder on a detached commit has no local branch to start from).
 

@@ -8,13 +8,13 @@ Gives every call the dashboard makes the daemon's own capabilities, wired once w
 
 [1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[3] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [4] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [5] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [6] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it.
 [7] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [8] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[9] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
+[9] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.openagent/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
 [10] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 
 ## Business logic — TL;DR

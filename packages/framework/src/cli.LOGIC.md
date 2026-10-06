@@ -9,8 +9,8 @@ Implements the `openagent` command: four options and no verbs. The bare command 
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
-[2] start hook: the one shell line under `start` in a project's `.the-framework/hooks.yml`, which the daemon runs when the user presses Start; it answers the id of the agent it began.
-[3] daemon token: the shared secret that authenticates a dashboard exposed to the network: generated once for a daemon bound to a non-loopback address, kept in `~/.the-framework.json`, carried by the URL the terminal prints, and required on every request.
+[2] start hook: the one shell line under `start` in a project's `.openagent/hooks.yml`, which the daemon runs when the user presses Start; it answers the id of the agent it began.
+[3] daemon token: the shared secret that authenticates a dashboard exposed to the network: generated once for a daemon bound to a non-loopback address, kept in `~/.openagent.json`, carried by the URL the terminal prints, and required on every request.
 
 ## Business logic — TL;DR
 
@@ -30,7 +30,7 @@ Implements the `openagent` command: four options and no verbs. The bare command 
 
 #### Business logic
 
-The command accepts `--port <n>`, `--host <addr>`, `-h`/`--help` and `-v`/`--version`, and nothing else: it runs no agent. `--port` must be a non-negative integer (`0` asks for an ephemeral port); anything else is "invalid --port: must be a non-negative integer". `--host` without a value is "invalid --host: missing address". Any other word is "unknown option: <word>" when it starts with a dash and "unknown command: <word>" otherwise, so a verb such as `start` is refused, and so is `--agent`, the option the daemon once started its own agent processes with. A usage error is printed together with "Run `openagent --help` for usage." and the exit code is 2, whatever else was on the line. Otherwise, in this order of precedence: `--help` prints the help text (which presents the command as `openagent`) and exits 0; `--version` prints the version and exits 0; and the bare command serves the dashboard. The help text says that everything else is the dashboard: it shows a project's agents [1] from their files, and starts one through the project's own start hook [2] in `.the-framework/hooks.yml`, which names the tool that runs it.
+The command accepts `--port <n>`, `--host <addr>`, `-h`/`--help` and `-v`/`--version`, and nothing else: it runs no agent. `--port` must be a non-negative integer (`0` asks for an ephemeral port); anything else is "invalid --port: must be a non-negative integer". `--host` without a value is "invalid --host: missing address". Any other word is "unknown option: <word>" when it starts with a dash and "unknown command: <word>" otherwise, so a verb such as `start` is refused, and so is `--agent`, the option the daemon once started its own agent processes with. A usage error is printed together with "Run `openagent --help` for usage." and the exit code is 2, whatever else was on the line. Otherwise, in this order of precedence: `--help` prints the help text (which presents the command as `openagent`) and exits 0; `--version` prints the version and exits 0; and the bare command serves the dashboard. The help text says that everything else is the dashboard: it shows a project's agents [1] from their files, and starts one through the project's own start hook [2] in `.openagent/hooks.yml`, which names the tool that runs it.
 
 ### The version is read from the package
 

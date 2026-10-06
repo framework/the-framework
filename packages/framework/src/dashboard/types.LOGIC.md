@@ -5,11 +5,11 @@ Fixes the vocabulary the dashboard and the daemon speak to each other for starti
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] driver: the coding agent a person picks for an agent: `claude-code` or `codex`, the names an agent's card carries.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch. The user's own working copy is "the project's checkout".
-[4] start hook: the one shell line under `start` in a project's `.the-framework/hooks.yml`, which the daemon runs when the user presses Start; it answers the id of the agent it began.
+[4] start hook: the one shell line under `start` in a project's `.openagent/hooks.yml`, which the daemon runs when the user presses Start; it answers the id of the agent it began.
 [17] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [19] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [20] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
-[21] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[21] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 
 ## Business logic — TL;DR
 

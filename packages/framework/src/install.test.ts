@@ -63,13 +63,13 @@ test('installProject on a clean repo seeds the ignore file and makes exactly one
   assert.deepEqual(commits, [['commit', '-m', '[The Framework] install The Framework']])
 })
 
-test('installProject seeds .the-framework/.gitignore ignoring everything transient (#313/#1582)', async () => {
+test('installProject seeds .openagent/.gitignore ignoring everything transient (#313/#1582)', async () => {
   const fs = memFs()
   const { git } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
 
   await installProject(CWD, { git, fs })
   const ignore = fs.files.get(gitignorePath(CWD)) ?? ''
-  // Everything under .the-framework/ stays out of git on main: the lasting records live on the
+  // Everything under .openagent/ stays out of git on main: the lasting records live on the
   // data branch (#1582), so nothing is un-ignored except the file itself.
   const rules = ignore.split('\n').filter(line => line && !line.startsWith('#'))
   assert.deepEqual(rules, ['*', '!.gitignore'])
@@ -85,7 +85,7 @@ test('installProject on a dirty repo leaves the user’s changes alone and adds 
   assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true })
 
   assert.deepEqual(calls.filter(args => args[0] === 'commit').map(args => args[2]), ['[The Framework] install The Framework'])
-  assert.deepEqual(calls.filter(args => args[0] === 'add'), [['add', '.the-framework']], 'never `add -A`: the user’s file.ts is theirs')
+  assert.deepEqual(calls.filter(args => args[0] === 'add'), [['add', '.openagent']], 'never `add -A`: the user’s file.ts is theirs')
 })
 
 test('installProject on an already-activated repo is a no-op that never calls git', async () => {

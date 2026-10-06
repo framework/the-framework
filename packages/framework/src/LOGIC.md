@@ -10,13 +10,13 @@ Everything of The Framework that executes in Node: the `openagent` command, the 
 
 [1] the daemon: the one foreground process per machine: serves the dashboard, runs each project's hooks, runs the background sweeps [10]. Ctrl-C closes it; the agents it started go on to their own end.
 [2] agent: the unit of work: one task worked by a coding agent [11], in its own checkout [5], on its own branch, keeping a card [6] and a diary [7], publishing its own work only when asked to.
-[3] start hook: the one shell line under `start` in a project's `.the-framework/hooks.yml`, which the daemon runs when the user presses Start. It is given the prompt, and the coding agent [11], the model and the publish level (how far the agent publishes its work when it finishes: `commit`, `branch`, `pr` or `merge`) the user picked, in its environment, and answers the id of the agent [2] it began as JSON on stdout.
+[3] start hook: the one shell line under `start` in a project's `.openagent/hooks.yml`, which the daemon runs when the user presses Start. It is given the prompt, and the coding agent [11], the model and the publish level (how far the agent publishes its work when it finishes: `commit`, `branch`, `pr` or `merge`) the user picked, in its environment, and answers the id of the agent [2] it began as JSON on stdout.
 [4] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [5] checkout: an agent's own working copy of the project, where it works; the project's branches provider (`store/branches.ts`) says where it is.
-[6] card: `.the-framework/<id>.json` in an agent's checkout: the agent's own record while it works — what was asked, which coding agent [11], the branch, the process running it, how it ended — written by the tool that runs the agent.
-[7] diary: `.the-framework/<id>.jsonl` in an agent's checkout: one line per thing the agent said or did, written by the tool that runs the agent.
-[8] inbox: `.the-framework/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
-[9] resume hook: the one shell line under `resume` in a project's `.the-framework/hooks.yml`, given an agent [2] and either the user's words or their answer to the question it stopped on, which continues that agent.
+[6] card: `.openagent/<id>.json` in an agent's checkout: the agent's own record while it works — what was asked, which coding agent [11], the branch, the process running it, how it ended — written by the tool that runs the agent.
+[7] diary: `.openagent/<id>.jsonl` in an agent's checkout: one line per thing the agent said or did, written by the tool that runs the agent.
+[8] inbox: `.openagent/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
+[9] resume hook: the one shell line under `resume` in a project's `.openagent/hooks.yml`, given an agent [2] and either the user's words or their answer to the question it stopped on, which continues that agent.
 [10] sweep: a background job the daemon runs on its clock.
 [11] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [12] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, and the lasting record of every agent [2].

@@ -36,7 +36,7 @@ export function initHooks(repo: string): Promise<InitOutcome> {
 }
 
 /**
- * Write `lines` into `<repo>/.the-framework/hooks.yml`: a key is a one-line hook when its line is
+ * Write `lines` into `<repo>/.openagent/hooks.yml`: a key is a one-line hook when its line is
  * a string, a list (`open`, `close`) when it is an array. The dashboard's directory must be there
  * already (the dashboard makes it when the project is added, and hides it from git); without it
  * nothing is written. `added` names the keys that gained a line, `kept` the ones already set

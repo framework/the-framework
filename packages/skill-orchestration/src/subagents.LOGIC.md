@@ -15,7 +15,7 @@ A main agent [1] and its subagents [2]: saving and showing the main agent's plan
 [3] run: one agent the runner starts: a process of the runner's, a checkout, one prompt to the coding agent, and a run record [4] when it ends.
 [4] run record: the `logs` skill's record of a run on the `agent-data` branch: a card (`<id>.json`) and a diary (`<id>.jsonl`), written as `running` before the agent exists and again when the run ends.
 [5] the tool's mark: `caller.runner` on a card, the runner's own bookkeeping: `host`, the machine that started the run; `pid`, the run's process there while it runs; `parent`, the run this one was started for.
-[6] live card: the card `<id>.json` under `.the-framework/` in a run's checkout, kept by the session while the agent works; carries the tool's mark with the run's pid.
+[6] live card: the card `<id>.json` under `.openagent/` in a run's checkout, kept by the session while the agent works; carries the tool's mark with the run's pid.
 [7] the subagent lines: the fixed text the command adds after every subagent's task: `You are a subagent: another agent started you for this one task and reads your last reply as its result. Commit your work to your branch and publish nothing: no push, no pull request. Nobody will answer a question: decide yourself, and say in your last reply what you did and what you decided.`
 [8] plan: the main agent's list of tasks for its subagents, one markdown file beside its run record [4] on the `agent-data` branch; approved when the person answered `Approve` to the question that names it (`plan.ts`).
 [9] agent branch: a branch whose name starts with `agent-`, other than `agent-data`: the only branches the product deletes.

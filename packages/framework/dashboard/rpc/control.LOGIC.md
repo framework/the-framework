@@ -8,9 +8,9 @@ The browser's typed stubs for every action the dashboard takes on an agent [1], 
 [4] pick: the answer to a gate: the option or options the user chose.
 [5] message: the user's own words to an agent, the next prompt of the same conversation.
 [6] inbox: the file in a working agent's checkout where what the user says waits until the agent's turn ends.
-[7] resume hook: the one shell line under `resume:` in the project's `.the-framework/hooks.yml`, which continues an ended agent with the user's text or answer.
+[7] resume hook: the one shell line under `resume:` in the project's `.openagent/hooks.yml`, which continues an ended agent with the user's text or answer.
 [8] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[9] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id.
+[9] start hook: the one shell line under `start:` in the project's `.openagent/hooks.yml`, which starts an agent and answers its id.
 [10] the user's picks: the coding agent and the model chosen in the preferences, how far the agent takes its work (the option saved from the launcher's publish menu: `nothing`, `commit`, `branch`, `pr` or `merge`, absent when none is saved), and the device chosen in "Run on".
 [11] agent id: an agent's stable id, answered by the start hook; it names the agent's checkout directory, its branch until the agent names it, and its record.
 [12] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.

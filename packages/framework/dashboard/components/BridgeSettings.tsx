@@ -7,7 +7,7 @@ import { CopyButton } from './ui/copy-button.js'
  * Setting up the browser bridge (#1237).
  *
  * This exists because the feature was unusable without it: turning the bridge on meant editing
- * `~/.the-framework.json` by hand, and getting the token meant copying a field out of the same
+ * `~/.openagent.json` by hand, and getting the token meant copying a field out of the same
  * file. Neither is something to ask of anyone, and a token nobody can find is a feature nobody
  * can enable.
  *

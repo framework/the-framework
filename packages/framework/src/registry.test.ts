@@ -100,6 +100,8 @@ test('registryPath prefers XDG_CONFIG_HOME over HOME', () => {
 
 test('registryPath falls back to a single dotfile under HOME (empty XDG counts as unset)', () => {
   assert.equal(registryPath(ENV), join('/home/u', '.' + REGISTRY_FILE))
+  // The name itself, said once: a person finds this file by hand.
+  assert.equal(registryPath(ENV), '/home/u/.openagent.json')
   assert.equal(registryPath({ XDG_CONFIG_HOME: '', HOME: '/home/u' }), join('/home/u', '.' + REGISTRY_FILE))
 })
 

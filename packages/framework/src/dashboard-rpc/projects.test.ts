@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { addProject, listProjects } from '../registry.js'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
-import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../framework-dir.js'
 import { projectErrorStore } from '../project-errors.js'
 import { provideTestContext } from './test-context.js'
 import { onCommands, onProjects, onRecordsReach, sendAddProject, sendShareRecords } from './projects.js'
@@ -69,7 +69,7 @@ test('onCommands names the two branches an agent can start from only when the st
     provideTestContext()
     const id = (await listProjects())[0]!.id
     const startFrom = async () => (await onCommands(id))?.startFrom
-    await mkdir(join(dir, THE_FRAMEWORK_DIR), { recursive: true })
+    await mkdir(join(dir, OPENAGENT_DIR), { recursive: true })
     git('init', '-q', '-b', 'main')
     git('commit', '-q', '--allow-empty', '-m', 'first')
     git('checkout', '-q', '-b', 'my/work')

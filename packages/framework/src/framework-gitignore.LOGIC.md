@@ -1,4 +1,4 @@
-The `.gitignore` written into a project's `.the-framework/` directory when the project is activated: everything under `.the-framework/` is ignored except the ignore file itself, so what lives there (an agent's [1] live files in its checkout [2], this machine's hooks file) never turns a checkout dirty, and a code branch carries nothing of The Framework but that one file. The lasting records live on the `agent-data` branch [3].
+The `.gitignore` written into a project's `.openagent/` directory when the project is activated: everything under `.openagent/` is ignored except the ignore file itself, so what lives there (an agent's [1] live files in its checkout [2], this machine's hooks file) never turns a checkout dirty, and a code branch carries nothing of The Framework but that one file. The lasting records live on the `agent-data` branch [3].
 
 ## Glossary
 
@@ -8,6 +8,6 @@ The `.gitignore` written into a project's `.the-framework/` directory when the p
 
 ## Business logic — TL;DR
 
-- **Ignore everything under `.the-framework/`** - an agent's card, diary and inbox, the hooks file and anything else placed under it are all ignored.
-- **Except the ignore file itself** - it is the only file under `.the-framework/` git sees; it opens with the comment "The Framework: agent state is transient; the lasting records live on the agent-data branch."
+- **Ignore everything under `.openagent/`** - an agent's card, diary and inbox, the hooks file and anything else placed under it are all ignored.
+- **Except the ignore file itself** - it is the only file under `.openagent/` git sees; it opens with the comment "The Framework: agent state is transient; the lasting records live on the agent-data branch."
 - **Written once, at activation** - install writes it and commits it; its presence is what marks a project as activated, as `install.ts` and `project.ts` read it.

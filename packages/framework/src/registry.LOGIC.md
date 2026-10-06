@@ -1,4 +1,4 @@
-Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-framework.json`: the projects the user registered, the preferences [2] behind the dashboard's Settings [3] page, and the daemon token that authenticates a dashboard exposed to the network. Every read forgives a damaged or hand-edited file; every write is validated, atomic, owner-only and serialized with the other writes.
+Keeps the one file The Framework owns for the user, the registry [1] at `~/.openagent.json`: the projects the user registered, the preferences [2] behind the dashboard's Settings [3] page, and the daemon token that authenticates a dashboard exposed to the network. Every read forgives a damaged or hand-edited file; every write is validated, atomic, owner-only and serialized with the other writes.
 
 ## Context
 
@@ -8,8 +8,8 @@ Keeps the one file The Framework owns for the user, the registry [1] at `~/.the-
 
 ## Glossary
 
-[1] registry: `~/.the-framework.json`, the file that keeps the preferences [2] and also lists the projects.
-[2] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] registry: `~/.openagent.json`, the file that keeps the preferences [2] and also lists the projects.
+[2] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [3] Settings: the settings page.
 [4] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
 [5] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it.
@@ -41,7 +41,7 @@ See `## Context`.
 
 #### Business logic
 
-The registry [1] is a single file, never a directory. It is `$XDG_CONFIG_HOME/the-framework.json` when that environment variable is set to a non-empty value, else `$HOME/.the-framework.json`. Its parent directory is created on the first write.
+The registry [1] is a single file, never a directory. It is `$XDG_CONFIG_HOME/openagent.json` when that environment variable is set to a non-empty value, else `$HOME/.openagent.json`. Its parent directory is created on the first write.
 
 ### A project's id
 

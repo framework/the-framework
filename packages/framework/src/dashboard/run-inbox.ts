@@ -1,7 +1,7 @@
 import { hostname } from 'node:os'
 import { join } from 'node:path'
 import { appendInbox, takeInbox, type InboxLine } from '@openagt/agent-driver'
-import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../framework-dir.js'
 import { runResumeHook } from '../project-hooks.js'
 import { findAgent, isPidAlive, resolveAgentCheckout } from '../store/index.js'
 
@@ -13,7 +13,7 @@ import { findAgent, isPidAlive, resolveAgentCheckout } from '../store/index.js'
  */
 
 /**
- * The inbox of a run, in its checkout's `.the-framework/`: the file agent-driver's session reads
+ * The inbox of a run, in its checkout's `.openagent/`: the file agent-driver's session reads
  * when a turn ends, one JSON line per message or answer. The run's tool hands the session the
  * same path.
  */
@@ -44,7 +44,7 @@ export async function sayToRun(
   const isWorking = deps.isWorking ?? isRunWorking
   const lines = [line]
   if (await isWorking(cwd, agentId)) {
-    const inbox = join(await resolveAgentCheckout(cwd, agentId), THE_FRAMEWORK_DIR, RUN_INBOX_FILE)
+    const inbox = join(await resolveAgentCheckout(cwd, agentId), OPENAGENT_DIR, RUN_INBOX_FILE)
     await appendInbox(inbox, line)
     if (await isWorking(cwd, agentId)) return { ok: true }
     lines.splice(0, 1, ...(await takeInbox(inbox)))

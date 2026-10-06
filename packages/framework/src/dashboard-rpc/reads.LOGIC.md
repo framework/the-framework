@@ -27,7 +27,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 [18] open question: a question nobody has answered yet, as the dashboard lists them across projects.
 [19] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [21] pick: the answer to a gate: the option or options the user chose.
-[22] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[22] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [23] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent.
 
 ## Business logic — TL;DR

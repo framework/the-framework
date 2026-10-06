@@ -10,8 +10,8 @@ Hands what the user says to an agent [1] — their own words, or their answer to
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] question: what an agent's turn ended on, asking the user to choose between options; the agent ends `waiting`, its checkout kept, and the answer resumes it.
-[3] inbox: `.the-framework/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
-[4] resume hook: the one shell line under `resume` in a project's `.the-framework/hooks.yml`, which the daemon runs to continue an ended agent, with the agent's id and the user's text or answer; it answers the agent's id as JSON on stdout.
+[3] inbox: `.openagent/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
+[4] resume hook: the one shell line under `resume` in a project's `.openagent/hooks.yml`, which the daemon runs to continue an ended agent, with the agent's id and the user's text or answer; it answers the agent's id as JSON on stdout.
 
 ## Business logic — TL;DR
 
@@ -40,7 +40,7 @@ See `## Context`. The inbox [3] is `agent-driver`'s: the agent's session takes e
 
 #### Business logic
 
-The line — a message with its text, or an answer with the question's [2] title and the chosen labels — is appended to `inbox.jsonl` under the `.the-framework/` of the checkout the agent id resolves to (`store/agent-checkout.ts`). When the agent is still working after the write, the answer is success and nothing else happens.
+The line — a message with its text, or an answer with the question's [2] title and the chosen labels — is appended to `inbox.jsonl` under the `.openagent/` of the checkout the agent id resolves to (`store/agent-checkout.ts`). When the agent is still working after the write, the answer is success and nothing else happens.
 
 ### An ended agent is resumed
 

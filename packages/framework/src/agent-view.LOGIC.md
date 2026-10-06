@@ -9,7 +9,7 @@ Derives what the dashboard shows about an agent [1] from its event stream [2]: t
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[2] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.the-framework/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
+[2] event stream: everything an agent does, one event per line of the agent's diary — the file `<id>.jsonl` the tool that runs the agent writes under `.openagent/` in the agent's checkout, copied onto the `agent-data` branch when the agent ends. Every surface (dashboard, terminal, replay) is a projection of it.
 [5] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [6] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [7] agent view: one agent's page.

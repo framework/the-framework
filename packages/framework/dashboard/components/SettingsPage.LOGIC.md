@@ -8,14 +8,14 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 
 ## Glossary
 
-[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [2] the Overview: the dashboard's cross-project page at `/`.
 [3] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
 [4] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption.
 [5] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [6] agent view: one agent's page.
 [7] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[8] start hook: the one shell line under `start:` in a project's `.the-framework/hooks.yml`, which starts an agent; the user's picks of coding agent and model are handed to it.
+[8] start hook: the one shell line under `start:` in a project's `.openagent/hooks.yml`, which starts an agent; the user's picks of coding agent and model are handed to it.
 [9] relay: running an agent on a device: the local daemon forwards the start to the device and streams the events back.
 [10] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [16] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.
@@ -45,7 +45,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 
 #### Business logic
 
-Every control of the page's own sections reads and writes the user's own preferences [1], which the daemon keeps in the registry file `~/.the-framework.json`. The page belongs to no project. A change takes effect on the page the instant it is made and is saved to the daemon in the background; a failed save is not reported, and a value another tab changed is adopted when the daemon answers (the write rules are in `lib/preferences.ts`). The sections the installed modules bring keep their own data their own way (see "After "Claude web": the sections the installed packages bring").
+Every control of the page's own sections reads and writes the user's own preferences [1], which the daemon keeps in the registry file `~/.openagent.json`. The page belongs to no project. A change takes effect on the page the instant it is made and is saved to the daemon in the background; a failed save is not reported, and a value another tab changed is adopted when the daemon answers (the write rules are in `lib/preferences.ts`). The sections the installed modules bring keep their own data their own way (see "After "Claude web": the sections the installed packages bring").
 
 ### The Onboarding checklist stays on this page
 

@@ -10,7 +10,7 @@ The box at the bottom of an agent view [1]: where the user says something to tha
 
 [1] agent view: one agent's page.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[3] resume hook: the one shell line under `resume:` in the project's `.the-framework/hooks.yml`. The daemon runs it with the agent's id and the user's text or answer in its environment, and the line continues that agent.
+[3] resume hook: the one shell line under `resume:` in the project's `.openagent/hooks.yml`. The daemon runs it with the agent's id and the user's text or answer in its environment, and the line continues that agent.
 [4] inbox: the file in a working agent's checkout where what the user says waits; the agent takes it when its turn ends, as its next prompt.
 [5] waiting: how an agent that ended on a question reads: not working, its checkout kept, resumed by the answer or by the user's next message.
 

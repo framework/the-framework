@@ -1,12 +1,12 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './framework-dir.js'
 import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
 import { nodeStoreFs, type StoreFs } from './store/index.js'
 import { errorMessage } from './error-message.js'
 
 /**
- * Install/activate a repo for The Framework (#391): create the `.the-framework/` marker and its
+ * Install/activate a repo for The Framework (#391): create the `.openagent/` marker and its
  * ignore file, committing pre-existing dirty changes first so the install commit is clean. Pure
  * core over the same {@link GitRunner} + {@link StoreFs} seams as project.ts.
  */
@@ -23,7 +23,7 @@ export interface InstallDeps {
 }
 
 /**
- * Activate the repo at `cwd`: create `.the-framework/` with
+ * Activate the repo at `cwd`: create `.openagent/` with
  * its ignore file and layout marker (#1575), and commit the install. A repo whose ignore file is
  * already there is a no-op (`alreadyActivated`) — the ignore file is the activation marker.
  * Forgiving: any git/fs failure surfaces as `{ ok: false, error }`.
@@ -42,14 +42,14 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
       .catch(() => false)
     if (!insideRepo) await git(['init'], cwd)
 
-    await fs.mkdir(join(cwd, THE_FRAMEWORK_DIR))
-    // Keep what lives under `.the-framework/` (a run's live files, the hooks file) out of git
+    await fs.mkdir(join(cwd, OPENAGENT_DIR))
+    // Keep what lives under `.openagent/` (a run's live files, the hooks file) out of git
     // (#313). The early return above established the file is absent.
     await fs.write(gitignorePath(cwd), frameworkGitignore())
 
     // Only The Framework's own directory (#1638): whatever the user has uncommitted stays theirs,
     // uncommitted. Nothing is ever swept into a commit on their behalf.
-    await git(['add', THE_FRAMEWORK_DIR], cwd)
+    await git(['add', OPENAGENT_DIR], cwd)
     await git(['commit', '-m', '[The Framework] install The Framework'], cwd)
     return insideRepo ? { ok: true } : { ok: true, initialized: true }
   } catch (err) {

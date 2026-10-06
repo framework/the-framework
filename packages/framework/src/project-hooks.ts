@@ -4,15 +4,15 @@ import { basename, delimiter, join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { builtInBinDirs } from './built-in.js'
 import { errorMessage } from './error-message.js'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './framework-dir.js'
 
 /**
- * A project's hooks (#1774): the shell lines a project's own `.the-framework/hooks.yml` names to
+ * A project's hooks (#1774): the shell lines a project's own `.openagent/hooks.yml` names to
  * run when the dashboard opens and when it closes, the two lines that start a run and continue
  * one, and the line that says whether a run can start here at all. The daemon calls no tool by
  * name: it runs whatever the file says, in the project, with the project's installed tools and
  * then the built-in packages' on the PATH, so a line reaches its tool with nothing fetched from npm. Per
- * user, since `.the-framework/` is ignored: a hook is this machine's, and a teammate's pull
+ * user, since `.openagent/` is ignored: a hook is this machine's, and a teammate's pull
  * changes nothing.
  *
  * Optional, best-effort and bounded: no file means nothing runs, a broken file is a warning, an
@@ -20,8 +20,8 @@ import { THE_FRAMEWORK_DIR } from './framework-dir.js'
  * here ever throws to the daemon.
  */
 
-/** The hooks file, under the project's ignored `.the-framework/`. */
-export const PROJECT_HOOKS_FILE = `${THE_FRAMEWORK_DIR}/hooks.yml`
+/** The hooks file, under the project's ignored `.openagent/`. */
+export const PROJECT_HOOKS_FILE = `${OPENAGENT_DIR}/hooks.yml`
 
 /** How long one line may run before it is killed and logged as timed out. */
 export const HOOK_TIMEOUT_MS = 60_000

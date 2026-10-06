@@ -2,4 +2,4 @@ The dashboard header's appearance control: one icon button that opens a menu of 
 
 ## Glossary
 
-[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).

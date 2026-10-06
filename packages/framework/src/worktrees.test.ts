@@ -70,8 +70,8 @@ test("a branches/ directory that is not a git worktree is refused before any git
     // Turn the run's checkout into residue: gone as a worktree, its directory holding only the
     // framework's bookkeeping. And leave the user's own checkout dirty, which is what must survive.
     await git(['worktree', 'remove', '--force', worktree], repo)
-    await mkdir(join(worktree, '.the-framework'), { recursive: true })
-    await writeFile(join(worktree, '.the-framework', `${RUN_ID}.json`), JSON.stringify({ id: RUN_ID, startedAt: '2026-01-01T00:00:00.000Z', status: 'failed' }))
+    await mkdir(join(worktree, '.openagent'), { recursive: true })
+    await writeFile(join(worktree, '.openagent', `${RUN_ID}.json`), JSON.stringify({ id: RUN_ID, startedAt: '2026-01-01T00:00:00.000Z', status: 'failed' }))
     await writeFile(join(repo, 'index.html'), '<h1>half-typed</h1>\n')
     const before = (await git(['rev-parse', 'HEAD'], repo)).trim()
 
@@ -129,9 +129,9 @@ test("a run started from another run's branch: the commit on its card is named t
     const sub = await addWorktree(repo, { agentId: 'run2', branch: agentBranchName('run2'), base: branch }, git)
     const baseCommit = (await git(['rev-parse', 'HEAD'], sub.path)).trim()
     await mkdir(join(repo, '.git', 'info'), { recursive: true })
-    await writeFile(join(repo, '.git', 'info', 'exclude'), '.the-framework/\n')
-    await mkdir(join(sub.path, '.the-framework'), { recursive: true })
-    await writeFile(join(sub.path, '.the-framework', 'run2.json'), JSON.stringify({ id: 'run2', startedAt: '2026-01-01T00:00:00.000Z', status: 'done', caller: { baseCommit } }))
+    await writeFile(join(repo, '.git', 'info', 'exclude'), '.openagent/\n')
+    await mkdir(join(sub.path, '.openagent'), { recursive: true })
+    await writeFile(join(sub.path, '.openagent', 'run2.json'), JSON.stringify({ id: 'run2', startedAt: '2026-01-01T00:00:00.000Z', status: 'done', caller: { baseCommit } }))
     assert.deepEqual(await removeProjectWorktree(repo, 'run2'), { ok: true, branchesDeleted: [sub.branch] })
     await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${sub.branch}`], repo), 'nothing reached origin')
   } finally {

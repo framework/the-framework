@@ -35,7 +35,7 @@ async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done:
   )
   return { done, state: await listening }
 }
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './framework-dir.js'
 import { projectId, listProjects, addProject } from './registry.js'
 import { gitignorePath, frameworkGitignore } from './framework-gitignore.js'
 
@@ -61,7 +61,7 @@ const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(r
 
 /** Fake an activated workspace: the install-written ignore file is the activation marker (#1600). */
 async function activate(cwd: string): Promise<void> {
-  await mkdir(join(cwd, THE_FRAMEWORK_DIR), { recursive: true })
+  await mkdir(join(cwd, OPENAGENT_DIR), { recursive: true })
   await writeFile(gitignorePath(cwd), frameworkGitignore())
 }
 
@@ -108,7 +108,7 @@ test('runDaemon serves the dashboard, and shuts down when the signal aborts', as
   }
 })
 
-test('runDaemon comes up on a fresh workspace with no .the-framework yet', async () => {
+test('runDaemon comes up on a fresh workspace with no .openagent yet', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-daemon-')) // deliberately no mkdir
   const env = await configEnv(cwd)
   const ac = new AbortController()
@@ -127,7 +127,7 @@ test("a project's open hooks run once the dashboard listens, its close hooks at 
   const cwd = await realpath(await tmpWorkspace())
   const env = await configEnv(cwd)
   await writeFile(
-    join(cwd, THE_FRAMEWORK_DIR, 'hooks.yml'),
+    join(cwd, OPENAGENT_DIR, 'hooks.yml'),
     'open:\n  - echo open-1 >> hooks.log\n  - pwd -P >> hooks.log\n  - exit 3\n  - echo open-2 >> hooks.log\nclose:\n  - echo close >> hooks.log\n',
   )
   const logged: string[] = []
@@ -168,7 +168,7 @@ test('a Start runs the project\'s own start hook with the prompt and the picks, 
   // The daemon names no tool: whatever the line is, it gets the prompt and the picks in its
   // environment, and the id it prints is the run's.
   await writeFile(
-    join(cwd, THE_FRAMEWORK_DIR, 'hooks.yml'),
+    join(cwd, OPENAGENT_DIR, 'hooks.yml'),
     `start: 'printf "%s|%s|%s" "$PROMPT" "$DRIVER" "\${MODEL-unset}" > started.txt; echo "{\\"id\\":\\"run-42\\"}"'\n`,
   )
   const ac = new AbortController()
@@ -180,7 +180,7 @@ test('a Start runs the project\'s own start hook with the prompt and the picks, 
     assert.deepEqual(await callRpc(state.url, 'sendStart', ['no-such-project', 'x']), { ok: false, error: 'unknown project: no-such-project' })
 
     // Without the line there is nothing to start a run with, and the daemon says so.
-    await writeFile(join(cwd, THE_FRAMEWORK_DIR, 'hooks.yml'), 'open:\n  - "true"\n')
+    await writeFile(join(cwd, OPENAGENT_DIR, 'hooks.yml'), 'open:\n  - "true"\n')
     assert.deepEqual(await sendStart(state.url, cwd, 'Read the docs'), { ok: false, error: 'this project has no start hook' })
     ac.abort()
     await done

@@ -12,7 +12,7 @@
 // real run writes it with; only the coding agent is scripted.
 //
 // The prompt scripts the agent, by the words in it:
-//   "hold"    the run waits for `<checkout>/.the-framework/go` before its first turn, so a story
+//   "hold"    the run waits for `<checkout>/.openagent/go` before its first turn, so a story
 //             can act on a run that is certainly still working;
 //   "ask"     the first turn ends on a question, so the run ends `waiting`;
 //   "commit"  the run commits a file, so its branch holds work to push.
@@ -29,7 +29,7 @@ import { nodeGitRunner } from '@openagt/agent-data'
 import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@openagt/skill-branches'
 import { findRun, parseRunCard, readDiary, writeRun, type AnyDiaryLine, type RunCard } from '@openagt/skill-logs'
 import { agentIdFromStartedAt } from '../agent-id.js'
-import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../framework-dir.js'
 
 const QUESTION = { title: 'Which way?', options: [{ label: 'Left', detail: 'the short way' }, { label: 'Right' }], recommended: 'Left' }
 
@@ -53,7 +53,7 @@ async function exists(path: string): Promise<boolean> {
 
 /** One session of the run in `checkout`: the prompt, the log, the inbox, the record, the reclaim. */
 async function session(id: string, checkout: string, prompt: string, card: Omit<RunCard, 'status'>, continued: boolean): Promise<void> {
-  const dir = join(checkout, THE_FRAMEWORK_DIR)
+  const dir = join(checkout, OPENAGENT_DIR)
   // Hidden from git in this checkout alone, as the runner does: a `.gitignore` of `*`, the project's own kept.
   await mkdir(dir, { recursive: true })
   await writeFile(join(dir, '.gitignore'), '*\n', { flag: 'wx' }).catch(() => {})
@@ -132,9 +132,9 @@ async function main(): Promise<void> {
     const kept = worktreePath(repo, runId)
     const checkout = (await exists(kept)) ? kept : (await attachCheckout(repo, { agentId: runId, branch: card.branch ?? agentBranchName(runId) }, git)).path
     // A checkout made again holds no diary: the recorded one is put back, so the log continues it.
-    if (!(await exists(join(checkout, THE_FRAMEWORK_DIR, logDiaryFile(runId))))) {
-      await mkdir(join(checkout, THE_FRAMEWORK_DIR), { recursive: true })
-      await writeFile(join(checkout, THE_FRAMEWORK_DIR, logDiaryFile(runId)), ((await readDiary(repo, runId)) ?? []).map(line => JSON.stringify(line) + '\n').join(''))
+    if (!(await exists(join(checkout, OPENAGENT_DIR, logDiaryFile(runId))))) {
+      await mkdir(join(checkout, OPENAGENT_DIR), { recursive: true })
+      await writeFile(join(checkout, OPENAGENT_DIR, logDiaryFile(runId)), ((await readDiary(repo, runId)) ?? []).map(line => JSON.stringify(line) + '\n').join(''))
     }
     const question = [...((await readDiary(repo, runId)) ?? [])].reverse().find(line => line.kind === 'question')
     const answer = process.env['ANSWER']

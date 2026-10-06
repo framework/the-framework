@@ -28,7 +28,7 @@ export const USAGE = `usage: agent-runner <command>
   run --detach --resume <id> …  the same continuing in its own process, answered at once: what a dashboard's resume hook runs
   check [--driver <claude-code|codex>]
                                 whether a run can start here: the coding agent's CLI installed and logged in, and its warnings; what a dashboard's check hook runs
-  init                          this tool's lines in the dashboard's .the-framework/hooks.yml, so its Start works; a line already there is kept
+  init                          this tool's lines in the dashboard's .openagent/hooks.yml, so its Start works; a line already there is kept
 
 When a run ends waiting on a question, or ends done with a pull request it did not have, the \`ended:\` line in the
 project's .agent-runner/config.yml runs, if there is one, in the project's root, with MESSAGE (one line for a person),
@@ -174,7 +174,7 @@ const COMMANDS: Record<string, Command> = {
     const repo = await project(io.cwd, git)
     const outcome = await initHooks(repo)
     if (outcome.ok) return outcome
-    const line = outcome.reason === 'no-dashboard' ? 'no .the-framework/ here: add the project in the dashboard first' : `${outcome.file}: ${outcome.detail ?? 'unreadable'}`
+    const line = outcome.reason === 'no-dashboard' ? 'no .openagent/ here: add the project in the dashboard first' : `${outcome.file}: ${outcome.detail ?? 'unreadable'}`
     throw new Refused(outcome, line)
   },
 }

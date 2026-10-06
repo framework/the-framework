@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createProjectRuntime } from './daemon-runtime.js'
 import { PROJECT_HOOKS_FILE } from './project-hooks.js'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './framework-dir.js'
 import { addProject } from './registry.js'
 import { readSharing } from '@openagt/agent-data'
 
@@ -15,7 +15,7 @@ import { readSharing } from '@openagt/agent-data'
 
 async function project(hooks?: string): Promise<string> {
   const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-runtime-')))
-  await mkdir(join(cwd, THE_FRAMEWORK_DIR), { recursive: true })
+  await mkdir(join(cwd, OPENAGENT_DIR), { recursive: true })
   if (hooks !== undefined) await writeFile(join(cwd, PROJECT_HOOKS_FILE), hooks)
   return cwd
 }

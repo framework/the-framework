@@ -8,7 +8,7 @@ Renders an agent's [1] transcript: the events [2] the agent emitted, one row eac
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] event / event stream: everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded; every surface is a projection of it.
-[3] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[3] archive: the transient copy of a finished agent's events and status under a project's `.openagent/agents/`.
 [4] gate: a question with options an agent's turn ended on: the agent ends waiting for the answer, the dashboard shows the question as a card, and the answer resumes the agent.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [7] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.

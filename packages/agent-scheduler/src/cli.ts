@@ -15,7 +15,7 @@ import { readSchedule, type ScheduledCommand } from './schedule.js'
 export const USAGE = `usage: agent-scheduler <command>
 
   tick                          pull agent-data, sweep, read agent-schedule.md, start what is due, each a run of agent-runner
-  init                          this tool's lines in the dashboard's .the-framework/hooks.yml, so it runs while the dashboard is open; a line already there is kept
+  init                          this tool's lines in the dashboard's .openagent/hooks.yml, so it runs while the dashboard is open; a line already there is kept
   start [--keep-alive]          the scheduler on, ticking every minute in its own process
   stop [--unless-keep-alive]    the scheduler off; runs in flight go to the end; with the flag a keep-alive scheduler is left running
   status                        the state file, and whether the scheduler's process is alive
@@ -86,7 +86,7 @@ const COMMANDS: Record<string, Command> = {
     const repo = await project(io.cwd, git)
     const outcome = await initHooks(repo)
     if (outcome.ok) return outcome
-    const line = outcome.reason === 'no-dashboard' ? 'no .the-framework/ here: add the project in the dashboard first' : `${outcome.file}: ${outcome.detail ?? 'unreadable'}`
+    const line = outcome.reason === 'no-dashboard' ? 'no .openagent/ here: add the project in the dashboard first' : `${outcome.file}: ${outcome.detail ?? 'unreadable'}`
     throw new Refused(outcome, line)
   },
 

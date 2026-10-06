@@ -8,7 +8,7 @@ Fixes what an unset preference [1] means, and the reach of the usage bar's handl
 
 ## Glossary
 
-[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [2] the usage bar's handle: the control on the Overview's usage bar that moves a module's stop line, the offset from the quota boundary, in percentage points of the week, at which that module's unattended work stops.
 [3] quota boundary: the share of the quota week that may be spent by now, rising with the clock. The dashboard only draws it; whether work stops at it is the business of whatever starts unattended work.
 [4] intervention: something that needs a human — an open question, a pull request to review, unpushed commits — one of the two notification feeds. The other is activity: an agent started or finished.

@@ -231,7 +231,7 @@ export function StartAgentForm({
       {noStartHook && (
         <p role="alert" className="mt-2 text-xs text-danger">
           This project has no start hook. Add a <code className="font-mono">start:</code> line to{' '}
-          <code className="font-mono">.the-framework/hooks.yml</code>.
+          <code className="font-mono">.openagent/hooks.yml</code>.
         </p>
       )}
     </form>

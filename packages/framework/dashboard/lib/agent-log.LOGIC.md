@@ -11,7 +11,7 @@ Names the key an ended agent's [1] archive [2] is remembered under in the browse
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[2] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[2] archive: the transient copy of a finished agent's events and status under a project's `.openagent/agents/`.
 
 ## Business logic — TL;DR
 

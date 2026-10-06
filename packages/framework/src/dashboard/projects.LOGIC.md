@@ -2,7 +2,7 @@ The read side of the registered projects: one summary per project for the sideba
 
 ## Context
 
-**User story**: the sidebar lists the user's projects by name, greys out one that lost its `.the-framework/` marker, and orders them by activity. A project whose directory the user renamed or deleted disappears from the sidebar without any action, and is back the moment the directory is.
+**User story**: the sidebar lists the user's projects by name, greys out one that lost its `.openagent/` marker, and orders them by activity. A project whose directory the user renamed or deleted disappears from the sidebar without any action, and is back the moment the directory is.
 
 **Problem**: a registration whose directory is gone looks, when listed, exactly like a project that merely lost its marker: a grey "not activated" entry with no files and nothing to click to make it go away. Skipping it while keeping its registration removes the ghost without a removal the user did not ask for.
 
@@ -10,13 +10,13 @@ The read side of the registered projects: one summary per project for the sideba
 
 [1] launcher: the Start form on a project's own page.
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
-[4] registry: `~/.the-framework.json`, which lists the projects and keeps the user's preferences.
+[4] registry: `~/.openagent.json`, which lists the projects and keeps the user's preferences.
 [5] recorded agents: the agents on the `agent-data` branch, written there by the tool that ran them, through the `logs` skill.
 [6] sweep: a background job the daemon runs on its clock.
 
 ## Business logic — TL;DR
 
-- **A project's summary** - its registry id, its path, the directory's name as its display name, whether the `.the-framework/` marker is present, whether one of its packages provides a git host, and the newest activity among its agents, each read forgivingly.
+- **A project's summary** - its registry id, its path, the directory's name as its display name, whether the `.openagent/` marker is present, whether one of its packages provides a git host, and the newest activity among its agents, each read forgivingly.
 - **Only projects whose directory is on disk are served** - a renamed or deleted directory leaves the list and comes back on the next read once it is there again; the registration is never pruned.
 - **A project id resolves to its path** - only for a project currently on disk; anything else is unknown.
 - **A projection read says which projects it saw whole** - every cross-project read returns its items together with the ids of the projects every source answered for, so a caller that announces new items can tell an empty project from an unreadable one.
@@ -31,7 +31,7 @@ See `## Context`.
 
 #### Business logic
 
-A summary is derived from a registry [4] record: the record's id, which is stable and safe in a URL; the absolute path; the display name, which is the last segment of the path; whether the project is activated, meaning its `.the-framework/` marker is present; whether it has a git host, meaning one of its packages provides one (`../store/git-host.ts`), which is what lets a pull request be opened there, and which a module's piece is told about each of its projects; and its last activity. The last activity is the newest among the project's agents [3], those with a checkout and the recorded ones [5] alike, taking each agent's last-update time or, failing that, its start time; a project with no agents has no last activity.  Every read is forgiving: a failed marker check reads as not activated, a failed git host lookup reads as no git host, failed agents read as no activity, and neither of them fails the summary. What the daemon's sweeps [6] currently find wrong with a project is not part of the summary; the dashboard's project list attaches it from the daemon's error state (`../project-errors.ts`).
+A summary is derived from a registry [4] record: the record's id, which is stable and safe in a URL; the absolute path; the display name, which is the last segment of the path; whether the project is activated, meaning its `.openagent/` marker is present; whether it has a git host, meaning one of its packages provides one (`../store/git-host.ts`), which is what lets a pull request be opened there, and which a module's piece is told about each of its projects; and its last activity. The last activity is the newest among the project's agents [3], those with a checkout and the recorded ones [5] alike, taking each agent's last-update time or, failing that, its start time; a project with no agents has no last activity.  Every read is forgiving: a failed marker check reads as not activated, a failed git host lookup reads as no git host, failed agents read as no activity, and neither of them fails the summary. What the daemon's sweeps [6] currently find wrong with a project is not part of the summary; the dashboard's project list attaches it from the daemon's error state (`../project-errors.ts`).
 
 ### Only projects whose directory is on disk are served
 

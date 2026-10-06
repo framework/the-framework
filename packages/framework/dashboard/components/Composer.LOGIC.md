@@ -14,9 +14,9 @@ The dashboard's prompt editor with the controls around it, shared by the launche
 [4] saved prompt: a prompt the user saved under a name, either for themselves (kept with their preferences) or for the project (committed in the project's repository), and loads back into the editor verbatim.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [6] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[7] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[7] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [8] relay: running an agent on a device: the local daemon forwards the start to the device, which runs its own project's start hook, and streams the events back, so the agent renders like a local one.
-[9] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id.
+[9] start hook: the one shell line under `start:` in the project's `.openagent/hooks.yml`, which starts an agent and answers its id.
 [10] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
 [11] chip: a small, bordered, rounded label in muted text: an icon and a few words that say one thing. A chip is either plain or the button of a menu.
 

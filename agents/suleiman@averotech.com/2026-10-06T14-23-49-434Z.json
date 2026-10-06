@@ -6,7 +6,6 @@
   "intent": "Work on tickets/2026-10-01_launcher-choose-agent-start.md. Do not start any other ticket.",
   "driver": "claude-code",
   "model": "sonnet",
-  "branch": "agent-2026-10-06T14-23-49-434Z",
   "caller": {
     "runner": {
       "host": "Suleimans-MacBook-Pro.local",

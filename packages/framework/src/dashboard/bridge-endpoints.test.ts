@@ -331,6 +331,15 @@ test('the expected version and the extension manifest move in lockstep (#1519)',
   assert.equal(EXPECTED_EXTENSION_VERSION, manifest.version)
 })
 
+test('the extension states its version in the header the daemon reads', () => {
+  // The two files of the extension that call the daemon each write the header's name themselves:
+  // renaming it on one side only would have every call refused as "unknown" in someone's browser.
+  for (const file of ['background.js', 'options.js']) {
+    const source = readFileSync(new URL(`../../../chrome-extension/${file}`, import.meta.url), 'utf8')
+    assert.ok(source.includes(`'${EXTENSION_VERSION_HEADER}': chrome.runtime.getManifest().version`), file)
+  }
+})
+
 test('the start-queue is served to the extension and its report travels back (#1328)', async () => {
   const reports: { id: string; ok: boolean; sessionId?: string; note?: string }[] = []
   let pending: { id: string; repo: string; branch: string; prompt: string; model?: string } | undefined = {

@@ -40,4 +40,4 @@ function changedFiles(before, after) {
 
 // The worker loads this with importScripts, where a top-level binding is already global; jsdom
 // evaluates it the same way. Nothing else to export.
-if (typeof globalThis !== 'undefined') globalThis.__tfFingerprint = { WATCHED_FILES, fingerprint, changedFiles }
+if (typeof globalThis !== 'undefined') globalThis.__oaFingerprint = { WATCHED_FILES, fingerprint, changedFiles }

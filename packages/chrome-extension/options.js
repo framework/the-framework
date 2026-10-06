@@ -75,7 +75,7 @@ document.getElementById('save').addEventListener('click', async () => {
     )
   }
   try {
-    const version = { 'x-tf-extension-version': chrome.runtime.getManifest().version }
+    const version = { 'x-oa-extension-version': chrome.runtime.getManifest().version }
     const res = await fetch(`${daemonUrl}/_bridge/ping`, { headers: { authorization: `Bearer ${token}`, ...version } })
     if (res.status === 401) return say('The dashboard is reachable but rejected the token.', true)
     if (res.status === 404) return say('Reached the dashboard, but the bridge is off. Turn it on in OpenAgent.', true)
@@ -113,7 +113,7 @@ document.getElementById('save').addEventListener('click', async () => {
 // also resumes a Driver the user paused by closing its tab.
 document.getElementById('openNow').addEventListener('click', () => {
   say('Driving…')
-  chrome.runtime.sendMessage({ type: 'tf-open-now' }, result => {
+  chrome.runtime.sendMessage({ type: 'oa-open-now' }, result => {
     if (chrome.runtime.lastError) return say(chrome.runtime.lastError.message ?? 'the worker did not answer', true)
     if (!result) return say('The worker did not answer. Try reloading the extension.', true)
     if (!result.ok) return say(`Did nothing: ${result.reason}`, true)

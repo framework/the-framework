@@ -169,7 +169,7 @@ for (const [name, body, expectFound] of cases) {
     runScripts: 'outside-only',
   })
   dom.window.eval(script)
-  const got = dom.window.__tfBridgeQuestion
+  const got = dom.window.__oaBridgeQuestion
   const want = {
     sessionId: 'session_01TEST',
     title: 'Which checks should run?',
@@ -194,7 +194,7 @@ function mirrorOf(body) {
   })
   dom.window.eval(script)
   const panel = [...dom.window.document.documentElement.children].filter(el => el.tagName === 'DIV').map(el => el.textContent).join(' ')
-  const got = dom.window.__tfBridgeTranscript
+  const got = dom.window.__oaBridgeTranscript
   dom.window.close()
   return { got, panel }
 }
@@ -250,7 +250,7 @@ async function deliver(body, prepare) {
   })
   dom.window.eval(script)
   const observed = prepare ? prepare(dom.window) : undefined
-  const result = await dom.window.__tfBridgeDeliverAnswer('Work on the next TODO')
+  const result = await dom.window.__oaBridgeDeliverAnswer('Work on the next TODO')
   return { dom, result, observed }
 }
 
@@ -290,7 +290,7 @@ async function deliver(body, prepare) {
   const { dom, result } = await deliver(`<p>nothing to type into</p>`, w => {
     // Shorten the composer wait: this page never gains one, and the real 20s is for claude.ai
     // still rendering after a tab revive.
-    w.__tfComposerWaitMs = 100
+    w.__oaComposerWaitMs = 100
     return undefined
   })
   const ok = !result.ok && /no composer/.test(result.note)
@@ -300,7 +300,7 @@ async function deliver(body, prepare) {
 }
 
 // ---------------------------------------------------------------------------
-// The collapse toggle: the panel folds down to a compact "TF" tab — the full title retreats to
+// The collapse toggle: the panel folds down to a compact "OA" tab — the full title retreats to
 // the tooltip so the fold actually gives the corner back — and unfolds with the rows intact.
 // chrome.storage is extension-only, so in jsdom the fold simply lives for the page's lifetime,
 // which is exactly the degradation the guard in content.js promises.
@@ -311,7 +311,7 @@ async function deliver(body, prepare) {
     { url: 'https://claude.ai/code/session_01TEST', runScripts: 'outside-only' },
   )
   dom.window.eval(script)
-  const panel = dom.window.document.getElementById('tf-bridge-panel')
+  const panel = dom.window.document.getElementById('oa-bridge-panel')
   // The toggle is the one button carrying aria-expanded; Copy report and Fill composer do not.
   const toggle = () => panel.querySelector('button[aria-expanded]')
   const expanded = /question found/.test(panel.textContent) && /OpenAgent bridge/.test(panel.textContent)
@@ -319,13 +319,13 @@ async function deliver(body, prepare) {
   const folded =
     !/question found/.test(panel.textContent) &&
     !/OpenAgent bridge/.test(panel.textContent) &&
-    /TF/.test(panel.textContent) &&
+    /OA/.test(panel.textContent) &&
     toggle().getAttribute('aria-expanded') === 'false'
   toggle().click()
   const restored = /question found\s*yes/.test(panel.textContent)
   const ok = expanded && folded && restored
   if (!ok) failed++
-  console.log(`${ok ? 'PASS' : 'FAIL'}  panel folds to a compact TF tab and back  (expanded=${expanded}, folded=${folded}, restored=${restored})`)
+  console.log(`${ok ? 'PASS' : 'FAIL'}  panel folds to a compact OA tab and back  (expanded=${expanded}, folded=${folded}, restored=${restored})`)
   dom.window.close()
 }
 
@@ -428,9 +428,9 @@ function newSessionPage({
     seen.sent = true
     w.history.pushState({}, '', '/code/session_01NEW')
   })
-  w.__tfComposerWaitMs = 1000
-  w.__tfMenuSettleMs = 10
-  w.__tfSessionWaitMs = 2000
+  w.__oaComposerWaitMs = 1000
+  w.__oaMenuSettleMs = 10
+  w.__oaSessionWaitMs = 2000
   w.eval(script)
   return { dom, w, d, seen }
 }
@@ -440,7 +440,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
 {
   // The page remembered our repo: nothing to pick but the branch.
   const { dom, w, d, seen } = newSessionPage()
-  const result = await w.__tfBridgeCreateSession(START)
+  const result = await w.__oaBridgeCreateSession(START)
   const branch = d.getElementById('branch')?.textContent
   const text = d.querySelector('[contenteditable="true"]').textContent
   const ok = result.ok && result.sessionId === 'session_01NEW' && /repo already the-framework/.test(result.note) && branch === 'cloud-1-abcd' && text === 'Add the thing' && seen.sent && seen.modelOpened === 0
@@ -453,7 +453,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
   // A request naming a model (#1697): the picker is opened and the entry for that model clicked
   // before anything is sent; the note reports what was clicked, and the trigger reads it.
   const { dom, w, d, seen } = newSessionPage()
-  const result = await w.__tfBridgeCreateSession({ ...START, model: 'sonnet' })
+  const result = await w.__oaBridgeCreateSession({ ...START, model: 'sonnet' })
   const model = d.getElementById('model')?.textContent
   const ok = result.ok && model === 'Sonnet 5' && /model: clicked "Sonnet 5"/.test(result.note) && seen.sent && seen.modelOpened === 1
   if (!ok) failed++
@@ -464,7 +464,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
 {
   // The picker already reads the requested model: nothing is opened, and the note says so.
   const { dom, w, d, seen } = newSessionPage({ currentModel: 'Opus 5' })
-  const result = await w.__tfBridgeCreateSession({ ...START, model: 'opus' })
+  const result = await w.__oaBridgeCreateSession({ ...START, model: 'opus' })
   const ok = result.ok && d.getElementById('model')?.textContent === 'Opus 5' && /model already Opus 5/.test(result.note) && seen.sent && seen.modelOpened === 0
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  create leaves a model picker that already reads the requested model alone  (result=${JSON.stringify(result)})`)
@@ -474,7 +474,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
 {
   // An older version lives behind "More models": the submenu is opened and searched too.
   const { dom, w, d, seen } = newSessionPage()
-  const result = await w.__tfBridgeCreateSession({ ...START, model: 'Opus 4.8' })
+  const result = await w.__oaBridgeCreateSession({ ...START, model: 'Opus 4.8' })
   const model = d.getElementById('model')?.textContent
   const ok = result.ok && model === 'Opus 4.8' && /model: clicked "Opus 4.8" via More models/.test(result.note) && seen.sent
   if (!ok) failed++
@@ -485,7 +485,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
 {
   // The menu does not offer the model: nothing is sent, and the note names the model and what was offered.
   const { dom, w, d, seen } = newSessionPage()
-  const result = await w.__tfBridgeCreateSession({ ...START, model: 'gpt-9' })
+  const result = await w.__oaBridgeCreateSession({ ...START, model: 'gpt-9' })
   const ok = !result.ok && /model: the menu offered no "gpt-9"/.test(result.note) && /Fable 5/.test(result.note) && !seen.sent && d.getElementById('model')?.textContent === 'Opus 5'
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  create refuses to send on a model the menu does not offer  (sent=${seen.sent}, note=${JSON.stringify(result.note)})`)
@@ -495,7 +495,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
 {
   // No model picker on the page at all: a request naming a model is not sent on whatever the page defaults to.
   const { dom, w, seen } = newSessionPage({ modelPicker: false })
-  const result = await w.__tfBridgeCreateSession({ ...START, model: 'sonnet' })
+  const result = await w.__oaBridgeCreateSession({ ...START, model: 'sonnet' })
   const ok = !result.ok && /no model picker on the page/.test(result.note) && !seen.sent
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  create names a missing model picker rather than sending on the default  (sent=${seen.sent}, note=${result.note.slice(0, 80)}…)`)
@@ -506,7 +506,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
   // As the live page renders in the content script's world: icon-font glyphs beside every label
   // and a check glyph on the chosen entry (dogfood 4).
   const { dom, w, d, seen } = newSessionPage({ glyphs: true, remembered: 'docpress' })
-  const result = await w.__tfBridgeCreateSession(START)
+  const result = await w.__oaBridgeCreateSession(START)
   const repo = d.getElementById('repo')?.textContent.replace(/[\uE000-\uF8FF]/g, '')
   const branch = d.getElementById('branch')?.textContent.replace(/[\uE000-\uF8FF]/g, '')
   const ok = result.ok && repo === 'the-framework' && branch === 'cloud-1-abcd' && seen.sent
@@ -518,7 +518,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
 {
   // The page remembered another repo: its chip is the picker.
   const { dom, w, d, seen } = newSessionPage({ remembered: 'docpress' })
-  const result = await w.__tfBridgeCreateSession(START)
+  const result = await w.__oaBridgeCreateSession(START)
   const repo = d.getElementById('repo')?.textContent
   const branch = d.getElementById('branch')?.textContent
   const ok = result.ok && repo === 'the-framework' && branch === 'cloud-1-abcd' && seen.sent && /repo: clicked "framework\/the-framework"/.test(result.note)
@@ -530,7 +530,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
 {
   // Nothing remembered: the bare "Select repo" trigger.
   const { dom, w, d, seen } = newSessionPage({ remembered: '' })
-  const result = await w.__tfBridgeCreateSession(START)
+  const result = await w.__oaBridgeCreateSession(START)
   const repo = d.getElementById('repo')?.textContent
   const ok = result.ok && repo === 'the-framework' && seen.sent
   if (!ok) failed++
@@ -541,7 +541,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
 {
   // The branch list does not offer the pushed ref: nothing is sent, and the note says so.
   const { dom, w, seen } = newSessionPage({ branches: ['main', 'develop'] })
-  const result = await w.__tfBridgeCreateSession(START)
+  const result = await w.__oaBridgeCreateSession(START)
   const ok = !result.ok && /branch/.test(result.note) && !seen.sent
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  create refuses to send on the wrong branch  (sent=${seen.sent}, note=${JSON.stringify(result.note)})`)
@@ -550,11 +550,11 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
 
 {
   const { dom, w, seen } = newSessionPage({ remembered: '', repoPicker: false })
-  const result = await w.__tfBridgeCreateSession(START)
+  const result = await w.__oaBridgeCreateSession(START)
   const ok = !result.ok && /no repo picker/.test(result.note) && !seen.sent
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  create names the missing control  (note=${result.note.slice(0, 80)}…)`)
-  const probe = w.__tfBridgeProbeNewSession()
+  const probe = w.__oaBridgeProbeNewSession()
   const probeOk = probe.composer === 'contenteditable' && probe.sendButton === true && probe.triggers.some(t => t.text === 'Default')
   if (!probeOk) failed++
   console.log(`${probeOk ? 'PASS' : 'FAIL'}  probe describes the page without touching it  (${JSON.stringify(probe.triggers)})`)
@@ -647,10 +647,10 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   })
   wireRows()
   wireMain()
-  w.__tfComposerWaitMs = 500
-  w.__tfSettleMs = 10
-  w.__tfMenuSettleMs = 10
-  w.__tfSessionWaitMs = 2000
+  w.__oaComposerWaitMs = 500
+  w.__oaSettleMs = 10
+  w.__oaMenuSettleMs = 10
+  w.__oaSessionWaitMs = 2000
   w.eval(script)
   return { dom, w, d, seen }
 }
@@ -658,7 +658,7 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
 {
   const { dom, w, seen } = appPage()
   const ids = SESSIONS.map(s => s.id).concat('session_01GONE')
-  const got = await w.__tfBridgeReadSessionList(ids)
+  const got = await w.__oaBridgeReadSessionList(ids)
   const want = [
     ['session_01AWAIT', 'awaiting'],
     ['session_01UNREAD', 'unread'],
@@ -685,18 +685,18 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   // queued answer typed, and the send counts only once the transcript gained the turn; the page
   // ends back on the list, and the overlay is up throughout.
   const { dom, w, d, seen } = appPage()
-  const result = await w.__tfBridgeDrive({
+  const result = await w.__oaBridgeDrive({
     visits: [
       { id: 'session_01AWAIT', status: 'awaiting' },
       { id: 'session_01UNREAD', status: 'unread', answer: { id: 'ans-1', text: 'Work on the next TODO' } },
     ],
   })
-  const overlay = d.getElementById('tf-driver-overlay')
+  const overlay = d.getElementById('oa-driver-overlay')
   const visited = result.visited.map(v => [v.id, v.ok, v.question ?? null])
   const ok =
     result.ok &&
     JSON.stringify(visited) === JSON.stringify([['session_01AWAIT', true, 'What would you like me to do?'], ['session_01UNREAD', true, null]]) &&
-    w.__tfBridgeQuestion?.sessionId === 'session_01AWAIT' &&
+    w.__oaBridgeQuestion?.sessionId === 'session_01AWAIT' &&
     JSON.stringify(result.delivered) === JSON.stringify([{ sessionId: 'session_01UNREAD', id: 'ans-1', ok: true, note: 'filled contenteditable, clicked send button' }]) &&
     JSON.stringify(seen.sent) === JSON.stringify([{ path: '/code/session_01UNREAD', text: 'Work on the next TODO' }]) &&
     JSON.stringify(seen.navigations) === JSON.stringify(['session_01AWAIT', 'session_01UNREAD', 'home']) &&
@@ -704,17 +704,17 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
     overlay &&
     /OpenAgent Driver/.test(overlay.textContent) &&
     /Show debug logs/.test(overlay.textContent) &&
-    /visit session_01AWAIT \(awaiting\)/.test(overlay.querySelector('.tf-driver-log').textContent) &&
-    d.getElementById('tf-bridge-panel').style.display === 'none'
+    /visit session_01AWAIT \(awaiting\)/.test(overlay.querySelector('.oa-driver-log').textContent) &&
+    d.getElementById('oa-bridge-panel').style.display === 'none'
   if (!ok) failed++
   console.log(
-    `${ok ? 'PASS' : 'FAIL'}  a cycle visits in-app, reports the question, types the answer and waits for the send, then returns to the list under the overlay  (visited=${JSON.stringify(visited)}, question=${w.__tfBridgeQuestion?.sessionId}, delivered=${JSON.stringify(result.delivered)}, nav=${seen.navigations.join('>')}, path=${w.location.pathname}, overlay=${Boolean(overlay)})`,
+    `${ok ? 'PASS' : 'FAIL'}  a cycle visits in-app, reports the question, types the answer and waits for the send, then returns to the list under the overlay  (visited=${JSON.stringify(visited)}, question=${w.__oaBridgeQuestion?.sessionId}, delivered=${JSON.stringify(result.delivered)}, nav=${seen.navigations.join('>')}, path=${w.location.pathname}, overlay=${Boolean(overlay)})`,
   )
   // Whatever removes the overlay, the next page change brings it back.
   overlay.remove()
   d.getElementById('main').insertAdjacentHTML('beforeend', '<p>something changed</p>')
   await new Promise(resolve => setTimeout(resolve, 600))
-  const back = Boolean(d.getElementById('tf-driver-overlay'))
+  const back = Boolean(d.getElementById('oa-driver-overlay'))
   if (!back) failed++
   console.log(`${back ? 'PASS' : 'FAIL'}  the overlay is re-asserted after being removed  (back=${back})`)
   // The sign-in page is where a person has to act in this tab (the daemon's bridge browser is
@@ -722,11 +722,11 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   w.history.pushState({}, '', '/login?from=logout')
   d.getElementById('main').insertAdjacentHTML('beforeend', '<p>sign in</p>')
   await new Promise(resolve => setTimeout(resolve, 600))
-  const aside = !d.getElementById('tf-driver-overlay')
+  const aside = !d.getElementById('oa-driver-overlay')
   w.history.pushState({}, '', '/code')
   d.getElementById('main').insertAdjacentHTML('beforeend', '<p>signed in</p>')
   await new Promise(resolve => setTimeout(resolve, 600))
-  const returned = Boolean(d.getElementById('tf-driver-overlay'))
+  const returned = Boolean(d.getElementById('oa-driver-overlay'))
   if (!aside || !returned) failed++
   console.log(`${aside && returned ? 'PASS' : 'FAIL'}  the overlay stands aside on the sign-in page and returns on the next page  (aside=${aside}, returned=${returned})`)
   dom.window.close()
@@ -735,8 +735,8 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
 {
   // A page that swallows the send: the answer is reported as not taken, never as sent.
   const { dom, w } = appPage({ sendAppendsRow: false })
-  w.__tfSendWaitMs = 300
-  const result = await w.__tfBridgeDrive({ visits: [{ id: 'session_01UNREAD', status: 'unread', answer: { id: 'ans-2', text: 'Work on the next TODO' } }] })
+  w.__oaSendWaitMs = 300
+  const result = await w.__oaBridgeDrive({ visits: [{ id: 'session_01UNREAD', status: 'unread', answer: { id: 'ans-2', text: 'Work on the next TODO' } }] })
   const delivered = result.delivered[0]
   const ok = delivered && delivered.ok === false && /did not take the send/.test(delivered.note) && /rows 2 -> 2/.test(delivered.note)
   if (!ok) failed++
@@ -747,7 +747,7 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
 {
   // A session the list does not show cannot be visited; the queued answer is reported back untouched.
   const { dom, w } = appPage()
-  const result = await w.__tfBridgeDrive({ visits: [{ id: 'session_01GONE', status: 'missing', answer: { id: 'ans-3', text: 'x' } }] })
+  const result = await w.__oaBridgeDrive({ visits: [{ id: 'session_01GONE', status: 'missing', answer: { id: 'ans-3', text: 'x' } }] })
   const ok = result.visited[0].ok === false && result.visited[0].note === 'not on the list' && result.delivered.length === 0
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  a session missing from the list is not visited and its answer is not claimed  (${JSON.stringify(result.visited[0])})`)
@@ -758,7 +758,7 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   // The session the daemon asked for is created first, from the list page the cycle starts on,
   // before any visit — a run is waiting on it — and the cycle still ends on the list.
   const { dom, w, seen } = appPage()
-  const result = await w.__tfBridgeDrive({
+  const result = await w.__oaBridgeDrive({
     visits: [{ id: 'session_01UNREAD', status: 'unread', answer: { id: 'ans-4', text: 'Work on the next TODO' } }],
     start: { repo: 'framework/the-framework', branch: 'main', prompt: 'Add the thing' },
   })
@@ -777,8 +777,8 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
 {
   // A second instruction while a drive runs is refused as busy, never run alongside it.
   const { dom, w } = appPage()
-  const first = w.__tfBridgeDrive({ visits: [{ id: 'session_01AWAIT', status: 'awaiting' }] })
-  const second = await w.__tfBridgeReadSessionList(['session_01AWAIT'])
+  const first = w.__oaBridgeDrive({ visits: [{ id: 'session_01AWAIT', status: 'awaiting' }] })
+  const second = await w.__oaBridgeReadSessionList(['session_01AWAIT'])
   const done = await first
   const ok = second.ok === false && second.busy === true && done.ok && done.visited[0]?.ok === true
   if (!ok) failed++
@@ -791,7 +791,7 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   // opened a pull request and then stopped for its user is still awaiting.
   const { dom, w, d } = appPage()
   d.querySelector('a[href="/code/session_01AWAIT"]').insertAdjacentHTML('afterbegin', '<span aria-label="#1700 · Open"></span>')
-  const got = await w.__tfBridgeReadSessionList(['session_01AWAIT'])
+  const got = await w.__oaBridgeReadSessionList(['session_01AWAIT'])
   const ok = got.statuses[0].status === 'awaiting'
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  a status word on the row beats its pull-request label  (${JSON.stringify(got.statuses[0])})`)
@@ -809,7 +809,7 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
     { id: 'session_01PRCLOSED', label: '#1702 · Closed', title: 'Pull request closed' },
   ]
   const { dom, w } = appPage({ sessions })
-  const got = await w.__tfBridgeReadSessionList(sessions.map(s => s.id))
+  const got = await w.__oaBridgeReadSessionList(sessions.map(s => s.id))
   const statuses = got.statuses.map(s => [s.sessionId, s.status])
   const want = [
     ['session_01PROPEN', 'idle'],
@@ -840,10 +840,10 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   // Let whatever the load itself queued run out, then make exactly one page change. The re-read
   // coalesces over 250 ms; a self-loop fits several more surveys into the wait after it.
   await settle(600)
-  const before = w.__tfBridgeSurveys()
+  const before = w.__oaBridgeSurveys()
   w.document.querySelector('[role=feed]').insertAdjacentHTML('beforeend', row('assistant', 2, 'One more turn.'))
   await settle(1500)
-  const ran = w.__tfBridgeSurveys() - before
+  const ran = w.__oaBridgeSurveys() - before
   const ok = ran === 1
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  one page change costs one survey: the panel's redraw does not trigger the next  (surveys after the change=${ran})`)
@@ -860,7 +860,7 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   const plan = readFileSync(join(here, 'driver-plan.js'), 'utf8')
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { runScripts: 'outside-only' })
   dom.window.eval(plan)
-  const planVisits = dom.window.__tfPlanVisits
+  const planVisits = dom.window.__oaPlanVisits
   const NOW = 1_000_000
   const statuses = [
     { sessionId: 's_await', status: 'awaiting' },
@@ -922,7 +922,7 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   const src = readFileSync(join(here, 'fingerprint.js'), 'utf8')
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { runScripts: 'outside-only' })
   dom.window.eval(src)
-  const { WATCHED_FILES, fingerprint, changedFiles } = dom.window.__tfFingerprint
+  const { WATCHED_FILES, fingerprint, changedFiles } = dom.window.__oaFingerprint
   {
     // The manifest's files, what the worker imports, and the options page's script.
     const manifest = JSON.parse(readFileSync(join(here, 'manifest.json'), 'utf8'))

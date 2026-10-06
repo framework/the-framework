@@ -34,10 +34,10 @@ export const BRIDGE_PREFIX = '/_bridge'
  * which reads as a framework bug and burns a debugging session. The extension's manifest must
  * carry the same number; a test keeps the two in lockstep.
  */
-export const EXPECTED_EXTENSION_VERSION = '0.12.0'
+export const EXPECTED_EXTENSION_VERSION = '0.13.0'
 
 /** The header the extension states its version in. Lowercase, as node presents all headers. */
-export const EXTENSION_VERSION_HEADER = 'x-tf-extension-version'
+export const EXTENSION_VERSION_HEADER = 'x-oa-extension-version'
 
 /**
  * One thing a cloud session did, as scraped from its page (#1237).

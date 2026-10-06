@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { DashboardData, OnboardingSuggestion } from '../../src/index.js'
 import { Square, SquareCheckBig, X } from 'lucide-react'
 import { onDashboard } from '../rpc/reads.js'
@@ -7,6 +7,7 @@ import { usePolled } from '../lib/use-async.js'
 import { usePreferences, updatePreferences, notificationsEnabled } from '../lib/preferences.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
 import { startPicks, useStartAgent } from '../lib/use-start-agent.js'
+import { AddProjectEffects } from './AddProjectEffects.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
 import { UpdateTicketsButton, UPDATE_TICKETS_PROMPT } from './UpdateTicketsButton.js'
 import { Button } from './ui/button.js'
@@ -27,7 +28,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 interface Step {
   key: string
   label: string
-  description: string
+  /** What the step is: a sentence, or more when the step changes something of the person's. */
+  description: ReactNode
   done: boolean
   /**
    * Nothing breaks if this one is never done (#1139).
@@ -98,7 +100,10 @@ export function OnboardingChecklist({
     {
       key: 'project',
       label: 'Add a project',
-      description: 'A project is a git repo OpenAgent may work in.',
+      // Said before the button is pressed: what adding does to the folder. Once a project is
+      // added the step is done, and one sentence says what a project is. Until the first read
+      // lands nobody knows which, so the tall text does not flash at a person who has projects.
+      description: data && projectCount === 0 ? <AddProjectEffects /> : 'A project is a git repo OpenAgent may work in.',
       done: projectCount > 0,
       action: (
         <div className="flex flex-wrap justify-end gap-2">
@@ -203,8 +208,10 @@ export function OnboardingChecklist({
       <CardContent>
         <ul className="divide-y divide-border">
           {steps.map(step => (
-            <li key={step.key} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
-              <div className="flex min-w-0 items-start gap-3">
+            // The action drops under the text when the row cannot hold both at a readable width:
+            // a long folder name on the first step's button would squeeze its text to a strip.
+            <li key={step.key} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0">
+              <div className="flex min-w-0 grow basis-96 items-start gap-3">
                 {/* A checkbox, not a circle: an outlined circle reads as a radio button, i.e. as
                     one of a set you pick between, when these are independent things to tick (#1139). */}
                 {step.done ? (
@@ -221,7 +228,7 @@ export function OnboardingChecklist({
                       </span>
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground">{step.description}</p>
+                  {typeof step.description === 'string' ? <p className="text-xs text-muted-foreground">{step.description}</p> : <div className="mt-1">{step.description}</div>}
                 </div>
               </div>
               {!step.done && step.action && <div className="shrink-0">{step.action}</div>}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { sendAddProject, sendPickProjectDirectory } from '../rpc/projects.js'
 import { useAction } from '../lib/use-action.js'
+import { AddProjectEffects } from './AddProjectEffects.js'
 import { Button } from './ui/button.js'
 
 // Add a project (#396/#1150): the OS's own folder picker instead of a typed path — the daemon
@@ -142,6 +143,9 @@ export function AddProjectPanel({ folder, onAdded, onClose }: { folder?: string 
               Adding it lets the agent read its files. Hidden instructions in an untrusted repo can hijack the agent
               (prompt injection), so only add repos you trust.
             </p>
+            <div className="mb-3">
+              <AddProjectEffects />
+            </div>
             <fieldset className="mb-3 text-xs">
               <legend className="mb-1 font-medium text-foreground">The agents&rsquo; records (what you ask, what each agent answers)</legend>
               <label className="flex items-start gap-2 py-0.5">

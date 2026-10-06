@@ -13,7 +13,7 @@ The "Add project" modal, opened from the "Projects" list and from the onboarding
 ## Business logic — TL;DR
 
 - **Picking is the form** - the system folder dialog opens the moment the modal does; dismissing it closes the modal, and a dialog the daemon could not open reports why with a "Try again"; a modal handed a folder opens no system dialog and starts at the trust confirmation.
-- **The trust confirmation** - the chosen path is shown back under "Do you trust this repository?" with the prompt-injection warning, and the project is added only on "I trust it, add it"; "Choose again" reopens the system dialog, and reads "Cancel", closing the modal, when the folder was handed in.
+- **The trust confirmation** - the chosen path is shown back under "Do you trust this repository?" with the prompt-injection warning and, under it, what adding the project does to the folder (`AddProjectEffects.tsx`, the same text as on the onboarding checklist), and the project is added only on "I trust it, add it"; "Choose again" reopens the system dialog, and reads "Cancel", closing the modal, when the folder was handed in.
 - **Where the agents' records go** - on the trust step, two choices: "Keep them on this machine", picked until the user picks the other, and "Share them to the repository's remote"; each says what it does before anything happens, and the pick travels with the add.
 - **Success and failure** - "Project added" or "Already added", with a "Done" and an automatic close after 2.5 seconds; when sharing was picked and the repository has no remote, a line says the records stay on this machine and the close waits 6 seconds; a refused add shows the daemon's reason and stays on the trust step.
 - **It behaves like a dialog** - Escape closes it, Tab stays inside it, clicking outside closes it, and focus returns to the control that opened it.
@@ -42,7 +42,7 @@ See `## Context`.
 
 #### Business logic
 
-With a folder picked, the modal reads "Do you trust this repository?", shows the picked path, and warns: "Adding it lets the agent read its files. Hidden instructions in an untrusted repo can hijack the agent (prompt injection), so only add repos you trust." Two buttons: "Choose again" reopens the system folder dialog and, if a folder is picked, replaces the path (when the folder was handed in by the opener there is nothing to choose again, so the button reads "Cancel" and closes the modal without adding anything); "I trust it, add it", focused by default, asks the daemon to install and register the project, with the user's answer on the agents' records (next section), reading "Adding…" while it does. Both are disabled while the add is in flight. The daemon is never asked to add a project the user has not confirmed.
+With a folder picked, the modal reads "Do you trust this repository?", shows the picked path, and warns: "Adding it lets the agent read its files. Hidden instructions in an untrusted repo can hijack the agent (prompt injection), so only add repos you trust." Under the warning, the same text as on the onboarding checklist says what adding the project does to the folder (`AddProjectEffects.tsx`). Two buttons: "Choose again" reopens the system folder dialog and, if a folder is picked, replaces the path (when the folder was handed in by the opener there is nothing to choose again, so the button reads "Cancel" and closes the modal without adding anything); "I trust it, add it", focused by default, asks the daemon to install and register the project, with the user's answer on the agents' records (next section), reading "Adding…" while it does. Both are disabled while the add is in flight. The daemon is never asked to add a project the user has not confirmed.
 
 ### Where the agents' records go
 
@@ -54,7 +54,7 @@ With a folder picked, the modal reads "Do you trust this repository?", shows the
 
 #### Business logic
 
-Between the warning and the buttons, the trust step asks under "The agents' records (what you ask, what each agent answers)", as one choice of two:
+Between that text and the buttons, the trust step asks under "The agents' records (what you ask, what each agent answers)", as one choice of two:
 
 - "Keep them on this machine", with "Nothing is pushed." under it. It is the one picked when the step opens.
 - "Share them to the repository's remote", with "Pushes a branch agent-data to origin, and keeps pushing as agents work." under it.

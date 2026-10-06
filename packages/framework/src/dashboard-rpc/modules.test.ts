@@ -29,7 +29,7 @@ const module = (bin: string) => ({
 
 /** A queue provider that is also a module: `--local` prints its file; `add` appends to it. */
 const queueModule = {
-  manifest: { exports: { './dashboard': './w.js' }, bin: { queue: 'bin/queue' }, framework: { queue: 'queue' } },
+  manifest: { exports: { './dashboard': './w.js' }, bin: { queue: 'bin/queue' }, openagent: { queue: 'queue' } },
   files: {
     'w.js': 'export default {}',
     'bin/queue': `

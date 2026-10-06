@@ -4,7 +4,7 @@ Creates a project's repository on a host, for a project that lives on this machi
 
 **User story**: in the project menu of a project with no remote, the user picks "Create a repository on GitHub…", confirms, and the project is on GitHub, private, pushed. The item is not there for a project that has a remote, or when the host cannot be reached as the user.
 
-**Business logic story**: a package declares `"framework": { "repository": "<command>" }` in its `package.json`. The built-in GitHub package declares it (`../built-in.ts`), so a project with nothing installed is offered it too; a project's own package wins.
+**Business logic story**: a package declares `"openagent": { "repository": "<command>" }` in its `package.json`. The built-in GitHub package declares it (`../built-in.ts`), so a project with nothing installed is offered it too; a project's own package wins.
 
 ## Business logic — TL;DR
 

@@ -13,7 +13,7 @@ The `branches` skill [1], one of the four skills every agent [2] is taught: one 
 [5] session name: the name an agent gives its own work (`[a-z0-9-]+`); its branch is renamed to `agent-<session name>` and the dashboard labels the agent by it.
 [6] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [7] push: send a checkout's branch to the remote `origin`, once the checkout is clean; done only when a person asks for it.
-[8] branches provider: the package among a project's dependencies whose `package.json` declares `"framework": { "branches": "<command>" }`; the dashboard's server reads and moves the project's checkouts by running that command, naming no package.
+[8] branches provider: the package among a project's dependencies whose `package.json` declares `"openagent": { "branches": "<command>" }`; the dashboard's server reads and moves the project's checkouts by running that command, naming no package.
 
 ## Business logic — TL;DR
 

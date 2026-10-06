@@ -8,7 +8,7 @@ Collects the agent queue [1] of every project into the dashboard's cross-project
 
 [1] the agent queue: every task agents will work next, in the order they will be taken, kept by a project package (the `queue` skill keeps it as `TODO_AGENTS.md` on the `agent-data` branch, in priority sections).
 [2] entry: one task on the agent queue [1], as the provider's command prints it: the text a future agent is started with.
-[3] queue provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's agent queue [1], in its own package.json under `"framework": { "queue": "<command>" }`.
+[3] queue provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's agent queue [1], in its own package.json under `"openagent": { "queue": "<command>" }`.
 
 ## Business logic — TL;DR
 

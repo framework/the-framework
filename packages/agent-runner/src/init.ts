@@ -7,7 +7,7 @@ import { DASHBOARD_DIR, DASHBOARD_HOOKS } from './names.js'
  * `init`: this tool's lines written into a dashboard's hooks file, so a project added to the
  * dashboard can check, start and resume a run with nothing typed by hand. The tool writes its own
  * lines: the dashboard runs `init` when a project is added (the package declares it under
- * `framework.hooks` in its package.json) and holds no copy of them, and a project that wants
+ * `openagent.hooks` in its package.json) and holds no copy of them, and a project that wants
  * another tool writes that tool's lines. The writer takes any tool's lines, so
  * another tool's `init` (a scheduler's) writes its own through it.
  *

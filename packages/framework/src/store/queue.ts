@@ -4,7 +4,7 @@ import { providedCommand } from '../built-in.js'
 /**
  * The agent queue, as the framework reads it (#1774). The framework keeps no queue and imports no
  * queue package: a project's queue comes from whichever of its packages declares that it provides
- * it — `"framework": { "queue": "<command>" }` in the package's own package.json — and the
+ * it — `"openagent": { "queue": "<command>" }` in the package's own package.json — and the
  * framework reads it by running that command. Swap the package for another that answers the same
  * command line and prints the same shape, and nothing here changes. No package declares it: the
  * project has no queue, and the dashboard shows it none.

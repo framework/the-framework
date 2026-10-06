@@ -10,10 +10,10 @@ import { lookupProvidedCommand, readProvidedCommand, runPackageCommand } from '.
 
 const ECHO = `process.stdout.write(JSON.stringify(process.argv.slice(2)))`
 
-/** A project listing `deps`; `framework` is the project's own `framework` key, when given. */
-async function project(deps: Record<string, Record<string, unknown>>, framework?: Record<string, string>): Promise<string> {
+/** A project listing `deps`; `named` is the project's own `openagent` key, when given. */
+async function project(deps: Record<string, Record<string, unknown>>, named?: Record<string, string>): Promise<string> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'provided-command-')))
-  await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: Object.fromEntries(Object.keys(deps).map(name => [name, '*'])), ...(framework ? { framework } : {}) }))
+  await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: Object.fromEntries(Object.keys(deps).map(name => [name, '*'])), ...(named ? { openagent: named } : {}) }))
   for (const [name, manifest] of Object.entries(deps)) {
     const dir = join(root, 'node_modules', name)
     await mkdir(dir, { recursive: true })
@@ -26,8 +26,8 @@ async function project(deps: Record<string, Record<string, unknown>>, framework?
 test('one package declaring a kind provides it; a declaration naming no command of the package is none; nobody declaring is nothing, and no problem', async () => {
   const root = await project({
     plain: { bin: { plain: 'cmd.cjs' } },
-    'wrong-bin': { bin: { a: 'cmd.cjs' }, framework: { runs: 'b' } },
-    logs: { bin: { logs: 'cmd.cjs' }, framework: { runs: 'logs' } },
+    'wrong-bin': { bin: { a: 'cmd.cjs' }, openagent: { runs: 'b' } },
+    logs: { bin: { logs: 'cmd.cjs' }, openagent: { runs: 'logs' } },
   })
   try {
     const found = await lookupProvidedCommand(root, 'runs')
@@ -44,7 +44,7 @@ test('one package declaring a kind provides it; a declaration naming no command 
 })
 
 test('two packages declaring a kind: the one the project names provides; none named is none, with the reason; a name that does not provide it is none, said', async () => {
-  const two = { github: { bin: { github: 'cmd.cjs' }, framework: { 'git-host': 'github' } }, gitlab: { bin: { gitlab: 'cmd.cjs' }, framework: { 'git-host': 'gitlab' } } }
+  const two = { github: { bin: { github: 'cmd.cjs' }, openagent: { 'git-host': 'github' } }, gitlab: { bin: { gitlab: 'cmd.cjs' }, openagent: { 'git-host': 'gitlab' } } }
   const unnamed = await project(two)
   const named = await project(two, { 'git-host': 'gitlab' })
   const wrong = await project(two, { 'git-host': 'plain' })
@@ -52,7 +52,7 @@ test('two packages declaring a kind: the one the project names provides; none na
   try {
     const none = await lookupProvidedCommand(unnamed, 'git-host')
     assert.equal(none.command, undefined, 'never the first in dependency order')
-    assert.equal(none.problem, '2 packages provide git-host: github, gitlab; name one under "framework" in package.json')
+    assert.equal(none.problem, '2 packages provide git-host: github, gitlab; name one under "openagent" in package.json')
     assert.equal(await readProvidedCommand(unnamed, 'git-host'), undefined)
 
     const picked = await lookupProvidedCommand(named, 'git-host')
@@ -67,10 +67,10 @@ test('two packages declaring a kind: the one the project names provides; none na
 })
 
 test('packages the caller ships provide a kind only when none of the project\'s own packages declares it', async () => {
-  const shippedRoot = await project({ shipped: { bin: { s: 'cmd.cjs' }, framework: { runs: 's' } } })
-  const shipped = [{ name: 'shipped', dir: join(shippedRoot, 'node_modules', 'shipped'), manifest: { name: 'shipped', bin: { s: 'cmd.cjs' }, framework: { runs: 's' } } }]
+  const shippedRoot = await project({ shipped: { bin: { s: 'cmd.cjs' }, openagent: { runs: 's' } } })
+  const shipped = [{ name: 'shipped', dir: join(shippedRoot, 'node_modules', 'shipped'), manifest: { name: 'shipped', bin: { s: 'cmd.cjs' }, openagent: { runs: 's' } } }]
   const bare = await project({ plain: { bin: { plain: 'cmd.cjs' } } })
-  const own = await project({ logs: { bin: { records: 'cmd.cjs' }, framework: { runs: 'records' } } })
+  const own = await project({ logs: { bin: { records: 'cmd.cjs' }, openagent: { runs: 'records' } } })
   try {
     assert.equal((await lookupProvidedCommand(bare, 'runs', shipped)).command?.package, 'shipped')
     assert.equal((await lookupProvidedCommand(join(bare, 'nowhere'), 'runs', shipped)).command?.package, 'shipped', 'no package.json at all')
@@ -82,7 +82,7 @@ test('packages the caller ships provide a kind only when none of the project\'s 
 })
 
 test('a package command runs with Node in the project and answers its JSON, its last stderr line, or that it printed none', async () => {
-  const root = await project({ tool: { bin: { tool: 'cmd.cjs' }, framework: { thing: 'tool' } } })
+  const root = await project({ tool: { bin: { tool: 'cmd.cjs' }, openagent: { thing: 'tool' } } })
   const dir = join(root, 'node_modules', 'tool')
   await writeFile(join(dir, 'fails.cjs'), `process.stderr.write('first\\nno such thing\\n'); process.exit(1)`)
   await writeFile(join(dir, 'text.cjs'), `process.stdout.write('hello')`)

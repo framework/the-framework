@@ -23,7 +23,7 @@
   "bin": {
     "github": "bin/github"
   },
-  "framework": {
+  "openagent": {
     "git-host": "github",
     "repository": "github"
   },

@@ -9,8 +9,8 @@ Which of a project's installed packages provides one kind of The Framework's dat
 ## Glossary
 
 [1] kind: one sort of The Framework's data a package may provide: `tickets`, `queue`, `runs`, `branches`, `git-host`. A kind is a word both sides agree on; The Framework knows the kinds, never the packages.
-[2] provided command: the command a package declares, in its own `package.json` under `"framework": { "<kind>": "<command>" }`, naming one of its own `bin` entries, as answering one kind [1] for the project.
-[3] the project's line: the entry in the project's own root `package.json`, `"framework": { "<kind>": "<package name>" }`, naming which installed package provides a kind [1] when several declare it.
+[2] provided command: the command a package declares, in its own `package.json` under `"openagent": { "<kind>": "<command>" }`, naming one of its own `bin` entries, as answering one kind [1] for the project.
+[3] the project's line: the entry in the project's own root `package.json`, `"openagent": { "<kind>": "<package name>" }`, naming which installed package provides a kind [1] when several declare it.
 
 ## Business logic — TL;DR
 
@@ -30,7 +30,7 @@ See `## Context`.
 
 #### Business logic
 
-The providers of a kind [1] are the project's installed packages whose own `package.json` has a `framework` object with, under the kind, the name of one of the package's own commands; a declaration naming a command the package does not have, or anything that is not a string, is no declaration. Then:
+The providers of a kind [1] are the project's installed packages whose own `package.json` has a `openagent` object with, under the kind, the name of one of the package's own commands; a declaration naming a command the package does not have, or anything that is not a string, is no declaration. Then:
 
 - no provider: the answer is empty, and there is no problem; the project has none of that data;
 - one provider and no line [3] for the kind: it provides;

@@ -23,7 +23,7 @@
   "bin": {
     "logs": "bin/logs"
   },
-  "framework": {
+  "openagent": {
     "runs": "logs"
   },
   "exports": {

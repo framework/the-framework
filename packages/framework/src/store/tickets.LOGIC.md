@@ -7,14 +7,14 @@ How The Framework reads a project's tickets [1]: through the tickets provider [2
 - A project that installed no tickets package has no tickets: the onboarding step about tickets does not apply.
 - Browsing, planning, claiming and releasing tickets, and the Overview's hot-tickets card, are not The Framework's: the tickets package brings its own module [4] for that, which reads and changes them through the same command.
 
-**Business logic story**: The Framework names no skill. A project picks the package that keeps its tickets by listing it as a dependency; that package says, in its own package.json, which of its commands answers for the tickets (`"framework": { "tickets": "tickets" }` for the `tickets` skill's package). The Framework only reads, and only for what it composes across skills.
+**Business logic story**: The Framework names no skill. A project picks the package that keeps its tickets by listing it as a dependency; that package says, in its own package.json, which of its commands answers for the tickets (`"openagent": { "tickets": "tickets" }` for the `tickets` skill's package). The Framework only reads, and only for what it composes across skills.
 
 **Problem**: the dashboard reads every project's tickets on several polls every few seconds, and every read of the provider is a process.
 
 ## Glossary
 
 [1] ticket: a piece of work proposed for the project, kept by a project package (the `tickets` skill keeps it as a markdown file under `tickets/` on the `agent-data` branch, with its plan and its claim beside it).
-[2] tickets provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's tickets [1], in its own package.json under `"framework": { "tickets": "<command>" }`.
+[2] tickets provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's tickets [1], in its own package.json under `"openagent": { "tickets": "<command>" }`.
 [3] a ticket's row: one ticket as the provider's command lists it: its file name (its identity, and what a link to it names as `tickets/<file>`), its title, a one-line summary, the file's date, whether a plan sits beside it; and, when the ticket has them, its priority as written (`0` to `10`), its topics, the issue it tracks and the pull request that closes it (each a label and a URL), whether and by whom it is claimed, and its plan's effort and uncertainty.
 [4] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 
@@ -35,7 +35,7 @@ See `## Context`.
 
 #### Business logic
 
-The project's own package.json is read; its `dependencies` then `devDependencies` are taken in their order, a name listed twice read once. Each is looked up in the project's `node_modules`, links followed. The first whose own package.json declares `"framework": { "tickets": "<command>" }`, where `<command>` is one of that package's own commands, is the tickets provider [2]. A declaration naming a command the package does not have is skipped. No package.json, no installed dependency, or no declaration: the project has no tickets provider, and the project has no tickets (`undefined`, which the Overview reads as nothing to show and the onboarding as nothing to populate). The provider is looked up again at most every five seconds, so a project that installs, swaps or drops its provider is read the new way within five seconds.
+The project's own package.json is read; its `dependencies` then `devDependencies` are taken in their order, a name listed twice read once. Each is looked up in the project's `node_modules`, links followed. The first whose own package.json declares `"openagent": { "tickets": "<command>" }`, where `<command>` is one of that package's own commands, is the tickets provider [2]. A declaration naming a command the package does not have is skipped. No package.json, no installed dependency, or no declaration: the project has no tickets provider, and the project has no tickets (`undefined`, which the Overview reads as nothing to show and the onboarding as nothing to populate). The provider is looked up again at most every five seconds, so a project that installs, swaps or drops its provider is read the new way within five seconds.
 
 ### The command line it answers
 

@@ -1,4 +1,4 @@
-The project's git host [1], reached by declaration: whichever of the project's installed packages declares in its own `package.json` that its command provides the `git-host` kind of data (`"framework": { "git-host": "<command>" }`) answers the pull requests, and this tool runs that command in the project the way the dashboard runs any provided command (the shared library's rule, `agent-data`). The tool names no git host and no package; a project with no such package has no pull requests to read back and nothing to merge.
+The project's git host [1], reached by declaration: whichever of the project's installed packages declares in its own `package.json` that its command provides the `git-host` kind of data (`"openagent": { "git-host": "<command>" }`) answers the pull requests, and this tool runs that command in the project the way the dashboard runs any provided command (the shared library's rule, `agent-data`). The tool names no git host and no package; a project with no such package has no pull requests to read back and nothing to merge.
 
 ## Context
 

@@ -4,7 +4,7 @@ import { providedCommand } from '../built-in.js'
 /**
  * The tickets, as the framework reads them (#1774). The framework keeps no ticket and imports no
  * tickets package: a project's tickets come from whichever of its packages declares that it
- * provides them — `"framework": { "tickets": "<command>" }` in the package's own package.json —
+ * provides them — `"openagent": { "tickets": "<command>" }` in the package's own package.json —
  * and the framework reads them by running that command. Swap the package for another that answers
  * the same command line and prints the same shape, and nothing here changes. No package declares
  * it: the project has no tickets, and the dashboard shows it none.

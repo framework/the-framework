@@ -9,7 +9,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## The git host as a skill
 - GitHub is a skill: this package teaches an agent how to work with GitHub and declares the
   one command the framework and the scheduler run for the git host
-  (`"framework": { "git-host": "github" }`). `gh` runs in this package only; no other skill
+  (`"openagent": { "git-host": "github" }`). `gh` runs in this package only; no other skill
   names GitHub or `gh`. Another git host is another package answering the same command;
   the framework and the scheduler name none. Picked over a git host adapter inside the
   branches package, which would have kept a request half in a skill about git.
@@ -50,7 +50,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   merged.
 - `create` makes the project's repository on GitHub, for a project with no `origin`: private,
   named `<account>/<folder>`, set as `origin` and pushed, in one `gh` step. `--check` only
-  names it. The package declares it under `"framework": { "repository": "github" }`, so a
+  names it. The package declares it under `"openagent": { "repository": "github" }`, so a
   dashboard offers it without naming GitHub. Always private: making code public is never this
   command's choice. Picked over a name the person types, which is one more thing to ask, and
   over moving a project that already has a remote.

@@ -9,7 +9,7 @@ The `github` skill [1]: the project's git host [2] is GitHub, and this package i
 [1] skill: one of the capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs`, `github` — each a package with the instructions the agent reads (its `SKILL.md`), a command on the agent's PATH, and, for some, a command the product runs.
 [2] git host: the service hosting the project's remote repository, its pull requests and its issues: GitHub here.
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[4] git host provider: the package among a project's dependencies whose `package.json` declares `"framework": { "git-host": "<command>" }`; the dashboard's server and `agent-runner` read and act on the project's pull requests by running that command, naming no package.
+[4] git host provider: the package among a project's dependencies whose `package.json` declares `"openagent": { "git-host": "<command>" }`; the dashboard's server and `agent-runner` read and act on the project's pull requests by running that command, naming no package.
 
 ## Business logic — TL;DR
 

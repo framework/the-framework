@@ -7,7 +7,7 @@ Gives an agent [1] in a shell, the user, the dashboard's server and `agent-runne
 ## Glossary
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[2] git host provider: the package among a project's dependencies whose `package.json` declares `"framework": { "git-host": "<command>" }`; the dashboard's server and `agent-runner` read and act on the project's pull requests by running that command, naming no package.
+[2] git host provider: the package among a project's dependencies whose `package.json` declares `"openagent": { "git-host": "<command>" }`; the dashboard's server and `agent-runner` read and act on the project's pull requests by running that command, naming no package.
 
 ## Business logic — TL;DR
 

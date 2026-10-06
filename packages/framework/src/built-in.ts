@@ -8,7 +8,7 @@ import { declaring, lookupProvidedCommand, packageBins, projectPackages, readMan
  * itself, resolved from its own install, so a project installs nothing for them and an empty
  * folder starts an agent and shows it. Each comes through the same contract as a project's own
  * package: a module by its `./dashboard` export, a provider of a kind of data and the writer of
- * its hook lines by its `framework` key. This list is the one place the framework names a
+ * its hook lines by its `openagent` key. This list is the one place the framework names a
  * package, and a project's own copy of any of them wins.
  */
 export const BUILT_IN_PACKAGES: readonly string[] = ['@openagt/files', '@openagt/skill-branches', '@openagt/skill-github', '@openagt/skill-logs', '@openagt/agent-runner']
@@ -64,7 +64,7 @@ export async function isBuiltIn(root: string, command: ProvidedCommand): Promise
 
 /**
  * Have every package that writes hook lines write its own into the project at `root`: a package
- * declares `"framework": { "hooks": "<command>" }`, and `<command> init`, run in the project,
+ * declares `"openagent": { "hooks": "<command>" }`, and `<command> init`, run in the project,
  * writes its lines into the project's hooks file, keeping every line already there. The project's
  * own packages are asked, then the built-in ones the project has no copy of. Answers one line per
  * package that could not write, in words.

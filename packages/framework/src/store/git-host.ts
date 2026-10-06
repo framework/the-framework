@@ -5,7 +5,7 @@ import { isBuiltIn, providedCommand } from '../built-in.js'
  * The project's git host, as the framework reads and acts on it (#1820): the pull requests of the
  * project, opening one, landing one, and the project's page there. The framework names no git host
  * and runs no git host tool: a project's git host comes from whichever of its packages declares that it
- * provides it — `"framework": { "git-host": "<command>" }` in the package's own package.json — and
+ * provides it — `"openagent": { "git-host": "<command>" }` in the package's own package.json — and
  * the framework asks by running that command. Swap the package for another that answers the same
  * command line and prints the same shapes, and nothing here changes. No package declares it: the
  * project has no git host, so no pull requests, and a finished run's last step is the push. A

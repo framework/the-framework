@@ -32,7 +32,7 @@ A modal handed a folder by its opener (the onboarding checklist's "Add <director
 
 - The user picked a folder: the modal moves to the trust confirmation with that path.
 - The user dismissed the system dialog: the modal closes too, without adding anything; the user said "not now" once already.
-- The daemon could not open a dialog, or could not be reached: the modal shows the reason in red under "Add project" (the daemon's own message, such as that the machine running The Framework has no desktop session and so no folder dialog can open there; or "Could not reach the daemon."), with "Cancel" and "Try again", which asks the daemon again.
+- The daemon could not open a dialog, or could not be reached: the modal shows the reason in red under "Add project" (the daemon's own message, such as that the machine running OpenAgent has no desktop session and so no folder dialog can open there; or "Could not reach the daemon."), with "Cancel" and "Try again", which asks the daemon again.
 
 ### The trust confirmation
 

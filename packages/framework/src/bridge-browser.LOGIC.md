@@ -61,7 +61,7 @@ The browser is the newest Chrome for Testing already under the directory's `chro
 
 #### Business logic
 
-The extension's files are looked for in two places, in this order, and a folder counts only when its manifest names the bridge extension ("The Framework: Claude web bridge"):
+The extension's files are looked for in two places, in this order, and a folder counts only when its manifest names the bridge extension ("OpenAgent: Claude web bridge"):
 
 1. The checkout's `packages/chrome-extension`, next to this package. It is installed from where it is: its folder never moves, and the extension reloads itself when its files are edited there.
 2. The copy the package's build puts in `dist/chrome-extension`, which is what an installed package has. Once any browser an earlier daemon left behind is stopped, and before the launch, that copy replaces the contents of the bridge browser's own `extension` folder, and the extension is installed from there, so its identity stays the same across package versions.

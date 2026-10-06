@@ -1,6 +1,6 @@
 # Claude web bridge
 
-Reports the question a Claude Code cloud session is parked on to your local The Framework
+Reports the question a Claude Code cloud session is parked on to your local OpenAgent
 dashboard (#1237). A cloud run hands off and ends, so when the session later asks something there
 is nothing streaming back and the question is stranded on claude.ai. This carries it home.
 
@@ -12,12 +12,12 @@ same "You paused to ask … The user chose …" a local agent is re-prompted wit
 tells the session the user is taking over), and a queued answer can be withdrawn until the
 extension collects it.
 
-A cloud session started by The Framework asks its questions like a local agent does (#1554); with
+A cloud session started by OpenAgent asks its questions like a local agent does (#1554); with
 the bridge off it simply waits on claude.ai for an answer typed there.
 
 ## Set it up
 
-The short way (#1332): turn the bridge on in The Framework's settings, then switch on **Bridge
+The short way (#1332): turn the bridge on in OpenAgent's settings, then switch on **Bridge
 browser** below it. The daemon downloads a Chrome for Testing (once, ~150 MB), installs this
 extension into it over CDP, hands it the token, and keeps the window minimized. Press *Show the
 window*, sign in to claude.ai in it once, hide it again — done, and web runs no longer need your
@@ -25,7 +25,7 @@ own Chrome open. This works from a checkout and from `npx @openagt/dashboard` al
 a copy of this extension. The steps below are the manual way, for running the extension in your own
 Chrome, from a checkout.
 
-1. **Turn the bridge on in The Framework.** It is off by default; it opens the daemon's one route
+1. **Turn the bridge on in OpenAgent.** It is off by default; it opens the daemon's one route
    reachable from another origin, so it is an explicit choice.
 2. **Load the extension**: `chrome://extensions` -> Developer mode -> Load unpacked -> this directory.
 2b. **Grant site access.** On the extension's Details page, under **Site access**, switch on
@@ -35,7 +35,7 @@ Chrome, from a checkout.
    the daemon sees nothing, and it looks exactly like a wrong token.
 3. **Paste the token**: the extension's Options page. Hit *Save and test*, which pings the daemon
    and tells you which of the two failure modes you have (bridge off, or wrong token).
-4. Start a web run. The extension opens one pinned tab — "The Framework Driver" (#1332) — that
+4. Start a web run. The extension opens one pinned tab — "OpenAgent Driver" (#1332) — that
    reads claude.ai's session list, visits the sessions waiting on you, and types your answers.
    The dashboard shows a parked question within a minute.
 

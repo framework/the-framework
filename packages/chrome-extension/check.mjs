@@ -314,11 +314,11 @@ async function deliver(body, prepare) {
   const panel = dom.window.document.getElementById('tf-bridge-panel')
   // The toggle is the one button carrying aria-expanded; Copy report and Fill composer do not.
   const toggle = () => panel.querySelector('button[aria-expanded]')
-  const expanded = /question found/.test(panel.textContent) && /The Framework bridge/.test(panel.textContent)
+  const expanded = /question found/.test(panel.textContent) && /OpenAgent bridge/.test(panel.textContent)
   toggle().click()
   const folded =
     !/question found/.test(panel.textContent) &&
-    !/The Framework bridge/.test(panel.textContent) &&
+    !/OpenAgent bridge/.test(panel.textContent) &&
     /TF/.test(panel.textContent) &&
     toggle().getAttribute('aria-expanded') === 'false'
   toggle().click()
@@ -702,7 +702,7 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
     JSON.stringify(seen.navigations) === JSON.stringify(['session_01AWAIT', 'session_01UNREAD', 'home']) &&
     w.location.pathname === '/code' &&
     overlay &&
-    /The Framework Driver/.test(overlay.textContent) &&
+    /OpenAgent Driver/.test(overlay.textContent) &&
     /Show debug logs/.test(overlay.textContent) &&
     /visit session_01AWAIT \(awaiting\)/.test(overlay.querySelector('.tf-driver-log').textContent) &&
     d.getElementById('tf-bridge-panel').style.display === 'none'

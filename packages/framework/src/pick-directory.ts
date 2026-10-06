@@ -108,7 +108,7 @@ export async function pickDirectory(
     // A dialog needs a screen to appear on, and a daemon started over SSH or inside a container has
     // none — saying so beats spawning a helper that can only fail.
     if (!env.DISPLAY && !env.WAYLAND_DISPLAY)
-      return { ok: false, error: 'The machine running The Framework has no desktop session, so no folder dialog can open there.' }
+      return { ok: false, error: 'The machine running OpenAgent has no desktop session, so no folder dialog can open there.' }
     return openDialog(linuxDialogs(env.HOME ?? '.'), run)
   }
   return { ok: false, error: `The system folder picker is not available on ${platform}.` }
@@ -126,5 +126,5 @@ async function openDialog(dialogs: Dialog[], run: DialogRunner): Promise<PickDir
     return path ? { ok: true, path } : { ok: false, error: 'The folder dialog returned no path.' }
   }
   const names = dialogs.map(dialog => dialog.command).join(' or ')
-  return { ok: false, error: `The folder dialog needs ${names}, which the machine running The Framework does not have installed.` }
+  return { ok: false, error: `The folder dialog needs ${names}, which the machine running OpenAgent does not have installed.` }
 }

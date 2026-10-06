@@ -78,7 +78,7 @@ document.getElementById('save').addEventListener('click', async () => {
     const version = { 'x-tf-extension-version': chrome.runtime.getManifest().version }
     const res = await fetch(`${daemonUrl}/_bridge/ping`, { headers: { authorization: `Bearer ${token}`, ...version } })
     if (res.status === 401) return say('The dashboard is reachable but rejected the token.', true)
-    if (res.status === 404) return say('Reached the dashboard, but the bridge is off. Turn it on in The Framework.', true)
+    if (res.status === 404) return say('Reached the dashboard, but the bridge is off. Turn it on in OpenAgent.', true)
     // The daemon refuses a version-skewed extension on every route (#1519); its answer names
     // both versions and the way out, so hand it over verbatim.
     if (res.status === 426) return say(await res.text(), true)
@@ -87,7 +87,7 @@ document.getElementById('save').addEventListener('click', async () => {
     // recognise, so a build with no bridge route answers 200 and a page of HTML, and treating
     // that as success would report "connected" to someone whose bridge does not exist.
     const body = (await res.text()).trim()
-    if (body !== 'ok') return say('That dashboard has no bridge route. Update The Framework, then try again.', true)
+    if (body !== 'ok') return say('That dashboard has no bridge route. Update OpenAgent, then try again.', true)
 
     // Prove the read path too, not just auth. "Connected" on its own leaves the next question
     // unanswered: does the daemon actually have anything for us to watch?

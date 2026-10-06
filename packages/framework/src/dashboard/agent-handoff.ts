@@ -455,6 +455,6 @@ function agentPrBody(agent: HandoffAgent): string {
   const lines: string[] = []
   const opening = agent.intent?.trim()
   if (opening) lines.push(opening, '')
-  lines.push(`Opened from The Framework session \`${agent.id}\`.`)
+  lines.push(`Opened from OpenAgent session \`${agent.id}\`.`)
   return lines.join('\n')
 }

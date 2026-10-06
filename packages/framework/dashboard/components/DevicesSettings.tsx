@@ -40,7 +40,7 @@ export function DevicesSettings() {
         <div>
           <CardTitle>Devices</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Other machines running The Framework that you can run a session on. Saved in this browser, not on the
+            Other machines running OpenAgent that you can run a session on. Saved in this browser, not on the
             server, because each one is reached with its own token.
           </p>
         </div>

@@ -9,5 +9,5 @@ The `.gitignore` written into a project's `.openagent/` directory when the proje
 ## Business logic — TL;DR
 
 - **Ignore everything under `.openagent/`** - an agent's card, diary and inbox, the hooks file and anything else placed under it are all ignored.
-- **Except the ignore file itself** - it is the only file under `.openagent/` git sees; it opens with the comment "The Framework: agent state is transient; the lasting records live on the agent-data branch."
+- **Except the ignore file itself** - it is the only file under `.openagent/` git sees; it opens with the comment "OpenAgent: agent state is transient; the lasting records live on the agent-data branch."
 - **Written once, at activation** - install writes it and commits it; its presence is what marks a project as activated, as `install.ts` and `project.ts` read it.

@@ -98,7 +98,7 @@ export function OnboardingChecklist({
     {
       key: 'project',
       label: 'Add a project',
-      description: 'A project is a git repo The Framework may work in.',
+      description: 'A project is a git repo OpenAgent may work in.',
       done: projectCount > 0,
       action: (
         <div className="flex flex-wrap justify-end gap-2">

@@ -6,7 +6,7 @@ import { nodeStoreFs, type StoreFs } from './store/index.js'
 import { errorMessage } from './error-message.js'
 
 /**
- * Install/activate a repo for The Framework (#391): create the `.openagent/` marker and its
+ * Install/activate a repo for OpenAgent (#391): create the `.openagent/` marker and its
  * ignore file, committing pre-existing dirty changes first so the install commit is clean. Pure
  * core over the same {@link GitRunner} + {@link StoreFs} seams as project.ts.
  */
@@ -35,7 +35,7 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
   if (await fs.exists(gitignorePath(cwd))) return { ok: true, alreadyActivated: true }
 
   try {
-    // Auto-initialize a repo when the folder isn't one yet: The Framework treats
+    // Auto-initialize a repo when the folder isn't one yet: OpenAgent treats
     // git as the source of truth, so `git init` it for the user rather than erroring.
     const insideRepo = await git(['rev-parse', '--is-inside-work-tree'], cwd)
       .then(out => out.trim() === 'true')
@@ -47,10 +47,10 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
     // (#313). The early return above established the file is absent.
     await fs.write(gitignorePath(cwd), frameworkGitignore())
 
-    // Only The Framework's own directory (#1638): whatever the user has uncommitted stays theirs,
+    // Only OpenAgent's own directory (#1638): whatever the user has uncommitted stays theirs,
     // uncommitted. Nothing is ever swept into a commit on their behalf.
     await git(['add', OPENAGENT_DIR], cwd)
-    await git(['commit', '-m', '[The Framework] install The Framework'], cwd)
+    await git(['commit', '-m', '[OpenAgent] install OpenAgent'], cwd)
     return insideRepo ? { ok: true } : { ok: true, initialized: true }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }

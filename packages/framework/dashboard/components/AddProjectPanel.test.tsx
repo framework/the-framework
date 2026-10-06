@@ -87,7 +87,7 @@ describe('AddProjectPanel (#1150)', () => {
   })
 
   test('a dialog that could not be opened reports why, and Try again asks again', async () => {
-    sendPickProjectDirectory.mockResolvedValueOnce({ ok: false, error: 'The machine running The Framework has no desktop session, so no folder dialog can open there.' })
+    sendPickProjectDirectory.mockResolvedValueOnce({ ok: false, error: 'The machine running OpenAgent has no desktop session, so no folder dialog can open there.' })
     sendPickProjectDirectory.mockResolvedValueOnce({ ok: true, path: '/Users/dev/my-repo' })
     render(<AddProjectPanel onAdded={() => {}} onClose={() => {}} />)
     await screen.findByText(/no desktop session/)

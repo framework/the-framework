@@ -179,11 +179,11 @@ test('the Open PR button pushes the branch through the branches provider, then o
   assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/9', number: 9 })
   assert.deepEqual(calls.slice(-2), [
     ['push', 'the-framework/work'],
-    ['open', 'the-framework/work', { title: 'the-framework/work', body: 'fix it\n\nOpened from The Framework session `r1`.' }],
+    ['open', 'the-framework/work', { title: 'the-framework/work', body: 'fix it\n\nOpened from OpenAgent session `r1`.' }],
   ])
   // A caller not asking for review opens a draft.
   await openAgentPullRequest('/repo', agent(), { branches, gitHost, draft: true })
-  assert.deepEqual((calls.at(-1) as unknown[])[2], { title: 'the-framework/work', body: 'fix it\n\nOpened from The Framework session `r1`.', draft: true })
+  assert.deepEqual((calls.at(-1) as unknown[])[2], { title: 'the-framework/work', body: 'fix it\n\nOpened from OpenAgent session `r1`.', draft: true })
 })
 
 test('a run started from another branch is read from the commit its own work begins at; a subagent is never opened a pull request', async () => {
@@ -253,7 +253,7 @@ test('a remote-only branch gets its draft PR through the two providers, and the 
   const { branches, gitHost, calls } = fakeBranches({})
   const result = await openRemoteBranchPullRequest('/repo', { id: 'r1', branch: 'agent-x', intent: 'fix it' }, 'claude/x', { branches, gitHost })
   assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/9', number: 9 })
-  assert.deepEqual(calls, [['push', 'claude/x'], ['open', 'claude/x', { title: 'agent-x', body: 'fix it\n\nOpened from The Framework session `r1`.', draft: true }]])
+  assert.deepEqual(calls, [['push', 'claude/x'], ['open', 'claude/x', { title: 'agent-x', body: 'fix it\n\nOpened from OpenAgent session `r1`.', draft: true }]])
 })
 
 test('the Push button pushes a finished session\'s branch through the branches provider: the last step where the project has no git host (#1820)', async () => {

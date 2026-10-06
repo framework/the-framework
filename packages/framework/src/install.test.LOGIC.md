@@ -1,6 +1,6 @@
 What the tests cover:
 
-- **A clean repository** - activation writes the ignore file and makes exactly one commit, "[The Framework] install The Framework".
+- **A clean repository** - activation writes the ignore file and makes exactly one commit, "[OpenAgent] install OpenAgent".
 - **The ignore file's rules** - everything under `.openagent/` is ignored except the ignore file itself, since the lasting records live on the `agent-data` branch.
 - **A dirty repository** - the user's uncommitted changes are left alone: only the `.openagent` directory is staged, never everything, and the one install commit is the only commit made.
 - **Already activated** - a repository whose ignore file exists is a no-op reported as already activated, with no git command run at all.

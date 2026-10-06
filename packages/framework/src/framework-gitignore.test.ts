@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { frameworkGitignore } from './framework-gitignore.js'
 
-test('against real git: everything under .openagent is transient on main (#1582)', async () => {
+test('against real git: everything under .openagent is hidden from git, the ignore file included (#1582)', async () => {
   // The lasting records live on the data branch, so the ignore file is "ignore it all" — a
   // session's live state, the transient archive, and the run checkouts must never dirty main.
   const { mkdtemp, mkdir, writeFile, rm } = await import('node:fs/promises')
@@ -26,10 +26,7 @@ test('against real git: everything under .openagent is transient on main (#1582)
     await writeFile(join(fw, 'branches', 'agent-r9', 'file.txt'), 'x\n')
 
     const status = git('status', '--porcelain', '-uall')
-    assert.ok(!status.includes('.openagent/hooks.yml'), 'this machine\'s hooks file stays ignored')
-    assert.ok(!status.includes('.openagent/r9.'), 'a run\'s card and diary stay ignored')
-    assert.ok(!status.includes('.branches/'), 'a run checkout stays ignored')
-    assert.ok(status.includes('.openagent/.gitignore'), 'the ignore file itself is the one tracked thing')
+    assert.equal(status, '', 'the hooks file, a run\'s card and diary, a directory under it and the ignore file itself: git shows no trace of any')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

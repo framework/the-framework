@@ -4,7 +4,7 @@ Keeps a project's shared custom presets [1], the ones saved into the repository 
 
 **User story**: the user saves a custom preset from the composer either privately, so it follows the person across every project and stays in the registry [2] in the home directory, or for the project, so it lands in the repository and everyone who clones the repository gets it. The launcher's Commands menu lists both, under "Your saved prompts" and "Project saved prompts", below the project's commands.
 
-**Problem**: `.openagent/` ignores everything but its own `.gitignore`, so without an explicit un-ignore line git would never see the shared presets and they could not be shared.
+**Problem**: `.openagent/` ignores everything in it, so without an explicit un-ignore line git would never see the shared presets and they could not be shared.
 
 ## Glossary
 
@@ -43,7 +43,7 @@ A file that is missing or cannot be read yields no presets; so does one that is 
 
 #### Context
 
-**Problem**: `.openagent/.gitignore` ignores everything (`*`) and un-ignores only itself, so a file written there is invisible to git unless it is un-ignored by name.
+**Problem**: `.openagent/.gitignore` ignores everything (`*`), itself included, so a file written there is invisible to git unless it is un-ignored by name.
 
 #### Business logic
 

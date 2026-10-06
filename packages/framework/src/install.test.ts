@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { installProject } from './install.js'
+import { FIRST_COMMIT_MESSAGE, installProject } from './install.js'
 import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
 import type { GitRunner } from '@openagt/agent-data'
 import type { StoreFs } from './store/index.js'
@@ -52,40 +52,90 @@ function fakeGit(script: (args: string[], cwd: string) => Promise<string> | stri
 
 const CWD = '/proj'
 
-test('installProject on a clean repo seeds the ignore file and makes exactly one install commit', async () => {
+/** A git that answers as a repository with commits does: inside a work tree, HEAD resolves. */
+const inRepoWithCommits = (args: string[]): string => (args[0] === 'rev-parse' && args[1] === '--is-inside-work-tree' ? 'true' : '')
+
+test('installProject on a repo with commits seeds the ignore file and commits nothing', async () => {
   const fs = memFs()
-  const { git, calls } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
+  const { git, calls } = fakeGit(inRepoWithCommits)
 
   assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true })
   assert.equal(fs.files.get(gitignorePath(CWD)), frameworkGitignore())
 
-  const commits = calls.filter(args => args[0] === 'commit')
-  assert.deepEqual(commits, [['commit', '-m', '[OpenAgent] install OpenAgent']])
+  assert.deepEqual(
+    calls.map(args => args[0]),
+    ['rev-parse', 'rev-parse'],
+    'two questions and nothing else: no add, no commit, the branch is the person’s',
+  )
 })
 
-test('installProject seeds .openagent/.gitignore ignoring everything transient (#313/#1582)', async () => {
+test('installProject seeds .openagent/.gitignore ignoring everything, itself included (#313/#1582)', async () => {
   const fs = memFs()
-  const { git } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
+  const { git } = fakeGit(inRepoWithCommits)
 
   await installProject(CWD, { git, fs })
   const ignore = fs.files.get(gitignorePath(CWD)) ?? ''
-  // Everything under .openagent/ stays out of git on main: the lasting records live on the
-  // data branch (#1582), so nothing is un-ignored except the file itself.
+  // Everything under .openagent/ stays out of git: the lasting records live on the data branch
+  // (#1582), and nothing is un-ignored, so the directory leaves no trace in the repository.
   const rules = ignore.split('\n').filter(line => line && !line.startsWith('#'))
-  assert.deepEqual(rules, ['*', '!.gitignore'])
+  assert.deepEqual(rules, ['*'])
 })
 
-test('installProject on a dirty repo leaves the user’s changes alone and adds only its own directory (#1638)', async () => {
-  const fs = memFs()
-  const { git, calls } = fakeGit(args => {
-    if (args[0] === 'rev-parse') return 'true'
-    return args[0] === 'status' ? ' M file.ts\n' : ''
+/** A real repository in a temporary folder, removed after `body`. */
+async function withRealRepo(body: (repo: string, git: (...args: string[]) => string) => Promise<void>): Promise<void> {
+  const { mkdtemp, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { execFileSync } = await import('node:child_process')
+  const repo = await mkdtemp(join(tmpdir(), 'fw-install-'))
+  const git = (...args: string[]): string => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
+  try {
+    git('init', '-q')
+    git('config', 'user.email', 'git@example.com')
+    git('config', 'user.name', 'Test')
+    await body(repo, git)
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+}
+
+test('against real git: adding a project leaves the person’s repository as it was, their uncommitted and staged work included (#1638)', async () => {
+  const { writeFile, readFile } = await import('node:fs/promises')
+  const { join } = await import('node:path')
+  await withRealRepo(async (repo, git) => {
+    await writeFile(join(repo, 'file.ts'), 'one\n')
+    git('add', 'file.ts')
+    git('commit', '-q', '-m', 'theirs')
+    await writeFile(join(repo, 'file.ts'), 'two\n')
+    await writeFile(join(repo, 'staged.ts'), 'new\n')
+    git('add', 'staged.ts')
+    const before = { log: git('log', '--format=%H %s'), status: git('status', '--porcelain', '-uall') }
+
+    assert.deepEqual(await installProject(repo), { ok: true })
+
+    assert.equal(await readFile(gitignorePath(repo), 'utf8'), frameworkGitignore(), 'the ignore file is written')
+    assert.equal(git('log', '--format=%H %s'), before.log, 'no commit on the person’s branch')
+    assert.equal(git('status', '--porcelain', '-uall'), before.status, 'git shows no new file, and their changes are as they left them')
+    assert.deepEqual(await installProject(repo), { ok: true, alreadyActivated: true })
   })
+})
 
-  assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true })
+test('against real git: a repository with no commit gets an empty first one, and a file the person staged stays staged, uncommitted', async () => {
+  const { writeFile } = await import('node:fs/promises')
+  const { join } = await import('node:path')
+  await withRealRepo(async (repo, git) => {
+    await writeFile(join(repo, 'staged.ts'), 'new\n')
+    await writeFile(join(repo, 'loose.ts'), 'new\n')
+    git('add', 'staged.ts')
 
-  assert.deepEqual(calls.filter(args => args[0] === 'commit').map(args => args[2]), ['[OpenAgent] install OpenAgent'])
-  assert.deepEqual(calls.filter(args => args[0] === 'add'), [['add', '.openagent']], 'never `add -A`: the user’s file.ts is theirs')
+    assert.deepEqual(await installProject(repo), { ok: true })
+
+    assert.equal(git('log', '--format=%s').trim(), FIRST_COMMIT_MESSAGE)
+    assert.equal(git('ls-tree', '-r', '--name-only', 'HEAD'), '', 'the commit holds no file')
+    assert.equal(git('status', '--porcelain', '-uall'), 'A  staged.ts\n?? loose.ts\n', 'their files are where they left them')
+    // An agent's branch can start now.
+    git('branch', 'agent-x')
+  })
 })
 
 test('installProject on an already-activated repo is a no-op that never calls git', async () => {
@@ -96,27 +146,30 @@ test('installProject on an already-activated repo is a no-op that never calls gi
   assert.deepEqual(calls, [])
 })
 
-test('installProject surfaces a git failure as { ok: false }, never throws', async () => {
+test('installProject surfaces a git failure as { ok: false }, never throws, and a first commit that fails leaves no marker, so the next add tries again', async () => {
   const fs = memFs()
   const { git } = fakeGit(args => {
-    if (args[0] === 'rev-parse') return 'true'
-    if (args[0] === 'commit') throw new Error('nothing to commit')
+    if (args[0] === 'rev-parse') throw new Error('no')
+    if (args[0] === 'commit-tree') throw new Error('Author identity unknown')
     return ''
   })
 
-  assert.deepEqual(await installProject(CWD, { git, fs }), { ok: false, error: 'nothing to commit' })
+  assert.deepEqual(await installProject(CWD, { git, fs }), { ok: false, error: 'Author identity unknown' })
+  assert.equal(fs.files.has(gitignorePath(CWD)), false)
 })
 
-test('installProject initializes a git repo when the folder is not one yet, then installs', async () => {
+test('installProject initializes a git repo when the folder is not one yet, and gives it an empty first commit for agents to start from', async () => {
   const fs = memFs()
-  // rev-parse fails on a non-repo folder; every other git call succeeds.
+  // Both rev-parse questions fail on a non-repo folder; every other git call succeeds.
   const { git, calls } = fakeGit(args => {
     if (args[0] === 'rev-parse') throw new Error('not a git repository')
-    return ''
+    return args[0] === 'commit-tree' ? 'abc123\n' : ''
   })
 
   assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true, initialized: true })
-  assert.ok(calls.some(args => args[0] === 'init'), 'ran git init')
-  const commits = calls.filter(args => args[0] === 'commit').map(args => args[2])
-  assert.deepEqual(commits, ['[OpenAgent] install OpenAgent'])
+  assert.deepEqual(
+    calls.filter(args => args[0] !== 'rev-parse'),
+    [['init'], ['commit-tree', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', '-m', FIRST_COMMIT_MESSAGE], ['update-ref', 'HEAD', 'abc123']],
+    'the commit is made from the empty tree, never from the index: nothing of the person’s is in it',
+  )
 })

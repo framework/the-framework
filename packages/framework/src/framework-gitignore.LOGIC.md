@@ -1,4 +1,4 @@
-The `.gitignore` written into a project's `.openagent/` directory when the project is activated: everything under `.openagent/` is ignored except the ignore file itself, so what lives there (an agent's [1] live files in its checkout [2], this machine's hooks file) never turns a checkout dirty, and a code branch carries nothing of The Framework but that one file. The lasting records live on the `agent-data` branch [3].
+The `.gitignore` written into a project's `.openagent/` directory when the project is activated: everything under `.openagent/` is ignored, the ignore file itself included, so what lives there (an agent's [1] live files in its checkout [2], this machine's hooks file) never turns a checkout dirty, and git shows no trace of the directory. The lasting records live on the `agent-data` branch [3].
 
 ## Glossary
 
@@ -9,5 +9,5 @@ The `.gitignore` written into a project's `.openagent/` directory when the proje
 ## Business logic — TL;DR
 
 - **Ignore everything under `.openagent/`** - an agent's card, diary and inbox, the hooks file and anything else placed under it are all ignored.
-- **Except the ignore file itself** - it is the only file under `.openagent/` git sees; it opens with the comment "OpenAgent: agent state is transient; the lasting records live on the agent-data branch."
-- **Written once, at activation** - install writes it and commits it; its presence is what marks a project as activated, as `install.ts` and `project.ts` read it.
+- **The ignore file hides itself too** - as written at activation, no file under `.openagent/` is offered to git, so nothing of the directory is committed or listed as new (a project's shared presets file is the one exception, un-ignored by name when the user saves one, `project-presets.ts`); the file opens with the comment "OpenAgent: agent state is transient; the lasting records live on the agent-data branch."
+- **Written once, at activation** - install writes it and commits nothing; its presence is what marks a project as activated, as `install.ts` and `project.ts` read it.

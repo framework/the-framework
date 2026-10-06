@@ -1,6 +1,6 @@
 import { contextAddProject, contextProjectErrors, contextProjects, resolveProjectPath } from './context.js'
 import { readProjectCommands, type ProjectCommand } from '../project-commands.js'
-import { originDefaultBranch } from '@openagt/agent-data'
+import { DATA_BRANCH, branchReach, originDefaultBranch, pullFileBranch, writeSharing, type BranchReach } from '@openagt/agent-data'
 import { readProjectHooks, runCheckHook, startLineTakesBase, type StartReadiness } from '../project-hooks.js'
 import { isPublishPick, publishPickIn, type PublishPick } from '../publish-levels.js'
 import { hasRemote } from '../has-remote.js'
@@ -16,15 +16,15 @@ import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.
 // The live event stream is its own endpoint rather than a call (`GET /_rpc/events`).
 //
 // Each project also carries what the daemon's background jobs found wrong with it (#1500) —
-// a data branch that cannot reach origin, say (#1599) — and whether its repository has no remote.
+// a data branch that cannot reach origin, say (#1599) — and why its data stays on this machine, if it does.
 // Both ride this list rather than a read of their own because the list is what every project
 // surface already polls, so an error reaches the sidebar dot and the project's banner with
 // nothing new to subscribe to.
 export async function onProjects(): Promise<ProjectSummary[]> {
   const state = contextProjectErrors()
   return (await contextProjects().list()).map(project => {
-    const { errors, localOnly } = state(project.path)
-    return { ...project, ...(errors.length > 0 ? { errors } : {}), ...(localOnly ? { localOnly: true as const } : {}) }
+    const { errors, local } = state(project.path)
+    return { ...project, ...(errors.length > 0 ? { errors } : {}), ...(local ? { local } : {}) }
   })
 }
 
@@ -33,13 +33,40 @@ export async function onProjects(): Promise<ProjectSummary[]> {
  * Projects list. Like `sendStart` this needs the daemon (it spawns git + writes the shared
  * registry), so it calls the daemon's own `addProject` closure off the wired dashboard context.
  * Returns the daemon's {@link AddProjectResult}.
+ *
+ * `share` is the person's answer, asked before the add: whether the agents' records may go to the
+ * repository's remote. Nothing is pushed for a project added with `false`.
  */
-export async function sendAddProject(path: string): Promise<AddProjectResult> {
+export async function sendAddProject(path: string, share: boolean): Promise<AddProjectResult> {
   // Throws on an unwired context (D3), like `sendStart`: a missing capability is a wiring bug.
   const addProject = contextAddProject()
   const trimmed = path.trim()
   if (!trimmed) return { ok: false, error: 'a project path is required' }
-  return addProject(trimmed)
+  return addProject(trimmed, share === true)
+}
+
+/** How far the project's records reach right now, read off its repository; `null` when the project is unknown here. */
+export async function onRecordsReach(projectId: string): Promise<BranchReach | null> {
+  const cwd = await resolveProjectPath(projectId)
+  return cwd ? branchReach(cwd) : null
+}
+
+/**
+ * The person's switch: share the project's records with its remote, or keep them on this machine.
+ * Turning it on sends what is there now, so a remote that refuses is said at once, and the switch
+ * goes back to off: the records stay where they were. A project with no remote has nothing to
+ * share with, and is refused.
+ */
+export async function sendShareRecords(projectId: string, on: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
+  if (on && !(await hasRemote(cwd))) return { ok: false, error: 'this project has no remote to share with' }
+  await writeSharing(cwd, on)
+  if (!on) return { ok: true }
+  const sent = await pullFileBranch(cwd, DATA_BRANCH, { log: () => {} })
+  if (sent.ok) return { ok: true }
+  await writeSharing(cwd, false)
+  return { ok: false, error: sent.error }
 }
 
 /**

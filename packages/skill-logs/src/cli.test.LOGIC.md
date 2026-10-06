@@ -1,4 +1,4 @@
-What the tests cover, against a bare `origin` holding the `agent-data` branch and clones standing in for agents:
+What the tests cover, against a bare `origin` holding the `agent-data` branch and clones standing in for agents, each sharing the branch with origin:
 
 - **The bare command** - lists every person's runs off origin, newest first, with the skill's fields only and never `caller`; `--branch` keeps one branch's runs; `--limit` caps the list, and the cap counts the runs kept after the filter; nothing lands in the clone: no local copy of the branch and a clean status.
 - **The default cap** - the newest 20 runs are printed unless `--limit` asks for more.

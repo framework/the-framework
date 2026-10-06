@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner, withFileBranch, DATA_BRANCH } from '@openagt/agent-data'
+import { nodeGitRunner, withFileBranch, writeSharing, DATA_BRANCH } from '@openagt/agent-data'
 import { runCli, USAGE } from './cli.js'
 import { QUEUE_FILE } from './names.js'
 
@@ -30,6 +30,8 @@ async function rig(clones: number, queue?: string) {
     await git(['commit', '-m', 'seed'], seed)
   }
   await git(['push', 'origin', DATA_BRANCH], seed)
+  // Every clone here shares the records with origin: the person's yes, given once per clone.
+  await writeSharing(seed, true)
   const agents: string[] = []
   for (let i = 0; i < clones; i++) {
     const parent = await realpath(await mkdtemp(join(tmpdir(), `queue-cli-agent${i}-`)))
@@ -38,6 +40,7 @@ async function rig(clones: number, queue?: string) {
     await git(['config', 'user.email', `a${i}@a`], clone)
     await git(['config', 'user.name', `a${i}`], clone)
     await git(['checkout', '-b', `agent-a${i}`], clone)
+    await writeSharing(clone, true)
     agents.push(clone)
   }
   const cleanup = async () => {
@@ -150,7 +153,7 @@ test('usage: an unknown command, a wrong argument count, an empty entry and a pr
   }
 })
 
-test('a repository with no remote reads its local branch and refuses to write; outside a repository is a refusal', async () => {
+test('a repository with no remote reads and writes its local branch; outside a repository is a refusal', async () => {
   const solo = await realpath(await mkdtemp(join(tmpdir(), 'queue-cli-solo-')))
   try {
     await git(['init', '-b', 'main'], solo)
@@ -162,9 +165,10 @@ test('a repository with no remote reads its local branch and refuses to write; o
     const commit = (await git(['commit-tree', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', '-m', 'create the agent-data branch'], solo)).trim()
     await git(['branch', DATA_BRANCH, commit], solo)
     assert.deepEqual((await run(solo, [])).json, [])
-    const refused = await run(solo, ['add', 'x'])
-    assert.equal(refused.code, 1)
-    assert.deepEqual(refused.json, { ok: false, reason: 'no-remote' })
+    // Nothing to carry the change anywhere: it lands as a local commit, and the next read has it.
+    assert.equal((await run(solo, ['add', 'x'])).code, 0)
+    assert.equal(((await run(solo, [])).json as unknown[]).length, 1)
+    assert.match(await git(['show', `${DATA_BRANCH}:${QUEUE_FILE}`], solo), /x/)
     const outside = await run(tmpdir(), [])
     assert.equal(outside.code, 1)
     assert.deepEqual(outside.json, { ok: false, reason: 'not-a-repo' })

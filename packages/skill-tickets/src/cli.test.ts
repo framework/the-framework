@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner, DATA_BRANCH } from '@openagt/agent-data'
+import { nodeGitRunner, writeSharing, DATA_BRANCH } from '@openagt/agent-data'
 import { runCli, USAGE } from './cli.js'
 
 const git = nodeGitRunner()
@@ -33,6 +33,8 @@ async function rig(clones: number) {
   await git(['add', '-A'], seed)
   await git(['commit', '-m', 'seed'], seed)
   await git(['push', 'origin', DATA_BRANCH], seed)
+  // Every clone here shares the records with origin: the person's yes, given once per clone.
+  await writeSharing(seed, true)
   const agents: string[] = []
   for (let i = 0; i < clones; i++) {
     const parent = await realpath(await mkdtemp(join(tmpdir(), `tickets-cli-agent${i}-`)))
@@ -41,6 +43,7 @@ async function rig(clones: number) {
     await git(['config', 'user.email', `a${i}@a`], clone)
     await git(['config', 'user.name', `a${i}`], clone)
     await git(['checkout', '-b', `agent-a${i}`], clone)
+    await writeSharing(clone, true)
     agents.push(clone)
   }
   const cleanup = async () => {
@@ -199,6 +202,7 @@ test('put writes a ticket, a plan or meta.json from stdin, never a lock; close r
       await git(['config', 'user.email', 'b@b'], b)
       await git(['config', 'user.name', 'b'], b)
       await git(['checkout', '-b', 'agent-b'], b)
+      await writeSharing(b, true)
       await run(b, ['claim', '2026-08-30_a.md'])
       const theirs = await run(a!, ['close', '2026-08-30_a.md'])
       assert.equal(theirs.code, 1)
@@ -217,7 +221,7 @@ test('put writes a ticket, a plan or meta.json from stdin, never a lock; close r
   }
 })
 
-test('a repository with no remote reads its local branch and refuses to write; outside a repository is a refusal', async () => {
+test('a repository with no remote, or one that keeps its records, reads and writes its local branch; outside a repository is a refusal', async () => {
   const solo = await realpath(await mkdtemp(join(tmpdir(), 'tickets-cli-solo-')))
   try {
     await git(['init', '-b', 'main'], solo)
@@ -229,9 +233,17 @@ test('a repository with no remote reads its local branch and refuses to write; o
     const commit = (await git(['commit-tree', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', '-m', 'create the agent-data branch'], solo)).trim()
     await git(['branch', DATA_BRANCH, commit], solo)
     assert.deepEqual((await run(solo, ['list'])).json, [])
-    const refused = await run(solo, ['put', '2026-08-31_c.md'], '# C\n')
-    assert.equal(refused.code, 1)
-    assert.deepEqual(refused.json, { ok: false, reason: 'no-remote' })
+    // Nothing to carry the change anywhere: it lands as a local commit, and the next read has it.
+    assert.equal((await run(solo, ['put', '2026-08-31_c.md'], '# C\n')).code, 0)
+    assert.equal(((await run(solo, ['list'])).json as unknown[]).length, 1)
+    // A remote the person does not share the records with changes nothing: the write stays here.
+    const bare = join(solo, 'origin.git')
+    await git(['init', '--bare', '-b', 'main', bare], solo)
+    await git(['remote', 'add', 'origin', bare], solo)
+    await git(['push', 'origin', 'main'], solo)
+    assert.equal((await run(solo, ['put', '2026-08-31_d.md'], '# D\n')).code, 0)
+    assert.equal(((await run(solo, ['list'])).json as unknown[]).length, 2)
+    assert.equal((await git(['for-each-ref', '--format=%(refname)', 'refs/heads'], bare)).trim(), 'refs/heads/main')
     const outside = await run(tmpdir(), ['list'])
     assert.equal(outside.code, 1)
     assert.deepEqual(outside.json, { ok: false, reason: 'not-a-repo' })

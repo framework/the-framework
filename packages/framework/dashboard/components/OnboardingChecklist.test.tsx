@@ -7,8 +7,10 @@ import { configureFirst } from '../test-utils.js'
 // for a daemon and each row's "done" comes from a fixture instead.
 const onDashboard = vi.hoisted(() => vi.fn())
 const onOnboarding = vi.hoisted(() => vi.fn())
+const sendAddProject = vi.hoisted(() => vi.fn())
+const sendPickProjectDirectory = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onDashboard }))
-vi.mock('../rpc/projects.js', () => ({ onOnboarding, sendAddProject: vi.fn(), sendPickProjectDirectory: vi.fn() }))
+vi.mock('../rpc/projects.js', () => ({ onOnboarding, sendAddProject, sendPickProjectDirectory }))
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => ({}),
   updatePreferences: vi.fn(),
@@ -30,6 +32,8 @@ afterEach(() => {
   startAgent.start.mockReset()
   startAgent.busy = false
   startAgent.error = null
+  sendAddProject.mockReset()
+  sendPickProjectDirectory.mockReset()
   takePendingDraft() // a draft left by one test would look like the next one's
 })
 
@@ -148,6 +152,30 @@ describe('the tickets import lands on the session it starts (#1169)', () => {
     await waitFor(() => expect(onSelectProject).toHaveBeenCalledWith('p1'))
     expect(startAgent.start).not.toHaveBeenCalled()
     expect(takePendingDraft()).toBe('/update-tickets')
+  })
+
+  test('"Add <folder> as project\u2026" adds nothing itself: it opens the Add dialog on that folder, which asks first', async () => {
+    onDashboard.mockResolvedValue(EMPTY)
+    onOnboarding.mockResolvedValue({ cwd: '/Users/dev/here', cwdProjectId: null })
+    sendAddProject.mockResolvedValue({ ok: true, alreadyActivated: false })
+    render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add /Users/dev/here as project\u2026' }))
+    // The dialog, on the folder the dashboard runs in: no system dialog, and nothing added yet.
+    expect(screen.getByRole('dialog', { name: 'Add project' })).toBeTruthy()
+    expect(screen.getByText('/Users/dev/here')).toBeTruthy()
+    expect((screen.getByRole('radio', { name: /Keep them on this machine/ }) as HTMLInputElement).checked).toBe(true)
+    expect(sendPickProjectDirectory).not.toHaveBeenCalled()
+    expect(sendAddProject).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'I trust it, add it' }))
+    await waitFor(() => expect(sendAddProject).toHaveBeenCalledWith('/Users/dev/here', false))
+  })
+
+  test('a folder that is already a project is not offered again', async () => {
+    onDashboard.mockResolvedValue(WITH_PROJECT)
+    onOnboarding.mockResolvedValue({ cwd: '/Users/dev/here', cwdProjectId: 'p1' })
+    render(<OnboardingChecklist onAgentStarted={vi.fn()} onSelectProject={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: /as project/ })).toBeNull()
   })
 
   test('with no project yet, there is no import to offer: no project provides tickets', async () => {

@@ -56,7 +56,7 @@ The call names a project, a package, the read's name and its input. An unknown p
 
 #### Context
 
-**Problem**: a package's command writes as a remote writer, straight to origin, and never moves this machine's copy of the data branch [5]; the daemon converges that copy once a minute. "Add to queue" clicked, the AI Queue card would show the entry a minute later, where the dashboard's own write used to show at once.
+**Problem**: in a project that shares its records, a package's command writes as a remote writer, straight to origin, and never moves this machine's copy of the data branch [5]; the daemon converges that copy once a minute. "Add to queue" clicked, the AI Queue card would show the entry a minute later, where the dashboard's own write used to show at once.
 
 #### Business logic
 

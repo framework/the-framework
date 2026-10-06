@@ -37,7 +37,7 @@ export interface DashboardOptions {
    * Called when the browser adds a project (#396): the `sendAddProject` RPC reaches this through
    * the wired dashboard context. Wire it to install the repo and register it.
    */
-  onAddProject: (path: string) => Promise<AddProjectResult> | AddProjectResult
+  onAddProject: (path: string, share: boolean) => Promise<AddProjectResult> | AddProjectResult
   /**
    * The user-preferences store (#410): the `onPreferences` / `savePreferences` RPCs read and
    * write it through the wired dashboard context.

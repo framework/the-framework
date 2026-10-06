@@ -178,7 +178,7 @@ export async function makeWorld(): Promise<StoryWorld> {
     quota: { read: async () => quota.view, stop: () => {} },
     // No story reads the menu, and none may start a coding agent's CLI to ask.
     models: { read: async () => ({ 'claude-code': { models: [] as [] }, codex: { models: [] as [] } }) },
-    projectErrors: () => ({ errors: [], localOnly: false }),
+    projectErrors: () => ({ errors: [] }),
     bridgeBrowser: { status: async () => ({ state: 'off' as const }), start: async () => {}, stop: async () => {}, act: async () => {} },
   }
 
@@ -246,7 +246,7 @@ export async function makeWorld(): Promise<StoryWorld> {
       const origin = join(cwd, 'origin.git')
       await git(cwd, 'init', '-q', '--bare', origin)
       await git(cwd, 'remote', 'add', 'origin', origin)
-      const added = await rpc(sendAddProject)(cwd)
+      const added = await rpc(sendAddProject)(cwd, true)
       if (!added.ok) throw new Error(`could not register the fixture repo: ${added.error}`)
       // The project's own start and resume lines: this machine's file, under the ignored directory.
       await writeFile(join(cwd, PROJECT_HOOKS_FILE), `start: node ${JSON.stringify(fakeRun)} start\nresume: node ${JSON.stringify(fakeRun)} resume\n`)

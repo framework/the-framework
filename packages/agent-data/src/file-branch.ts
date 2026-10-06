@@ -79,12 +79,50 @@ function resolveDeps(deps: FileBranchDeps): Resolved {
  * `origin`, so a repo whose only remote is called something else is remote-less to this module:
  * the stated no-remote outcomes, not a push that fails twice.
  */
-async function hasRemote(cwd: string, git: GitRunner): Promise<boolean> {
+async function hasOrigin(cwd: string, git: GitRunner): Promise<boolean> {
   try {
     return (await git(['remote'], cwd)).split('\n').some(line => line.trim() === 'origin')
   } catch {
     return false
   }
+}
+
+/**
+ * The repository's own git setting that says its branches here may leave the machine. Unset
+ * reads as off: nothing is fetched from or pushed to origin until the person turns it on. It
+ * lives in the repository's git config, which every checkout of the clone shares, so a
+ * long-lived process and a command an agent runs in its checkout read the same answer.
+ */
+export const SHARE_SETTING = 'agent-data.share'
+
+/** Whether the person turned sharing on for the repository `cwd` belongs to. */
+export async function readSharing(cwd: string, git: GitRunner = nodeGitRunner()): Promise<boolean> {
+  return git(['config', '--local', '--get', '--type=bool', SHARE_SETTING], cwd).then(
+    out => out.trim() === 'true',
+    () => false,
+  )
+}
+
+/** Turn sharing on or off for the repository `cwd` belongs to. */
+export async function writeSharing(cwd: string, on: boolean, git: GitRunner = nodeGitRunner()): Promise<void> {
+  await git(['config', '--local', SHARE_SETTING, String(on)], cwd)
+}
+
+/**
+ * How far a branch here reaches: `origin` when the repository has one and the person shares
+ * with it, else why it stays on this machine: there is no origin (`no-remote`), or the person
+ * has not turned sharing on (`kept`).
+ */
+export type BranchReach = 'origin' | 'no-remote' | 'kept'
+
+export async function branchReach(cwd: string, git: GitRunner = nodeGitRunner()): Promise<BranchReach> {
+  if (!(await hasOrigin(cwd, git))) return 'no-remote'
+  return (await readSharing(cwd, git)) ? 'origin' : 'kept'
+}
+
+/** Whether a fetch or a push may go out: the one question every sync and write here asks first. */
+async function reachesOrigin(cwd: string, git: GitRunner): Promise<boolean> {
+  return (await branchReach(cwd, git)) === 'origin'
 }
 
 /** Whether a ref exists locally. */
@@ -127,7 +165,7 @@ function serialize<T>(repo: string, branch: string, lock: CheckoutLockDeps, task
  */
 async function ensureBranchRef(repo: string, branch: string, git: GitRunner): Promise<void> {
   if (await refExists(repo, `refs/heads/${branch}`, git)) return
-  if (await hasRemote(repo, git)) await git(['fetch', 'origin', branch], repo).catch(() => {})
+  if (await reachesOrigin(repo, git)) await git(['fetch', 'origin', branch], repo).catch(() => {})
   if (await refExists(repo, `refs/remotes/origin/${branch}`, git)) {
     await git(['branch', '--no-track', branch, `origin/${branch}`], repo)
   } else {
@@ -212,7 +250,7 @@ async function ensureCore(repo: string, branch: string, r: Resolved): Promise<vo
  * tip, attached, which is the same "origin wins" outcome for a conflict.
  */
 async function syncCore(repo: string, branch: string, r: Resolved): Promise<void> {
-  if (!(await hasRemote(repo, r.git))) return
+  if (!(await reachesOrigin(repo, r.git))) return
   const path = checkoutPath(repo, branch)
   await r.git(['fetch', 'origin', branch], repo).catch(() => {})
   if (!(await refExists(repo, `refs/remotes/origin/${branch}`, r.git))) return
@@ -315,7 +353,7 @@ async function cycle(
 ): Promise<FileBranchWrite> {
   try {
     await ensureCore(repo, branch, r)
-    const remote = await hasRemote(repo, r.git)
+    const remote = await reachesOrigin(repo, r.git)
     for (let attempt = 0; ; attempt++) {
       await syncCore(repo, branch, r)
       // The tip before this op's commit: what a lost push winds back to before re-applying, so
@@ -349,8 +387,8 @@ async function cycle(
   }
 }
 
-/** How a pull went: converged with origin, or why it could not; `noRemote` when the reason is that there is no origin at all. */
-export type FileBranchSync = { ok: true } | { ok: false; error: string; noRemote?: true }
+/** How a pull went: how far the branch reaches once it is done, or why it could not converge. */
+export type FileBranchSync = { ok: true; reach: BranchReach } | { ok: false; error: string }
 
 /**
  * The eager pull: sync the persistent checkout with origin so this machine reads what other
@@ -358,22 +396,18 @@ export type FileBranchSync = { ok: true } | { ok: false; error: string; noRemote
  * anything a failed cycle left stranded locally, via the same owed-push rule as the writer.
  * Ensures the checkout exists, so a fresh clone converges on its first tick. Never throws.
  *
- * Reports why it could not converge: a push origin rejects, or no origin to converge with at
- * all. The writer treats a remote-less repo as fine — the commit is safe locally — but a sync's
- * whole job is to meet the other machines, so a repo nothing can reach did not converge. That
- * outcome is marked `noRemote`, since a caller may tell a repository that was never shared from a
- * sync that broke.
+ * Reports why it could not converge: a push origin rejects. A branch that stays on this machine
+ * (no origin, or sharing is off) has nothing to converge with: the pull is fine and says so in
+ * `reach`, so a caller may tell a repository that is not shared from a sync that broke.
  */
 export async function pullFileBranch(repo: string, branch: string, deps: FileBranchDeps = {}): Promise<FileBranchSync> {
   const r = resolveDeps(deps)
   const result = await withFileBranch(repo, branch, 'sync', async () => {}, deps)
-  const outcome: FileBranchSync = !result.ok
-    ? { ok: false, error: result.error }
-    : (await hasRemote(repo, r.git))
-      ? { ok: true }
-      : { ok: false, noRemote: true, error: `the repository has no remote, so the ${branch} branch cannot be shared with other machines` }
-  if (!outcome.ok) r.log(`[branches] ${branch}: ${outcome.error}`)
-  return outcome
+  if (!result.ok) {
+    r.log(`[branches] ${branch}: ${result.error}`)
+    return { ok: false, error: result.error }
+  }
+  return { ok: true, reach: await branchReach(repo, r.git) }
 }
 
 /**
@@ -398,7 +432,7 @@ export async function fileBranchRepo(cwd: string, git: GitRunner = nodeGitRunner
  * fetched but never branched — the cloud case).
  */
 async function readRefs(repo: string, branch: string, fresh: boolean | undefined, git: GitRunner): Promise<string[]> {
-  const remote = fresh && (await hasRemote(repo, git))
+  const remote = fresh && (await reachesOrigin(repo, git))
   if (remote) await git(['fetch', 'origin', branch], repo).catch(() => {})
   return remote ? [`origin/${branch}`, branch] : [branch, `origin/${branch}`]
 }
@@ -460,7 +494,7 @@ export async function listBranchDir(
 
 /** Reads off one ref of the branch, for a reader that opens many files: fetched once, up front. */
 export interface BranchReader {
-  /** The ref every read goes to: origin's copy when the repo has a remote, else the local branch. */
+  /** The ref every read goes to: origin's copy when the branch reaches origin, else the local branch, else the copy of origin's this clone holds. */
   ref: string
   /** One file's content, or `undefined` when the ref has no such file. */
   read: (rel: string) => Promise<string | undefined>
@@ -472,13 +506,21 @@ export interface BranchReader {
  * Open the branch for reading from any clone, holding no checkout: fetch origin's copy once and
  * read that (a one-shot reader — a command an agent runs — must see what other writers pushed,
  * its own detached write included, which the local ref never moves for), else the local branch
- * when there is no remote. Every read then goes to that one ref; nothing is fetched again.
+ * when the branch stays on this machine, else the copy of origin's the clone already holds. Every
+ * read then goes to that one ref; nothing is fetched again.
  */
 export async function openBranchReader(cwd: string, branch: string, deps: FileBranchDeps = {}): Promise<BranchReader> {
   const r = resolveDeps(deps)
   const repo = await cloneHome(cwd, r.git)
-  const [ref] = await readRefs(repo, branch, true, r.git)
-  const at = (await refExists(repo, `refs/remotes/origin/${branch}`, r.git)) ? ref! : branch
+  // The first of the refs that is there: a clone that never made the branch still holds the copy
+  // of origin's it was cloned with.
+  let at = branch
+  for (const ref of await readRefs(repo, branch, true, r.git)) {
+    if (await refExists(repo, ref.startsWith('origin/') ? `refs/remotes/${ref}` : `refs/heads/${ref}`, r.git)) {
+      at = ref
+      break
+    }
+  }
   return {
     ref: at,
     read: rel => r.git(['show', `${at}:${rel}`], cwd).catch(() => undefined),
@@ -490,10 +532,10 @@ export async function openBranchReader(cwd: string, branch: string, deps: FileBr
   }
 }
 
-/** What a detached write did, or why it could not: the repo has no remote to carry it. */
-export type DetachedWrite =
-  | { ok: true; changed: boolean }
-  | { ok: false; reason: 'no-remote' }
+/** What a one-shot write did: whether the op wrote anything new. */
+export interface DetachedWrite {
+  changed: boolean
+}
 
 /**
  * Apply one change to the branch as a one-shot remote writer, from any clone: fetch origin's
@@ -507,8 +549,11 @@ export type DetachedWrite =
  * committed under the wrong message or wiped. The local branch ref is not moved either — the
  * persistent checkout, when there is one, converges on its own next pull.
  *
- * A branch origin does not have yet is born by the write itself, parentless. A repo with no
- * remote refuses: a change nothing can reach is the caller's error state, not a mode.
+ * A branch origin does not have yet is born by the write itself, parentless.
+ *
+ * A branch that stays on this machine (no origin, or sharing is off) has no remote to write to:
+ * the change goes through the funnel instead, which every process on the clone may join, and
+ * lands as a local commit. A funnel that fails throws with its reason.
  */
 export async function writeFileBranchDetached(
   cwd: string,
@@ -518,7 +563,11 @@ export async function writeFileBranchDetached(
   deps: FileBranchDeps = {},
 ): Promise<DetachedWrite> {
   const r = resolveDeps(deps)
-  if (!(await hasRemote(cwd, r.git))) return { ok: false, reason: 'no-remote' }
+  if (!(await reachesOrigin(cwd, r.git))) {
+    const local = await withFileBranch(cwd, branch, message, op, deps)
+    if (!local.ok) throw new Error(local.error)
+    return { changed: local.changed }
+  }
   const { mkdtemp, rm } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
   // A slash in the branch name would name a directory under tmpdir that does not exist (#1762).
@@ -535,11 +584,11 @@ export async function writeFileBranchDetached(
       await op(dir)
       await r.git(['add', '-A'], dir)
       const staged = (await r.git(['status', '--porcelain'], dir)).trim()
-      if (!staged) return { ok: true, changed: false }
+      if (!staged) return { changed: false }
       await r.git(['commit', '-m', resolveMessage(message)], dir)
       try {
         await r.git(['push', 'origin', `HEAD:refs/heads/${branch}`], dir)
-        return { ok: true, changed: true }
+        return { changed: true }
       } catch (err) {
         if (attempt >= 1) throw err
         await r.git(['reset', '--hard', await tip()], dir)

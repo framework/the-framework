@@ -3,14 +3,14 @@ import { test } from 'node:test'
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner, fileBranchPath, withFileBranch, DATA_BRANCH } from '@openagt/agent-data'
+import { nodeGitRunner, fileBranchPath, withFileBranch, writeSharing, DATA_BRANCH } from '@openagt/agent-data'
 import { deleteRun, findRun, listRuns, patchRun, readDiary, runFiles, writeRun } from './store.js'
 import { RUNS_DIR } from './names.js'
 
 const git = nodeGitRunner()
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10 } as const
 
-/** A repo committing as `email`, with a bare origin. */
+/** A repo committing as `email`, with a bare origin it shares the records with. */
 async function repo(email = 'Dev@Example.com'): Promise<{ root: string; bare: string; cleanup: () => Promise<void> }> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'logs-store-')))
   const bare = await realpath(await mkdtemp(join(tmpdir(), 'logs-store-bare-')))
@@ -24,6 +24,7 @@ async function repo(email = 'Dev@Example.com'): Promise<{ root: string; bare: st
   await git(['commit', '-m', 'init'], root)
   await git(['remote', 'add', 'origin', bare], root)
   await git(['push', 'origin', 'main'], root)
+  await writeSharing(root, true)
   return { root, bare, cleanup: async () => { for (const dir of [root, bare]) await rm(dir, RETRIED_RM) } }
 }
 

@@ -48,8 +48,9 @@ export async function onModules(): Promise<DashboardModule[]> {
  *
  * `acts` says the command is a module's action on the project (a link action), not a page's read:
  * the framework then also converges the project's data branch with origin, as its clock does
- * every minute, before forgetting — a package's command writes as a remote writer, straight to
- * origin, and this machine's copy would otherwise show the write only at the next sync.
+ * every minute, before forgetting — in a project that shares its records a package's command
+ * writes as a remote writer, straight to origin, and this machine's copy would otherwise show the
+ * write only at the next sync.
  */
 export async function runModuleCommand(projectId: string, pkg: string, args: string[], command?: string, acts = false): Promise<ModuleCommandResult> {
   const root = await resolveProjectPath(projectId)

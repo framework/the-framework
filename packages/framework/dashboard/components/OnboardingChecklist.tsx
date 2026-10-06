@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { DashboardData, OnboardingSuggestion } from '../../src/index.js'
 import { Square, SquareCheckBig, X } from 'lucide-react'
 import { onDashboard } from '../rpc/reads.js'
-import { onOnboarding, sendAddProject } from '../rpc/projects.js'
+import { onOnboarding } from '../rpc/projects.js'
 import { usePolled } from '../lib/use-async.js'
 import { usePreferences, updatePreferences, notificationsEnabled } from '../lib/preferences.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
@@ -66,9 +66,8 @@ export function OnboardingChecklist({
   const permission = useNotificationPermission()
   const { start, busy: starting, error: startError } = useStartAgent()
 
-  const [addingProject, setAddingProject] = useState(false)
-  const [addingCwd, setAddingCwd] = useState(false)
-  const [addError, setAddError] = useState<string | null>(null)
+  // The Add dialog: open with the folder the dashboard runs in, open to pick one, or closed.
+  const [addingProject, setAddingProject] = useState<{ folder?: string } | null>(null)
 
   // The project onboarding acts on: the one this server runs in when it is registered, else the
   // only/most recent one. Onboarding is a first-agent flow, so there is rarely a second candidate.
@@ -77,20 +76,6 @@ export function OnboardingChecklist({
   const projectCount = data?.totals.projects ?? 0
   const hasTickets = data?.projects.some(p => p.hasTickets) ?? false
   const browserGranted = permission === 'granted' && notificationsEnabled(preferences)
-
-  const addCwd = async () => {
-    if (!suggestion?.cwd) return
-    setAddingCwd(true)
-    setAddError(null)
-    const result = await sendAddProject(suggestion.cwd).catch(() => ({ ok: false as const, error: 'Could not reach the daemon.' }))
-    setAddingCwd(false)
-    if (!result.ok) {
-      setAddError(result.error)
-      return
-    }
-    void reload()
-    reloadSuggestion()
-  }
 
   const enableBrowserNotifications = () => {
     updatePreferences({ notifyBrowser: true })
@@ -106,6 +91,9 @@ export function OnboardingChecklist({
     if (started) onAgentStarted(targetProjectId, UPDATE_TICKETS_PROMPT, started.agentId)
   }
 
+  // The folder the dashboard runs in, while it is not a project yet: the first step offers it.
+  const here = suggestion?.cwd && !suggestion.cwdProjectId ? suggestion.cwd : undefined
+
   const steps: Step[] = [
     {
       key: 'project',
@@ -113,18 +101,15 @@ export function OnboardingChecklist({
       description: 'A project is a git repo The Framework may work in.',
       done: projectCount > 0,
       action: (
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex flex-wrap justify-end gap-2">
-            {suggestion?.cwd && !suggestion.cwdProjectId && (
-              <Button size="sm" onClick={addCwd} disabled={addingCwd}>
-                {addingCwd ? 'Adding…' : `Add ${suggestion.cwd} as project`}
-              </Button>
-            )}
-            <Button size="sm" variant="outline" onClick={() => setAddingProject(true)}>
-              Select &amp; add project directory
+        <div className="flex flex-wrap justify-end gap-2">
+          {here && (
+            <Button size="sm" onClick={() => setAddingProject({ folder: here })}>
+              {`Add ${here} as project…`}
             </Button>
-          </div>
-          {addError && <span className="text-xs text-destructive">{addError}</span>}
+          )}
+          <Button size="sm" variant="outline" onClick={() => setAddingProject({})}>
+            Select &amp; add project directory
+          </Button>
         </div>
       ),
     },
@@ -247,11 +232,12 @@ export function OnboardingChecklist({
 
       {addingProject && (
         <AddProjectPanel
+          folder={addingProject.folder}
           onAdded={() => {
             void reload()
             reloadSuggestion()
           }}
-          onClose={() => setAddingProject(false)}
+          onClose={() => setAddingProject(null)}
         />
       )}
     </Card>

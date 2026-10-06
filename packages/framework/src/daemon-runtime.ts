@@ -10,6 +10,7 @@ import { tailAgentEvents } from './dashboard-rpc/events-tail.js'
 import { addProject, listProjects, projectId } from './registry.js'
 import { writeHookLines } from './built-in.js'
 import { installProject } from './install.js'
+import { writeSharing } from '@openagt/agent-data'
 import { runProjectHooks, runStartHook } from './project-hooks.js'
 import { publishLevelOf, publishPickIn } from './publish-levels.js'
 import { isBranchName } from './branch-name.js'
@@ -34,7 +35,7 @@ export interface ProjectRuntimeOptions {
 /** The per-project surface the dashboard drives, plus its teardown. */
 export interface ProjectRuntime {
   onStart: (prompt: string, options?: StartAgentOptions, targetProjectId?: string) => Promise<StartAgentResult>
-  onAddProject: (path: string) => Promise<AddProjectResult>
+  onAddProject: (path: string, share: boolean) => Promise<AddProjectResult>
   /** The live event stream for an agent this daemon is relaying from a device (#1067), else undefined
    *  so `onEvents` falls back to tailing the on-disk log. Wired as the dashboard's events source. */
   remoteEventsSource: EventsSource
@@ -129,8 +130,10 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
   }
 
   // Add a project (#396): install the repo, then register it so it appears in the Projects
-  // list. installProject is idempotent (an already-activated repo is a no-op success).
-  const onAddProject = async (path: string): Promise<AddProjectResult> => {
+  // list. installProject is idempotent (an already-activated repo is a no-op success). `share`
+  // is the person's answer on the agents' records, written before the project is registered:
+  // the first sync of a project added with `false` sends nothing.
+  const onAddProject = async (path: string, share: boolean): Promise<AddProjectResult> => {
     // Resolve relative input against the daemon cwd, and check the directory really
     // exists first: without this a bad path reaches git as a missing cwd, which
     // surfaces as the confusing "spawn git ENOENT" rather than a path error.
@@ -139,6 +142,11 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
     if (!isDir) return { ok: false, error: `path does not exist or is not a directory: ${abs}` }
     const result = await installProject(abs)
     if (!result.ok) return { ok: false, error: result.error }
+    // A yes is to the remote that is there: with none the records are kept, so a remote the
+    // project gets later is asked about, in the project's menu, before anything goes to it.
+    const shared = share && (await hasRemote(abs))
+    const written = await writeSharing(abs, shared).then(() => undefined, (err: unknown) => (err instanceof Error ? err.message : String(err)))
+    if (written !== undefined) return { ok: false, error: written }
     // Each package that writes hook lines writes its own (the built-in runner's start, resume and
     // check among them), so the new project starts an agent with nothing typed by hand. A writer
     // keeps every line already there, so adding a project again only fills what is missing.
@@ -147,7 +155,7 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
     // The project's open hooks (#1774): a project added while the daemon runs is a project the
     // boot never saw, so its open lines run now, the way they would have at boot.
     await runProjectHooks(abs, 'open', { log: console.log })
-    return { ok: true, alreadyActivated: result.alreadyActivated === true }
+    return { ok: true, alreadyActivated: result.alreadyActivated === true, ...(share && !shared ? { noRemote: true as const } : {}) }
   }
 
   // The dashboard's events source (#1067): a stream for an agent this daemon is relaying from a device,

@@ -9,7 +9,7 @@ import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
 import { projectErrorStore } from '../project-errors.js'
 import { provideTestContext } from './test-context.js'
-import { onCommands, onProjects } from './projects.js'
+import { onCommands, onProjects, onRecordsReach, sendAddProject, sendShareRecords } from './projects.js'
 
 // Against the real registry, pointed at a temp $XDG_CONFIG_HOME so the user's own is never touched.
 async function registered(): Promise<{ dir: string; restore: () => Promise<void> }> {
@@ -46,11 +46,13 @@ test('onProjects carries each project’s recorded errors, and nothing when ther
       { code: 'data-sync', message: 'the data branch could not be pushed: permission denied', since: '2026-08-20T10:00:00.000Z' },
     ])
 
-    assert.equal('localOnly' in stranded!, false, 'a project whose repository has a remote carries no note')
-    errors.setLocalOnly(dir, true)
-    assert.equal((await onProjects())[0]?.localOnly, true)
-    errors.setLocalOnly(dir, false)
-    assert.equal('localOnly' in (await onProjects())[0]!, false)
+    assert.equal('local' in stranded!, false, 'a project whose data reaches its remote carries no note')
+    errors.setReach(dir, 'no-remote')
+    assert.equal((await onProjects())[0]?.local, 'no-remote')
+    errors.setReach(dir, 'kept')
+    assert.equal((await onProjects())[0]?.local, 'kept')
+    errors.setReach(dir, 'origin')
+    assert.equal('local' in (await onProjects())[0]!, false)
   } finally {
     await restore()
   }
@@ -99,4 +101,64 @@ test('onCommands names the two branches an agent can start from only when the st
   } finally {
     await restore()
   }
+})
+
+test('the records switch: kept on this machine until turned on, and a remote that refuses turns it back off', async () => {
+  const { dir, restore } = await registered()
+  const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@example.com' } })
+  const remote = await realpath(await mkdtemp(join(tmpdir(), 'framework-records-remote-')))
+  const branchesOn = (bare: string) => git(bare, 'for-each-ref', '--format=%(refname)', 'refs/heads').trim()
+  try {
+    provideTestContext()
+    const id = (await listProjects())[0]!.id
+    git(dir, 'init', '-q', '-b', 'main')
+    git(dir, 'config', 'user.email', 't@example.com')
+    git(dir, 'config', 'user.name', 'T')
+    git(dir, 'commit', '-q', '--allow-empty', '-m', 'first')
+    assert.equal(await onRecordsReach(id), 'no-remote')
+    assert.equal(await onRecordsReach('no-such-project'), null)
+    // Nothing to share with: refused, and the setting is not left on for a remote made later.
+    assert.deepEqual(await sendShareRecords(id, true), { ok: false, error: 'this project has no remote to share with' })
+    assert.equal(execFileSync('git', ['config', '--local', '--default', 'unset', '--get', 'agent-data.share'], { cwd: dir, encoding: 'utf8' }).trim(), 'unset')
+
+    git(remote, 'init', '-q', '--bare')
+    git(dir, 'remote', 'add', 'origin', remote)
+    assert.equal(await onRecordsReach(id), 'kept', 'a remote alone shares nothing')
+
+    // Turned on: what is there goes out at once.
+    assert.deepEqual(await sendShareRecords(id, true), { ok: true })
+    assert.equal(await onRecordsReach(id), 'origin')
+    assert.equal(branchesOn(remote), 'refs/heads/agent-data')
+
+    // Turned off: kept again.
+    assert.deepEqual(await sendShareRecords(id, false), { ok: true })
+    assert.equal(await onRecordsReach(id), 'kept')
+
+    // A remote that refuses the push: said in its words, and the switch is back to off.
+    git(dir, 'remote', 'set-url', 'origin', join(remote, 'gone'))
+    git(join(dir, '.branches', 'agent-data'), 'commit', '-q', '--allow-empty', '-m', 'kept here')
+    const refused = await sendShareRecords(id, true)
+    assert.ok(!refused.ok && /could not be pushed/.test(refused.error))
+    assert.equal(await onRecordsReach(id), 'kept')
+
+    assert.deepEqual(await sendShareRecords('no-such-project', true), { ok: false, error: 'this project has no local path on this server' })
+  } finally {
+    await restore()
+    await rm(remote, { recursive: true, force: true })
+  }
+})
+
+test('sendAddProject hands the person\u2019s answer on the records to the daemon, as a yes only when it is one', async () => {
+  const seen: [string, boolean][] = []
+  provideTestContext({
+    addProject: (path, share) => {
+      seen.push([path, share])
+      return { ok: true, alreadyActivated: false }
+    },
+  })
+  await sendAddProject(' /repos/a ', true)
+  await sendAddProject('/repos/b', false)
+  await sendAddProject('/repos/c', 'yes' as unknown as boolean)
+  assert.deepEqual(seen, [['/repos/a', true], ['/repos/b', false], ['/repos/c', false]])
+  assert.deepEqual(await sendAddProject('  ', true), { ok: false, error: 'a project path is required' })
 })

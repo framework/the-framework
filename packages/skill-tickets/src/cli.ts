@@ -233,11 +233,10 @@ async function ticketsFs(cwd: string, local: boolean | undefined, git: GitRunner
   return { list: dir => listBranchDir(cwd, DATA_BRANCH, dir, {}, { git }), read: path => readBranchFile(cwd, DATA_BRANCH, path, {}, { git }) }
 }
 
-/** One detached write, refusing where nothing can carry it. */
+/** One write as a one-shot writer: to origin when the branch reaches it, else as a local commit. */
 async function write(cwd: string, message: string, op: (dir: string) => Promise<void>, git: GitRunner): Promise<void> {
   await inRepo(() => checkoutRoot(cwd, git))
-  const result = await writeFileBranchDetached(cwd, DATA_BRANCH, message, op, { git })
-  if (!result.ok) throw new Refused({ ok: false, reason: result.reason }, 'the repository has no remote, so nothing can carry the change')
+  await writeFileBranchDetached(cwd, DATA_BRANCH, message, op, { git })
 }
 
 /** Who this command claims as; a checkout on no branch has no identity to claim with. */

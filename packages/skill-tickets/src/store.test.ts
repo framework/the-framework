@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, readFile, readlink, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner, BRANCHES_DIR, DATA_BRANCH } from '@openagt/agent-data'
+import { nodeGitRunner, writeSharing, BRANCHES_DIR, DATA_BRANCH } from '@openagt/agent-data'
 import { syncTickets, ticketsCheckoutPath, ticketsDir } from './store.js'
 
 const git = nodeGitRunner()
@@ -20,11 +20,10 @@ async function repo(): Promise<string> {
   return path
 }
 
-test('sync births the branch, links tickets/ at the root hidden from git, and names a repo with no remote', async () => {
+test('sync births the branch, links tickets/ at the root hidden from git, and says a repo with no remote keeps it here', async () => {
   const root = await repo()
   try {
-    const result = await syncTickets(root)
-    assert.ok(!result.ok && /no remote/.test(result.error), 'a repo nothing can reach is an error state, said')
+    assert.deepEqual(await syncTickets(root), { ok: true, reach: 'no-remote' })
     const wt = await ticketsCheckoutPath(root)
     assert.equal(wt, join(root, BRANCHES_DIR, DATA_BRANCH))
     assert.equal(await ticketsDir(root), join(wt, 'tickets'))
@@ -74,7 +73,8 @@ test('sync converges with origin: the branch origin has is adopted, and a pushed
     await git(['init', '--bare', bare], bare)
     await git(['remote', 'add', 'origin', bare], root)
     await git(['push', 'origin', 'main'], root)
-    assert.deepEqual(await syncTickets(root), { ok: true })
+    await writeSharing(root, true)
+    assert.deepEqual(await syncTickets(root), { ok: true, reach: 'origin' })
     // Another machine clones and pushes a ticket straight onto the branch.
     const other = join(otherParent, 'clone')
     await git(['clone', bare, other], otherParent)
@@ -86,7 +86,7 @@ test('sync converges with origin: the branch origin has is adopted, and a pushed
     await git(['add', '-A'], other)
     await git(['commit', '-m', 'put tickets/2026-08-30_a.md'], other)
     await git(['push', 'origin', DATA_BRANCH], other)
-    assert.deepEqual(await syncTickets(root), { ok: true })
+    assert.deepEqual(await syncTickets(root), { ok: true, reach: 'origin' })
     assert.equal(await readFile(join(await ticketsDir(root), '2026-08-30_a.md'), 'utf8'), '# A\n')
   } finally {
     for (const dir of [root, bare, otherParent]) await rm(dir, RETRIED_RM)

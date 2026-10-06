@@ -4,7 +4,7 @@ The `logs` command line: the reads an agent [1] (or a person) makes in a shell, 
 
 **User story**: before planning or working a ticket, an agent [1] runs `npx logs show <id>` for each run its claim on the ticket names, or `npx logs --branch <name>` for a branch it names, and reads what that agent said before it ended; `npx logs` lists the latest runs newest first, `--branch` the runs on one branch. The agent sees only the record's own fields, never the daemon's bookkeeping.
 
-**Business logic story**: the command opens the branch through the one-shot reader of `file-branch.ts`: one fetch from `origin`, then every read off origin's copy of the branch; without a remote, the local branch is read. The checkout [4] a daemon keeps under `.branches/agent-data` is never touched, and nothing lands in the clone: no local branch, no file.
+**Business logic story**: the command opens the branch through the one-shot reader of `file-branch.ts`: one fetch from `origin`, then every read off origin's copy of the branch; without a remote, or while the person does not share the branch with it, nothing is fetched and the local branch is read. The checkout [4] a daemon keeps under `.branches/agent-data` is never touched, and nothing lands in the clone: no local branch, no file.
 
 **Business logic story**: a dashboard [8] reads the runs through this command rather than through the package's code, so any package that answers the same command line can take this one's place. The package says so in its `package.json` (`"framework": { "runs": "logs" }`). The dashboard polls, so it reads the checkout [4] kept on this machine, with no fetch; and it replays a run's whole diary [5] and needs the recording program's [6] `caller` key, so it asks for the whole record.
 
@@ -24,7 +24,7 @@ The `logs` command line: the reads an agent [1] (or a person) makes in a shell, 
 ## Business logic — TL;DR
 
 - **One JSON document, one exit code** - a result on stdout with exit 0; a refusal as `{ "ok": false, "reason": … }` on stdout plus one line on stderr with exit 1; a command line that could not be read as the usage on stderr, nothing on stdout, exit 2.
-- **Read off origin, from anywhere in the repository** - the branch is fetched from `origin` once and every read goes to that copy; with no remote, the local branch; outside a repository, the refusal `not-a-repo`.
+- **Read off origin, from anywhere in the repository** - the branch is fetched from `origin` once and every read goes to that copy; with no remote, or a remote the person does not share the branch with, the local branch; outside a repository, the refusal `not-a-repo`.
 - **The bare command lists the runs** - newest first, the newest 20 unless `--limit` says otherwise, narrowed by `--branch <name>`, the skill's fields only.
 - **`show <id>` prints one run** - its card and the agent's four kinds of diary line, never the recording program's; an id no run has is the refusal `no-run`.
 - **For a dashboard: `--local` and `--full`** - with either read, `--local` reads the checkout kept at `.branches/agent-data` instead of fetching; `--full` prints the whole card, `caller` included, and for `show` every diary line.
@@ -52,7 +52,7 @@ A command that runs prints exactly one JSON document on stdout and exits 0. A re
 
 #### Business logic
 
-The command first checks that it runs inside a git working tree; outside one it refuses with `not-a-repo` and the line "not inside a git repository". Only git's own "not a git repository" answer reads as that: a timeout, a missing git or a corrupt repository stays the failure it is. Then the branch is opened once through the one-shot reader in `file-branch.ts`: when the repository has an `origin` remote, the `agent-data` branch [3] is fetched from it once and every read goes to origin's copy; when it has none, the local branch is read. Nothing is fetched twice within one command, nothing is written to the clone, and the checkout [4] a daemon keeps is never touched.
+The command first checks that it runs inside a git working tree; outside one it refuses with `not-a-repo` and the line "not inside a git repository". Only git's own "not a git repository" answer reads as that: a timeout, a missing git or a corrupt repository stays the failure it is. Then the branch is opened once through the one-shot reader in `file-branch.ts`: when the repository has an `origin` remote and the person turned sharing on for it (the `agent-data` package's rule), the `agent-data` branch [3] is fetched from it once and every read goes to origin's copy; otherwise nothing is fetched and the local branch is read. Nothing is fetched twice within one command, nothing is written to the clone, and the checkout [4] a daemon keeps is never touched.
 
 ### The bare command lists the runs
 

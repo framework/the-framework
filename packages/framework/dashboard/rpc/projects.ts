@@ -12,6 +12,8 @@ export type * from '../../src/dashboard-rpc/projects.js'
 
 export const onProjects = rpc<typeof impl.onProjects>('onProjects')
 export const sendAddProject = rpc<typeof impl.sendAddProject>('sendAddProject')
+export const onRecordsReach = rpc<typeof impl.onRecordsReach>('onRecordsReach')
+export const sendShareRecords = rpc<typeof impl.sendShareRecords>('sendShareRecords')
 export const sendPickProjectDirectory = rpc<typeof impl.sendPickProjectDirectory>('sendPickProjectDirectory')
 export const onOnboarding = rpc<typeof impl.onOnboarding>('onOnboarding')
 export const onCommands = rpc<typeof impl.onCommands>('onCommands')

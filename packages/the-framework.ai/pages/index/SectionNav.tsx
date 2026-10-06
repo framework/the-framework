@@ -141,7 +141,7 @@ export function SectionNav() {
           >
             <img
               src="/assets/logo.svg"
-              alt="The Framework — back to top"
+              alt="OpenAgent — back to top"
               style={{ width: 22, height: 25, display: 'block' }}
             />
           </a>

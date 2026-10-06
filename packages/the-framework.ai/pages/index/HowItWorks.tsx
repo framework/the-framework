@@ -5,7 +5,7 @@ import { Queues } from './Queues'
 export function HowItWorks() {
   return (
     <section id="how-it-works" style={sectionStyle}>
-      <SectionHead title="How it works" sub="The Framework introduces one major building block:" />
+      <SectionHead title="How it works" sub="OpenAgent introduces one major building block:" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(44px, 8vw, 64px)' }}>
         <Queues />
         <Prompts />

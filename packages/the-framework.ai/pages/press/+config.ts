@@ -1,5 +1,5 @@
 import type { Config } from 'vike/types'
 
 export default {
-  title: 'Press — The Framework',
+  title: 'Press — OpenAgent',
 } satisfies Config

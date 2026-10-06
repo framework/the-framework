@@ -1,5 +1,5 @@
 import type { Config } from 'vike/types'
 
 export default {
-  title: 'Banner — The Framework',
+  title: 'Banner — OpenAgent',
 } satisfies Config

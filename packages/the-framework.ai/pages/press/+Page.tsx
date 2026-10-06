@@ -32,7 +32,7 @@ function Swatch({ bg, label, border }: { bg: string; label: string; border: stri
         padding: '28px 20px 16px',
       }}
     >
-      <img src="/assets/logo.svg" alt="The Framework logo" style={{ width: 72, height: 82 }} />
+      <img src="/assets/logo.svg" alt="OpenAgent logo" style={{ width: 72, height: 82 }} />
       <span style={{ fontSize: 12.5, color: '#859289' }}>{label}</span>
     </div>
   )
@@ -54,7 +54,7 @@ export default function Page() {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <h1 style={h2Style}>Press</h1>
-          <p style={pStyle}>Logos, banners, and naming — everything you need to talk about The Framework.</p>
+          <p style={pStyle}>Logos, banners, and naming — everything you need to talk about OpenAgent.</p>
         </div>
         <Step kicker="Logo">
           <p style={pStyle}>
@@ -72,15 +72,15 @@ export default function Page() {
         </Step>
         <Step kicker="Name">
           <p style={pStyle}>
-            The name is written <b style={{ color: '#d3c6aa', fontWeight: 600 }}>The Framework</b> (capital T, capital
-            F), and the package is <CodeChip fontSize={13}>framework</CodeChip>.
+            The name is written <b style={{ color: '#d3c6aa', fontWeight: 600 }}>OpenAgent</b> (one word, capital O, capital
+            A), and the package is <CodeChip fontSize={13}>@openagt/dashboard</CodeChip>.
           </p>
         </Step>
         <Step kicker="Banner">
           <a href="/banner.jpg" style={{ alignSelf: 'flex-start' }}>
             <img
               src="/banner.jpg"
-              alt="The Framework banner"
+              alt="OpenAgent banner"
               style={{ width: 'min(476px, 100%)', height: 'auto', display: 'block', outline: '1px solid #3d484d', borderRadius: 4 }}
             />
           </a>

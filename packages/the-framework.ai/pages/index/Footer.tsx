@@ -27,7 +27,7 @@ export function Footer() {
     >
       <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
         <img src="/assets/logo.svg" alt="" style={{ width: 20, height: 23 }} />
-        The Framework
+        OpenAgent
       </span>
       <span style={{ display: 'flex', flexWrap: 'wrap', gap: '12px 20px' }}>
         <a href={DISCORD_URL} className="footer-link" style={linkStyle}>

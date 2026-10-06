@@ -1,4 +1,4 @@
-The "Go to dashboard" page (`/go-to-dashboard`): where a visitor who looks for the dashboard on the public site is told that the dashboard runs on their own machine and is opened from their terminal, with the exact command to copy for each of three situations — The Framework is installed, it must be installed first, or the visitor only wants to try it once. The page does not detect, reach or open a running dashboard: it is a static page, and the dashboard is served by the daemon on the visitor's computer.
+The "Go to dashboard" page (`/go-to-dashboard`): where a visitor who looks for the dashboard on the public site is told that the dashboard runs on their own machine and is opened from their terminal, with the exact command to copy for each of three situations — OpenAgent is installed, it must be installed first, or the visitor only wants to try it once. The page does not detect, reach or open a running dashboard: it is a static page, and the dashboard is served by the daemon on the visitor's computer.
 
 ## Context
 
@@ -8,7 +8,7 @@ The "Go to dashboard" page (`/go-to-dashboard`): where a visitor who looks for t
 
 ## Business logic — TL;DR
 
-- **Three ways to open the dashboard** - "Run" (`the-framework`, when installed), "Install" (a global install with the visitor's package manager), and "One-time run" (run once without installing).
+- **Three ways to open the dashboard** - "Run" (`openagent`, when installed), "Install" (a global install with the visitor's package manager), and "One-time run" (run once without installing).
 - **The commands follow the visitor's package manager** - the "Install" and "One-time run" commands show the variant for the package manager picked with the tabs above them, a choice shared with the landing page and remembered across visits.
 - **Every command copies with one click** - clicking a command copies exactly the visible text to the clipboard and confirms with "copied!".
 
@@ -24,11 +24,11 @@ See `## Context`.
 
 Under the heading "Go to dashboard" and the sentence "The dashboard runs 100% locally — you open it from your terminal.", three steps follow in this order:
 
-- "Run": "If The Framework is installed, run it:" followed by the command `the-framework`.
-- "Install": "Not installed yet? Install it globally:" followed by the global install command of the chosen package manager — `npm i -g framework`, `pnpm add -g framework`, `bun add -g framework`, or `npm i -g framework` again for yarn (why yarn's install line is an npm command is explained in `../index/Hero.tsx`, where the commands are defined).
-- "One-time run": "You just want to try it out? Run it once, no install:" followed by the one-shot command of the chosen package manager — `npx framework`, `pnpm dlx framework`, `bunx framework` or `yarn dlx framework`.
+- "Run": "If OpenAgent is installed, run it:" followed by the command `openagent`.
+- "Install": "Not installed yet? Install it globally:" followed by the global install command of the chosen package manager — `npm i -g @openagt/dashboard`, `pnpm add -g @openagt/dashboard`, `bun add -g @openagt/dashboard`, or `npm i -g @openagt/dashboard` again for yarn (why yarn's install line is an npm command is explained in `../index/Hero.tsx`, where the commands are defined).
+- "One-time run": "You just want to try it out? Run it once, no install:" followed by the one-shot command of the chosen package manager — `npx @openagt/dashboard`, `pnpm dlx @openagt/dashboard`, `bunx @openagt/dashboard` or `yarn dlx @openagt/dashboard`.
 
-The install command shown here is the bare install: unlike the landing page's install chip, it does not append `&& the-framework` to launch the dashboard right after installing.
+The install command shown here is the bare install: unlike the landing page's install chip, it does not append `&& openagent` to launch the dashboard right after installing.
 
 ### The commands follow the visitor's package manager
 

@@ -26,14 +26,14 @@ export function Features() {
         <div style={{ ...featureCardStyle, gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Bring your own subscription</h3>
           <FeatureText>
-            Use your AI subscription — The Framework orchestrates agents via your Claude Code / Codex
+            Use your AI subscription — OpenAgent orchestrates agents via your Claude Code / Codex
             installation, like humans do.
           </FeatureText>
         </div>
         <div style={{ ...featureCardStyle, gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Optimal quota usage</h3>
           <FeatureText>
-            Stop wasting unused quota — The Framework drives AI autonomy for optimal quota usage:
+            Stop wasting unused quota — OpenAgent drives AI autonomy for optimal quota usage:
             maximum daily usage while keeping enough quota space for manual prompts.
           </FeatureText>
         </div>

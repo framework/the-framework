@@ -120,7 +120,7 @@ export default function Page() {
             color: '#a7c080',
           }}
         >
-          The Framework
+          OpenAgent
         </div>
       </div>
     </div>

@@ -1,12 +1,12 @@
-The site's four pages and what every page shares. The landing page (`/`) makes the pitch and hands out the command that starts The Framework; "Go to dashboard" (`/go-to-dashboard`) tells a visitor looking for the dashboard that it runs on their own machine and how to start it; the press page (`/press`) is the press kit; and the banner page (`/banner`) is the composition that the link-preview image is a screenshot of. Two things cross pages and are described below: the package manager in which every command is shown, and the link-preview image.
+The site's four pages and what every page shares. The landing page (`/`) makes the pitch and hands out the command that starts OpenAgent; "Go to dashboard" (`/go-to-dashboard`) tells a visitor looking for the dashboard that it runs on their own machine and how to start it; the press page (`/press`) is the press kit; and the banner page (`/banner`) is the composition that the link-preview image is a screenshot of. Two things cross pages and are described below: the package manager in which every command is shown, and the link-preview image.
 
 ## Context
 
-**User story**: a visitor picks "pnpm" once in the hero and every command on the site, today and on their next visit, is a pnpm command. A visitor shares any page of the site and the card that unfurls shows The Framework's banner.
+**User story**: a visitor picks "pnpm" once in the hero and every command on the site, today and on their next visit, is a pnpm command. A visitor shares any page of the site and the card that unfurls shows OpenAgent's banner.
 
 ## Business logic — TL;DR
 
-- **Site-wide settings** (`+config.ts`) - every page is pre-rendered to static HTML; the default title "The Framework", the description and the favicon.
+- **Site-wide settings** (`+config.ts`) - every page is pre-rendered to static HTML; the default title "OpenAgent", the description and the favicon.
 - **Head content of every page** (`+Head.tsx`) - restores the package manager choice before first paint, declares the link-preview metadata, loads the typefaces.
 - **The landing page** (`index/`) - the pitch, the chapters, the install commands, and the navigation, footer and building blocks every page reuses.
 - **The "Go to dashboard" page** (`go-to-dashboard/`) - the three commands that open the dashboard, since a public page cannot open a local one.

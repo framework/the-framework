@@ -53,8 +53,8 @@ export function TopNav() {
           whiteSpace: 'nowrap',
         }}
       >
-        <img src="/assets/logo.svg" alt="The Framework logo" style={{ width: 30, height: 34, display: 'block' }} />
-        The Framework
+        <img src="/assets/logo.svg" alt="OpenAgent logo" style={{ width: 30, height: 34, display: 'block' }} />
+        OpenAgent
       </a>
       <div
         style={{

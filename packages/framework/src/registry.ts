@@ -88,7 +88,7 @@ export interface Preferences {
    */
   postMergeCleanup?: boolean
   /** Preferred editor for "Open in editor" (#727): an editor CLI (e.g. `code`, `cursor`, `zed`).
-   * Absent falls back to `$FRAMEWORK_EDITOR`, then `code`. */
+   * Absent falls back to `$OPENAGENT_EDITOR`, then `code`. */
   editor?: string
   /** Dashboard color theme (#725): `system` (follow the OS, the default), `light`, or `dark`. Absent = system. */
   theme?: 'system' | 'light' | 'dark'

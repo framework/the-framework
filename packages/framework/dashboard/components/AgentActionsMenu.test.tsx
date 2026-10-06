@@ -206,6 +206,8 @@ describe('the editor picker in the menu (#727)', () => {
     detectedEditors = [{ bin: 'cursor', label: 'Cursor' }]
     render(<AgentActionsMenu part="session" projectId="p1" agentId="run-1" events={[]} />)
     await openEditorMenu()
+    // "Default" names the setting a person sets to choose it.
+    expect(await screen.findByText('$OPENAGENT_EDITOR, or code')).toBeTruthy()
     fireEvent.click(await screen.findByText('Default'))
     expect(updatePreferences).toHaveBeenCalledWith({ editor: '' })
   })

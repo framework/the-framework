@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin, type UserConfig } from 'vite'
 
-// Opt-in (`pnpm dev:daemon`, i.e. FRAMEWORK_DEV_DAEMON=1): let the dev server actually start runs.
+// Opt-in (`pnpm dev:daemon`, i.e. OPENAGENT_DEV_DAEMON=1): let the dev server actually start runs.
 //
 // `pnpm dev` alone is the Vite dev server with no daemon behind it, so nothing answers `/_rpc` and
 // `sendStart` fails (the same gap that leaves preferences unpersisted in dev).
@@ -25,7 +25,7 @@ function frameworkDevDaemon(): Plugin {
     name: 'framework:dev-daemon',
     apply: 'serve',
     configureServer(server) {
-      if (!process.env.FRAMEWORK_DEV_DAEMON) return
+      if (!process.env.OPENAGENT_DEV_DAEMON) return
       let target: { hostname: string; port: string } | null = null
       const ready = (async () => {
         // The one place here that genuinely wants the *build*: this runs in the Vite config's own
@@ -34,7 +34,7 @@ function frameworkDevDaemon(): Plugin {
         // comes from the source it is built from, so a signature change is still an error here.
         const built = new URL('../dist/daemon.js', import.meta.url).href
         const { runDaemon } = (await import(built)) as typeof import('../src/daemon.js')
-        const cwd = process.env.FRAMEWORK_DEV_DAEMON_CWD || process.cwd()
+        const cwd = process.env.OPENAGENT_DEV_DAEMON_CWD || process.cwd()
         // Ephemeral port: the dev server owns the address the browser talks to, and binding 4200
         // would collide with a `framework` the developer is running in another terminal.
         const url = await new Promise<string>((resolvePromise, rejectPromise) => {

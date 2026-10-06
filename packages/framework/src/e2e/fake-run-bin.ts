@@ -16,7 +16,7 @@
 //             can act on a run that is certainly still working;
 //   "ask"     the first turn ends on a question, so the run ends `waiting`;
 //   "commit"  the run commits a file, so its branch holds work to push.
-// When `$FRAMEWORK_E2E_STARTS_FILE` is set, every `start` and `resume` appends what its
+// When `$OPENAGENT_E2E_STARTS_FILE` is set, every `start` and `resume` appends what its
 // environment carried there, one JSON line each: the only place a story can see it.
 import { spawn } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
@@ -38,7 +38,7 @@ const repo = process.cwd()
 const git = nodeGitRunner()
 
 function record(entry: Record<string, unknown>): void {
-  const file = process.env['FRAMEWORK_E2E_STARTS_FILE']
+  const file = process.env['OPENAGENT_E2E_STARTS_FILE']
   if (file) appendFileSync(file, JSON.stringify(entry) + '\n')
 }
 

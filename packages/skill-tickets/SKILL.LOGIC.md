@@ -39,7 +39,7 @@ See `## Context`.
 
 #### Business logic
 
-The agent is told that the tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) live on the branch `agent-data` [7], never on a code branch, and that a `tickets` link at the repository root, if present, is a possibly stale copy it must never write to. It reads and changes them with the `tickets` command, a dependency of the repository (`@openagt/skill-tickets`): with no `node_modules` it first installs with the lockfile's package manager (`npm install` for `package-lock.json`), then runs `npx tickets`. It is told that every change the command makes is one commit pushed straight to the `agent-data` branch, and never to pass `--local` or `--force`, which are a person's.
+The agent is told that the tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) live on the branch `agent-data` [7], never on a code branch, and that a `tickets` link at the repository root, if present, is a possibly stale copy it must never write to. It reads and changes them with the `tickets` command, a dependency of the repository (`@openagt/skill-tickets`): with no `node_modules` it first installs with the lockfile's package manager (`npm install` for `package-lock.json`), then runs `npx tickets`. It is told that every change the command makes is one commit on the `agent-data` branch, pushed straight to the remote when the project shares its records, and never to pass `--local` or `--force`, which are a person's.
 
 ### How the command answers, and how a ticket is named
 

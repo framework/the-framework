@@ -32,7 +32,7 @@ See `## Context`.
 
 #### Business logic
 
-The agent is told that the agent queue [2], `TODO_AGENTS.md`, lives on the branch `agent-data` [5], never on a code branch, so its own checkout [3] does not contain it, and that the file lists every task agents will work on next, in the order they will be taken. It reads and changes the queue with the `queue` command, a dependency of the repository (`@openagt/skill-queue`): with no `node_modules` it first installs with the lockfile's package manager (`npm install` for `package-lock.json`), then runs `npx queue`. It is told that every change the command makes is one commit pushed straight to the `agent-data` branch, that the command's `--local` and `--full` flags are for the dashboard that shows the queue and never for it, that a refusal exits 1 with a line on stderr, and that a wrong command line exits 2 with the usage.
+The agent is told that the agent queue [2], `TODO_AGENTS.md`, lives on the branch `agent-data` [5], never on a code branch, so its own checkout [3] does not contain it, and that the file lists every task agents will work on next, in the order they will be taken. It reads and changes the queue with the `queue` command, a dependency of the repository (`@openagt/skill-queue`): with no `node_modules` it first installs with the lockfile's package manager (`npm install` for `package-lock.json`), then runs `npx queue`. It is told that every change the command makes is one commit on the `agent-data` branch, pushed straight to the remote when the project shares its records, that the command's `--local` and `--full` flags are for the dashboard that shows the queue and never for it, that a refusal exits 1 with a line on stderr, and that a wrong command line exits 2 with the usage.
 
 ### Reading
 

@@ -28,8 +28,12 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## The branch
 - A branch of the project's repository holds the agents' data (tickets, the queue) the way
   `gh-pages` holds a site; code branches hold only code. Every write that changes
-  something pushes when there is a remote, and a pull is a cycle of its own, so a machine
-  that writes nothing still gets what the others pushed.
+  something pushes when the person shares the branch with the remote, and a pull is a
+  cycle of its own, so a machine that writes nothing still gets what the others pushed.
+- The branch leaves the machine only on the person's word: one git setting in the
+  repository, `agent-data.share`, unset means off. Off is both ways, nothing pushed and
+  nothing fetched: taking without giving would rebase kept commits onto origin's forever,
+  and a conflict there drops them.
 - One branch for all skills, each with its own folder or file. Not one per skill: every
   extra branch needs its own checkout and its own sync failure to report.
 - Missing locally, it is adopted from origin's copy; missing there too, it is born an
@@ -38,7 +42,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   `names` is its own entry point with no node imports, so browser code can import it.
 - A read works from anywhere in the repository, an agent's worktree included: the checkout
   is looked for beside the real `.git`. A one-shot command opens the branch once: one
-  fetch when there is an origin, every read off origin's copy (the local branch when there
+  fetch when the branch is shared with origin, every read off origin's copy (the local branch when there
   is no `origin/<branch>`), because its own writes go straight to the remote and never
   move the local branch. A read never fails: a missing file, a missing branch and a git
   that could not run all read as absent.
@@ -73,5 +77,5 @@ Fetch what others pushed → make the change → commit → push.
   skill's folder vanishes with its last file and is absent on a new branch.
 - The remote is always `origin`; a repository without one is remote-less whatever other
   remotes it has. Then the process's write commits locally and reports no error, a
-  command's write refuses (an outcome, not a throw), and the pull reports an error:
-  nothing to converge with.
+  command's write commits locally through the checkout, and the pull is fine and says
+  the branch stays here.

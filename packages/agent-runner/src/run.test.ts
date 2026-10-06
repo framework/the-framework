@@ -865,7 +865,7 @@ test("a run holds its lock while the agent works: a sweep of this machine leaves
   }
 })
 
-/** A git host package declared in the test repository: `framework.git-host` in its package.json, a command that keeps every call and answers canned pull requests. */
+/** A git host package declared in the test repository: `openagent.git-host` in its package.json, a command that keeps every call and answers canned pull requests. */
 const GIT_HOST_PACKAGE = `
 const { appendFileSync } = require('node:fs')
 const { join } = require('node:path')
@@ -881,7 +881,7 @@ test('the git host is the package the project declares: a run reads its pull req
   try {
     const dir = join(repo, 'node_modules', 'git-host-fake')
     await mkdir(dir, { recursive: true })
-    await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'git-host-fake', bin: { 'git-host-fake': 'cli.cjs' }, framework: { 'git-host': 'git-host-fake' } }))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'git-host-fake', bin: { 'git-host-fake': 'cli.cjs' }, openagent: { 'git-host': 'git-host-fake' } }))
     await writeFile(join(dir, 'cli.cjs'), GIT_HOST_PACKAGE)
     await writeFile(join(repo, 'package.json'), JSON.stringify({ name: 'project', devDependencies: { 'git-host-fake': '*' } }))
     await git(['add', 'package.json'], repo)

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { readProvidedCommand } from '@openagt/agent-data'
 import { parseRunCard, providedRuns } from './runs.js'
 
-// The finished-runs contract (#1774): a project's package declares `"framework": { "runs": "<command>" }`
+// The finished-runs contract (#1774): a project's package declares `"openagent": { "runs": "<command>" }`
 // and the framework reads finished runs by running that command. These tests use real processes:
 // a tiny provider script that logs each call it answers, in a throwaway project.
 
@@ -55,8 +55,8 @@ const calls = async (root: string, pkg: string): Promise<string[]> =>
 test('the runs provider is the dependency that declares it, naming one of its own commands; none declares it, the built-in one provides', async () => {
   const root = await project({
     plain: { bin: { plain: 'provider.cjs' } },
-    'wrong-bin': { bin: { a: 'provider.cjs' }, framework: { runs: 'b' } },
-    logs: { bin: { records: 'provider.cjs' }, framework: { runs: 'records' } },
+    'wrong-bin': { bin: { a: 'provider.cjs' }, openagent: { runs: 'b' } },
+    logs: { bin: { records: 'provider.cjs' }, openagent: { runs: 'records' } },
   })
   try {
     const found = await readProvidedCommand(root, 'runs')
@@ -76,7 +76,7 @@ test('the runs provider is the dependency that declares it, naming one of its ow
 })
 
 test('a provider is read through its command: whole cards with caller, one run with its diary; reads within the window share one call', async () => {
-  const root = await project({ logs: { bin: { logs: 'provider.cjs' }, framework: { runs: 'logs' } } })
+  const root = await project({ logs: { bin: { logs: 'provider.cjs' }, openagent: { runs: 'logs' } } })
   try {
     let clock = 1_000_000
     const runs = await providedRuns(() => clock)(root)
@@ -105,7 +105,7 @@ test('a provider is read through its command: whole cards with caller, one run w
 })
 
 test('a patch and a delete go through the command and drop what was read, so the next read sees them', async () => {
-  const root = await project({ logs: { bin: { logs: 'provider.cjs' }, framework: { runs: 'logs' } } })
+  const root = await project({ logs: { bin: { logs: 'provider.cjs' }, openagent: { runs: 'logs' } } })
   try {
     const runs = (await providedRuns(() => 0)(root))!
     assert.equal((await runs.list())[1]!.branch, undefined)

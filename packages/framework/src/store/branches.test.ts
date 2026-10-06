@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseBranchStates, parseCheckouts, providedBranches } from './branches.js'
 
-// The branches contract (#1774): a project's package declares `"framework": { "branches": "<command>" }`
+// The branches contract (#1774): a project's package declares `"openagent": { "branches": "<command>" }`
 // and the framework reads its checkouts, a branch's state, and moves them, by running that command.
 // Real processes: a tiny provider script that logs each call it answers, in a throwaway project.
 
@@ -41,7 +41,7 @@ async function project(deps: Record<string, Record<string, unknown>>): Promise<s
   return root
 }
 
-const BRANCHES = { branches: { bin: { branches: 'provider.cjs' }, framework: { branches: 'branches' } } }
+const BRANCHES = { branches: { bin: { branches: 'provider.cjs' }, openagent: { branches: 'branches' } } }
 
 const calls = async (root: string, pkg: string): Promise<string[]> =>
   (await readFile(join(root, 'node_modules', pkg, 'calls.log'), 'utf8').catch(() => '')).split('\n').filter(Boolean)

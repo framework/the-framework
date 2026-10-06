@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseQueueEntries, providedQueue } from './queue.js'
 
-// The queue contract (#1774): a project's package declares `"framework": { "queue": "<command>" }`
+// The queue contract (#1774): a project's package declares `"openagent": { "queue": "<command>" }`
 // and the framework reads the queue by running `<command> --local`. Real processes: a tiny
 // provider script that logs each call it answers, in a throwaway project.
 
@@ -36,7 +36,7 @@ const calls = async (root: string, pkg: string): Promise<string[]> =>
 
 test('a project with no queue provider has no queue; one with a provider is read through `<command> --local`', async () => {
   const none = await project({ plain: { bin: { plain: 'provider.cjs' } } })
-  const root = await project({ queue: { bin: { queue: 'provider.cjs' }, framework: { queue: 'queue' } } })
+  const root = await project({ queue: { bin: { queue: 'provider.cjs' }, openagent: { queue: 'queue' } } })
   try {
     assert.equal(await providedQueue()(none), undefined)
     const queue = await providedQueue()(root)
@@ -50,7 +50,7 @@ test('a project with no queue provider has no queue; one with a provider is read
 })
 
 test('reads within the window share one call; changed() forgets the read; a failed read is not kept', async () => {
-  const root = await project({ queue: { bin: { queue: 'provider.cjs' }, framework: { queue: 'queue' } } })
+  const root = await project({ queue: { bin: { queue: 'provider.cjs' }, openagent: { queue: 'queue' } } })
   try {
     let clock = 1_000_000
     const reader = providedQueue(() => clock)

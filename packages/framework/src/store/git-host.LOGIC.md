@@ -12,7 +12,7 @@ How The Framework reads a project's pull requests and acts on them: through the 
 
 ## Glossary
 
-[1] git host provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's git host, in its own package.json under `"framework": { "git-host": "<command>" }` (the `github` skill's package declares its `github` command); it lists the project's pull requests, opens one, lands one, and names the project's page on the git host (`store/git-host.ts`).
+[1] git host provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's git host, in its own package.json under `"openagent": { "git-host": "<command>" }` (the `github` skill's package declares its `github` command); it lists the project's pull requests, opens one, lands one, and names the project's page on the git host (`store/git-host.ts`).
 [2] pull request: as the provider answers it: its number, its link, its state (`open`, `merged` or `closed`), its title, whether it is a draft, the branch it is from, the commit its head is at, when it was created and, for a merged one, when it merged and the commit it landed as on the base branch.
 [3] the project's page on the git host: a link to the project where its pull requests live, and the git host's name, for the dashboard to draw a link from without naming any git host itself.
 
@@ -35,7 +35,7 @@ See `## Context`.
 
 #### Business logic
 
-The provider is found by the shared library's rule (`agent-data`'s `provided-command.ts`): among the project's installed dependencies, the one whose own package.json declares `"framework": { "git-host": "<command>" }`, where `<command>` is one of that package's own commands, is the git host provider [1]; a declaration naming a command the package does not have is skipped. When two or more declare it, the one the project's own package.json names under the same key provides, and with no such line none does (the daemon says why in the project's error banner). No package.json, no installed dependency, or no declaration: the project has no git host, and every ask below answers nothing.
+The provider is found by the shared library's rule (`agent-data`'s `provided-command.ts`): among the project's installed dependencies, the one whose own package.json declares `"openagent": { "git-host": "<command>" }`, where `<command>` is one of that package's own commands, is the git host provider [1]; a declaration naming a command the package does not have is skipped. When two or more declare it, the one the project's own package.json names under the same key provides, and with no such line none does (the daemon says why in the project's error banner). No package.json, no installed dependency, or no declaration: the project has no git host, and every ask below answers nothing.
 
 ### The command line it answers
 

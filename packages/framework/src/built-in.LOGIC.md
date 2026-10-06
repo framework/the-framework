@@ -58,4 +58,4 @@ The directories holding the built-in packages' [1] commands are listed, each onc
 
 #### Business logic
 
-A package declares `"framework": { "hooks": "<command>" }` in its `package.json`, naming one of its own commands. For the project's own installed packages, then for each built-in package [1] the project has no copy of, every such command is run in the project with the argument `init`; the command writes its own lines into the project's hooks file and keeps every line already there. A command that fails is answered as one line, "<package>: <its error>", and the others still run.
+A package declares `"openagent": { "hooks": "<command>" }` in its `package.json`, naming one of its own commands. For the project's own installed packages, then for each built-in package [1] the project has no copy of, every such command is run in the project with the argument `init`; the command writes its own lines into the project's hooks file and keeps every line already there. A command that fails is answered as one line, "<package>: <its error>", and the others still run.

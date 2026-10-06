@@ -30,7 +30,7 @@ test('a project\'s own package for a kind wins over the built-in one', async () 
   try {
     const own = join(root, 'node_modules', 'my-logs')
     await mkdir(join(own, 'bin'), { recursive: true })
-    await writeFile(join(own, 'package.json'), JSON.stringify({ name: 'my-logs', bin: { mine: 'bin/mine' }, framework: { runs: 'mine' } }))
+    await writeFile(join(own, 'package.json'), JSON.stringify({ name: 'my-logs', bin: { mine: 'bin/mine' }, openagent: { runs: 'mine' } }))
     await writeFile(join(own, 'bin', 'mine'), '')
     await writeFile(join(root, 'package.json'), JSON.stringify({ dependencies: { 'my-logs': '1.0.0' } }))
     assert.equal((await providedCommand(root, 'runs'))?.package, 'my-logs')

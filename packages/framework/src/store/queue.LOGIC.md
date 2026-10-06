@@ -6,14 +6,14 @@ How The Framework reads a project's agent queue [1]: through the queue provider 
 - The user opens the Overview and sees, per project, what agents will work on next, as the total of open entries and as the queue package's own card; the tickets page skips a ticket that is already queued.
 - A project that installed no queue package has no queue: the Overview's total counts nothing of it, and the onboarding step about the queue does not apply.
 
-**Business logic story**: The Framework names no skill. A project picks the package that keeps its queue by listing it as a dependency; that package says, in its own package.json, which of its commands answers for the queue (`"framework": { "queue": "queue" }` for the `queue` skill's package). The Framework only reads: putting something on the queue is the module [4] that package brings, acting through its own command from the browser.
+**Business logic story**: The Framework names no skill. A project picks the package that keeps its queue by listing it as a dependency; that package says, in its own package.json, which of its commands answers for the queue (`"openagent": { "queue": "queue" }` for the `queue` skill's package). The Framework only reads: putting something on the queue is the module [4] that package brings, acting through its own command from the browser.
 
 **Problem**: the dashboard reads every project's queue on several polls every few seconds, and every read of the provider is a process.
 
 ## Glossary
 
 [1] the agent queue: every task agents will work next, in the order they will be taken, kept by a project package (the `queue` skill keeps it as `TODO_AGENTS.md` on the `agent-data` branch, in priority sections).
-[2] queue provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's agent queue [1], in its own package.json under `"framework": { "queue": "<command>" }`.
+[2] queue provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's agent queue [1], in its own package.json under `"openagent": { "queue": "<command>" }`.
 [3] entry: one task on the agent queue [1], as the provider's command prints it: the text a future agent is started with. A markdown link at its start names the work and where it points; how a dashboard reads that is the queue package's module's.
 [4] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 
@@ -34,7 +34,7 @@ See `## Context`.
 
 #### Business logic
 
-The project's own package.json is read; its `dependencies` then `devDependencies` are taken in their order, a name listed twice read once. Each is looked up in the project's `node_modules`, links followed. The first whose own package.json declares `"framework": { "queue": "<command>" }`, where `<command>` is one of that package's own commands, is the queue provider [2]. A declaration naming a command the package does not have is skipped. No package.json, no installed dependency, or no declaration: the project has no queue provider, and the project has no queue (`undefined`, which `dashboard/queue.ts` turns into "not listed"). The provider is looked up again at most every five seconds, so a project that installs, swaps or drops its provider is read the new way within five seconds.
+The project's own package.json is read; its `dependencies` then `devDependencies` are taken in their order, a name listed twice read once. Each is looked up in the project's `node_modules`, links followed. The first whose own package.json declares `"openagent": { "queue": "<command>" }`, where `<command>` is one of that package's own commands, is the queue provider [2]. A declaration naming a command the package does not have is skipped. No package.json, no installed dependency, or no declaration: the project has no queue provider, and the project has no queue (`undefined`, which `dashboard/queue.ts` turns into "not listed"). The provider is looked up again at most every five seconds, so a project that installs, swaps or drops its provider is read the new way within five seconds.
 
 ### The command line it answers
 

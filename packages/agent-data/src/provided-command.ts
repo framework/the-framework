@@ -5,10 +5,10 @@ import { join } from 'node:path'
 /**
  * Which of a project's packages provides one kind of the framework's data, and how its command is
  * run (#1774, #1820). A package declares what it provides in its own package.json,
- * `"framework": { "<kind>": "<command>" }`, naming one of its own commands; the framework and the
+ * `"openagent": { "<kind>": "<command>" }`, naming one of its own commands; the framework and the
  * scheduler name no package: whoever declares the kind provides it. When several installed
  * packages declare the same kind, the project's own root package.json says which one, under the
- * same key with the package's name as the value, `"framework": { "<kind>": "<package>" }`; with
+ * same key with the package's name as the value, `"openagent": { "<kind>": "<package>" }`; with
  * no such line nothing provides the kind, and the reason is said, never the first in dependency
  * order taken silently.
  */
@@ -19,7 +19,7 @@ export interface PackageManifest {
   version?: unknown
   exports?: unknown
   bin?: unknown
-  framework?: unknown
+  openagent?: unknown
   dependencies?: unknown
   devDependencies?: unknown
 }
@@ -92,17 +92,17 @@ export interface ProvidedCommand {
  */
 export type ProvidedCommandLookup = { command: ProvidedCommand; problem?: undefined } | { command?: undefined; problem?: string }
 
-/** The `framework` object of a manifest, when it has one. */
-function frameworkKey(manifest: PackageManifest, kind: string): unknown {
-  const framework = manifest.framework
-  return framework && typeof framework === 'object' && !Array.isArray(framework) ? (framework as Record<string, unknown>)[kind] : undefined
+/** The `openagent` object of a manifest, when it has one. */
+function declaredFor(manifest: PackageManifest, kind: string): unknown {
+  const declared = manifest.openagent
+  return declared && typeof declared === 'object' && !Array.isArray(declared) ? (declared as Record<string, unknown>)[kind] : undefined
 }
 
 /**
  * The command that provides `kind` in the project at `root`: the one installed dependency whose
  * own package.json declares the kind naming one of its commands; a declaration naming a command
  * the package does not have is no declaration. Two or more declare it: the one the project's own
- * package.json names under `"framework": { "<kind>": "<package name>" }`, else none, with the
+ * package.json names under `"openagent": { "<kind>": "<package name>" }`, else none, with the
  * reason. The project naming a package that does not declare the kind is the same: none, said.
  *
  * `shipped` are packages the caller brings for every project (a dashboard's built-in ones): they
@@ -113,7 +113,7 @@ export async function lookupProvidedCommand(root: string, kind: string, shipped:
   let providers = declaring(await projectPackages(root), kind)
   if (providers.length === 0) providers = declaring(shipped, kind)
   const project = await readManifest(join(root, 'package.json'))
-  const named = project ? frameworkKey(project, kind) : undefined
+  const named = project ? declaredFor(project, kind) : undefined
   const names = providers.map(p => p.package).join(', ')
   if (typeof named === 'string') {
     const command = providers.find(p => p.package === named)
@@ -122,14 +122,14 @@ export async function lookupProvidedCommand(root: string, kind: string, shipped:
   }
   if (providers.length === 1) return { command: providers[0]! }
   if (providers.length === 0) return {}
-  return { problem: `${providers.length} packages provide ${kind}: ${names}; name one under "framework" in package.json` }
+  return { problem: `${providers.length} packages provide ${kind}: ${names}; name one under "openagent" in package.json` }
 }
 
 /** The commands among `packages` that declare `kind`, each naming one of its package's own commands. */
 export function declaring(packages: readonly ProjectPackage[], kind: string): ProvidedCommand[] {
   const providers: ProvidedCommand[] = []
   for (const { name, dir, manifest } of packages) {
-    const declared = frameworkKey(manifest, kind)
+    const declared = declaredFor(manifest, kind)
     if (typeof declared !== 'string') continue
     const bin = packageBins(name, manifest.bin, dir)[declared]
     if (bin !== undefined) providers.push({ package: name, name: declared, bin })

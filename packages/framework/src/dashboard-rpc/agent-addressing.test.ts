@@ -404,7 +404,7 @@ test('sendOpenPullRequest opens the pull request as a draft when asked to, and a
     await writeFile(manifestPath, JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, host: '*' } }))
     const host = join(ctx.dir, 'node_modules', 'host')
     await mkdir(host, { recursive: true })
-    await writeFile(join(host, 'package.json'), JSON.stringify({ name: 'host', bin: { host: 'provider.cjs' }, framework: { 'git-host': 'host' } }))
+    await writeFile(join(host, 'package.json'), JSON.stringify({ name: 'host', bin: { host: 'provider.cjs' }, openagent: { 'git-host': 'host' } }))
     await writeFile(join(host, 'provider.cjs'), GIT_HOST_PROVIDER)
     const opens = async (): Promise<string[]> => (await readFile(join(host, 'calls.log'), 'utf8').catch(() => '')).split('\n').filter(line => line.startsWith('open '))
 

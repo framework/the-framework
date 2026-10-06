@@ -6,7 +6,7 @@ The `logs` command line: the reads an agent [1] (or a person) makes in a shell, 
 
 **Business logic story**: the command opens the branch through the one-shot reader of `file-branch.ts`: one fetch from `origin`, then every read off origin's copy of the branch; without a remote, or while the person does not share the branch with it, nothing is fetched and the local branch is read. The checkout [4] a daemon keeps under `.branches/agent-data` is never touched, and nothing lands in the clone: no local branch, no file.
 
-**Business logic story**: a dashboard [8] reads the runs through this command rather than through the package's code, so any package that answers the same command line can take this one's place. The package says so in its `package.json` (`"framework": { "runs": "logs" }`). The dashboard polls, so it reads the checkout [4] kept on this machine, with no fetch; and it replays a run's whole diary [5] and needs the recording program's [6] `caller` key, so it asks for the whole record.
+**Business logic story**: a dashboard [8] reads the runs through this command rather than through the package's code, so any package that answers the same command line can take this one's place. The package says so in its `package.json` (`"openagent": { "runs": "logs" }`). The dashboard polls, so it reads the checkout [4] kept on this machine, with no fetch; and it replays a run's whole diary [5] and needs the recording program's [6] `caller` key, so it asks for the whole record.
 
 **Problem**: a list of every run, each with its prompt, is more than an agent should read for a look back; and a run's whole diary [5] is mostly the recording program's [6] bookkeeping, hundreds of kilobytes an agent cannot read.
 
@@ -19,7 +19,7 @@ The `logs` command line: the reads an agent [1] (or a person) makes in a shell, 
 [5] diary: the run's `<id>.jsonl`: what the agent said.
 [6] recording program: the program that ran an agent and records its run when the agent ends; in the product, the runner (`agent-runner`).
 [7] card: the run's `<id>.json`: what was asked, the branch, the pull request, how it ended, what it cost.
-[8] dashboard: a program that shows a project's runs to a person, such as The Framework's; it finds this command through the package's `framework.runs` declaration.
+[8] dashboard: a program that shows a project's runs to a person, such as The Framework's; it finds this command through the package's `openagent.runs` declaration.
 
 ## Business logic — TL;DR
 

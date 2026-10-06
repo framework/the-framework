@@ -5,7 +5,7 @@ import { isRunId } from './runs.js'
 /**
  * The checkouts and the branches, as the framework reads and acts on them (#1774). The framework
  * keeps no checkout and imports no branches package: a project's checkouts come from whichever of
- * its packages declares that it provides them — `"framework": { "branches": "<command>" }` in the
+ * its packages declares that it provides them — `"openagent": { "branches": "<command>" }` in the
  * package's own package.json — and the framework reads and moves them by running that command.
  * Swap the package for another that answers the same command line and prints the same shapes,
  * and nothing here changes. No package declares it: the project has no checkouts, so no run with

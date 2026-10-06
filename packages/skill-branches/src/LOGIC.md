@@ -21,7 +21,7 @@ Implements the `branches` skill [1]: one git worktree per agent [2] under the pr
 [11] branch link: a symbolic link under `.branches/`, named as the branch a checkout is on now and pointing at that checkout's directory, so `.branches/<branch>` reaches the checkout by its current branch name.
 [12] sweep: `agent-runner`'s pass, run by the scheduler on every tick, that records and reclaims the runs of this machine whose process died, and only this machine's.
 [13] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
-[15] branches provider: the package among a project's dependencies whose `package.json` declares `"framework": { "branches": "<command>" }`; the dashboard's server reads and moves the project's checkouts by running that command, naming no package.
+[15] branches provider: the package among a project's dependencies whose `package.json` declares `"openagent": { "branches": "<command>" }`; the dashboard's server reads and moves the project's checkouts by running that command, naming no package.
 
 ## Business logic — TL;DR
 

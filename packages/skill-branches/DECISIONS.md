@@ -134,7 +134,7 @@ ending.
   disk, so a caller may poll them.
 - The command has a second caller, the dashboard, for `list`, `show`, `push --branch` and
   `remove`, declared as the project's branches provider
-  (`"framework": { "branches": "branches" }`).
+  (`"openagent": { "branches": "branches" }`).
 - Before its first change the agent names its session, saying what the work is, unless its
   branch already differs from its folder name, as a continued agent's does: it is already
   named. The agent finishes only when `npx branches status` reports the checkout clean, or

@@ -23,7 +23,7 @@
   "bin": {
     "branches": "bin/branches"
   },
-  "framework": {
+  "openagent": {
     "branches": "branches"
   },
   "exports": {

@@ -24,7 +24,7 @@ import { holderOf } from './holder.js'
  * Two flags are the dashboard's, never an agent's: `--local` on the reads (this machine's copy of
  * the branch, no fetch — the dashboard polls, and the writer on that machine keeps the checkout
  * synced), and `--force` on `release` (lift whoever's claim: a person's answer to a dead agent).
- * The framework finds this command through the package's `framework.tickets` declaration.
+ * The framework finds this command through the package's `openagent.tickets` declaration.
  */
 
 export const USAGE = `usage: tickets <command>

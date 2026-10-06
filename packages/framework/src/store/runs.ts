@@ -4,7 +4,7 @@ import { providedCommand } from '../built-in.js'
 /**
  * Finished runs, as the framework reads them (#1774). The framework keeps no run and imports no
  * records package: a project's finished runs come from whichever of its packages declares that it
- * provides them — `"framework": { "runs": "<command>" }` in the package's own package.json — and
+ * provides them — `"openagent": { "runs": "<command>" }` in the package's own package.json — and
  * the framework reads them by running that command. Swap the package for another that answers
  * the same command line and prints the same shapes, and nothing here changes. No package declares
  * it: the project has no finished runs, only the ones still running in a checkout.

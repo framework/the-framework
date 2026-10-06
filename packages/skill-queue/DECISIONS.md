@@ -9,7 +9,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## The queue
 - Two callers: the command an agent runs, and a dashboard, which reads the queue through
   the command (`--local`, `--full`) and adds to it through the command as its module's
-  action, found by the package's `framework.queue` declaration. A dashboard importing the
+  action, found by the package's `openagent.queue` declaration. A dashboard importing the
   package was the alternative and was not taken: the dashboard names no skill. The
   executable is `queue`. The package ships `SKILL.md`, the agent's instructions.
 - The queue is one markdown file on the branch, `TODO_AGENTS.md`: sections `## Priority

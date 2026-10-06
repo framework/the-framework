@@ -23,7 +23,7 @@
   "bin": {
     "tickets": "bin/tickets"
   },
-  "framework": {
+  "openagent": {
     "tickets": "tickets"
   },
   "exports": {

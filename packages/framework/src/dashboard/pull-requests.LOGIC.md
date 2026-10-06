@@ -10,7 +10,7 @@ Every pull request the dashboard reads, in one place, all through the project's 
 
 ## Glossary
 
-[1] git host provider: the package of the project that declares it provides the git host (`"framework": { "git-host": "<command>" }`); The Framework reads and moves pull requests through the command that package declares (`../store/git-host.ts`). A project with none has no git host.
+[1] git host provider: the package of the project that declares it provides the git host (`"openagent": { "git-host": "<command>" }`); The Framework reads and moves pull requests through the command that package declares (`../store/git-host.ts`). A project with none has no git host.
 [2] linked pull request: a pull request as the dashboard keeps it for a branch: number, URL, state (`OPEN`, `MERGED`, `CLOSED`, or `UNKNOWN` for a recorded pull request no live read confirmed), title, and, when the provider answered them, the creation time, the head commit and, for a merged one, the commit it landed as.
 [3] open pull request: a pull request as the interventions feed keeps it: number, title, URL, whether it is a draft, and, when the provider answered them, the head branch and the creation time.
 [4] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.

@@ -1,4 +1,4 @@
-Writes this tool's lines into a dashboard's hooks file, `.openagent/hooks.yml` in the project, so the dashboard's check before a Start, the Start, and its answers to a run's question run through this tool. What `agent-runner init` runs, which is also what the dashboard runs when a project is added: the package declares `"framework": { "hooks": "agent-runner" }` in its `package.json`. The writer takes any tool's lines, one-line keys and lists alike, so the scheduler's `init` writes its own lines (`open`, `close`) through it.
+Writes this tool's lines into a dashboard's hooks file, `.openagent/hooks.yml` in the project, so the dashboard's check before a Start, the Start, and its answers to a run's question run through this tool. What `agent-runner init` runs, which is also what the dashboard runs when a project is added: the package declares `"openagent": { "hooks": "agent-runner" }` in its `package.json`. The writer takes any tool's lines, one-line keys and lists alike, so the scheduler's `init` writes its own lines (`open`, `close`) through it.
 
 ## Context
 

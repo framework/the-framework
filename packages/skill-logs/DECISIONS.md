@@ -10,7 +10,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - Three callers: the command an agent runs, which only reads; the program that ran an
   agent, which records the run through this package's functions when it is over; and a
   dashboard, which reads, deletes and patches runs through the command (`--local`,
-  `--full`, `delete`, `patch`), found by the package's `framework.runs` declaration. A
+  `--full`, `delete`, `patch`), found by the package's `openagent.runs` declaration. A
   dashboard importing the package was the alternative and was not taken: the dashboard
   names no skill. The executable is `logs`. The package ships `SKILL.md`, the agent's
   instructions.

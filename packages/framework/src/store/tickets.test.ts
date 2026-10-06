@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseTickets, providedTickets } from './tickets.js'
 
-// The tickets contract (#1774): a project's package declares `"framework": { "tickets": "<command>" }`
+// The tickets contract (#1774): a project's package declares `"openagent": { "tickets": "<command>" }`
 // and the framework reads the tickets by running `<command> list --local`. Real processes: a tiny
 // provider script that logs each call it answers, in a throwaway project.
 
@@ -38,7 +38,7 @@ const calls = async (root: string, pkg: string): Promise<string[]> =>
 
 test('a project with no tickets provider has no tickets; one with a provider is read through `<command> list --local`', async () => {
   const none = await project({ plain: { bin: { plain: 'provider.cjs' } } })
-  const root = await project({ tickets: { bin: { tickets: 'provider.cjs' }, framework: { tickets: 'tickets' } } })
+  const root = await project({ tickets: { bin: { tickets: 'provider.cjs' }, openagent: { tickets: 'tickets' } } })
   try {
     assert.equal(await providedTickets()(none), undefined)
     const tickets = await providedTickets()(root)
@@ -52,7 +52,7 @@ test('a project with no tickets provider has no tickets; one with a provider is 
 })
 
 test('reads within the window share one call; changed() forgets the read; a failed read is not kept', async () => {
-  const root = await project({ tickets: { bin: { tickets: 'provider.cjs' }, framework: { tickets: 'tickets' } } })
+  const root = await project({ tickets: { bin: { tickets: 'provider.cjs' }, openagent: { tickets: 'tickets' } } })
   try {
     let clock = 1_000_000
     const reader = providedTickets(() => clock)

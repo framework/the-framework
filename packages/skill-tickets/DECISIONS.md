@@ -10,7 +10,7 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - Two callers: the command an agent runs, and a dashboard, which reads the tickets through
   the command (`--local`: this machine's copy, no fetch, because it polls and the writer
   there keeps the checkout synced) and lifts a dead agent's claim through `release
-  --force` as its module's own pages, found by the package's `framework.tickets`
+  --force` as its module's own pages, found by the package's `openagent.tickets`
   declaration. A dashboard importing the package was the alternative and was not taken:
   the dashboard names no skill. The library a long-lived program called to keep the
   branch checked out and claim tickets for the agents it starts stays in the package;

@@ -15,18 +15,18 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   skills say. Picked over the built-in presets: a prompt that lives here cannot be read,
   changed or run by the agent working the repository.
 - The tickets are a package's: The Framework reads them through the command the package
-  declares (`framework.tickets`, `list --local`), and only for what it composes across
+  declares (`openagent.tickets`, `list --local`), and only for what it composes across
   skills, the onboarding step, a queued link's title. Showing,
   planning, claiming and releasing a ticket is the package's own module, through its
   command. Picked over the dashboard's own ticket pages fed by the provider, which would
   have kept a reserved route and a hand-written sidebar row.
 - The checkouts are a package's: The Framework finds a run's checkout, and pushes and
-  reclaims its branch, through the command the package declares (`framework.branches`:
+  reclaims its branch, through the command the package declares (`openagent.branches`:
   `list`, `show`, `push --branch`, `remove`); it composes a pull request's title and body
   from the run, and keeps the rule that says which pull request is a run's. Picked over the
   framework's own git handoff, which was a second way to publish.
 - The git host is a package's: every pull request The Framework opens, lands or reads goes
-  through the command the package declares (`framework.git-host`: `requests`, `open`,
+  through the command the package declares (`openagent.git-host`: `requests`, `open`,
   `merge`, `home`), and Open PR is the two commands composed, the push then the open.
   The Framework names no git host and runs no git host tool; a project with no git host package
   has no pull requests, and a finished run's last step is Push. Picked over the branches
@@ -53,7 +53,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A subagent's page offers no pull request, no merge and no push. It says landed or not
   landed. Picked over saying nothing in their place.
 - Which package provides a kind of data when several installed packages declare it: the
-  project's own package.json says, under the same `framework` key with the package's name
+  project's own package.json says, under the same `openagent` key with the package's name
   as the value; several and no line means nothing provides it, and the project's banner
   says why. Picked over the first in dependency order, taken silently, and over routing by
   the remote's host.
@@ -81,7 +81,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The packages every project wants are built in: the framework depends on them and uses them
   for every project through the same contract as a project's own package (a module by its
   `./dashboard` export, a provider of a kind of data and the writer of its hook lines by its
-  `framework` key), and a project's own copy wins. They are Files, the runner, the
+  `openagent` key), and a project's own copy wins. They are Files, the runner, the
   packages that read a project's runs and checkouts, and the GitHub package, so an empty
   folder starts an agent, shows it, and can be put on GitHub. A built-in git host is a
   project's only when the project's remote is on that host: it was not chosen by the

@@ -19,7 +19,7 @@
   "bin": {
     "agent-runner": "bin/agent-runner"
   },
-  "framework": {
+  "openagent": {
     "hooks": "agent-runner"
   },
   "exports": {

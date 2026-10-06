@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseRequests, providedGitHost } from './git-host.js'
 
-// The git host contract (#1820): a project's package declares `"framework": { "git-host": "<command>" }`
+// The git host contract (#1820): a project's package declares `"openagent": { "git-host": "<command>" }`
 // and the framework reads the project's pull requests, opens one, lands one and finds the
 // project's page by running that command. Real processes: a tiny provider script that logs each
 // call it answers, in a throwaway project.
@@ -43,7 +43,7 @@ async function project(deps: Record<string, Record<string, unknown>>): Promise<s
   return root
 }
 
-const GIT_HOST = { github: { bin: { github: 'provider.cjs' }, framework: { 'git-host': 'github' } } }
+const GIT_HOST = { github: { bin: { github: 'provider.cjs' }, openagent: { 'git-host': 'github' } } }
 
 const calls = async (root: string, pkg: string): Promise<string[]> =>
   (await readFile(join(root, 'node_modules', pkg, 'calls.log'), 'utf8').catch(() => '')).split('\n').filter(Boolean)

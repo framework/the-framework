@@ -76,18 +76,18 @@ test('a project whose data branch cannot reach a remote carries a data-sync erro
 test('a project where two packages provide the same kind carries a provider error until its package.json names one (#1820)', async () => {
   const project = await mkdtemp(join(tmpdir(), 'framework-providers-'))
   try {
-    const manifest = (framework?: Record<string, string>) => JSON.stringify({ devDependencies: { a: '*', b: '*' }, ...(framework ? { framework } : {}) })
+    const manifest = (named?: Record<string, string>) => JSON.stringify({ devDependencies: { a: '*', b: '*' }, ...(named ? { openagent: named } : {}) })
     await writeFile(join(project, 'package.json'), manifest())
     for (const name of ['a', 'b']) {
       await mkdir(join(project, 'node_modules', name), { recursive: true })
-      await writeFile(join(project, 'node_modules', name, 'package.json'), JSON.stringify({ name, bin: { [name]: 'cmd.cjs' }, framework: { tickets: name } }))
+      await writeFile(join(project, 'node_modules', name, 'package.json'), JSON.stringify({ name, bin: { [name]: 'cmd.cjs' }, openagent: { tickets: name } }))
       await writeFile(join(project, 'node_modules', name, 'cmd.cjs'), '')
     }
     const errors = projectErrorStore()
     await checkProviders(project, errors)
     const [unsettled] = errors.list(project)
     assert.equal(unsettled?.code, 'provider')
-    assert.equal(unsettled?.message, '2 packages provide tickets: a, b; name one under "framework" in package.json')
+    assert.equal(unsettled?.message, '2 packages provide tickets: a, b; name one under "openagent" in package.json')
 
     await writeFile(join(project, 'package.json'), manifest({ tickets: 'b' }))
     await checkProviders(project, errors)

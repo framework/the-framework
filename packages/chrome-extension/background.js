@@ -16,20 +16,20 @@ const DEFAULT_DAEMON = 'http://localhost:4200'
 // Every daemon call states this extension's version, and a daemon expecting another refuses it
 // outright (#1519): a version-skewed extension half-works in ways that read as dashboard bugs,
 // so the daemon blocks rather than degrades, and the error it answers names both versions.
-const VERSION_HEADER = { 'x-tf-extension-version': chrome.runtime.getManifest().version }
+const VERSION_HEADER = { 'x-oa-extension-version': chrome.runtime.getManifest().version }
 
 /** What we last successfully reported per session, so a re-render does not re-post. */
 const lastSent = new Map()
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Run a cycle on demand, so the options page can prove it works without waiting on an alarm.
-  if (message?.type === 'tf-open-now') {
+  if (message?.type === 'oa-open-now') {
     void openDriverNow()
       .then(sendResponse)
       .catch(err => sendResponse({ ok: false, reason: String(err?.message ?? err) }))
     return true
   }
-  if (message?.type === 'tf-hello') {
+  if (message?.type === 'oa-hello') {
     // The reply says whether the page asking is the Driver tab, so it draws its overlay the
     // moment it loads rather than when the first cycle reaches it.
     void Promise.all([post('/_bridge/hello', { version: message.version, sessionId: message.sessionId, note: message.note }), driverTabId()])
@@ -37,19 +37,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(() => sendResponse({ ok: false }))
     return true
   }
-  if (message?.type === 'tf-driver-log') {
+  if (message?.type === 'oa-driver-log') {
     // Receiving it is the point: a cycle in the page can run for minutes, and each message
     // resets the idle clock that would otherwise end this worker mid-cycle.
     sendResponse({ ok: true })
     return false
   }
-  if (message?.type === 'tf-events') {
+  if (message?.type === 'oa-events') {
     void postEvents(message)
       .then(sendResponse)
       .catch(err => sendResponse({ ok: false, error: String(err?.message ?? err) }))
     return true
   }
-  if (message?.type !== 'tf-question') return false
+  if (message?.type !== 'oa-question') return false
   void report(message.question)
     .then(sendResponse)
     .catch(err => sendResponse({ ok: false, error: String(err?.message ?? err) }))
@@ -294,7 +294,7 @@ async function askDriver(tabId, message) {
       lastErr = err
       // A port that closed after the page took the message means the page acted and was then
       // torn down — a reload under it, a sign-in bounce. The answer may already be typed.
-      if (message.type === 'tf-drive' && /port closed/i.test(String(err?.message ?? ''))) {
+      if (message.type === 'oa-drive' && /port closed/i.test(String(err?.message ?? ''))) {
         return { ok: false, tornDown: true, note: 'the Driver page was torn down mid-drive; an answer handed over may or may not have been typed — check the session before picking again' }
       }
       if (i >= 2 && !reloaded) {
@@ -367,7 +367,7 @@ async function runCycle() {
   const tab = await ensureDriverTab()
   const ids = sessions.map(s => s.id)
   if (ids.length && Date.now() - lastReloadAt >= LIST_REFRESH_MS) await reloadDriver(tab.id)
-  const read = ids.length ? await askDriver(tab.id, { type: 'tf-read-list', ids }) : { ok: true, statuses: [] }
+  const read = ids.length ? await askDriver(tab.id, { type: 'oa-read-list', ids }) : { ok: true, statuses: [] }
   if (!read.ok) {
     // A Driver still busy with an earlier cycle's drive is left alone, claim included: the claim
     // expires on the daemon and the request is offered again once the page is free.
@@ -388,7 +388,7 @@ async function runCycle() {
   const driven =
     visits.length || start
       ? await askDriver(tab.id, {
-          type: 'tf-drive',
+          type: 'oa-drive',
           visits,
           ...(start ? { start: { repo: start.repo, branch: start.branch, prompt: start.prompt, ...(typeof start.model === 'string' ? { model: start.model } : {}) } } : {}),
         })
@@ -477,9 +477,9 @@ chrome.tabs.onRemoved.addListener(async (tabId, info) => {
 // An alarm rather than setInterval: an MV3 service worker is terminated when idle, and a timer
 // dies with it. Alarms wake it back up. One beat for everything: a person may be sitting at the
 // dashboard watching an answer's spinner, and a run may be waiting for its session.
-chrome.alarms.create('tf-cycle', { periodInMinutes: CYCLE_MINUTES })
+chrome.alarms.create('oa-cycle', { periodInMinutes: CYCLE_MINUTES })
 chrome.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === 'tf-cycle') void beat()
+  if (alarm.name === 'oa-cycle') void beat()
 })
 
 // ---------------------------------------------------------------------------

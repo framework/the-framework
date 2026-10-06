@@ -38,7 +38,7 @@ function ownWrites(draw) {
   }
 }
 /** The on-page panel's element id. */
-const PANEL_ID = 'tf-bridge-panel'
+const PANEL_ID = 'oa-bridge-panel'
 const IS_TOP = window.top === window
 
 /** The cloud session this page is showing, which is the key the daemon joins runs on. */
@@ -86,12 +86,12 @@ function reportToDaemon(parsed) {
   // Offline (check.mjs, no extension runtime): expose what would have been posted, so the
   // harness can pin the shape the daemon receives, not just the panel's summary of it.
   if (typeof chrome === 'undefined') {
-    window.__tfBridgeQuestion = question
+    window.__oaBridgeQuestion = question
     return
   }
   if (!chrome.runtime?.sendMessage) return
   try {
-    chrome.runtime.sendMessage({ type: 'tf-question', question }, reply => {
+    chrome.runtime.sendMessage({ type: 'oa-question', question }, reply => {
       // Silence here was the first thing to go wrong live: the worker answered "no token set"
       // and nobody ever saw it, so a configured-looking extension simply did nothing.
       if (chrome.runtime.lastError) bridgeStatus = chrome.runtime.lastError.message ?? 'worker unreachable'
@@ -178,7 +178,7 @@ function sayHello(sessionId, note) {
   if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
   const version = chrome.runtime.getManifest?.().version ?? '?'
   try {
-    chrome.runtime.sendMessage({ type: 'tf-hello', sessionId, version, note }, reply => {
+    chrome.runtime.sendMessage({ type: 'oa-hello', sessionId, version, note }, reply => {
       // The worker's reply says whether this tab is the Driver (#1332): the overlay goes up
       // the moment the page loads, not when the first cycle reaches it.
       if (!chrome.runtime.lastError && reply?.driver) setDriver(true)
@@ -199,7 +199,7 @@ function reportTranscript() {
   const rows = turnRows()
   const blocks = transcript()
   // Offline (check.mjs, no extension runtime): expose what would have been posted.
-  if (typeof chrome === 'undefined') window.__tfBridgeTranscript = blocks
+  if (typeof chrome === 'undefined') window.__oaBridgeTranscript = blocks
   if (!rows.length) {
     // Named, not guessed at: a page with no turn rows is a layout the mirror does not know, and
     // saying so beats mirroring whatever text happens to be on screen.
@@ -216,7 +216,7 @@ function reportTranscript() {
     return
   }
   try {
-    chrome.runtime.sendMessage({ type: 'tf-events', sessionId, events }, reply => {
+    chrome.runtime.sendMessage({ type: 'oa-events', sessionId, events }, reply => {
       if (chrome.runtime.lastError) {
         transcriptStatus = chrome.runtime.lastError.message ?? 'worker unreachable'
         return
@@ -507,7 +507,7 @@ async function deliverAnswer(text) {
   // Wait for the composer rather than failing on its absence: the first live delivery landed
   // right after a tab revive, and claude.ai takes well over the naive 5 seconds to render, so
   // "no composer on the page" mostly means "not yet". The harness shortens the wait.
-  const deadline = Date.now() + (window.__tfComposerWaitMs ?? 20000)
+  const deadline = Date.now() + (window.__oaComposerWaitMs ?? 20000)
   let composer = findComposer()
   while (!composer && Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, 500))
@@ -778,7 +778,7 @@ function probeNewSession() {
  * failure with a reason, never a silent success.
  */
 async function createSession({ repo, branch, prompt, model }) {
-  const composer = await waitFor(findComposer, window.__tfComposerWaitMs ?? 20000)
+  const composer = await waitFor(findComposer, window.__oaComposerWaitMs ?? 20000)
   if (!composer) return { ok: false, note: 'no composer on the new-session page' }
 
   const bare = String(repo).split('/').pop() ?? repo
@@ -786,7 +786,7 @@ async function createSession({ repo, branch, prompt, model }) {
   const selectRepo = () => menuTriggers().find(t => /select repo|add repo|choose repo/i.test(t.text) || /select repo|choose repo/i.test(t.el.getAttribute('aria-label') ?? ''))
   // The chips render a beat after the composer: wait for either a chip or the bare picker.
   await waitFor(() => chips().some(c => c.text) || selectRepo(), MENU_WAIT_MS)
-  await new Promise(resolve => setTimeout(resolve, window.__tfMenuSettleMs ?? 800))
+  await new Promise(resolve => setTimeout(resolve, window.__oaMenuSettleMs ?? 800))
 
   let repoNote
   if (repoWanted.includes(chips()[0]?.text.toLowerCase())) {
@@ -855,7 +855,7 @@ async function createSession({ repo, branch, prompt, model }) {
     }
   }
 
-  const sessionId = await waitFor(sessionIdFromUrl, window.__tfSessionWaitMs ?? 60000, 500)
+  const sessionId = await waitFor(sessionIdFromUrl, window.__oaSessionWaitMs ?? 60000, 500)
   const notes = [repoNote, branchNote, ...(modelNote ? [modelNote] : [])].join('; ')
   if (!sessionId) return { ok: false, note: `sent, but the page never became a session URL (${notes})` }
   return { ok: true, sessionId, note: `${notes}; sent via ${button ? 'button' : 'enter'}` }
@@ -890,7 +890,7 @@ const SEND_WAIT_MS = 15000
 const LIST_PAGE_WAIT_MS = 5000
 const MAX_LIST_PAGES = 10
 const LOG_LINES = 300
-const OVERLAY_ID = 'tf-driver-overlay'
+const OVERLAY_ID = 'oa-driver-overlay'
 
 /** claude.ai's sign-in page, and the sign-out step that redirects to it: where a person must act. */
 const signInPage = () => /^\/(login|logout)(\/|$)/.test(location.pathname)
@@ -939,7 +939,7 @@ function driverLog(line) {
   renderOverlay()
   if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
   try {
-    chrome.runtime.sendMessage({ type: 'tf-driver-log', line: stamped }, () => void chrome.runtime.lastError)
+    chrome.runtime.sendMessage({ type: 'oa-driver-log', line: stamped }, () => void chrome.runtime.lastError)
   } catch {
     // Dead context; the log still renders.
   }
@@ -1059,7 +1059,7 @@ async function visitSession(visit) {
   // The address changes before the page does: wait for turn rows that are not the previous
   // session's, so what is surveyed and typed into is this session's page.
   await waitFor(() => turnRows().some(r => !stale.has(r)), ROWS_WAIT_MS)
-  await new Promise(resolve => setTimeout(resolve, window.__tfSettleMs ?? 1500))
+  await new Promise(resolve => setTimeout(resolve, window.__oaSettleMs ?? 1500))
   const found = findPendingChoice()
   const result = { id: visit.id, ok: true, rows: turnRows().length, ...(found ? { question: String(found.parsed.title ?? '').slice(0, 100) } : {}) }
   if (visit.answer) {
@@ -1068,7 +1068,7 @@ async function visitSession(visit) {
     if (outcome.ok) {
       // Taken once the composer is empty again and a turn row exists that did not before — a
       // new row, not a higher count, since a long transcript keeps only its tail rendered.
-      const taken = await waitFor(() => !composerText().trim() && turnRows().some(r => !before.has(r)), window.__tfSendWaitMs ?? SEND_WAIT_MS)
+      const taken = await waitFor(() => !composerText().trim() && turnRows().some(r => !before.has(r)), window.__oaSendWaitMs ?? SEND_WAIT_MS)
       if (!taken) {
         outcome = {
           ok: false,
@@ -1094,7 +1094,7 @@ async function drive({ visits = [], start }) {
     const wasHome = atHome()
     const there = wasHome || (await goHome())
     // A navigation home swaps the page under us a beat after the address changes.
-    if (there && !wasHome) await new Promise(resolve => setTimeout(resolve, window.__tfSettleMs ?? 1500))
+    if (there && !wasHome) await new Promise(resolve => setTimeout(resolve, window.__oaSettleMs ?? 1500))
     started = there ? await createSession(start) : { ok: false, note: 'could not reach the new-session page' }
     driverLog(`create: ${started.ok ? started.sessionId : started.note}`)
   }
@@ -1145,7 +1145,7 @@ function ensureOverlay() {
     'OpenAgent is using this tab to watch your Claude Code sessions and to type your answers into them. Use another tab for claude.ai. Closing this tab pauses the bridge; the extension’s options page reopens it.'
   phrase.style.cssText = 'max-width:560px;text-align:center;margin:0 0 16px;color:#aab2c0'
   const status = document.createElement('div')
-  status.className = 'tf-driver-status'
+  status.className = 'oa-driver-status'
   status.style.cssText = 'font:12px/1.45 ui-monospace,monospace;color:#7f8797;text-align:center;max-width:800px'
   const details = document.createElement('details')
   details.style.cssText = 'margin-top:20px;width:min(900px,100%)'
@@ -1153,7 +1153,7 @@ function ensureOverlay() {
   summary.textContent = 'Show debug logs'
   summary.style.cssText = 'cursor:pointer;color:#7f8797;text-align:center'
   const log = document.createElement('pre')
-  log.className = 'tf-driver-log'
+  log.className = 'oa-driver-log'
   log.style.cssText = 'max-height:50vh;overflow:auto;background:#1f2430;padding:12px;border-radius:8px;font:12px/1.45 ui-monospace,monospace;white-space:pre-wrap;margin:8px 0 0'
   details.append(summary, log)
   overlay.append(heading, phrase, status, details)
@@ -1167,8 +1167,8 @@ function renderOverlay() {
   if (!overlay) return
   const version = typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : '?'
   ownWrites(() => {
-    overlay.querySelector('.tf-driver-status').textContent = `bridge v${version} · ${location.pathname} · ${turnRows().length} turn rows · question ${bridgeStatus} · transcript ${transcriptStatus}`
-    overlay.querySelector('.tf-driver-log').textContent = driverLines.join('\n')
+    overlay.querySelector('.oa-driver-status').textContent = `bridge v${version} · ${location.pathname} · ${turnRows().length} turn rows · question ${bridgeStatus} · transcript ${transcriptStatus}`
+    overlay.querySelector('.oa-driver-log').textContent = driverLines.join('\n')
   })
 }
 
@@ -1176,14 +1176,14 @@ function renderOverlay() {
 // acting too would click and submit twice.
 if (IS_TOP && typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === 'tf-read-list' && Array.isArray(message.ids)) {
+    if (message?.type === 'oa-read-list' && Array.isArray(message.ids)) {
       setDriver(true)
       void whileFree(() => readSessionList(message.ids.filter(id => typeof id === 'string')))
         .then(sendResponse)
         .catch(err => sendResponse({ ok: false, note: String(err?.message ?? err) }))
       return true
     }
-    if (message?.type !== 'tf-drive') return false
+    if (message?.type !== 'oa-drive') return false
     void whileFree(() => drive({ visits: Array.isArray(message.visits) ? message.visits : [], start: message.start }))
       .then(sendResponse)
       .catch(err => sendResponse({ ok: false, note: String(err?.message ?? err) }))
@@ -1195,12 +1195,12 @@ if (IS_TOP && typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 // to hand answers through. Exposed only there: on a real page `chrome` exists and nothing is
 // added to the window claude.ai can see.
 if (typeof chrome === 'undefined') {
-  window.__tfBridgeDeliverAnswer = deliverAnswer
-  window.__tfBridgeCreateSession = createSession
-  window.__tfBridgeProbeNewSession = probeNewSession
-  window.__tfBridgeReadSessionList = ids => whileFree(() => readSessionList(ids))
-  window.__tfBridgeDrive = args => whileFree(() => drive(args))
-  window.__tfBridgeSurveys = () => surveys
+  window.__oaBridgeDeliverAnswer = deliverAnswer
+  window.__oaBridgeCreateSession = createSession
+  window.__oaBridgeProbeNewSession = probeNewSession
+  window.__oaBridgeReadSessionList = ids => whileFree(() => readSessionList(ids))
+  window.__oaBridgeDrive = args => whileFree(() => drive(args))
+  window.__oaBridgeSurveys = () => surveys
 }
 
 /**
@@ -1270,7 +1270,7 @@ if (!IS_TOP) {
   const send = () => {
     const s = survey()
     if (s.choiceFound || s.diagnostics.jsonishBlocks || s.diagnostics.optionsInDeepText) {
-      parent.postMessage({ __tfBridge: s }, '*')
+      parent.postMessage({ __oaBridge: s }, '*')
     }
   }
   send()
@@ -1278,7 +1278,7 @@ if (!IS_TOP) {
 } else {
   let fromFrame
   window.addEventListener('message', e => {
-    if (e.data && typeof e.data === 'object' && e.data.__tfBridge) fromFrame = e.data.__tfBridge
+    if (e.data && typeof e.data === 'object' && e.data.__oaBridge) fromFrame = e.data.__oaBridge
   })
 
   const panel = document.createElement('div')
@@ -1297,7 +1297,7 @@ if (!IS_TOP) {
   // but the worker's reply is what tells the Driver tab it is the Driver (#1332).
   sayHello(sessionIdFromUrl(), `page loaded on ${location.pathname}`)
 
-  // Whether the panel is folded down to a compact TF tab. Remembered in chrome.storage rather than
+  // Whether the panel is folded down to a compact OA tab. Remembered in chrome.storage rather than
   // the page's localStorage: the preference should survive a reload, and nothing the extension
   // keeps should be readable by the page it watches. Restored asynchronously, so the panel can
   // open expanded for a beat before the remembered fold lands.
@@ -1347,9 +1347,9 @@ if (!IS_TOP) {
     const title = document.createElement('span')
     const version = typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : '?'
     const fullTitle = `OpenAgent bridge v${version}`
-    // Folded, the label shrinks to "TF": the fold exists to give the corner back, so the full
+    // Folded, the label shrinks to "OA": the fold exists to give the corner back, so the full
     // name and version retreat to the tooltip.
-    title.textContent = collapsed ? 'TF' : fullTitle
+    title.textContent = collapsed ? 'OA' : fullTitle
     if (collapsed) title.title = fullTitle
     title.style.cssText = 'font-weight:600;color:#a7c080;flex:1'
     const toggle = document.createElement('button')
@@ -1372,7 +1372,7 @@ if (!IS_TOP) {
     })
     head.append(title, toggle)
     panel.appendChild(head)
-    // Folded, the TF tab is all there is to draw. The survey above still ran: collapsing
+    // Folded, the OA tab is all there is to draw. The survey above still ran: collapsing
     // hides the detail, not the bridge, so the daemon keeps hearing from this page.
     if (collapsed) return
     const rows = [

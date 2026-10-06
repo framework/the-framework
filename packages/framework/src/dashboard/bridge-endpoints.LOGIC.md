@@ -29,7 +29,7 @@ Serves the daemon's side of the Claude web bridge [1]: the routes under `/_bridg
 - **Off unless the bridge is on, and every contact recorded** - with the bridge off every route is 404 "bridge not enabled"; with it on, every request's route and outcome is recorded, refusals included.
 - **The bridge token on every route** - each request must present the bridge token as a bearer token, compared in constant time, before anything is read; anything else is 401.
 - **No CORS headers, by design** - the daemon never allows a cross-origin page in, so the extension must call from its worker, never from a page.
-- **The version gate** - the extension states its version on every call and the daemon refuses any version but `0.12.0` with 426 and the update steps, ping included, so a stale extension never half-works.
+- **The version gate** - the extension states its version on every call and the daemon refuses any version but `0.13.0` with 426 and the update steps, ping included, so a stale extension never half-works.
 - **What the bridge accepts is deliberately tiny** - one shape per route, every field checked with a reason, unknown fields dropped, capped bodies, session ids of one exact form, and a batch refused whole on one bad entry.
 - **The ping** - a bare 200 "ok" once past the token and the version, which is what the options page's test needs.
 - **The question the session is parked on** - a title and one to twenty distinctly labeled options, optionally a detail, a pre-checked default and a stop flag per option, a recommendation that must name an option, and multi-select; timestamped by the daemon and recorded.
@@ -79,7 +79,7 @@ The bridge [1] answers no CORS headers on any route. An extension worker holding
 
 #### Business logic
 
-The extension states its own version on every call, in the `x-tf-extension-version` header. The daemon expects exactly `0.12.0`, the number the extension's manifest must carry; a test keeps the two in lockstep. Any other value, a missing header included (read as "unknown"), is refused with 426 and the message "extension v<got> does not match the v0.12.0 this daemon expects: update the extension (pull the repo, then reload it at chrome://extensions) and retry". The gate applies to every route past the token, the ping included, so there is no degraded mode: the only way forward from a stale extension is updating it. It sits behind the token, so an unauthenticated caller learns nothing about versions. The version the caller claimed, and whether it was turned away, is recorded for the dashboard (`bridge-store.ts`).
+The extension states its own version on every call, in the `x-oa-extension-version` header. The daemon expects exactly `0.13.0`, the number the extension's manifest must carry; a test keeps the two in lockstep, and another keeps the header's name the same on both sides. Any other value, a missing header included (read as "unknown"), is refused with 426 and the message "extension v<got> does not match the v0.13.0 this daemon expects: update the extension (pull the repo, then reload it at chrome://extensions) and retry". The gate applies to every route past the token, the ping included, so there is no degraded mode: the only way forward from a stale extension is updating it. It sits behind the token, so an unauthenticated caller learns nothing about versions. The version the caller claimed, and whether it was turned away, is recorded for the dashboard (`bridge-store.ts`).
 
 ### What the bridge accepts is deliberately tiny
 

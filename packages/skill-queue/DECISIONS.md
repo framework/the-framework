@@ -46,9 +46,10 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A bare `queue` answers with a JSON array of strings; with `--full`, of objects, each
   entry with the priority section it sits in, for the dashboard's page. Every other
   result and every refusal is an object with `ok`.
-- The command's write is one commit per command, pushed straight to origin through a
-  throwaway worktree at origin's tip; a push that loses a race is re-applied on the new
-  tip by `@openagt/agent-data`.
+- The command's write is one commit per command, pushed straight to origin when the
+  project shares its records, else committed through the machine's checkout. The push
+  goes through a throwaway worktree at origin's tip; one that loses a race is re-applied
+  on the new tip by `@openagt/agent-data`.
 - `queue done` takes the entry as `queue` printed it, trimmed, removes the first such
   line, and refuses a line the queue does not have, an empty one included, decided inside
   the write.

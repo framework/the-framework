@@ -103,9 +103,10 @@ not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   git's own "not a git repository" reads as that.
 - `list` answers with a JSON array and `meta` with the bare stamp object (`{}` when none);
   every other result and every refusal is an object with `ok`.
-- The command's write is one commit per command, pushed straight to origin through a
-  throwaway worktree at origin's tip; a push that loses a race is re-applied on the new
-  tip by `@openagt/agent-data`. The program's writes go through its persistent checkout's
+- The command's write is one commit per command, pushed straight to origin when the
+  project shares its records, else committed through the machine's checkout. The push
+  goes through a throwaway worktree at origin's tip; one that loses a race is re-applied
+  on the new tip by `@openagt/agent-data`. The program's writes go through its persistent checkout's
   cycle instead.
 - The Overview's Hot tickets card is this package's, reading `list --local` like the page, with
   three lanes: claimed; unclaimed at priority 7 or up, neither in review nor waiting; and

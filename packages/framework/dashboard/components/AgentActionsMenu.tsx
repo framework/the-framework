@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import type { GitHostHome, FrameworkEvent, RepositoryOffer } from '../../src/index.js'
+import type { GitHostHome, FrameworkEvent, RepositoryOffer, RecordsReach } from '../../src/index.js'
 import { sessionInfo } from '../../src/client.js'
-import { MoreVertical, ChevronDown, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy, CloudUpload, Info } from 'lucide-react'
+import { MoreVertical, ChevronDown, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy, CloudUpload, CloudOff, Info } from 'lucide-react'
 import { onGitHostHome, onRepositoryOffer } from '../rpc/reads.js'
+import { onRecordsReach, sendShareRecords } from '../rpc/projects.js'
 import {
   sendOpenInApp,
   sendStop,
@@ -40,7 +41,7 @@ import {
 // when the answer lands.
 //
 // On the "New agent" page there is no session, and one ⋮ holds all of the project's (no `part`):
-// its git host page, the offer of a repository, its folder, its editor.
+// its git host page, the offer of a repository, where the agents' records go, its folder, its editor.
 //
 // The handoff's Push / Open PR are not here: they move the work forward, and sit in the bar above
 // the message box. The editor keeps its preferred-editor submenu; Delete opens its confirm dialog
@@ -112,6 +113,16 @@ export function AgentActionsMenu({
   // the person's account, so it is asked once more before it happens.
   const offer = useLoaded<RepositoryOffer | null>(ofProject && !agentId ? () => onRepositoryOffer(projectId) : null, null, [projectId, agentId, created, ofProject])
   const [confirmCreate, setConfirmCreate] = useState(false)
+  // Where the agents' records go: kept on this machine until the person shares them with the
+  // project's remote. The project's menu says which and switches it; sharing pushes a branch, so it
+  // is asked once more before it happens. A project with no remote has nothing to switch.
+  const [switched, setSwitched] = useState(0)
+  const reach = useLoaded<RecordsReach | null>(ofProject && !agentId ? () => onRecordsReach(projectId) : null, null, [projectId, agentId, created, switched, ofProject], 'previous')
+  const [confirmShare, setConfirmShare] = useState(false)
+  const stopSharing = () =>
+    void run(() => sendShareRecords(projectId, false), 'Could not stop sharing.').then(outcome => {
+      if (outcome.ok) setSwitched(n => n + 1)
+    })
 
   const { busy, error, run } = useAction()
 
@@ -190,6 +201,16 @@ export function AgentActionsMenu({
           {offer && (
             <DropdownMenuItem onClick={() => setConfirmCreate(true)}>
               <CloudUpload className="h-3.5 w-3.5 shrink-0" /> Create a repository on {offer.name}…
+            </DropdownMenuItem>
+          )}
+          {reach === 'kept' && (
+            <DropdownMenuItem onClick={() => setConfirmShare(true)}>
+              <CloudUpload className="h-3.5 w-3.5 shrink-0" /> Share the agents&rsquo; records to the remote…
+            </DropdownMenuItem>
+          )}
+          {reach === 'origin' && (
+            <DropdownMenuItem disabled={busy} onClick={stopSharing}>
+              <CloudOff className="h-3.5 w-3.5 shrink-0" /> Stop sharing the agents&rsquo; records
             </DropdownMenuItem>
           )}
           {ofSession && (
@@ -286,6 +307,26 @@ export function AgentActionsMenu({
           destructive={false}
           onConfirm={() => sendCreateRepository(projectId)}
           onSuccess={() => setCreated(n => n + 1)}
+        />
+      )}
+      {reach === 'kept' && (
+        <ConfirmDialog
+          open={confirmShare}
+          onOpenChange={setConfirmShare}
+          title="Share the agents&rsquo; records to the remote?"
+          body={
+            <>
+              This pushes a branch <span className="font-medium text-foreground">agent-data</span> to this project&rsquo;s remote, and keeps
+              pushing as agents work. It holds what you asked each agent and what it answered, under your git email. Everyone
+              who can read the remote can read it.
+            </>
+          }
+          confirmLabel="Share"
+          confirmBusyLabel="Sharing…"
+          fallbackError="Could not share the records."
+          destructive={false}
+          onConfirm={() => sendShareRecords(projectId, true)}
+          onSuccess={() => setSwitched(n => n + 1)}
         />
       )}
       {onDeleted && agentId && (

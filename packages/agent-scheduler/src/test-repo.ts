@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { strict as assert } from 'node:assert'
-import { DATA_BRANCH, nodeGitRunner } from '@openagt/agent-data'
+import { DATA_BRANCH, nodeGitRunner, writeSharing } from '@openagt/agent-data'
 import { readDiary, type AnyDiaryLine } from '@openagt/skill-logs'
 
 /**
@@ -36,6 +36,8 @@ export async function testRepo(): Promise<string> {
   const commit = (await git(['commit-tree', tree, '-m', `create the ${DATA_BRANCH} branch`], repo)).trim()
   await git(['push', '-q', 'origin', `${commit}:refs/heads/${DATA_BRANCH}`], repo)
   await git(['fetch', '-q', 'origin'], repo)
+  // A project that shares its records with origin: the person's yes, given once per clone.
+  await writeSharing(repo, true)
   return repo
 }
 

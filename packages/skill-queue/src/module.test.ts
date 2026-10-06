@@ -42,8 +42,8 @@ test('addToQueue reads the open entries once, runs one add per link not yet queu
     'the batch stops where it failed',
   )
 
-  const refusing = queueOf([], () => ({ ok: true, output: { ok: false, reason: 'no-remote' } }))
-  assert.deepEqual(await addToQueue(refusing.run, [{ text: 'a' }]), { ok: false, error: 'the queue refused: no-remote' })
+  const refusing = queueOf([], () => ({ ok: true, output: { ok: false, reason: 'not-a-repo' } }))
+  assert.deepEqual(await addToQueue(refusing.run, [{ text: 'a' }]), { ok: false, error: 'the queue refused: not-a-repo' })
   assert.deepEqual(await addToQueue(queueOf([], () => ({ ok: true, output: { ok: false } })).run, [{ text: 'a' }]), { ok: false, error: 'the queue refused' })
   // An empty batch reads nothing and is done; a read that cannot run stops the batch before any add.
   const untouched = queueOf([])

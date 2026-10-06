@@ -48,13 +48,15 @@ test('errors are per project', () => {
   assert.equal(errors.list('/repos/a').length, 1)
 })
 
-test('local only is a note beside the errors, per project, set and unset', () => {
+test('why a project\'s data stays on this machine is a note beside the errors, per project, set and unset', () => {
   const errors = projectErrorStore(ticking())
-  assert.deepEqual(errors.read('/repos/a'), { errors: [], localOnly: false })
-  errors.setLocalOnly('/repos/a', true)
-  assert.deepEqual(errors.read('/repos/a'), { errors: [], localOnly: true })
+  assert.deepEqual(errors.read('/repos/a'), { errors: [] })
+  errors.setReach('/repos/a', 'no-remote')
+  assert.deepEqual(errors.read('/repos/a'), { errors: [], local: 'no-remote' })
   assert.deepEqual(errors.list('/repos/a'), [], 'a note is no error')
-  assert.equal(errors.read('/repos/b').localOnly, false)
-  errors.setLocalOnly('/repos/a', false)
-  assert.equal(errors.read('/repos/a').localOnly, false)
+  assert.deepEqual(errors.read('/repos/b'), { errors: [] })
+  errors.setReach('/repos/a', 'kept')
+  assert.deepEqual(errors.read('/repos/a'), { errors: [], local: 'kept' })
+  errors.setReach('/repos/a', 'origin')
+  assert.deepEqual(errors.read('/repos/a'), { errors: [] })
 })

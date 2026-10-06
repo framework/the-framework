@@ -1,4 +1,4 @@
-What the tests cover, against a real repository with a bare `origin`:
+What the tests cover, against a real repository with a bare `origin` it shares the branch with:
 
 - **Recording** - a run is written under the directory of the lowercased email the repository commits as, card and diary together, as one commit "logs: record run <id>" that is pushed and leaves the checkout clean (committed, not merely written); a run whose id is unsafe is refused and nothing is written.
 - **Listing and reading** - runs list newest first; a start time keeps only the runs started at or after it; a run is found by id, and an unknown or unsafe id finds none; a diary reads back line by line, is empty for a run written with none, and is none for an unknown run; the card and diary paths of a run are answered.

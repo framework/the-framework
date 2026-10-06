@@ -8,6 +8,7 @@ import { createProjectRuntime } from './daemon-runtime.js'
 import { PROJECT_HOOKS_FILE } from './project-hooks.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { addProject } from './registry.js'
+import { readSharing } from '@openagt/agent-data'
 
 // A Start, as the daemon does it (#1774): the project's own start hook line, nothing else. The
 // relay half of onStart has its own loopback test (dashboard/remote-run.integration.test.ts).
@@ -116,13 +117,21 @@ test('adding a project writes the runner\'s start, resume and check lines, an em
   Object.assign(process.env, env)
   const runtime = createProjectRuntime({ cwd: folder, env })
   try {
-    assert.deepEqual(await runtime.onAddProject(folder), { ok: true, alreadyActivated: false })
+    assert.deepEqual(await runtime.onAddProject(folder, false), { ok: true, alreadyActivated: false })
+    // The person's answer on the agents' records is written with the add: kept on this machine.
+    assert.equal(await readSharing(folder), false)
     const written = await readFile(join(folder, PROJECT_HOOKS_FILE), 'utf8')
     for (const key of ['start', 'resume', 'check']) assert.match(written, new RegExp(`^${key}: agent-runner `, 'm'))
 
     // The person's own line stays; adding the project again fills only what is missing.
     await writeFile(join(folder, PROJECT_HOOKS_FILE), 'start: my-own-tool "$PROMPT"\n')
-    assert.deepEqual(await runtime.onAddProject(folder), { ok: true, alreadyActivated: true })
+    // A yes is to the remote that is there: this folder has none, so the records stay kept.
+    assert.deepEqual(await runtime.onAddProject(folder, true), { ok: true, alreadyActivated: true, noRemote: true })
+    assert.equal(await readSharing(folder), false)
+    // With a remote, the same answer shares them from now on.
+    execFileSync('git', ['remote', 'add', 'origin', join(cfg, 'origin.git')], { cwd: folder })
+    assert.deepEqual(await runtime.onAddProject(folder, true), { ok: true, alreadyActivated: true })
+    assert.equal(await readSharing(folder), true)
     const again = await readFile(join(folder, PROJECT_HOOKS_FILE), 'utf8')
     assert.match(again, /^start: my-own-tool "\$PROMPT"$/m)
     assert.match(again, /^resume: agent-runner /m)

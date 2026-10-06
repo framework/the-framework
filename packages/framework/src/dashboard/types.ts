@@ -11,9 +11,13 @@ export type RemoveWorktreeResult = { ok: true } | { ok: false; error: string }
 /** The outcome of deleting a session — its records and worktree (#1032). */
 export type DeleteAgentResult = { ok: true } | { ok: false; error: string }
 
-/** The outcome of an add-project attempt (#396): registered, or was already, or why not. */
+/**
+ * The outcome of an add-project attempt (#396): registered, or was already, or why not.
+ * `noRemote` says the person asked to share the agents' records and the repository has no remote
+ * to share with: they are kept on this machine.
+ */
 export type AddProjectResult =
-  | { ok: true; alreadyActivated: boolean }
+  | { ok: true; alreadyActivated: boolean; noRemote?: true }
   | { ok: false; error: string }
 
 /**

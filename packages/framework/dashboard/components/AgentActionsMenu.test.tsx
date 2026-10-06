@@ -10,7 +10,10 @@ const sendOpenInApp = vi.fn(async () => ({ ok: true as const }))
 const sendStop = vi.fn(async () => {})
 const sendRemoveWorktree = vi.fn(async () => ({ ok: true as const }))
 const sendDeleteAgent = vi.fn(async () => ({ ok: true as const }))
+const onRecordsReach = vi.fn(async () => null as 'origin' | 'no-remote' | 'kept' | null)
+const sendShareRecords = vi.fn(async () => ({ ok: true }) as unknown)
 vi.mock('../rpc/reads.js', () => ({ onGitHostHome, onRepositoryOffer }))
+vi.mock('../rpc/projects.js', () => ({ onRecordsReach, sendShareRecords }))
 vi.mock('../rpc/control.js', () => ({
   sendOpenInApp,
   sendStop,
@@ -37,6 +40,10 @@ beforeEach(() => {
   sendCreateRepository.mockResolvedValue({ ok: true, url: 'https://github.com/me/shop' })
   onRepositoryOffer.mockClear()
   onRepositoryOffer.mockResolvedValue(null)
+  onRecordsReach.mockClear()
+  onRecordsReach.mockResolvedValue(null)
+  sendShareRecords.mockClear()
+  sendShareRecords.mockResolvedValue({ ok: true })
   updatePreferences.mockClear()
   prefs = {}
   detectedEditors = []
@@ -208,6 +215,60 @@ describe('the editor picker in the menu (#727)', () => {
     render(<AgentActionsMenu part="session" projectId="p1" agentId="run-1" events={[]} />)
     await openEditorMenu()
     await waitFor(() => expect(screen.getAllByText('mate').length).toBeGreaterThan(0))
+  })
+})
+
+describe('Where the agents\u2019 records go, in the project\u2019s menu', () => {
+  const openProjectMenu = () => fireEvent.click(screen.getByRole('button', { name: 'Project actions' }))
+
+  test('records kept on this machine: the menu offers to share them, says what that pushes, and asks before it does', async () => {
+    onRecordsReach.mockResolvedValue('kept')
+    render(<AgentActionsMenu projectId="p1" events={[]} />)
+    openProjectMenu()
+    fireEvent.click(await screen.findByText('Share the agents\u2019 records to the remote\u2026'))
+    await waitFor(() => expect(screen.getByText('Share the agents\u2019 records to the remote?')).toBeTruthy())
+    expect(screen.getByText(/Everyone\s+who can read the remote can read it/)).toBeTruthy()
+    expect(sendShareRecords).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
+    await waitFor(() => expect(sendShareRecords).toHaveBeenCalledWith('p1', true))
+    // The project is asked again: the menu now offers the way back.
+    await waitFor(() => expect(onRecordsReach.mock.calls.length).toBeGreaterThan(1))
+  })
+
+  test('a remote that refuses is said in the dialog; shared records offer to stop; no remote, or a session\u2019s menu, offers neither', async () => {
+    onRecordsReach.mockResolvedValue('kept')
+    sendShareRecords.mockResolvedValue({ ok: false, error: 'the agent-data branch could not be pushed: permission denied' })
+    render(<AgentActionsMenu projectId="p1" events={[]} />)
+    openProjectMenu()
+    fireEvent.click(await screen.findByText('Share the agents\u2019 records to the remote\u2026'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+    await waitFor(() => expect(screen.getByText(/permission denied/)).toBeTruthy())
+    cleanup()
+
+    onRecordsReach.mockResolvedValue('origin')
+    sendShareRecords.mockClear()
+    sendShareRecords.mockResolvedValue({ ok: true })
+    render(<AgentActionsMenu projectId="p1" events={[]} />)
+    openProjectMenu()
+    fireEvent.click(await screen.findByText('Stop sharing the agents\u2019 records'))
+    await waitFor(() => expect(sendShareRecords).toHaveBeenCalledWith('p1', false))
+    expect(screen.queryByText(/Share the agents\u2019 records to the remote/)).toBeNull()
+    cleanup()
+
+    onRecordsReach.mockResolvedValue('no-remote')
+    render(<AgentActionsMenu projectId="p1" events={[]} />)
+    openProjectMenu()
+    await waitFor(() => expect(screen.getByText('Open folder')).toBeTruthy())
+    expect(screen.queryByText(/the agents\u2019 records/)).toBeNull()
+    cleanup()
+
+    onRecordsReach.mockClear()
+    onRecordsReach.mockResolvedValue('kept')
+    render(<AgentActionsMenu part="session" projectId="p1" agentId="run-1" events={[]} />)
+    fireEvent.click(screen.getByRole('button', { name: /session actions/i }))
+    await waitFor(() => expect(screen.getByText('Open project folder')).toBeTruthy())
+    expect(screen.queryByText(/the agents\u2019 records/)).toBeNull()
+    expect(onRecordsReach).not.toHaveBeenCalled()
   })
 })
 

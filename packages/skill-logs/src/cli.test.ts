@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nodeGitRunner, DATA_BRANCH } from '@openagt/agent-data'
+import { nodeGitRunner, writeSharing, DATA_BRANCH } from '@openagt/agent-data'
 import { runCli, USAGE, DEFAULT_LIMIT } from './cli.js'
 import { RUNS_DIR } from './names.js'
 
@@ -56,6 +56,8 @@ async function rig(clones: number, runs: Record<string, string> = RUNS) {
     await git(['commit', '-m', 'seed'], seed)
   }
   await git(['push', 'origin', DATA_BRANCH], seed)
+  // Every clone here shares the records with origin: the person's yes, given once per clone.
+  await writeSharing(seed, true)
   const agents: string[] = []
   for (let i = 0; i < clones; i++) {
     const parent = await realpath(await mkdtemp(join(tmpdir(), `logs-cli-agent${i}-`)))
@@ -65,6 +67,7 @@ async function rig(clones: number, runs: Record<string, string> = RUNS) {
     // `delete` and `patch` commit: a runner with no git identity (Linux CI) refuses to.
     await git(['config', 'user.email', `a${i}@a`], clone)
     await git(['config', 'user.name', `a${i}`], clone)
+    await writeSharing(clone, true)
     agents.push(clone)
   }
   const cleanup = async () => {

@@ -10,11 +10,15 @@ import {
   fileBranchPath,
   fileBranchRepo,
   isGitLocked,
+  branchReach,
   listBranchDir,
+  openBranchReader,
   pullFileBranch,
   readBranchFile,
+  readSharing,
   withFileBranch,
   writeFileBranchDetached,
+  writeSharing,
 } from './file-branch.js'
 
 const git = nodeGitRunner()
@@ -35,8 +39,8 @@ async function initRepo(prefix: string): Promise<string> {
   return repo
 }
 
-/** A repo wired to a bare origin, plus a second clone acting as "another machine". */
-async function initSyncedRepos(): Promise<{ repo: string; bare: string; other: string; cleanup: () => Promise<void> }> {
+/** A repo wired to a bare origin, plus a second clone acting as "another machine". Both share with origin unless `share` is false. */
+async function initSyncedRepos(share = true): Promise<{ repo: string; bare: string; other: string; cleanup: () => Promise<void> }> {
   const repo = await initRepo('file-branch-repo-')
   const bare = await realpath(await mkdtemp(join(tmpdir(), 'file-branch-bare-')))
   await git(['init', '--bare', bare], bare)
@@ -47,6 +51,7 @@ async function initSyncedRepos(): Promise<{ repo: string; bare: string; other: s
   await git(['clone', bare, other], otherParent)
   await git(['config', 'user.email', 'o@o'], other)
   await git(['config', 'user.name', 'o'], other)
+  if (share) for (const clone of [repo, other]) await writeSharing(clone, true)
   const cleanup = async () => {
     for (const dir of [repo, bare, otherParent]) await rm(dir, RETRIED_RM)
   }
@@ -390,15 +395,14 @@ test('the eager pull converges a machine on what others pushed, and names a repo
   try {
     await ensureFileBranch(repo, BRANCH)
     await otherMachineWrites(other, 'queue.md', '- pushed elsewhere\n')
-    assert.deepEqual(await pullFileBranch(repo, BRANCH), { ok: true })
+    assert.deepEqual(await pullFileBranch(repo, BRANCH), { ok: true, reach: 'origin' })
     assert.equal(await readFile(join(await fileBranchPath(repo, BRANCH), 'queue.md'), 'utf8'), '- pushed elsewhere\n')
   } finally {
     await cleanup()
   }
   const solo = await initRepo('file-branch-pull-solo-')
   try {
-    const result = await pullFileBranch(solo, BRANCH)
-    assert.ok(!result.ok && result.noRemote === true && /no remote/.test(result.error))
+    assert.deepEqual(await pullFileBranch(solo, BRANCH), { ok: true, reach: 'no-remote' })
   } finally {
     await rm(solo, RETRIED_RM)
   }
@@ -531,7 +535,7 @@ test('a detached write lands on origin from any clone without touching the persi
       await writeFileBranchDetached(other, BRANCH, 'first', async dir => {
         await writeFile(join(dir, 'a.md'), 'a\n')
       }),
-      { ok: true, changed: true },
+      { changed: true },
     )
     assert.equal(await git(['show', `${BRANCH}:a.md`], bare), 'a\n')
     assert.match(await git(['log', '-1', '--format=%s', BRANCH], bare), /^first/)
@@ -552,7 +556,7 @@ test('a detached write lands on origin from any clone without touching the persi
       }
       await writeFile(join(dir, 'b.md'), 'b\n')
     })
-    assert.deepEqual(result, { ok: true, changed: true })
+    assert.deepEqual(result, { changed: true })
     assert.equal(runs, 2, 'the op re-ran against origin\'s fresher tip')
     assert.equal(await git(['show', `${BRANCH}:b.md`], bare), 'b\n')
     assert.equal(await git(['show', `${BRANCH}:raced.md`], bare), 'raced\n')
@@ -560,16 +564,25 @@ test('a detached write lands on origin from any clone without touching the persi
     // No throwaway worktree is left registered.
     assert.ok(!(await git(['worktree', 'list'], other)).includes('write-'))
     // Nothing to write is no commit.
-    assert.deepEqual(await writeFileBranchDetached(other, BRANCH, 'nothing', async () => {}), { ok: true, changed: false })
+    assert.deepEqual(await writeFileBranchDetached(other, BRANCH, 'nothing', async () => {}), { changed: false })
   } finally {
     await cleanup()
   }
   const solo = await initRepo('file-branch-detached-solo-')
   try {
-    assert.deepEqual(await writeFileBranchDetached(solo, BRANCH, 'x', async () => {}), { ok: false, reason: 'no-remote' })
+    // No origin to write to: the change lands as a local commit, and a one-shot reader finds it.
+    assert.deepEqual(
+      await writeFileBranchDetached(solo, BRANCH, 'local', async dir => {
+        await writeFile(join(dir, 'a.md'), 'a\n')
+      }),
+      { changed: true },
+    )
+    assert.equal(await (await openBranchReader(solo, BRANCH)).read('a.md'), 'a\n')
     // A remote by any other name does not count: every push here names `origin`.
     await git(['remote', 'add', 'upstream', solo], solo)
-    assert.deepEqual(await writeFileBranchDetached(solo, BRANCH, 'x', async () => {}), { ok: false, reason: 'no-remote' })
+    await writeSharing(solo, true)
+    assert.equal(await branchReach(solo), 'no-remote')
+    assert.deepEqual(await writeFileBranchDetached(solo, BRANCH, 'x', async () => {}), { changed: false })
   } finally {
     await rm(solo, RETRIED_RM)
   }
@@ -582,11 +595,81 @@ test('a detached write works for a branch named with a slash: the throwaway chec
       await writeFileBranchDetached(other, 'feature/store', 'slashed', async dir => {
         await writeFile(join(dir, 'a.md'), 'a\n')
       }),
-      { ok: true, changed: true },
+      { changed: true },
     )
     assert.equal(await git(['show', 'feature/store:a.md'], bare), 'a\n')
     assert.ok(!(await git(['worktree', 'list'], other)).includes('write-'))
   } finally {
     await cleanup()
+  }
+})
+
+test('a repository whose sharing is off sends nothing to origin and takes nothing from it, until the person turns it on', async () => {
+  const { repo, bare, other, cleanup } = await initSyncedRepos(false)
+  const onOrigin = () => git(['for-each-ref', '--format=%(refname)', 'refs/heads'], bare)
+  try {
+    // Off until said otherwise: the repository has an origin, and the branch stays here.
+    assert.equal(await readSharing(repo), false)
+    assert.equal(await branchReach(repo), 'kept')
+    // The funnel: the write is a local commit, and the pull is fine and says why nothing went out.
+    const written = await withFileBranch(repo, BRANCH, 'kept here', async dir => {
+      await writeFile(join(dir, 'queue.md'), '- mine\n')
+    })
+    assert.deepEqual(written, { ok: true, changed: true, pushed: false })
+    assert.deepEqual(await pullFileBranch(repo, BRANCH), { ok: true, reach: 'kept' })
+    // A one-shot writer, from a second worktree of the clone as an agent's command runs: local too.
+    const agent = join(dirname(repo), `agent-${Date.now()}`)
+    await git(['worktree', 'add', '-b', 'agent', agent], repo)
+    assert.deepEqual(
+      await writeFileBranchDetached(agent, BRANCH, 'one shot', async dir => {
+        await writeFile(join(dir, 'ticket.md'), 'a ticket\n')
+      }),
+      { changed: true },
+    )
+    assert.equal(await (await openBranchReader(agent, BRANCH)).read('ticket.md'), 'a ticket\n')
+    assert.equal(await readBranchFile(agent, BRANCH, 'queue.md', { fresh: true }), '- mine\n')
+    await git(['worktree', 'remove', '--force', agent], repo)
+    assert.equal((await onOrigin()).trim(), 'refs/heads/main', 'origin holds nothing of the branch')
+    // What another machine shares is not taken either: this machine never asks origin for it.
+    await writeSharing(other, true)
+    await otherMachineWrites(other, 'theirs.md', 'theirs\n')
+    assert.deepEqual(await pullFileBranch(repo, BRANCH), { ok: true, reach: 'kept' })
+    await assert.rejects(git(['rev-parse', '--verify', `refs/remotes/origin/${BRANCH}`], repo))
+    // Turned on: the next pull meets origin, and everything kept here goes out with what was there.
+    await writeSharing(repo, true)
+    assert.equal(await branchReach(repo), 'origin')
+    assert.deepEqual(await pullFileBranch(repo, BRANCH), { ok: true, reach: 'origin' })
+    for (const file of ['queue.md', 'ticket.md', 'theirs.md']) await git(['show', `${BRANCH}:${file}`], bare)
+    // Turned off again: a later write stays here.
+    await writeSharing(repo, false)
+    const tip = (await git(['rev-parse', BRANCH], bare)).trim()
+    await withFileBranch(repo, BRANCH, 'kept again', async dir => {
+      await writeFile(join(dir, 'later.md'), 'later\n')
+    })
+    assert.equal((await git(['rev-parse', BRANCH], bare)).trim(), tip)
+  } finally {
+    await cleanup()
+  }
+})
+
+test('a one-shot reader in a clone that keeps its records and never made the branch reads the copy of origin\'s it was cloned with', async () => {
+  const { bare, other, cleanup } = await initSyncedRepos()
+  const parent = await realpath(await mkdtemp(join(tmpdir(), 'file-branch-fresh-')))
+  try {
+    await otherMachineWrites(other, 'queue.md', '- shared by the team\n')
+    // A fresh clone: sharing is off, there is no local branch, and git already fetched origin's.
+    const fresh = join(parent, 'clone')
+    await git(['clone', bare, fresh], parent)
+    assert.equal(await branchReach(fresh), 'kept')
+    await assert.rejects(git(['rev-parse', '--verify', `refs/heads/${BRANCH}`], fresh))
+    const reader = await openBranchReader(fresh, BRANCH)
+    assert.equal(reader.ref, `origin/${BRANCH}`)
+    assert.equal(await reader.read('queue.md'), '- shared by the team\n')
+    // Nothing is asked of origin for it: what another machine pushes after the clone is not seen.
+    await otherMachineWrites(other, 'later.md', 'later\n')
+    assert.equal(await (await openBranchReader(fresh, BRANCH)).read('later.md'), undefined)
+  } finally {
+    await cleanup()
+    await rm(parent, RETRIED_RM)
   }
 })

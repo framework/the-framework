@@ -3,7 +3,7 @@ import { listProjects, type ProjectRecord } from '../registry.js'
 import { nodeFs } from '../node-fs.js'
 import { isActivated } from '../project.js'
 import { readAllAgents, type AgentMeta } from '../store/index.js'
-import type { ProjectError } from '../project-errors.js'
+import type { ProjectError, StaysLocal } from '../project-errors.js'
 import { projectGitHost, type GitHostFor } from '../store/git-host.js'
 
 /**
@@ -34,10 +34,11 @@ export interface ProjectSummary {
    */
   errors?: ProjectError[]
   /**
-   * The project's repository has no remote, as the daemon's last data sync found it: nothing is
-   * wrong, it lives on this machine only. Absent otherwise; attached like `errors`.
+   * Why the project's data stays on this machine, as the daemon's last data sync found it: its
+   * repository has no remote, or the person keeps the agents' records here. Nothing is wrong.
+   * Absent for a project that shares them; attached like `errors`.
    */
-  localOnly?: true
+  local?: StaysLocal
 }
 
 /**

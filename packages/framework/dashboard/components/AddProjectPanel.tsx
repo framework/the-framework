@@ -7,14 +7,20 @@ import { Button } from './ui/button.js'
 // opens the dialog (a browser page cannot learn an absolute path from a picker of its own) and
 // hands the choice back, the user confirms they trust the repo, and the daemon installs and
 // registers it. Opened as a small modal from the projects picker and the onboarding checklist.
+// The checklist may hand it the folder the dashboard runs in: then there is nothing to pick.
+//
+// Before the add, the person also says where the agents' records go: kept on this machine, which
+// is what is picked until they pick the other, or shared to the repository's remote. Nothing is
+// pushed for a project added with the first.
 //
 // It behaves like the dialog it claims to be (#948): Esc closes, Tab stays inside, focus
 // returns to the opener on close.
-export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onClose: () => void }) {
+export function AddProjectPanel({ folder, onAdded, onClose }: { folder?: string | undefined; onAdded: () => void; onClose: () => void }) {
   // The picked path, once the system dialog answered; the phases are picking (no path yet),
   // confirming trust (path, not added), and done (added set).
-  const [path, setPath] = useState<string | null>(null)
-  const [added, setAdded] = useState<{ alreadyActivated: boolean } | null>(null)
+  const [path, setPath] = useState<string | null>(folder ?? null)
+  const [share, setShare] = useState(false)
+  const [added, setAdded] = useState<{ alreadyActivated: boolean; noRemote: boolean } | null>(null)
   const [pickError, setPickError] = useState<string | null>(null)
   const { busy, error, reset, run } = useAction()
   const panelRef = useRef<HTMLDivElement>(null)
@@ -43,14 +49,14 @@ export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onC
     setPath(picked.path)
   }
   useEffect(() => {
-    void pick()
+    if (!folder) void pick()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Auto-close a beat after success; Done closes sooner.
   useEffect(() => {
     if (!added) return
-    const timer = setTimeout(onClose, 2500)
+    const timer = setTimeout(onClose, added.noRemote ? 6000 : 2500)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [added])
@@ -58,9 +64,9 @@ export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onC
   // Trust confirmed (#439) -> install + register.
   const confirmAdd = async () => {
     if (busy || !path) return
-    const outcome = await run(() => sendAddProject(path), 'Failed to add the project.')
+    const outcome = await run(() => sendAddProject(path, share), 'Failed to add the project.')
     if (outcome.ok) {
-      setAdded({ alreadyActivated: outcome.value.alreadyActivated })
+      setAdded({ alreadyActivated: outcome.value.alreadyActivated, noRemote: outcome.value.noRemote === true })
       onAdded()
     }
   }
@@ -104,6 +110,8 @@ export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onC
             <p role="status" className="mb-3 text-sm font-medium">
               {added.alreadyActivated ? 'Already added' : 'Project added'}
             </p>
+            {/* Sharing was picked and there is nothing to share with: said, not dropped. */}
+            {added.noRemote && <p className="mb-3 text-xs text-muted-foreground">This repository has no remote, so the agents&rsquo; records stay on this machine.</p>}
             <div className="flex justify-end">
               <Button type="button" size="sm" autoFocus onClick={onClose}>
                 Done
@@ -134,10 +142,30 @@ export function AddProjectPanel({ onAdded, onClose }: { onAdded: () => void; onC
               Adding it lets the agent read its files. Hidden instructions in an untrusted repo can hijack the agent
               (prompt injection), so only add repos you trust.
             </p>
+            <fieldset className="mb-3 text-xs">
+              <legend className="mb-1 font-medium text-foreground">The agents&rsquo; records (what you ask, what each agent answers)</legend>
+              <label className="flex items-start gap-2 py-0.5">
+                <input type="radio" name="records" className="mt-0.5" checked={!share} disabled={busy} onChange={() => setShare(false)} />
+                <span>
+                  Keep them on this machine
+                  <span className="block text-muted-foreground">Nothing is pushed.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 py-0.5">
+                <input type="radio" name="records" className="mt-0.5" checked={share} disabled={busy} onChange={() => setShare(true)} />
+                <span>
+                  Share them to the repository&rsquo;s remote
+                  <span className="block text-muted-foreground">
+                    Pushes a branch <code className="rounded bg-muted px-1">agent-data</code> to origin, and keeps pushing as agents work.
+                  </span>
+                </span>
+              </label>
+              <p className="mt-1 text-muted-foreground">You can change this later in the project&rsquo;s menu.</p>
+            </fieldset>
             {error && <p className="mb-2 text-xs text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void pick()}>
-                Choose again
+              <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => (folder ? onClose() : void pick())}>
+                {folder ? 'Cancel' : 'Choose again'}
               </Button>
               <Button type="button" size="sm" autoFocus disabled={busy} onClick={() => void confirmAdd()}>
                 {busy ? 'Adding…' : 'I trust it, add it'}

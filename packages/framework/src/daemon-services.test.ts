@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { checkProviders, syncProjectData } from './daemon-services.js'
 import { projectErrorStore } from './project-errors.js'
+import { writeSharing } from '@openagt/agent-data'
 
 const git = promisify(execFile)
 
@@ -28,21 +29,39 @@ test('a project whose data branch cannot reach a remote carries a data-sync erro
 
     // No remote: the branch is born locally and the project is local only — a note, not an error.
     await syncProjectData(project, errors, m => logs.push(m))
-    assert.deepEqual(errors.read(project), { errors: [], localOnly: true })
+    assert.deepEqual(errors.read(project), { errors: [], local: 'no-remote' })
     assert.ok(!logs.some(m => m.includes('data sync')), 'nothing failed, so the daemon log names no failed sync')
 
-    // The user adds a remote: the next turn converges and the note is gone.
+    // The user adds a remote: the records are still kept here, and the remote holds nothing of them.
     await git('git', ['init', '-q', '--bare'], { cwd: remote })
     await git('git', ['remote', 'add', 'origin', remote], { cwd: project })
+    await syncProjectData(project, errors, m => logs.push(m))
+    assert.deepEqual(errors.read(project), { errors: [], local: 'kept' })
+    assert.equal((await git('git', ['for-each-ref', 'refs/heads'], { cwd: remote })).stdout.trim(), '')
+    assert.equal(logs.length, 0, 'a project that keeps its records says nothing in the daemon log')
+
+    // The person shares them: the next turn converges and the note is gone.
+    await writeSharing(project, true)
     await syncProjectData(project, errors, () => {})
-    assert.deepEqual(errors.read(project), { errors: [], localOnly: false })
+    assert.deepEqual(errors.read(project), { errors: [] })
+    assert.match((await git('git', ['for-each-ref', '--format=%(refname)', 'refs/heads'], { cwd: remote })).stdout, /refs\/heads\/agent-data/)
 
     // A remote that cannot be reached is the error it always was.
     await git('git', ['remote', 'set-url', 'origin', join(remote, 'gone')], { cwd: project })
     await git('git', ['commit', '-q', '--allow-empty', '-m', 'local'], { cwd: join(project, '.branches', 'agent-data') })
     await syncProjectData(project, errors, m => logs.push(m))
     assert.equal(errors.read(project).errors[0]?.code, 'data-sync')
-    assert.equal(errors.read(project).localOnly, false)
+    assert.equal('local' in errors.read(project), false)
+
+    // Kept again, then shared while the remote is still out of reach: the failed turn also says
+    // the records are no longer kept, so the note of the turn before does not outlive it.
+    await writeSharing(project, false)
+    await syncProjectData(project, errors, () => {})
+    assert.deepEqual(errors.read(project), { errors: [], local: 'kept' })
+    await writeSharing(project, true)
+    await syncProjectData(project, errors, () => {})
+    assert.equal(errors.read(project).errors[0]?.code, 'data-sync')
+    assert.equal('local' in errors.read(project), false)
   } finally {
     await rm(project, { recursive: true, force: true })
     await rm(remote, { recursive: true, force: true })

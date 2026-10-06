@@ -565,9 +565,12 @@ describe('the project select (#1513)', () => {
   })
 
   test('an activated project whose repository has no remote says so in grey, with no red dot', async () => {
-    const local = { ...idle, id: 'p3', name: 'gamma', activated: true, localOnly: true as const }
-    renderRail(<AgentHistory projectId={null} agents={[]} recentAgents={[]} selectedAgentId={null} onSelect={() => {}} projects={[stranded, local]} />)
+    const local = { ...idle, id: 'p3', name: 'gamma', activated: true, local: 'no-remote' as const }
+    const kept = { ...idle, id: 'p4', name: 'delta', activated: true, local: 'kept' as const }
+    renderRail(<AgentHistory projectId={null} agents={[]} recentAgents={[]} selectedAgentId={null} onSelect={() => {}} projects={[stranded, local, kept]} />)
     await openMenu(screen.getByRole('button', { name: 'Project: All projects' }))
+    // A project with a remote whose records the person keeps says that instead, as quietly.
+    expect(within(screen.getByRole('menuitem', { name: /delta/ })).getByText('Records kept on this machine').className).toContain('text-muted-foreground')
     const item = screen.getByRole('menuitem', { name: /gamma/ })
     expect(item.querySelector('.bg-danger')).toBeNull()
     expect(within(item).getByText('Local only, no remote').className).toContain('text-muted-foreground')

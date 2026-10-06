@@ -1,8 +1,8 @@
-The "Onboarding" card: the four things a new install needs (fewer while no project has a queue, or none has a package providing tickets), each shown in the state it is actually in. A step is ticked only because a fact holds — a registered project, a non-empty agent queue [2], a ticket on disk, a granted browser permission — never because it was clicked, and each open step carries the action that gets it done, including a one-click first project and a one-click import of the project's issues.
+The "Onboarding" card: the four things a new install needs (fewer while no project has a queue, or none has a package providing tickets), each shown in the state it is actually in. A step is ticked only because a fact holds — a registered project, a non-empty agent queue [2], a ticket on disk, a granted browser permission — never because it was clicked, and each open step carries the action that gets it done, including a first project offered with no folder to pick and a one-click import of the project's issues.
 
 ## Context
 
-**User story**: on first launch the user sees "Onboarding — 0 of 4 set up.", adds the directory the daemon runs in as a project with one click, fills `tickets/` from the project's issue tracker with another, and watches the rows tick as the facts change, even for steps done outside the dashboard. On the Overview [4] the card can be dismissed; the Settings [5] page always shows it, which is what dismissing promises.
+**User story**: on first launch the user sees "Onboarding — 0 of 4 set up.", adds the directory the daemon runs in as a project without picking a folder (one click opens the Add dialog on it, where they confirm they trust it and say where the agents' records go), fills `tickets/` from the project's issue tracker with another, and watches the rows tick as the facts change, even for steps done outside the dashboard. On the Overview [4] the card can be dismissed; the Settings [5] page always shows it, which is what dismissing promises.
 
 ## Glossary
 
@@ -17,7 +17,7 @@ The "Onboarding" card: the four things a new install needs (fewer while no proje
 
 - **Every "done" is a fact** - the card re-reads the dashboard's state every 10 seconds and derives each tick from it; nothing is ticked by clicking, and a step done elsewhere shows ticked anyway.
 - **The card, its count and its dismissal** - "Onboarding" with "<n> of 4 set up."; on the Overview [4] an X hides it for good by writing the dismissal to the preferences [3], and the Settings [5] page always shows it.
-- **"Add a project"** - done once any project is registered; offers "Add <directory> as project" for the directory the daemon runs in when it is not registered yet, and "Select & add project directory".
+- **"Add a project"** - done once any project is registered; offers "Add <directory> as project…" for the directory the daemon runs in when it is not registered yet, which opens the Add dialog on that directory, and "Select & add project directory", which opens it to pick one; nothing is added before the dialog's confirmation.
 - **"Populate the queue of AI tasks"** - on the board only while some registered project has a queue at all (a queue comes from a package the project depends on); done once any project's agent queue [2] has an open entry; the one essential step with no button, it is done by agents.
 - **"Populate tickets/"** - on the board only while some registered project has a package providing tickets; optional; done once any project has tickets; "Update tickets" starts an agent [1] with the project's `update-tickets` command on the target project and lands the user on it, or, through its chevron, opens that project's launcher [6] with the prompt.
 - **"Add browser notifications"** - optional; done once the browser permission is granted and browser delivery is on; "Enable" turns delivery on and asks the browser for permission.
@@ -48,13 +48,14 @@ The card is titled "Onboarding" with "<done> of 4 set up." under it. On the Over
 
 #### Context
 
-**User story**: the daemon was started inside a repository; the first step offers that very directory as the project, so the first project is one click.
+**User story**: the daemon was started inside a repository; the first step offers that very directory as the project, so the first project needs no folder picked; the user still confirms they trust it and says where the agents' records go before anything is added.
 
 #### Business logic
 
 - Description: "A project is a git repo The Framework may work in." Done once at least one project is registered.
-- When the daemon can name the directory it runs in and that directory is not registered yet, a primary button reads "Add <directory> as project" ("Adding…" while the add is in flight). The daemon registers it; on failure the daemon's own error is shown under the buttons in red, or "Could not reach the daemon." when the daemon did not answer. On success the card re-reads its state and the suggestion.
-- "Select & add project directory" opens the add-project panel (`AddProjectPanel.tsx`); when a project is added there, the card re-reads as well.
+- When the daemon can name the directory it runs in and that directory is not registered yet, a primary button reads "Add <directory> as project…". It adds nothing by itself: it opens the add-project panel (`AddProjectPanel.tsx`) with that directory handed in, so the system folder dialog is skipped and the panel starts at its trust confirmation and its question on the agents' records; a refused add is said in the panel.
+- "Select & add project directory" opens the same panel with no directory, which then asks for one through the system folder dialog.
+- When a project is added in the panel, either way, the card re-reads its state and the suggestion.
 
 ### "Populate the queue of AI tasks"
 

@@ -25,7 +25,49 @@ describe('AddProjectPanel (#1150)', () => {
     expect(sendAddProject).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'I trust it, add it' }))
     await screen.findByText('Project added')
-    expect(sendAddProject).toHaveBeenCalledWith('/Users/dev/my-repo')
+    // The records stay on this machine unless the person picks the other answer.
+    expect(sendAddProject).toHaveBeenCalledWith('/Users/dev/my-repo', false)
+  })
+
+  test('the person says where the agents\u2019 records go before the add: kept here until they pick sharing', async () => {
+    sendPickProjectDirectory.mockResolvedValue({ ok: true, path: '/Users/dev/my-repo' })
+    sendAddProject.mockResolvedValue({ ok: true, alreadyActivated: false })
+    render(<AddProjectPanel onAdded={() => {}} onClose={() => {}} />)
+    const keep = (await screen.findByRole('radio', { name: /Keep them on this machine/ })) as HTMLInputElement
+    const share = screen.getByRole('radio', { name: /Share them to the repository\u2019s remote/ }) as HTMLInputElement
+    expect([keep.checked, share.checked]).toEqual([true, false])
+    // What sharing does is said beside the choice, before anything happens.
+    expect(screen.getByText('Nothing is pushed.')).toBeTruthy()
+    expect(screen.getByText(/keeps pushing as agents work/)).toBeTruthy()
+    fireEvent.click(share)
+    fireEvent.click(screen.getByRole('button', { name: 'I trust it, add it' }))
+    await screen.findByText('Project added')
+    expect(sendAddProject).toHaveBeenCalledWith('/Users/dev/my-repo', true)
+    expect(screen.queryByText(/has no remote/)).toBeNull()
+  })
+
+  test('sharing picked for a repository with no remote: the dialog says the records stay on this machine', async () => {
+    sendAddProject.mockResolvedValue({ ok: true, alreadyActivated: false, noRemote: true })
+    render(<AddProjectPanel folder="/Users/dev/here" onAdded={() => {}} onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('radio', { name: /Share them to the repository\u2019s remote/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'I trust it, add it' }))
+    await screen.findByText('Project added')
+    expect(screen.getByText(/has no remote, so the agents\u2019 records stay on this machine/)).toBeTruthy()
+  })
+
+  test('a folder handed in is asked about at once: no system dialog, and Cancel closes', async () => {
+    const onClose = vi.fn()
+    sendAddProject.mockResolvedValue({ ok: true, alreadyActivated: false })
+    render(<AddProjectPanel folder="/Users/dev/here" onAdded={() => {}} onClose={onClose} />)
+    expect(screen.getByText('/Users/dev/here')).toBeTruthy()
+    expect(sendPickProjectDirectory).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Choose again' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onClose).toHaveBeenCalled()
+    expect(sendAddProject).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'I trust it, add it' }))
+    await screen.findByText('Project added')
+    expect(sendAddProject).toHaveBeenCalledWith('/Users/dev/here', false)
   })
 
   test('a repo that was already a project reads "Already added"', async () => {

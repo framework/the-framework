@@ -7,11 +7,11 @@ const NO_EVENTS: FrameworkEvent[] = []
 // The bar at the top of the "New agent" page: the ⋮ menu of actions on the project, alone, at the
 // end of the row. The row is laid out as an agent's top bar is (AgentActionBar), so the menu is in
 // the same place on both pages. It names no project and says nothing of the project's checkout.
-export function ProjectActions({ projectId }: { projectId: string }) {
+export function ProjectActions({ projectId, onProjectRemoved }: { projectId: string; onProjectRemoved?: (() => void) | undefined }) {
   return (
     <div className="flex items-center gap-2 overflow-hidden px-4 py-2">
       <div className="grow shrink-0" />
-      <AgentActionsMenu projectId={projectId} events={NO_EVENTS} />
+      <AgentActionsMenu projectId={projectId} events={NO_EVENTS} onProjectRemoved={onProjectRemoved} />
     </div>
   )
 }

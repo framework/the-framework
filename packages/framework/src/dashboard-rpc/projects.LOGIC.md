@@ -1,4 +1,4 @@
-Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder, with the person's answer on where the agents' records go), where a project's records go now and the switch that shares them with the remote or keeps them on this machine, the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], whether an agent can be started there at all, whether a pull request can be opened there, which branches an agent can start from, and what would stop an agent before it is started.
+Everything the dashboard asks the daemon about projects [1]: the list of registered projects with whatever the daemon currently finds wrong with each, adding a new one (opening the machine's own folder dialog, then installing and registering the chosen folder, with the person's answer on where the agents' records go), removing one from the list, where a project's records go now and the switch that shares them with the remote or keeps them on this machine, the folder the onboarding offers as a first project, and what the launcher [2] offers for a project: its commands [3], whether an agent can be started there at all, whether a pull request can be opened there, which branches an agent can start from, and what would stop an agent before it is started.
 
 ## Context
 
@@ -21,6 +21,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 
 - **The projects list carries what is wrong with each project** - every registered project [1] comes back with its identity and, when there is one, the fault the daemon's background work recorded against it.
 - **Adding a project** - a path is registered only after it has been installed as a project; an empty path is refused outright; the add carries the person's answer on sharing the agents' records, and anything but a plain yes is a no.
+- **Removing a project** - the project is named by its id and the removal is the daemon's; an empty id is refused outright; the daemon's answer, a refusal included, is the answer.
 - **Where a project's records go, and the switch** - a read answers whether the project's `agent-data` branch [5] reaches the remote, has no remote, or is kept on this machine; turning sharing on sends what is there at once, and a remote that refuses turns it back off and is told in its words; a project with no remote is refused; turning it off just stops.
 - **The folder dialog is the daemon's** - the machine's own choose-a-folder dialog is opened by the daemon, because a browser cannot learn an absolute path; dismissing it is an ordinary answer, not a failure.
 - **The onboarding's first suggestion** - the directory the daemon was started in is offered as the first project, together with whether it is already registered.
@@ -56,6 +57,20 @@ Adding takes a path and the person's answer, asked in the dialog before the add,
 Otherwise the daemon installs the repository as a project [1], writes the answer to it and registers it, and answers one of three ways: registered, already registered, or the reason it could not be. A registered answer also says when a yes was not taken because the repository has no remote. The installation itself is the daemon's (`../daemon-runtime.ts`, `../install.ts`).
 
 A host that has no ability to add projects at all fails this call outright rather than answering as though nothing happened, because being unable to add is a misconfiguration, not a state a user can be in.
+
+### Removing a project
+
+#### Context
+
+**User story**: in a project's menu the user picks "Remove project…" and confirms (`../../dashboard/components/AgentActionsMenu.tsx`); the project [1] leaves the list and nothing in its folder is deleted.
+
+**Problem**: removing is the daemon's to do, like adding: it runs the project's `close` hooks and writes the registry. And a project whose folder was deleted must still be removable, so a removal cannot name the project by its folder.
+
+#### Business logic
+
+Removing takes the project's id, not its path. An empty id is refused with "a project id is required" before the daemon is asked. Otherwise the daemon removes the project (`../daemon-runtime.ts`) and its answer is the answer: removed, or the reason it was not, for instance "An agent is working in this project. Stop it, then remove the project."
+
+A host that has no ability to remove projects at all fails this call outright, as for adding.
 
 ### Where a project's records go, and the switch
 

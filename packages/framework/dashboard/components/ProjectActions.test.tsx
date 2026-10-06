@@ -27,6 +27,13 @@ describe('ProjectActions', () => {
     expect(menu.mock.calls[0]![0].agentId).toBeUndefined()
   })
 
+  test('the menu is handed what to tell once the project is removed', () => {
+    menu.mockClear()
+    const onProjectRemoved = vi.fn()
+    render(<ProjectActions projectId="p1" onProjectRemoved={onProjectRemoved} />)
+    expect(menu).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'p1', onProjectRemoved }))
+  })
+
   test("laid out as an agent's top bar: no bottom border, the same row, the menu at the end", () => {
     const { container } = render(<ProjectActions projectId="p1" />)
     const row = container.firstElementChild!

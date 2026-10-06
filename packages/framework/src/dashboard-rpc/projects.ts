@@ -1,4 +1,4 @@
-import { contextAddProject, contextProjectErrors, contextProjects, resolveProjectPath } from './context.js'
+import { contextAddProject, contextProjectErrors, contextProjects, contextRemoveProject, resolveProjectPath } from './context.js'
 import { readProjectCommands, type ProjectCommand } from '../project-commands.js'
 import { DATA_BRANCH, branchReach, originDefaultBranch, pullFileBranch, writeSharing, type BranchReach } from '@openagt/agent-data'
 import { readProjectHooks, runCheckHook, startLineTakesBase, type StartReadiness } from '../project-hooks.js'
@@ -8,7 +8,7 @@ import { currentBranch } from '../dashboard/git-status.js'
 import { pickDirectory, type PickDirectoryResult } from '../pick-directory.js'
 import { projectGitHost } from '../store/git-host.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
-import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.js'
+import type { AddProjectResult, OnboardingSuggestion, RemoveProjectResult } from '../dashboard/types.js'
 
 // The Projects sidebar behind the new dashboard (#405): the global registry (#390) the
 // daemon and CLI write — id, path, name, activated, last activity. The per-agent
@@ -43,6 +43,18 @@ export async function sendAddProject(path: string, share: boolean): Promise<AddP
   const trimmed = path.trim()
   if (!trimmed) return { ok: false, error: 'a project path is required' }
   return addProject(trimmed, share === true)
+}
+
+/**
+ * Remove a project from the dashboard: it leaves the Projects list, and nothing in its folder is
+ * deleted. Like `sendAddProject` this is the daemon's to do (it runs the project's close hooks and
+ * writes the shared registry), so it calls the daemon's own closure off the wired dashboard context.
+ * Addressed by id and not by path, so a project whose folder is gone can still be removed.
+ */
+export async function sendRemoveProject(projectId: string): Promise<RemoveProjectResult> {
+  const removeProject = contextRemoveProject()
+  if (typeof projectId !== 'string' || !projectId) return { ok: false, error: 'a project id is required' }
+  return removeProject(projectId)
 }
 
 /** How far the project's records reach right now, read off its repository; `null` when the project is unknown here. */

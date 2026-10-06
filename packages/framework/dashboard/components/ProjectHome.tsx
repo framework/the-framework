@@ -27,6 +27,7 @@ export function ProjectHome({
   toggleContext,
   onOpenAgent,
   errors,
+  onProjectRemoved,
 }: {
   projectId: string
   /** The project's name, for the launcher's chip; absent until the projects are read. */
@@ -46,10 +47,12 @@ export function ProjectHome({
   onOpenAgent: (projectId: string, agentId: string) => void
   /** What the daemon currently finds wrong with the project (#1500), off the shell's project list. */
   errors?: ProjectError[] | undefined
+  /** Told once the project is off the list, so the shell leaves its page. */
+  onProjectRemoved?: (() => void) | undefined
 }) {
   return (
     <>
-      <ProjectActions projectId={projectId} />
+      <ProjectActions projectId={projectId} onProjectRemoved={onProjectRemoved} />
       {/* Above everything, because an agent started on a project whose agent-data branch cannot
           reach origin (#1599) works from stale tickets and a queue nobody else will see. */}
       <ProjectErrorBanner errors={errors} />

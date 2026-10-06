@@ -2,7 +2,7 @@ Activates a repository for OpenAgent, which is what adding a project does to it:
 
 ## Context
 
-**User story**: the user adds a repository by path on the Overview, or runs `openagent` inside one, and from then on the repository is a project agents [1] can work. Their repository looks as it did: the same commits, the same `git status`, and nothing they had uncommitted or staged is touched. This matters most in a repository the user does not own.
+**User story**: the user adds a repository by path on the Overview, and from then on the repository is a project agents [1] can work. Their repository looks as it did: the same commits, the same `git status`, and nothing they had uncommitted or staged is touched. This matters most in a repository the user does not own.
 
 ## Glossary
 

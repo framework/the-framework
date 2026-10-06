@@ -3,7 +3,7 @@ import type { GitHostHome, FrameworkEvent, RepositoryOffer, RecordsReach } from 
 import { sessionInfo } from '../../src/client.js'
 import { MoreVertical, ChevronDown, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy, CloudUpload, CloudOff, Info } from 'lucide-react'
 import { onGitHostHome, onRepositoryOffer } from '../rpc/reads.js'
-import { onRecordsReach, sendShareRecords } from '../rpc/projects.js'
+import { onRecordsReach, sendRemoveProject, sendShareRecords } from '../rpc/projects.js'
 import {
   sendOpenInApp,
   sendStop,
@@ -54,6 +54,7 @@ export function AgentActionsMenu({
   retainedWorktree = false,
   onWorktreeRemoved,
   onDeleted,
+  onProjectRemoved,
   part,
   details,
   size,
@@ -66,6 +67,8 @@ export function AgentActionsMenu({
   retainedWorktree?: boolean
   onWorktreeRemoved?: (() => void) | undefined
   onDeleted?: (() => void) | undefined
+  /** Told once the project is off the list; given, the project's menu offers "Remove project". */
+  onProjectRemoved?: (() => void) | undefined
   /** Which of an agent's page's two menus this is; absent, the one menu of a page with no session. */
   part?: 'session' | 'project' | undefined
   /** The session's details strip under the bar (its coding agent, its spend): the session's menu shows and hides it. */
@@ -119,6 +122,9 @@ export function AgentActionsMenu({
   const [switched, setSwitched] = useState(0)
   const reach = useLoaded<RecordsReach | null>(ofProject && !agentId ? () => onRecordsReach(projectId) : null, null, [projectId, agentId, created, switched, ofProject], 'previous')
   const [confirmShare, setConfirmShare] = useState(false)
+  // Removing a project takes it off the dashboard's list and deletes nothing in its folder; it is
+  // asked once more, and the question says what stays.
+  const [confirmRemove, setConfirmRemove] = useState(false)
   const stopSharing = () =>
     void run(() => sendShareRecords(projectId, false), 'Could not stop sharing.').then(outcome => {
       if (outcome.ok) setSwitched(n => n + 1)
@@ -286,6 +292,16 @@ export function AgentActionsMenu({
             </>
           )}
 
+          {/* Last, and apart: the one item of the project's menu that takes something away. */}
+          {onProjectRemoved && !agentId && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setConfirmRemove(true)} className="text-danger">
+                <Trash2 className="h-3.5 w-3.5 shrink-0" /> Remove project…
+              </DropdownMenuItem>
+            </>
+          )}
+
           {error && <p className="px-2 py-1.5 text-xs text-danger">{error}</p>}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -327,6 +343,28 @@ export function AgentActionsMenu({
           destructive={false}
           onConfirm={() => sendShareRecords(projectId, true)}
           onSuccess={() => setSwitched(n => n + 1)}
+        />
+      )}
+      {onProjectRemoved && !agentId && (
+        <ConfirmDialog
+          open={confirmRemove}
+          onOpenChange={setConfirmRemove}
+          title="Remove this project?"
+          body={
+            <>
+              It leaves the dashboard&rsquo;s list, and its scheduler stops unless you set it to keep running. Nothing in the folder is deleted:
+              your files and your commits stay, and so do OpenAgent&rsquo;s own files there (
+              <span className="font-medium text-foreground">.openagent</span>, <span className="font-medium text-foreground">.branches</span>,{' '}
+              <span className="font-medium text-foreground">.agent-runner</span> and the branch{' '}
+              <span className="font-medium text-foreground">agent-data</span> with the agents&rsquo; records). Add the folder again to bring
+              the project back.
+            </>
+          }
+          confirmLabel="Remove"
+          confirmBusyLabel="Removing…"
+          fallbackError="Could not remove the project."
+          onConfirm={() => sendRemoveProject(projectId)}
+          onSuccess={onProjectRemoved}
         />
       )}
       {onDeleted && agentId && (

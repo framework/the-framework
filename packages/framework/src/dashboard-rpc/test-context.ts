@@ -15,6 +15,7 @@ export function testDashboardContext(over: Partial<DashboardContext> = {}): Dash
   return {
     startAgent: () => ({ ok: false, error: 'not wired in this test' }),
     addProject: () => ({ ok: false, error: 'not wired in this test' }),
+    removeProject: () => ({ ok: false, error: 'not wired in this test' }),
     eventsSource: () => undefined,
     remote: { target: () => undefined, list: () => [] },
     preferences: registryPreferencesStore(),
@@ -31,8 +32,8 @@ export function testDashboardContext(over: Partial<DashboardContext> = {}): Dash
  * test asserting one route still stands up the same server the product does.
  */
 export function testDashboardOptions(over: Partial<DashboardOptions> = {}): DashboardOptions {
-  const { startAgent, addProject, ...rest } = testDashboardContext()
-  return { port: 0, onStart: startAgent, onAddProject: addProject, ...rest, ...over }
+  const { startAgent, addProject, removeProject, ...rest } = testDashboardContext()
+  return { port: 0, onStart: startAgent, onAddProject: addProject, onRemoveProject: removeProject, ...rest, ...over }
 }
 
 /**

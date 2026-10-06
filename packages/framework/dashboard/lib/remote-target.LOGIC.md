@@ -8,5 +8,5 @@ The selection lives only for as long as the page is open and is deliberately not
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [4] launcher: the Start form on a project's own page.
-[5] the start hook: the one shell line a project names in its own `.the-framework/hooks.yml` to start an agent. The daemon runs that line and takes back the id of the agent it started; a project without the line cannot start one.
-[6] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[5] the start hook: the one shell line a project names in its own `.openagent/hooks.yml` to start an agent. The daemon runs that line and takes back the id of the agent it started; a project without the line cannot start one.
+[6] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).

@@ -14,11 +14,11 @@ Runs the daemon's own browser for the Claude web bridge [1]: a Chrome for Testin
 [4] pick: the answer to a gate: the option or options chosen, by the user or automatically.
 [5] bridge browser: the Chrome for Testing the daemon runs for the bridge.
 [6] Driver tab: the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
-[7] registry: `~/.the-framework.json`, which keeps the user's preferences and lists the projects.
+[7] registry: `~/.openagent.json`, which keeps the user's preferences and lists the projects.
 
 ## Business logic — TL;DR
 
-- **Where the bridge browser lives** - under `$XDG_CONFIG_HOME/the-framework-browser` when that variable is set, else `~/.the-framework-browser`, beside the registry, with a profile that persists across restarts.
+- **Where the bridge browser lives** - under `$XDG_CONFIG_HOME/openagent-browser` when that variable is set, else `~/.openagent-browser`, beside the registry, with a profile that persists across restarts.
 - **Chrome for Testing, downloaded once** - the newest Chrome for Testing already under that directory, else the current stable build downloaded there with progress reported.
 - **Where the extension files come from** - a checkout's `packages/chrome-extension` first, else the copy the build puts in the package; a package's copy is installed from the bridge browser's own `extension` folder.
 - **Stopping a browser a dead daemon left behind** - whatever process holds the profile's lock is asked to leave, given 5 seconds, then killed.
@@ -39,7 +39,7 @@ Runs the daemon's own browser for the Claude web bridge [1]: a Chrome for Testin
 
 #### Business logic
 
-The bridge browser [5]'s directory holds its profile and its binary: `$XDG_CONFIG_HOME/the-framework-browser` when that variable is set, else `~/.the-framework-browser`. It sits beside the registry [7], so the same variable that isolates a test's registry isolates its browser. The profile inside it is persistent on purpose.
+The bridge browser [5]'s directory holds its profile and its binary: `$XDG_CONFIG_HOME/openagent-browser` when that variable is set, else `~/.openagent-browser`. It sits beside the registry [7], so the same variable that isolates a test's registry isolates its browser. The profile inside it is persistent on purpose.
 
 ### Chrome for Testing, downloaded once
 

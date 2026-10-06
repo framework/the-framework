@@ -10,14 +10,14 @@ The browser's side of the daemon's call surface: one module of typed stubs per g
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
-[3] start hook: The one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id. The resume hook, under `resume:`, continues an ended agent.
+[3] start hook: The one shell line under `start:` in the project's `.openagent/hooks.yml`, which starts an agent and answers its id. The resume hook, under `resume:`, continues an ended agent.
 [4] checkout: An agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [5] next step: What a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has.
 [6] the Claude web bridge: The daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it.
 [7] event / event stream: Everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded.
 [8] pick: The answer to a question an agent ended on: the option or options the user chose.
 [9] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down.
-[10] preferences: The user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[10] preferences: The user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [11] quota: The account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [12] quota boundary: The share of the quota week that may be spent by now, rising with the clock. The dashboard only draws it; whether work stops at it is the business of whatever starts unattended work.
 [13] device: Another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.

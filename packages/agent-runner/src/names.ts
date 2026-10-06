@@ -7,7 +7,7 @@ export const RUNNER_DIR = '.agent-runner'
 export const RUNS_DIR = 'runs'
 
 /** The dashboard's directory in a project it knows: made and hidden from git when the project is added. */
-export const DASHBOARD_DIR = '.the-framework'
+export const DASHBOARD_DIR = '.openagent'
 
 /** The dashboard's hooks file, the lines it runs for the project: where `init` writes this tool's. */
 export const DASHBOARD_HOOKS = `${DASHBOARD_DIR}/hooks.yml`

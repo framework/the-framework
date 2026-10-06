@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runCheckHook, runProjectHooks, runResumeHook, runStartHook, startLineTakesBase } from './project-hooks.js'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './framework-dir.js'
 import { initHooks } from '@openagt/agent-runner'
 
 // The hooks file and the runner (#1774), for real: `sh -c` in a throwaway project, the lines
@@ -13,7 +13,7 @@ import { initHooks } from '@openagt/agent-runner'
 
 async function project(hooks?: string): Promise<string> {
   const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-hooks-')))
-  await mkdir(join(cwd, THE_FRAMEWORK_DIR), { recursive: true })
+  await mkdir(join(cwd, OPENAGENT_DIR), { recursive: true })
   if (hooks !== undefined) await writeFile(join(cwd, PROJECT_HOOKS_FILE), hooks)
   return cwd
 }

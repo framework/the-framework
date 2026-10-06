@@ -1,14 +1,14 @@
 import { join } from 'node:path'
 import type { FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
-import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../framework-dir.js'
 import { projectBranches, type BranchesFor, type Checkout } from './branches.js'
 import { isRunId, parseRunCard, projectRuns, type AnyDiaryLine, type RunsFor } from './runs.js'
 import { eventsOf, fromRunCard } from './run-record.js'
 
 /**
  * The read side of a project's runs (#1774). The daemon runs no agent and writes no run: a run's
- * tool keeps the run's card (`<id>.json`) and diary (`<id>.jsonl`) under the `.the-framework/`
+ * tool keeps the run's card (`<id>.json`) and diary (`<id>.jsonl`) under the `.openagent/`
  * of the run's own checkout while it works, and a finished run is whatever the project's runs
  * provider answers (`runs.ts`), when one of its packages provides them. The dashboard is a
  * projection of those files and that answer.
@@ -241,7 +241,7 @@ export function isPidAlive(pid: number): boolean {
 }
 
 /**
- * The run a checkout holds, off its live card, `<id>.json` under the checkout's `.the-framework/`:
+ * The run a checkout holds, off its live card, `<id>.json` under the checkout's `.openagent/`:
  * the shape agent-driver's log writes, read as the meta the card unfolds to, `running` or not (a
  * run that ended waiting on a question keeps its checkout), on the branch the checkout is on now
  * (the provider read it), since the agent renames its branch itself while its card learns the new
@@ -249,7 +249,7 @@ export function isPidAlive(pid: number): boolean {
  * Never healed here: the tool that started the run sweeps its own dead runs.
  */
 export async function readLiveMeta(checkout: Checkout, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta | undefined> {
-  const path = join(checkout.path, THE_FRAMEWORK_DIR, `${checkout.id}.json`)
+  const path = join(checkout.path, OPENAGENT_DIR, `${checkout.id}.json`)
   if (!(await fs.exists(path))) return undefined
   const card = parseRunCard(await fs.read(path).catch(() => ''))
   if (!card) return undefined
@@ -300,7 +300,7 @@ function parseDiary(raw: string): AnyDiaryLine[] {
 export async function loadAgentEvents(cwd: string, id: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns, branches: BranchesFor = projectBranches): Promise<FrameworkEvent[] | undefined> {
   if (!isRunId(id)) return undefined
   const live = (await readLiveMetas(cwd, fs, branches).catch((): LiveAgent[] => [])).find(agent => agent.id === id)
-  const liveDiary = live ? join(live.cwd, THE_FRAMEWORK_DIR, `${id}.jsonl`) : undefined
+  const liveDiary = live ? join(live.cwd, OPENAGENT_DIR, `${id}.jsonl`) : undefined
   if (liveDiary && (await fs.exists(liveDiary))) return eventsOf(parseDiary(await fs.read(liveDiary).catch(() => '')))
   const diary = await readFinishedDiary(cwd, id, runs)
   return diary ? eventsOf(diary) : undefined
@@ -332,7 +332,7 @@ export async function readDoing(cwd: string, ids: readonly string[], fs: StoreFs
   const live = await readLiveMetas(cwd, fs, branches).catch((): LiveAgent[] => [])
   for (const agent of live) {
     if (agent.status !== 'running' || !ids.includes(agent.id)) continue
-    const lines = (await fs.read(join(agent.cwd, THE_FRAMEWORK_DIR, `${agent.id}.jsonl`)).catch(() => '')).split('\n')
+    const lines = (await fs.read(join(agent.cwd, OPENAGENT_DIR, `${agent.id}.jsonl`)).catch(() => '')).split('\n')
     for (let i = lines.length - 1; i >= 0; i--) {
       const said = doingOf(parseDiary(lines[i]!)[0] ?? { kind: '' })
       if (said === undefined) continue

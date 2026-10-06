@@ -5,7 +5,7 @@ import { onPreferences, patchPreferences, onProjectPresets, saveProjectPresets }
 import { parseRoute } from './route.js'
 
 // The dashboard's Global options (#410), owned by the daemon and persisted in the same
-// `the-framework.json` as the project list — no more localStorage. Loaded once over its RPC
+// `openagent.json` as the project list — no more localStorage. Loaded once over its RPC
 // and cached in this module so every component (the Start form's toggles, the notifications
 // menu, Settings) reads one shared value and stays in lockstep: an update writes through to the
 // cache, notifies subscribers, and persists daemon-side. Prerender has no daemon, so the
@@ -20,7 +20,7 @@ import { parseRoute } from './route.js'
 const EMPTY: Preferences = {}
 let cache: Preferences | null = null
 let loading: Promise<void> | null = null
-/** Each project's shared custom presets, committed in its `.the-framework/custom-presets.json` (#1025). */
+/** Each project's shared custom presets, committed in its `.openagent/custom-presets.json` (#1025). */
 const projectPresets = new Map<string, CustomPreset[]>()
 const projectPresetLoads = new Set<string>()
 const EMPTY_PRESETS: CustomPreset[] = []
@@ -70,7 +70,7 @@ if (typeof window !== 'undefined') {
   })
 }
 
-/** Load a project's shared custom presets (#1025) once, from its committed `.the-framework/`. */
+/** Load a project's shared custom presets (#1025) once, from its committed `.openagent/`. */
 function ensureProjectPresetsLoaded(projectId: string | null): void {
   if (!projectId || projectPresets.has(projectId) || projectPresetLoads.has(projectId)) return
   projectPresetLoads.add(projectId)
@@ -89,7 +89,7 @@ function ensureProjectPresetsLoaded(projectId: string | null): void {
 }
 
 /**
- * The open project's shared custom presets (#1025): the ones committed into its `.the-framework/`,
+ * The open project's shared custom presets (#1025): the ones committed into its `.openagent/`,
  * so everyone who clones the repo sees them. Empty with no project open, since there is no repo to
  * read them from.
  */
@@ -105,7 +105,7 @@ export function useProjectPresets(): CustomPreset[] {
 }
 
 /**
- * Replace the open project's shared presets, write-through then persist into its `.the-framework/`
+ * Replace the open project's shared presets, write-through then persist into its `.openagent/`
  * (#1025). Best-effort like {@link updatePreferences}: a failed save is not worth surfacing over a
  * preset edit. A no-op when no project is open — there is no repo to commit them to.
  */

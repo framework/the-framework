@@ -55,7 +55,7 @@ const CWD = '/ws'
 /** A run's checkout, as the project's branches provider lists it. */
 const checkoutOf = (id: string, branch?: string): Checkout => ({ id, path: join(CWD, '.branches', `agent-${id}`), ...(branch ? { branch } : {}) })
 /** A file of a run's live record, in the run's own checkout. */
-const liveAt = (id: string, ext: string) => join(checkoutOf(id).path, '.the-framework', `${id}.${ext}`)
+const liveAt = (id: string, ext: string) => join(checkoutOf(id).path, '.openagent', `${id}.${ext}`)
 /** The project's branches provider, listing the given checkouts. */
 const branchesOf = (...checkouts: Checkout[]) => testBranches({ [CWD]: checkouts })
 const card = (id: string, status: string, more: Record<string, unknown> = {}) => JSON.stringify({ id, startedAt: AT, status, ...more })

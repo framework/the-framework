@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './framework-dir.js'
 import { sanitizeCustomPresets, type CustomPreset } from './registry.js'
 import { nodeStoreFs, type StoreFs } from './store/index.js'
 
@@ -15,14 +15,14 @@ import { nodeStoreFs, type StoreFs } from './store/index.js'
  * the dashboard renders both from one type and the same sanitizer guards both files.
  */
 
-/** The committed file holding a project's shared custom presets, under `.the-framework/`. */
-export const PROJECT_PRESETS_FILE = `${THE_FRAMEWORK_DIR}/custom-presets.json`
+/** The committed file holding a project's shared custom presets, under `.openagent/`. */
+export const PROJECT_PRESETS_FILE = `${OPENAGENT_DIR}/custom-presets.json`
 
-/** The `.the-framework/.gitignore` line that un-ignores the presets file so git tracks it. */
+/** The `.openagent/.gitignore` line that un-ignores the presets file so git tracks it. */
 const GITIGNORE_NEGATION = '!custom-presets.json'
 
 function gitignorePath(cwd: string): string {
-  return join(cwd, THE_FRAMEWORK_DIR, '.gitignore')
+  return join(cwd, OPENAGENT_DIR, '.gitignore')
 }
 
 /**
@@ -51,7 +51,7 @@ export async function readProjectPresets(
 
 /**
  * Write a project's shared custom presets, sanitizing first so the committed file is always
- * well-formed. Also ensures `.the-framework/.gitignore` un-ignores the file: the dir's ignore is
+ * well-formed. Also ensures `.openagent/.gitignore` un-ignores the file: the dir's ignore is
  * `*` + `!.gitignore` (nothing else is tracked by default), so without a negation git would
  * never see the presets and they could not be shared. Removing every preset writes an empty array
  * rather than deleting the file, so the negation stays in place for the next save.
@@ -61,13 +61,13 @@ export async function writeProjectPresets(
   presets: CustomPreset[],
   fs: StoreFs = nodeStoreFs(),
 ): Promise<void> {
-  await fs.mkdir(join(cwd, THE_FRAMEWORK_DIR))
+  await fs.mkdir(join(cwd, OPENAGENT_DIR))
   await ensureGitignoreNegation(cwd, fs)
   const sanitized = sanitizeCustomPresets(presets)
   await fs.write(join(cwd, PROJECT_PRESETS_FILE), `${JSON.stringify(sanitized, null, 2)}\n`)
 }
 
-/** Append the un-ignore line to `.the-framework/.gitignore` unless it is already there. */
+/** Append the un-ignore line to `.openagent/.gitignore` unless it is already there. */
 async function ensureGitignoreNegation(cwd: string, fs: StoreFs): Promise<void> {
   const path = gitignorePath(cwd)
   let current = ''

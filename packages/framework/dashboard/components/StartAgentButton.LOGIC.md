@@ -12,7 +12,7 @@ Every button in the dashboard that starts an agent [1], as one two-part offer: p
 [2] launcher: the Start form on a project home — a project's own page with the launcher and its composer (the prompt editor, also used for live chat).
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [4] location: where an agent's turns ran, as its own record names it: `local` (this machine), `actions` (a GitHub Actions runner), or `web` (a Claude Code cloud session). Only `local` and a device are offered today; the other two are read off agents recorded before they left the launcher.
-[5] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[5] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [6] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
 [7] fan-out: starting several agents at once, one per queue entry.
 

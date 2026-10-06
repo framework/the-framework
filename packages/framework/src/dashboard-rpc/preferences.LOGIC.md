@@ -1,4 +1,4 @@
-The Settings surface of the dashboard's calls: reading and saving the user's preferences [1], the merge that keeps a stale tab from reverting settings it never touched, a project's shared custom presets [2] committed into its `.the-framework/`, and the editors installed on the daemon's machine for the "Preferred editor" picker.
+The Settings surface of the dashboard's calls: reading and saving the user's preferences [1], the merge that keeps a stale tab from reverting settings it never touched, a project's shared custom presets [2] committed into its `.openagent/`, and the editors installed on the daemon's machine for the "Preferred editor" picker.
 
 ## Context
 
@@ -8,18 +8,18 @@ The Settings surface of the dashboard's calls: reading and saving the user's pre
 
 ## Glossary
 
-[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [2] custom preset: a prompt the user saved, with an id and a label, listed as a saved prompt in the launcher's Commands menu beside the project's commands.
 [3] Settings: the settings page.
 [4] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude-code` or `codex`.
-[7] registry: `~/.the-framework.json`: where the user's preferences are kept, and which also lists the projects.
+[7] registry: `~/.openagent.json`: where the user's preferences are kept, and which also lists the projects.
 
 ## Business logic — TL;DR
 
 - **Reading the preferences** - the stored preferences [1] as the registry [7] holds them; a failed read answers empty preferences rather than an error.
 - **Saving all preferences** - replaces the whole block after validation; a failed write answers the typed error "failed to save preferences" instead of failing the call.
 - **Patching: merge, then hand back the truth** - only the keys the caller changed are merged into what is stored, and the merged result comes back so the tab adopts it and converges.
-- **A project's shared custom presets** - the team's custom presets [2] live in the project's `.the-framework/custom-presets.json`, committed so they travel with the repository; an unknown project reads as none and refuses a save.
+- **A project's shared custom presets** - the team's custom presets [2] live in the project's `.openagent/custom-presets.json`, committed so they travel with the repository; an unknown project reads as none and refuses a save.
 - **Installed editors** - the editors found on the daemon's machine, for the "Preferred editor" picker; none when detection fails.
 
 ## Business logic
@@ -62,7 +62,7 @@ The call merges only the keys it is given into the stored preferences [1] and an
 
 #### Business logic
 
-A project's shared custom presets are read from, and written to, `.the-framework/custom-presets.json` in the project's own checkout, a committed file (its format and the rule that makes git track it are `project-presets.ts`'s). The project is named by its id and resolved through the registry: an unknown project reads as no presets, and a save to one is refused with "unknown project". A file that cannot be read yields no presets; a save that fails answers "failed to save presets". The presets are validated by the same rules as the user's own.
+A project's shared custom presets are read from, and written to, `.openagent/custom-presets.json` in the project's own checkout, a committed file (its format and the rule that makes git track it are `project-presets.ts`'s). The project is named by its id and resolved through the registry: an unknown project reads as no presets, and a save to one is refused with "unknown project". A file that cannot be read yields no presets; a save that fails answers "failed to save presets". The presets are validated by the same rules as the user's own.
 
 ### Installed editors
 

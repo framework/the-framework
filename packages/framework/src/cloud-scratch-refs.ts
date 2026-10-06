@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { DATA_BRANCH, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './framework-dir.js'
 import { prsForBranch, type LinkedPr } from './dashboard/pull-requests.js'
 import { listAgents, type AgentMeta } from './store/index.js'
 import { nodeFs } from './node-fs.js'
@@ -46,7 +46,7 @@ export const SCRATCH_REF_SAFE_AGE_MS = 24 * 60 * 60 * 1000
 export const CLOUD_SCRATCH_REF = /^cloud-\d+-[0-9a-f]{8}$/
 
 /**
- * Where the sweep remembers when it first saw each `cloud-*` ref, under `.the-framework/`
+ * Where the sweep remembers when it first saw each `cloud-*` ref, under `.openagent/`
  * (gitignored, like the other per-repo bookkeeping). Needed because the ref's name carries no
  * timestamp and its commit date says nothing — the driver pushes the worktree's HEAD, which is
  * however old the base commit happens to be, not when the hand-off happened.
@@ -73,7 +73,7 @@ function nodeScratchFs(): ScratchFs {
 
 /** The first-seen state file path for a repo. */
 export function cloudRefsStatePath(cwd: string): string {
-  return join(cwd, THE_FRAMEWORK_DIR, CLOUD_REFS_FILE)
+  return join(cwd, OPENAGENT_DIR, CLOUD_REFS_FILE)
 }
 
 /** Read a repo's first-seen state. Forgiving: missing/unreadable/malformed yields an empty one. */
@@ -96,9 +96,9 @@ async function readState(cwd: string, fs: ScratchFs): Promise<CloudRefsState> {
   return { firstSeen: {} }
 }
 
-/** Record a repo's first-seen state, creating `.the-framework/` as needed. */
+/** Record a repo's first-seen state, creating `.openagent/` as needed. */
 async function writeState(cwd: string, state: CloudRefsState, fs: ScratchFs): Promise<void> {
-  await fs.mkdir(join(cwd, THE_FRAMEWORK_DIR))
+  await fs.mkdir(join(cwd, OPENAGENT_DIR))
   await fs.write(cloudRefsStatePath(cwd), JSON.stringify(state, null, 2))
 }
 

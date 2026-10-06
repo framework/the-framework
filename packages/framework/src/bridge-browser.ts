@@ -27,11 +27,11 @@ import { registryPath } from './registry.js'
  */
 
 /** The directory holding the bridge browser's profile and binary, next to the registry file. */
-export const BRIDGE_BROWSER_DIR = 'the-framework-browser'
+export const BRIDGE_BROWSER_DIR = 'openagent-browser'
 
 /**
- * Where the bridge browser lives: `$XDG_CONFIG_HOME/the-framework-browser` when set, else the
- * dotted `$HOME/.the-framework-browser`. Beside the registry, so the same variable that isolates
+ * Where the bridge browser lives: `$XDG_CONFIG_HOME/openagent-browser` when set, else the
+ * dotted `$HOME/.openagent-browser`. Beside the registry, so the same variable that isolates
  * a test's registry isolates its browser, and a machine's real one is never touched from a test.
  * The profile inside it is persistent on purpose: the user signs in once and the sign-in outlives
  * every daemon restart.

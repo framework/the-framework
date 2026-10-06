@@ -140,10 +140,10 @@ test('a run: marker, checkout, the live card, the prompt once, the record, the c
 
     // The live directory was hidden in the run's checkout alone: the project's own is still
     // one it can track, as the dashboard does when it adds the project.
-    await mkdir(join(repo, '.the-framework'))
-    await writeFile(join(repo, '.the-framework', '.gitignore'), '*\n!.gitignore\n')
-    await git(['add', '.the-framework'], repo)
-    assert.equal((await git(['diff', '--cached', '--name-only'], repo)).trim(), '.the-framework/.gitignore')
+    await mkdir(join(repo, '.openagent'))
+    await writeFile(join(repo, '.openagent', '.gitignore'), '*\n!.gitignore\n')
+    await git(['add', '.openagent'], repo)
+    assert.equal((await git(['diff', '--cached', '--name-only'], repo)).trim(), '.openagent/.gitignore')
   } finally {
     await removeRepo(repo)
   }
@@ -905,9 +905,9 @@ test('the git host is the package the project declares: a run reads its pull req
 test("a checkout whose project tracks its own .gitignore in the live directory keeps it as it is", async () => {
   const repo = await testRepo()
   try {
-    await mkdir(join(repo, '.the-framework'))
-    await writeFile(join(repo, '.the-framework', '.gitignore'), '*\n!.gitignore\n')
-    await git(['add', '.the-framework'], repo)
+    await mkdir(join(repo, '.openagent'))
+    await writeFile(join(repo, '.openagent', '.gitignore'), '*\n!.gitignore\n')
+    await git(['add', '.openagent'], repo)
     await git(['commit', '-qm', 'add the project'], repo)
     await git(['push', '-q', 'origin', 'HEAD'], repo)
     const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: new FakeDriver({ turns: [{ text: 'Nothing to do.' }] }), now: () => NOW, gitHost: noGitHost })

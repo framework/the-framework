@@ -7,7 +7,7 @@ What the launcher offers for one project, read once per project: its commands [1
 ## Glossary
 
 [1] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
-[2] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id.
+[2] start hook: the one shell line under `start:` in the project's `.openagent/hooks.yml`, which starts an agent and answers its id.
 [3] git host provider: the package of the project that declares it provides the git host; The Framework opens and lands pull requests through the command that package declares. A project with none has no git host: no pull request can be opened for it.
 
 ## Business logic

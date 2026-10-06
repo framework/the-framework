@@ -92,7 +92,7 @@ export async function onOnboarding(): Promise<OnboardingSuggestion> {
 /** What the launcher offers for a project: its commands, and whether a run can be started here at all. */
 export interface ProjectLauncher {
   commands: ProjectCommand[]
-  /** Whether the project's `.the-framework/hooks.yml` has a `start` line; without one Start is off. */
+  /** Whether the project's `.openagent/hooks.yml` has a `start` line; without one Start is off. */
   startHook: boolean
   /** Whether one of the project's packages provides a git host; without one no pull request can be opened, so the publish menu stops at the branch. */
   gitHost: boolean

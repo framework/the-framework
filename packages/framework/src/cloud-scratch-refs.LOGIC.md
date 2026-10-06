@@ -21,7 +21,7 @@ The cloud scratch sweep [1]: the sweep [2] that, once per tick [3] of the daemon
 ## Business logic — TL;DR
 
 - **Which refs are candidates** - only refs named `cloud-<number>-<8 hex digits>` and the branches a run's record names, never the default branch nor the `agent-data` branch, whatever a record says; every other branch on origin is never considered.
-- **Old enough** - a candidate is left alone for 24 hours: a `cloud-*` ref from the moment this machine first saw it, remembered in `.the-framework/cloud-refs.json`; a run's branch from the start its record says.
+- **Old enough** - a candidate is left alone for 24 hours: a `cloud-*` ref from the moment this machine first saw it, remembered in `.openagent/cloud-refs.json`; a run's branch from the start its record says.
 - **Not a live agent's** - a run's branch whose run the caller names as busy is kept; the daemon names none, since it runs no agent.
 - **Holds no work** - a ref goes only when its tip is already reachable from origin's default branch, or is an empty commit on a parent that is; anything unprovable keeps the ref.
 - **No open pull request** - a ref with an open pull request is kept, so a deletion never closes one.
@@ -49,7 +49,7 @@ Origin's branches and its default branch are read in one listing (the default br
 
 #### Business logic
 
-A candidate is kept as "young" until it is 24 hours old. A run's branch is aged from the start its record says. A `cloud-*` ref is aged from when this machine's sweep first saw it: the first sighting, or a sighting whose remembered time is unreadable, starts the day now and keeps the ref. The first-seen times live in `.the-framework/cloud-refs.json` of the project, which is not tracked by git; a missing, unreadable or malformed file means nothing seen yet. Because each machine only deletes what it has itself watched for a day, a ref another machine pushed yesterday is not deleted by this one today.
+A candidate is kept as "young" until it is 24 hours old. A run's branch is aged from the start its record says. A `cloud-*` ref is aged from when this machine's sweep first saw it: the first sighting, or a sighting whose remembered time is unreadable, starts the day now and keeps the ref. The first-seen times live in `.openagent/cloud-refs.json` of the project, which is not tracked by git; a missing, unreadable or malformed file means nothing seen yet. Because each machine only deletes what it has itself watched for a day, a ref another machine pushed yesterday is not deleted by this one today.
 
 ### Not a live agent's
 

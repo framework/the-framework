@@ -13,7 +13,7 @@ A main agent's [1] plan [2] and the person's approval of it: where the plan's fi
 [1] main agent: the run whose agent calls the command: the run named by `AGENT_ID` in the caller's environment, which the runner sets for every agent it starts.
 [2] plan: the main agent's list of tasks for its subagents, one markdown file, `<run id>.plan.md`, beside the main agent's run record on the `agent-data` branch.
 [3] subagent: a run started for a main agent: a run of its own, in its own checkout, on its own branch started from the main agent's, with the main agent as its parent on its record.
-[4] diary: the lines a run's session logs while the agent works, kept in the run's checkout under `.the-framework/` and copied to the run record when the run ends; a continued run's earlier lines are written back into its checkout first.
+[4] diary: the lines a run's session logs while the agent works, kept in the run's checkout under `.openagent/` and copied to the run record when the run ends; a continued run's earlier lines are written back into its checkout first.
 [5] continuation prompt: the prompt a run gets when the person answered its question: `You paused to ask: "<question>". The user chose: <answer>. Continue with that decision.`
 [6] mark: the first eight hexadecimal digits of the SHA-256 of the plan's text.
 

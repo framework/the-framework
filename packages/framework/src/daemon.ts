@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import { join, relative, isAbsolute } from 'node:path'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './framework-dir.js'
 import { startDashboard, type Dashboard } from './dashboard/index.js'
 import { createProjectRuntime } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
@@ -59,9 +59,9 @@ export interface DaemonState {
   host?: string
 }
 
-/** The `.the-framework/` directory for a workspace. */
+/** The `.openagent/` directory for a workspace. */
 function daemonDir(cwd: string): string {
-  return join(cwd, THE_FRAMEWORK_DIR)
+  return join(cwd, OPENAGENT_DIR)
 }
 
 /** True when `child` lives strictly inside `parent` (not equal, not outside). */
@@ -75,7 +75,7 @@ export function isNestedWithin(child: string, parent: string): boolean {
  * and idempotent (addProject dedupes by path), so it never blocks the daemon coming up.
  *
  * Skips a cwd that lives inside an already-tracked project (#647): the daemon creates
- * `.the-framework/` for its own state, so running it from a subfolder of a repo (e.g. the
+ * `.openagent/` for its own state, so running it from a subfolder of a repo (e.g. the
  * package dir the binary lives in) would otherwise keep re-adding a nested duplicate.
  */
 export async function registerHomeProject(cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
@@ -126,7 +126,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // narrowing anything. On a loopback bind that secret may not exist yet, hence ensure, not read.
   const bridgeOn = (await readPreferences(undefined, env).catch((): Preferences => ({}))).bridge === true
   const bridgeToken = bridgeOn ? await ensureDaemonToken(undefined, env) : undefined
-  // The project's own `.the-framework/` — where its hooks file sits, and where a run's tool keeps
+  // The project's own `.openagent/` — where its hooks file sits, and where a run's tool keeps
   // the run's card and diary inside the run's checkout. Created up front so the daemon works as the
   // very first command in a fresh workspace, before any run has made the directory.
   await mkdir(daemonDir(cwd), { recursive: true })
@@ -209,7 +209,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // above: the launch needs the address the dashboard only has now.
   if ((await readPreferences(undefined, env).catch((): Preferences => ({}))).bridgeBrowser === true) void bridgeBrowser.start()
 
-  // Each project's open hooks (#1774): the lines its own `.the-framework/hooks.yml` names, run in
+  // Each project's open hooks (#1774): the lines its own `.openagent/hooks.yml` names, run in
   // the project once the dashboard listens, so a slow line never delays the URL. The daemon names
   // no tool; the file does. Bounded and logged, never a reason the daemon did not come up.
   for (const record of await listProjects(undefined, env).catch(() => [])) {

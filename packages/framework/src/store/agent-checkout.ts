@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { readFinishedDiary } from './agent-store.js'
 import { projectBranches, type BranchesFor, type Checkout } from './branches.js'
 import { isRunId, projectRuns, type AnyDiaryLine, type RunsFor } from './runs.js'
-import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../framework-dir.js'
 
 /**
  * A run's checkout, as the project's branches provider lists it, or `undefined` when it lists
@@ -42,7 +42,7 @@ export type AgentDiarySource = { file: string } | { finished: AnyDiaryLine[] } |
 
 /**
  * The diary a run-scoped subscribe should follow (#1472, #1774): the run's own `<id>.jsonl`.
- * While the run has a checkout it is a file there, under the checkout's `.the-framework/`,
+ * While the run has a checkout it is a file there, under the checkout's `.openagent/`,
  * written by the run's tool as the agent works. Once the run is recorded and its checkout
  * reclaimed, it is the finished run's diary, whole, from the project's runs provider. A run that
  * has neither yet was started a moment ago: its tool has not made the checkout, so the diary is
@@ -65,7 +65,7 @@ export async function resolveAgentDiary(
 ): Promise<AgentDiarySource | undefined> {
   if (!agentId || !isRunId(agentId)) return undefined
   const checkout = await findCheckout(projectCwd, agentId, branches, opts)
-  if (checkout) return { file: join(checkout.path, THE_FRAMEWORK_DIR, `${agentId}.jsonl`) }
+  if (checkout) return { file: join(checkout.path, OPENAGENT_DIR, `${agentId}.jsonl`) }
   const finished = await readFinishedDiary(projectCwd, agentId, runs)
   return finished ? { finished } : { pending: true }
 }

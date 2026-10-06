@@ -15,7 +15,7 @@ Shows one agent [1] on its own page, the agent view [2], in one frame that stays
 [5] composer: the prompt editor, also used to say something to an agent.
 [6] message: the user's own words to an agent, the next prompt of the same conversation: an agent that is working takes it when its turn ends, an ended agent is resumed with it.
 [7] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[8] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[8] archive: the transient copy of a finished agent's events and status under a project's `.openagent/agents/`.
 [9] next step: what a person can do with an ended agent's work from the dashboard: open a pull request for its branch, or merge the pull request it has.
 [11] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [12] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.

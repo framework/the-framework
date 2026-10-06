@@ -12,10 +12,10 @@ One run [1]: a checkout [2] from the `branches` package, a session from `@openag
 [2] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [3] marker: a run record written before the agent exists: `status: running`, the tool's mark, an empty diary.
 [4] reclaim: removing a finished agent's checkout once its branch holds everything in it.
-[5] live record: the card `<id>.json` and the diary `<id>.jsonl` under `.the-framework/` in a run's checkout, the same two files as the run record, written by the session as the agent works (`live-card.ts`).
+[5] live record: the card `<id>.json` and the diary `<id>.jsonl` under `.openagent/` in a run's checkout, the same two files as the run record, written by the session as the agent works (`live-card.ts`).
 [6] the tool's mark: `caller.runner` on a card: the machine that started the run, the run's process on that machine while it runs, and, each when the run has one, the follow-up's [11] prompt, the publish level [16], the parent [14], the base (the branch the run's own branch started from, which is also on the card as `caller.base` beside `caller.host`, for a reader that does not know the mark), and the base commit [15].
 [7] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
-[8] inbox: `.the-framework/inbox.jsonl` in the checkout: the lines from outside the agent, messages and answers, the session sends into the conversation when a turn ends.
+[8] inbox: `.openagent/inbox.jsonl` in the checkout: the lines from outside the agent, messages and answers, the session sends into the conversation when a turn ends.
 [9] question: the block an agent ends a turn with when it will not decide alone, with its options and a recommended one; `agent-driver`'s contract.
 [10] the run's lock: `.agent-runner/runs/<id>.lock` at the repository root, holding the pid of the one process of the run at work on it; a pid that is not a live process holds nothing (`run-lock.ts`).
 [11] follow-up: the prompt a run names with `run --then`: once the run ends done with a pull request, a fresh run on the same branch is given that prompt followed by a space and the first run's id; the launcher's "Post-merge cleanup" box names `/post-merge-cleanup`.

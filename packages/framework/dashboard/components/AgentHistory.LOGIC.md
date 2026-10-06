@@ -21,7 +21,7 @@ The dashboard's left column, present on every page: the brand mark, the project 
 [15] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [16] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent.
 [17] picked project: the one project the project select, the menu at the top of this column, names. Every page then shows only that project's data. When the select says "All projects", no project is picked and every page shows every project's data.
-[18] archive: the transient copy of a finished agent's events and status under a project's `.the-framework/agents/`.
+[18] archive: the transient copy of a finished agent's events and status under a project's `.openagent/agents/`.
 
 ## Business logic — TL;DR
 

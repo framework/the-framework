@@ -15,11 +15,11 @@ function fakeFs(files: string[]): ProjectFs {
   }
 }
 
-test('isActivated is true when the install-written .the-framework/.gitignore exists (#1600)', async () => {
+test('isActivated is true when the install-written .openagent/.gitignore exists (#1600)', async () => {
   assert.equal(await isActivated(CWD, fakeFs([gitignorePath(CWD)])), true)
 })
 
-test('isActivated is false without the ignore file — a bare .the-framework/ dir is not activation (#1600)', async () => {
+test('isActivated is false without the ignore file — a bare .openagent/ dir is not activation (#1600)', async () => {
   assert.equal(await isActivated(CWD, fakeFs([])), false)
 })
 

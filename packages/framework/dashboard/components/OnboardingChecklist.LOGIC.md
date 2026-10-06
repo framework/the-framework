@@ -8,7 +8,7 @@ The "Onboarding" card: the four things a new install needs (fewer while no proje
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] the agent queue: `TODO_AGENTS.md` on the `agent-data` branch: every task agents will work next, in priority sections, worked top-down. An item on it is a queue entry.
-[3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[3] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [4] the Overview: the dashboard's cross-project page at `/`.
 [6] launcher: the Start form on a project's own page.
 [9] agent view: one agent's page.

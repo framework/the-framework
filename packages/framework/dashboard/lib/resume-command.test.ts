@@ -3,11 +3,11 @@ import { buildResumeCommand } from './resume-command.js'
 
 describe('buildResumeCommand (#1195)', () => {
   test('recreates the directory before resuming, since the worktree is usually gone', () => {
-    const cmd = buildResumeCommand({ sessionId: 'sess-1', workspace: '/repo/.the-framework/worktrees/run-1' })
+    const cmd = buildResumeCommand({ sessionId: 'sess-1', workspace: '/repo/.openagent/worktrees/run-1' })
     // The mkdir is the load-bearing part: the CLI matches a session by the cwd it ran in, so
     // without the path existing again `--resume` cannot find it.
     expect(cmd).toBe(
-      "mkdir -p '/repo/.the-framework/worktrees/run-1' && cd '/repo/.the-framework/worktrees/run-1' && claude --resume sess-1",
+      "mkdir -p '/repo/.openagent/worktrees/run-1' && cd '/repo/.openagent/worktrees/run-1' && claude --resume sess-1",
     )
   })
 

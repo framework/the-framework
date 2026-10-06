@@ -11,7 +11,7 @@ Holds the Context [1] the user picked to focus the next agent [2] on, so the lau
 [1] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [3] launcher: the Start form on a project's own page.
-[4] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`, which starts an agent and answers its id.
+[4] start hook: the one shell line under `start:` in the project's `.openagent/hooks.yml`, which starts an agent and answers its id.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [6] composer: the prompt editor on a project's own page, also used to say something to an agent.
 [7] project: a repository the user registered in the dashboard, identified by an id derived from its path.

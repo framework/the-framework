@@ -13,7 +13,7 @@ The menus of a page's top bar, split as Claude Code on the web splits them. An a
 [3] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
 [4] stop: ending an agent before it finishes: the Stop button or Ctrl-C.
 [5] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[6] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[6] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [7] agent's menu: the menu that opens from the agent's name in the action bar, holding what belongs to the agent.
 [8] project's menu: the "⋮" menu at the end of an agent's action bar, holding what belongs to the agent's project.
 

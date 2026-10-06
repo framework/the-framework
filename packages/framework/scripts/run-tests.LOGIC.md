@@ -2,7 +2,7 @@ Runs the framework package's compiled test suite, the `dist-test/` output of the
 
 ## Glossary
 
-[1] registry: `~/.the-framework.json`, where the user's dashboard settings are kept and which also lists the projects; it lives under the configuration home instead when one is set, which is what lets this script hide it.
+[1] registry: `~/.openagent.json`, where the user's dashboard settings are kept and which also lists the projects; it lives under the configuration home instead when one is set, which is what lets this script hide it.
 
 ## Business logic — TL;DR
 

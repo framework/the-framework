@@ -8,7 +8,7 @@ The "Save prompt" dialog: saves the prompt the user just wrote as a saved prompt
 
 [1] saved prompt: a prompt the user saved under a name, for themselves or for the project, loaded back into the editor verbatim.
 [2] composer: the prompt editor on a project's own page, also used to say something to an agent.
-[3] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[3] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 
 ## Business logic — TL;DR
 
@@ -48,7 +48,7 @@ The dialog is modal over the composer [2], titled "Save prompt". Its prompt box 
 #### Business logic
 
 - When a project is open, a "Save to" switch offers "Just me" and "This project", "Just me" selected by default. Next to it a note describes the selection: "Private to you, on every project" for "Just me", "Committed to the repo, shared with your team" for "This project".
-- A prompt saved to "Just me" goes into the user's preferences [3]; one saved to "This project" goes into the project's `.the-framework/custom-presets.json`, committed in its repository. The surface performs the save; this dialog only reports the choice.
+- A prompt saved to "Just me" goes into the user's preferences [3]; one saved to "This project" goes into the project's `.openagent/custom-presets.json`, committed in its repository. The surface performs the save; this dialog only reports the choice.
 - With no project open there is nothing to commit into: the switch is not shown and the saved prompt is always the user's.
 
 ### Cancel and limits

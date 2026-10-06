@@ -2,11 +2,11 @@ The tool behind the end-to-end stories' start and resume hooks [1]: a stand-in f
 
 ## Glossary
 
-[1] start hook / resume hook: the one shell line under `start`, and the one under `resume`, in a project's `.the-framework/hooks.yml`; each answers the agent's id as JSON on stdout.
+[1] start hook / resume hook: the one shell line under `start`, and the one under `resume`, in a project's `.openagent/hooks.yml`; each answers the agent's id as JSON on stdout.
 [2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory.
-[4] inbox: `.the-framework/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
-[5] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` and the diary `<id>.jsonl`, under the checkout's `.the-framework/` while the agent has a checkout, on the `agent-data` branch once recorded.
+[4] inbox: `.openagent/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
+[5] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` and the diary `<id>.jsonl`, under the checkout's `.openagent/` while the agent has a checkout, on the `agent-data` branch once recorded.
 
 ## Business logic — TL;DR
 
@@ -46,7 +46,7 @@ See the intro.
 
 #### Business logic
 
-The agent's checkout [3] is created through the branches skill, and its `.the-framework/` is hidden from git in that checkout alone, by a `.gitignore` of `*` unless the project tracks one there, so the tree stays clean. The card [5] starts with the id, the start time, the prompt, the driver (`DRIVER`, else "fake"), the model when given, the branch, and this process's id, this machine and the checkout path as the caller. One session of the fake driver runs the prompt with the inbox [4] in the checkout, so a line waiting when the turn ends becomes a further turn; each turn answers "done: <what it was told>". A SIGINT or SIGTERM aborts the session. The agent ends `stopped` when aborted, `failed` when the session threw, `waiting` when its last turn ended on a question, else `done`. The branch the checkout is on is written on the card, the log is closed with the status, the card and the diary are recorded on the `agent-data` branch, and, unless the agent is waiting, the checkout is reclaimed by the branches rule: its branch stays on this machine and nothing is pushed.
+The agent's checkout [3] is created through the branches skill, and its `.openagent/` is hidden from git in that checkout alone, by a `.gitignore` of `*` unless the project tracks one there, so the tree stays clean. The card [5] starts with the id, the start time, the prompt, the driver (`DRIVER`, else "fake"), the model when given, the branch, and this process's id, this machine and the checkout path as the caller. One session of the fake driver runs the prompt with the inbox [4] in the checkout, so a line waiting when the turn ends becomes a further turn; each turn answers "done: <what it was told>". A SIGINT or SIGTERM aborts the session. The agent ends `stopped` when aborted, `failed` when the session threw, `waiting` when its last turn ended on a question, else `done`. The branch the checkout is on is written on the card, the log is closed with the status, the card and the diary are recorded on the `agent-data` branch, and, unless the agent is waiting, the checkout is reclaimed by the branches rule: its branch stays on this machine and nothing is pushed.
 
 ### The continuation
 
@@ -66,4 +66,4 @@ A story needs an agent that is certainly still working, one that asks, and one t
 
 #### Business logic
 
-A prompt containing "hold" makes the agent wait, before its first turn, until a file named `go` appears under its checkout's `.the-framework/`, or until it is stopped. A prompt containing "ask" makes the first turn of a fresh agent end on the question "Which way?" with the options "Left" (recommended, with a detail line) and "Right". A prompt containing "commit" makes a fresh agent write `work.txt` and commit it before its turn, so its branch holds work to publish.
+A prompt containing "hold" makes the agent wait, before its first turn, until a file named `go` appears under its checkout's `.openagent/`, or until it is stopped. A prompt containing "ask" makes the first turn of a fresh agent end on the question "Which way?" with the options "Left" (recommended, with a detail line) and "Right". A prompt containing "commit" makes a fresh agent write `work.txt` and commit it before its turn, so its branch holds work to publish.

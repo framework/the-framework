@@ -26,7 +26,7 @@ function memFs(seed: Record<string, string> = {}): StoreFs & { files: Map<string
   }
 }
 
-const GITIGNORE = join('/repo', '.the-framework', '.gitignore')
+const GITIGNORE = join('/repo', '.openagent', '.gitignore')
 const PRESETS = join('/repo', PROJECT_PRESETS_FILE)
 
 test('readProjectPresets is empty for a missing file (never throws)', async () => {
@@ -60,7 +60,7 @@ test('writeProjectPresets sanitizes: drops malformed entries and trims', async (
   assert.deepEqual(await readProjectPresets('/repo', fs), [{ id: 'a', label: 'Keep', prompt: 'body' }])
 })
 
-test('writeProjectPresets un-ignores the file in .the-framework/.gitignore', async () => {
+test('writeProjectPresets un-ignores the file in .openagent/.gitignore', async () => {
   const fs = memFs({ [GITIGNORE]: '*\n!.gitignore\n!LOGS.md\n' })
   await writeProjectPresets('/repo', [{ id: 'a', label: 'l', prompt: 'p' }], fs)
   const gitignore = fs.files.get(GITIGNORE) ?? ''

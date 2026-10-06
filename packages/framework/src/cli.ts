@@ -55,7 +55,7 @@ Options:
   -v, --version          Print the version.
 
 Everything else is the dashboard: it shows a project's runs from their files, and starts one
-through the project's own start hook (.the-framework/hooks.yml), which names the tool that runs it.`
+through the project's own start hook (.openagent/hooks.yml), which names the tool that runs it.`
 
 /** What the CLI itself accepts: four options, no verbs (D4). */
 export interface CliArgs {

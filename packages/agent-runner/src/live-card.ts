@@ -5,14 +5,14 @@ import { parseDiary, parseRunCard, type AnyDiaryLine, type RunCard, type RunStat
 import { runnerMark } from './records.js'
 
 /**
- * A run's live record: the card and the diary agent-driver keeps under `.the-framework/` in the
+ * A run's live record: the card and the diary agent-driver keeps under `.openagent/` in the
  * run's checkout, in the run record's shape, while the agent works. The dashboard reads them
  * there; the run copies them onto the `agent-data` branch unchanged when it ends; the sweep
  * reads them to find a run whose process died, and closes them from outside.
  */
 
 /** The dashboard's directory in a checkout, where the two files live. */
-export const LIVE_DIR = '.the-framework'
+export const LIVE_DIR = '.openagent'
 
 /** The inbox's file name under the live directory: what reaches the agent from outside. */
 export const INBOX_FILE = 'inbox.jsonl'

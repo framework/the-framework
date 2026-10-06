@@ -6,7 +6,7 @@ Maps a run [3] — a card and a diary, in the shape The Framework defines (`runs
 
 ## Glossary
 
-[1] status snapshot: an agent's current state as one small object — what was asked, which coding agent [8], the branch, the pull request, the process running it, how it ended — so that reading an agent's status never means replaying its diary. On disk it is the agent's card: `.the-framework/<id>.json` in the agent's checkout while it works, and what the runs provider answers once it has ended (`runs.ts`).
+[1] status snapshot: an agent's current state as one small object — what was asked, which coding agent [8], the branch, the pull request, the process running it, how it ended — so that reading an agent's status never means replaying its diary. On disk it is the agent's card: `.openagent/<id>.json` in the agent's checkout while it works, and what the runs provider answers once it has ended (`runs.ts`).
 [2] skill: one of the four capabilities an agent is taught — `branches`, `tickets`, `queue`, `logs` — each a package with the instructions the agent reads (its `SKILL.md`, a tracked file of the project where the coding agent's harness looks for skills), a command run as `npx <skill>`, and an API the product calls.
 [3] run: only the record of one agent: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said). Never the unit of work.
 [4] agent: the unit of work: one task worked by a coding agent [8], in its own checkout, on its own branch, keeping a card and a diary, publishing its own work only when asked to. Begun by the project's own start hook.

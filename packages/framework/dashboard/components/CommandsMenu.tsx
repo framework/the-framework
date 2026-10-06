@@ -73,7 +73,7 @@ export function CommandsMenu({
 }: {
   commands: CommandEntry[]
   customPresets: CustomPreset[]
-  /** The open project's shared saved prompts, committed in its `.the-framework/` (#1025). */
+  /** The open project's shared saved prompts, committed in its `.openagent/` (#1025). */
   projectPresets: CustomPreset[]
   busy: boolean
   /** Load a text into the editor: a command as `/<name> `, a saved prompt verbatim. */

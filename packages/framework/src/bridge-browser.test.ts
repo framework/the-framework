@@ -25,8 +25,8 @@ import {
 } from './bridge-browser.js'
 
 test('the bridge browser lives beside the registry, so the test isolation covers it too (#1332)', () => {
-  assert.equal(bridgeBrowserDir({ XDG_CONFIG_HOME: '/cfg' }), '/cfg/the-framework-browser')
-  assert.equal(bridgeBrowserDir({ HOME: '/home/me' }), '/home/me/.the-framework-browser')
+  assert.equal(bridgeBrowserDir({ XDG_CONFIG_HOME: '/cfg' }), '/cfg/openagent-browser')
+  assert.equal(bridgeBrowserDir({ HOME: '/home/me' }), '/home/me/.openagent-browser')
 })
 
 test('the launch is headed, on its own profile, with the extension-debugging flag CDP installs need', () => {

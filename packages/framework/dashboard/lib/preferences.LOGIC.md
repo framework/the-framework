@@ -8,7 +8,7 @@ Holds the browser's view of the user's preferences [1]: loads them from the daem
 
 ## Glossary
 
-[1] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[1] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [2] saved prompt: a prompt the user saved under a name, either for themselves (kept with their preferences) or for the project (committed in the project's repository), and loads back into the editor verbatim.
 [3] Settings: the settings page.
 [4] launcher: the Start form on a project's own page.
@@ -103,7 +103,7 @@ The re-read is skipped while one of this tab's own writes is still in flight, wh
 
 #### Business logic
 
-A project's saved prompts [2] are read from a file committed inside the project (`.the-framework/custom-presets.json`) the first time that project is opened, and once only per project. A read that fails leaves the project with no saved prompts rather than an error.
+A project's saved prompts [2] are read from a file committed inside the project (`.openagent/custom-presets.json`) the first time that project is opened, and once only per project. A read that fails leaves the project with no saved prompts rather than an error.
 
 Saving replaces the whole list for the open project: the new list is in force at once and then committed, best-effort. The open project is the one named in the browser's address at the moment of the save, not a remembered one, so a save always belongs to the project the user is looking at. With no project open there is nowhere to commit to, so saving does nothing and the list is empty.
 

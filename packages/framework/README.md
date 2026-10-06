@@ -38,7 +38,7 @@ the command cannot start one at all.
 
 The Framework runs no coding agent and makes no model call. Starting an agent is running
 **one shell line the project itself names** — its `start` hook, in the project's own
-`.the-framework/hooks.yml`:
+`.openagent/hooks.yml`:
 
 ```yaml
 start: agent-runner run --detach "$PROMPT" ${DRIVER:+--driver "$DRIVER"} ${MODEL:+--model "$MODEL"} ${THEN:+--then "$THEN"} ${PUBLISH:+--publish "$PUBLISH"} ${BASE:+--base "$BASE"}
@@ -83,7 +83,7 @@ line: its part of the dashboard reads them with `agent-scheduler status` and sav
 `agent-scheduler offset`, `switch` and `publish`.
 
 The dashboard is a **projection of the agent's own files**. The agent's tool keeps the
-agent's card (`<id>.json`) and diary (`<id>.jsonl`) under `.the-framework/` in the agent's
+agent's card (`<id>.json`) and diary (`<id>.jsonl`) under `.openagent/` in the agent's
 checkout, and copies both onto the project's `agent-data` branch when the agent ends.
 Everything the dashboard shows — live, and months later — it reads from those two files.
 

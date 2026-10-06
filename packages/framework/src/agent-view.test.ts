@@ -16,12 +16,12 @@ test('sessionInfo merges the opening session with the latest session-update link
 
 test('sessionInfo keeps the workspace the run used, so a removed worktree is still nameable (#1195)', () => {
   const events: FrameworkEvent[] = [
-    { kind: 'session', driver: 'claude', workspace: '/repo/.the-framework/worktrees/run-1', fake: false },
+    { kind: 'session', driver: 'claude', workspace: '/repo/.openagent/worktrees/run-1', fake: false },
     { kind: 'session-update', sessionId: 'sess-1' },
   ]
   // The later session-update must not drop it: the id arrives after the workspace, and it is the
   // pair together that reopens the session in a terminal.
-  assert.equal(sessionInfo(events)?.workspace, '/repo/.the-framework/worktrees/run-1')
+  assert.equal(sessionInfo(events)?.workspace, '/repo/.openagent/worktrees/run-1')
   assert.equal(sessionInfo(events)?.sessionId, 'sess-1')
 })
 

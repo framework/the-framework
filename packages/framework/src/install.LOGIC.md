@@ -1,8 +1,8 @@
-Activates a repository for The Framework, which is what adding a project does to it: a `.the-framework/` directory holding the ignore file that keeps agent [1] state off the code branches, committed as exactly one commit that contains nothing of the user's own. A repository that is already activated is left untouched, a folder that is not a repository yet is made one first, and any failure is reported as an answer rather than thrown.
+Activates a repository for The Framework, which is what adding a project does to it: a `.openagent/` directory holding the ignore file that keeps agent [1] state off the code branches, committed as exactly one commit that contains nothing of the user's own. A repository that is already activated is left untouched, a folder that is not a repository yet is made one first, and any failure is reported as an answer rather than thrown.
 
 ## Context
 
-**User story**: the user adds a repository by path on the Overview, or runs `openagent` inside one, and from then on the repository is a project agents [1] can work: it carries one commit titled "[The Framework] install The Framework" and a `.the-framework/` directory, and nothing the user had uncommitted is touched.
+**User story**: the user adds a repository by path on the Overview, or runs `openagent` inside one, and from then on the repository is a project agents [1] can work: it carries one commit titled "[The Framework] install The Framework" and a `.openagent/` directory, and nothing the user had uncommitted is touched.
 
 ## Glossary
 
@@ -11,10 +11,10 @@ Activates a repository for The Framework, which is what adding a project does to
 
 ## Business logic — TL;DR
 
-- **The ignore file is the activation marker** - a repository whose `.the-framework/.gitignore` exists is already activated: the answer says so and nothing runs, not even git.
+- **The ignore file is the activation marker** - a repository whose `.openagent/.gitignore` exists is already activated: the answer says so and nothing runs, not even git.
 - **A folder that is not a repository is made one** - git is the source of truth, so a folder outside any repository is initialized for the user instead of refused, and the answer says it was.
-- **What activation writes** - `.the-framework/` with its ignore file, and nothing else.
-- **One commit, of The Framework's directory only** - only `.the-framework` is staged, never everything, and it is committed as "[The Framework] install The Framework"; whatever the user has uncommitted stays theirs, uncommitted.
+- **What activation writes** - `.openagent/` with its ignore file, and nothing else.
+- **One commit, of The Framework's directory only** - only `.openagent` is staged, never everything, and it is committed as "[The Framework] install The Framework"; whatever the user has uncommitted stays theirs, uncommitted.
 - **Failures are answers** - a git or filesystem failure at any step is returned with its message, never thrown, so the dashboard can show why the project could not be added.
 
 ## Business logic
@@ -23,11 +23,11 @@ Activates a repository for The Framework, which is what adding a project does to
 
 #### Context
 
-**Problem**: a `.the-framework/` directory can exist without the repository being activated, because the daemon creates one wherever it runs for its own state. Only the ignore file proves activation, since it is what keeps The Framework's state off the repository's branches.
+**Problem**: a `.openagent/` directory can exist without the repository being activated, because the daemon creates one wherever it runs for its own state. Only the ignore file proves activation, since it is what keeps The Framework's state off the repository's branches.
 
 #### Business logic
 
-Activation first looks for `.the-framework/.gitignore`. When it exists the repository is already activated: the answer is a success flagged as already activated, and no file is written and no git command runs. The same file is what `project.ts` reads to tell an activated project from any other directory.
+Activation first looks for `.openagent/.gitignore`. When it exists the repository is already activated: the answer is a success flagged as already activated, and no file is written and no git command runs. The same file is what `project.ts` reads to tell an activated project from any other directory.
 
 ### A folder that is not a repository is made one
 
@@ -47,7 +47,7 @@ When the folder is not inside a git working tree (a git that cannot answer the q
 
 #### Business logic
 
-Activation creates `.the-framework/` and writes into it the ignore file, which ignores everything under `.the-framework/` except itself. The ticket format's specification is deliberately not written: it ships inside the package and versions with it.
+Activation creates `.openagent/` and writes into it the ignore file, which ignores everything under `.openagent/` except itself. The ticket format's specification is deliberately not written: it ships inside the package and versions with it.
 
 ### One commit, of The Framework's directory only
 
@@ -57,7 +57,7 @@ Activation creates `.the-framework/` and writes into it the ignore file, which i
 
 #### Business logic
 
-Only the `.the-framework` directory is staged, never the whole working tree, and one commit is made with the message "[The Framework] install The Framework". A dirty repository therefore gets the same single commit as a clean one, and the user's uncommitted changes are exactly as they were.
+Only the `.openagent` directory is staged, never the whole working tree, and one commit is made with the message "[The Framework] install The Framework". A dirty repository therefore gets the same single commit as a clean one, and the user's uncommitted changes are exactly as they were.
 
 ### Failures are answers
 

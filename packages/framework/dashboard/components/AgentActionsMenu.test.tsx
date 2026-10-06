@@ -88,7 +88,7 @@ describe('AgentActionsMenu (#toolbar-menu)', () => {
     const writeText = vi.fn(async () => {})
     Object.assign(navigator, { clipboard: { writeText } })
     const events = [
-      { kind: 'session', driver: 'claude', workspace: '/repo/.the-framework/worktrees/run-1', fake: false },
+      { kind: 'session', driver: 'claude', workspace: '/repo/.openagent/worktrees/run-1', fake: false },
       { kind: 'session-update', sessionId: '45015d11-755b-423c-ae71-8dbfd54f7cce' },
     ] as never
     render(<AgentActionsMenu part="session" projectId="p1" agentId="run-1" events={events} onDeleted={vi.fn()} />)
@@ -98,7 +98,7 @@ describe('AgentActionsMenu (#toolbar-menu)', () => {
     fireEvent.click(screen.getByText('Copy resume command'))
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(
-        "mkdir -p '/repo/.the-framework/worktrees/run-1' && cd '/repo/.the-framework/worktrees/run-1' && claude --resume 45015d11-755b-423c-ae71-8dbfd54f7cce",
+        "mkdir -p '/repo/.openagent/worktrees/run-1' && cd '/repo/.openagent/worktrees/run-1' && claude --resume 45015d11-755b-423c-ae71-8dbfd54f7cce",
       ),
     )
     // And it says so, since a click that only fills the clipboard shows nothing otherwise.

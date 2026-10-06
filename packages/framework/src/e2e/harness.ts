@@ -150,7 +150,7 @@ export interface HookCall {
 
 /** Let a run whose prompt said "hold" go on to its first turn. */
 export async function release(project: StoryProject, agentId: string): Promise<void> {
-  await writeFile(join(worktreePath(project.cwd, agentId), '.the-framework', 'go'), '')
+  await writeFile(join(worktreePath(project.cwd, agentId), '.openagent', 'go'), '')
 }
 
 /**

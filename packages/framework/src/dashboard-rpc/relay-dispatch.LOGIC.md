@@ -16,7 +16,7 @@ The device [1] side of the relay [2]: the fixed set of calls a daemon that relay
 [6] handoff: what became of an ended agent's work: whether its branch exists, is pushed, and has a pull request.
 [7] stop: ending an agent before it finishes: the Stop button, a signal to the process the agent's card names.
 [8] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
-[9] registry: `~/.the-framework.json`: where the user's preferences are kept, and which also lists the projects.
+[9] registry: `~/.openagent.json`: where the user's preferences are kept, and which also lists the projects.
 
 ## Business logic — TL;DR
 

@@ -11,7 +11,7 @@ The sweep [1]: what a run's [2] own process could not do because it died. The sc
 [1] sweep: the pass that records and reclaims the runs of this machine whose process died, and only this machine's; the scheduler runs it on every tick.
 [2] run: one agent this tool starts: a process of the tool's own (`agent-runner run`), a checkout, one prompt to the coding agent, and a run record when it ends.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[4] live card: the card `<id>.json` under `.the-framework/` in a run's checkout, written by the session as the agent works, beside the diary `<id>.jsonl`; carries the tool's mark with the run's pid and host.
+[4] live card: the card `<id>.json` under `.openagent/` in a run's checkout, written by the session as the agent works, beside the diary `<id>.jsonl`; carries the tool's mark with the run's pid and host.
 [5] reclaim: removing a finished agent's checkout once its branch holds everything in it.
 [6] marker: a run record written before the agent exists: `status: running`, the tool's mark, an empty diary.
 [7] the run's lock: `.agent-runner/runs/<id>.lock` at the repository root, holding the pid of the one process of the run at work on it; a pid that is not a live process holds nothing (`run-lock.ts`).

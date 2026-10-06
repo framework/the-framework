@@ -18,7 +18,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 - **The contract** - one JSON document on stdout per command that ran, `ok` on every object; a refusal exits 1 with `{"ok":false,"reason":…}` and one line on stderr; a failure exits 1 with `{"ok":false,"reason":"failed","detail":…}` and the detail on stderr; a command line that cannot be read exits 2 with the usage on stderr and nothing on stdout.
 - **The project** - found from the working directory, from inside a checkout too; outside a git repository every command refuses `not-a-repo`, `not inside a git repository`.
 - **`tick`** - one tick of the project now, each due command started as a run of `agent-runner`, its decisions told on stderr, its record answered with `ok: true`.
-- **`init`** - this tool's lines written into the dashboard's hooks file, a line already there kept; answered with the file and which keys gained a line; refused `no-dashboard` where the project has no `.the-framework/` directory and `unreadable` where the file is not a YAML map (`init.ts`).
+- **`init`** - this tool's lines written into the dashboard's hooks file, a line already there kept; answered with the file and which keys gained a line; refused `no-dashboard` where the project has no `.openagent/` directory and `unreadable` where the file is not a YAML map (`init.ts`).
 - **`start`, `stop`, `status`** - the state answered after each; `start --foreground` makes this process the scheduler's; `start --keep-alive` writes keep-alive on; `stop --unless-keep-alive` leaves a keep-alive scheduler running, says so on stderr, and answers `kept: true`.
 - **`model <id>`, `offset <points>`** - the state's model (the one every scheduled run starts on) or spend cushion written for this user and the state answered; `offset` with something that is not a number is a usage error, `<value> is not a number of percentage points`.
 - **`switch <command> <on|off>`** - this machine's schedule switch [3] for one command of `agent-schedule.md`, named as its line names it (quoted when it holds a word after the folder: `switch "triage quick" on`), written and the state answered; refused `no-schedule` without the file and `not-scheduled` when it has no line for the command; a value neither `on` nor `off` is a usage error.
@@ -74,7 +74,7 @@ See `scheduler.ts`.
 
 #### Business logic
 
-`init` takes no argument. It writes this tool's lines into the project's `.the-framework/hooks.yml`, keeping every line already there (`init.ts`), and answers `{"ok":true,"file":…,"added":[…],"kept":[…]}`. Where the project has no `.the-framework/` directory it refuses `{"ok":false,"reason":"no-dashboard","file":…}` with `no .the-framework/ here: add the project in the dashboard first` on stderr, exit 1; a file that is not YAML, or not a map, is refused `unreadable`, with the file and the parser's first line on stderr, exit 1.
+`init` takes no argument. It writes this tool's lines into the project's `.openagent/hooks.yml`, keeping every line already there (`init.ts`), and answers `{"ok":true,"file":…,"added":[…],"kept":[…]}`. Where the project has no `.openagent/` directory it refuses `{"ok":false,"reason":"no-dashboard","file":…}` with `no .openagent/ here: add the project in the dashboard first` on stderr, exit 1; a file that is not YAML, or not a map, is refused `unreadable`, with the file and the parser's first line on stderr, exit 1.
 
 ### `model <id>`, `offset <points>`
 

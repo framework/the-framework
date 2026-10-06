@@ -13,7 +13,7 @@ const project = (id: string, path: string): ProjectSummary => ({ id, path, name:
 const noAgents = async (): Promise<LiveAgent[]> => []
 
 /** A live agent in its own worktree (#738), which is what the reader now returns. */
-const live = (meta: AgentMeta, cwd = '/a/.the-framework/worktrees/r1'): LiveAgent => ({ ...meta, cwd })
+const live = (meta: AgentMeta, cwd = '/a/.openagent/worktrees/r1'): LiveAgent => ({ ...meta, cwd })
 
 const runningAgentMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
   status: 'running',

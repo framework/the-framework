@@ -8,7 +8,7 @@ import { onRetainedWorktrees, onAgents } from './reads.js'
 import { addProject, projectId as idFor } from '../registry.js'
 import { DATA_BRANCH, fileBranchPath, nodeGitRunner } from '@openagt/agent-data'
 import { worktreePath, addWorktree, agentBranchName } from '@openagt/skill-branches'
-import { THE_FRAMEWORK_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../framework-dir.js'
 import { RUN_INBOX_FILE } from '../dashboard/run-inbox.js'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { provideTestContext } from './test-context.js'
@@ -48,15 +48,15 @@ async function projectWithWorktreeAgent(
   await addWorktree(dir, { agentId, branch: agentBranchName(agentId) }, git)
   await linkBranchesProvider(dir)
   const worktree = worktreePath(dir, agentId)
-  await mkdir(join(worktree, THE_FRAMEWORK_DIR), { recursive: true })
+  await mkdir(join(worktree, OPENAGENT_DIR), { recursive: true })
   // The run's card is what readLiveMetas discovers, and its id is what the caller addresses.
   await writeFile(
-    join(worktree, THE_FRAMEWORK_DIR, `${agentId}.json`),
+    join(worktree, OPENAGENT_DIR, `${agentId}.json`),
     JSON.stringify({ id: agentId, startedAt: '2026-07-19T10:00:00.000Z', status: run.status ?? 'running', caller: owner }),
   )
-  await writeFile(join(worktree, THE_FRAMEWORK_DIR, `${agentId}.jsonl`), (run.diary ?? []).map(line => JSON.stringify(line) + '\n').join(''))
+  await writeFile(join(worktree, OPENAGENT_DIR, `${agentId}.jsonl`), (run.diary ?? []).map(line => JSON.stringify(line) + '\n').join(''))
   if (run.hooks !== undefined) {
-    await mkdir(join(dir, THE_FRAMEWORK_DIR), { recursive: true })
+    await mkdir(join(dir, OPENAGENT_DIR), { recursive: true })
     await writeFile(join(dir, PROJECT_HOOKS_FILE), run.hooks)
   }
 
@@ -72,8 +72,8 @@ async function projectWithWorktreeAgent(
     dir,
     projectId: idFor(dir),
     agentId,
-    agentInbox: join(worktree, THE_FRAMEWORK_DIR, RUN_INBOX_FILE),
-    rootInbox: join(dir, THE_FRAMEWORK_DIR, RUN_INBOX_FILE),
+    agentInbox: join(worktree, OPENAGENT_DIR, RUN_INBOX_FILE),
+    rootInbox: join(dir, OPENAGENT_DIR, RUN_INBOX_FILE),
     restore: () => {
       if (previous === undefined) delete process.env.XDG_CONFIG_HOME
       else process.env.XDG_CONFIG_HOME = previous
@@ -188,7 +188,7 @@ test('an answer must be to the question the run\'s diary holds open, by its own 
   try {
     // The agent went on after the question: it is no longer open.
     assert.deepEqual(await sendChoice(ctx.projectId, 'await-choices', 'a', ctx.agentId), { ok: false, error: 'that question is no longer open' })
-    await writeFile(join(worktreePath(ctx.dir, ctx.agentId), THE_FRAMEWORK_DIR, `${ctx.agentId}.jsonl`), JSON.stringify(QUESTION) + '\n')
+    await writeFile(join(worktreePath(ctx.dir, ctx.agentId), OPENAGENT_DIR, `${ctx.agentId}.jsonl`), JSON.stringify(QUESTION) + '\n')
     assert.deepEqual(await sendChoice(ctx.projectId, 'await-choices', 'zzz', ctx.agentId), { ok: false, error: 'every pick must be one of the question\'s options' })
     assert.deepEqual(await sendChoice(ctx.projectId, 'await-choices', ['a', 'b'], ctx.agentId), { ok: false, error: 'pick exactly one option' })
     assert.deepEqual(await entries(ctx.agentInbox), [])
@@ -221,7 +221,7 @@ test('sendRemoveWorktree refuses while that run is still live (#737)', async () 
     const result = await sendRemoveWorktree(ctx.projectId, ctx.agentId)
     assert.equal(result.ok, false)
     assert.match(result.ok === false ? result.error : '', /still going/)
-    assert.ok(await readFile(join(worktreePath(ctx.dir, ctx.agentId), THE_FRAMEWORK_DIR, `${ctx.agentId}.json`), 'utf8'), 'the worktree is untouched')
+    assert.ok(await readFile(join(worktreePath(ctx.dir, ctx.agentId), OPENAGENT_DIR, `${ctx.agentId}.json`), 'utf8'), 'the worktree is untouched')
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })
@@ -343,7 +343,7 @@ test('onRetainedWorktrees hides a live run, and lists one that has finished (#73
     assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [], 'a running run has nothing to offer removing')
     // Once it is no longer running, its retained checkout is listed.
     await writeFile(
-      join(worktreePath(ctx.dir, ctx.agentId), THE_FRAMEWORK_DIR, `${ctx.agentId}.json`),
+      join(worktreePath(ctx.dir, ctx.agentId), OPENAGENT_DIR, `${ctx.agentId}.json`),
       JSON.stringify({ id: ctx.agentId, startedAt: '2026-07-19T10:00:00.000Z', status: 'failed' }),
     )
     assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [ctx.agentId])
@@ -392,7 +392,7 @@ test('sendOpenPullRequest opens the pull request as a draft when asked to, and a
     // The agent's work, committed on its branch, and a remote to push it to.
     const worktree = worktreePath(ctx.dir, ctx.agentId)
     // The run's own files are kept out of git, as a real run keeps them: the checkout is clean.
-    await writeFile(join(ctx.dir, '.git', 'info', 'exclude'), `${THE_FRAMEWORK_DIR}/\n`)
+    await writeFile(join(ctx.dir, '.git', 'info', 'exclude'), `${OPENAGENT_DIR}/\n`)
     await writeFile(join(worktree, 'index.html'), '<h1>Hello, there!</h1>\n')
     await git(['commit', '-q', '-am', 'Say hello'], worktree)
     const remote = join(ctx.dir, 'remote.git')

@@ -25,7 +25,7 @@ import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
  * This process records the run and reclaims the checkout when the
  * agent stops; a run that dies is caught by the sweep, which a scheduler runs on every tick.
  *
- * The session keeps the run's live record itself, the card and the diary under `.the-framework/`
+ * The session keeps the run's live record itself, the card and the diary under `.openagent/`
  * in the checkout, in the run record's shape; this process adds its mark, the pid and the host,
  * and copies the two files onto the branch unchanged when the run ends. What reaches the agent
  * from outside comes through the session's inbox: a line waiting when a turn ends becomes the

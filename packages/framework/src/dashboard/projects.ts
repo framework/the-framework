@@ -21,7 +21,7 @@ export interface ProjectSummary {
   path: string
   /** Display name (the path's basename). */
   name: string
-  /** True when the repo still has its `.the-framework/` marker. */
+  /** True when the repo still has its `.openagent/` marker. */
   activated: boolean
   /** Whether one of the project's packages provides a git host; without one no pull request can be opened there. */
   gitHost: boolean

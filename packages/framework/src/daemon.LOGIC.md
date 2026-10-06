@@ -11,22 +11,22 @@ Runs The Framework's one daemon per machine, in the foreground: it binds the das
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [3] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
-[4] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.the-framework/`, written by the tool that runs it; a finished agent's are on the `agent-data` branch.
+[4] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.openagent/`, written by the tool that runs it; a finished agent's are on the `agent-data` branch.
 [5] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
-[6] inbox: `.the-framework/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
+[6] inbox: `.openagent/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
 [7] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [8] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [9] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [10] question: what an agent's turn ended on, asking the user to choose between options; a cloud session's question reaches the dashboard through the bridge.
 [11] pick: the answer to a question: the option or options the user chose.
-[15] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`, which also lists the projects).
+[15] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
 [17] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
-[18] hooks: the shell lines a project's own `.the-framework/hooks.yml` names: the `open` and `close` lists, run in the project by the daemon when the dashboard opens and closes, and the `start`, `resume` and `check` lines, run when the user starts an agent, continues an ended one, or opens the launcher; per user, since the file is ignored by git.
+[18] hooks: the shell lines a project's own `.openagent/hooks.yml` names: the `open` and `close` lists, run in the project by the daemon when the dashboard opens and closes, and the `start`, `resume` and `check` lines, run when the user starts an agent, continues an ended one, or opens the launcher; per user, since the file is ignored by git.
 
 ## Business logic — TL;DR
 
 - **Port, host and the shared token** - the dashboard binds `127.0.0.1:4200` unless told otherwise; a loopback bind needs no secret, any other bind creates or reuses the shared token and every request without it is refused.
-- **The home project** - the directory the daemon starts in gets its `.the-framework/` directory up front and, when it is activated, joins the Projects list, unless it lies inside a project already registered.
+- **The home project** - the directory the daemon starts in gets its `.openagent/` directory up front and, when it is activated, joins the Projects list, unless it lies inside a project already registered.
 - **Nothing is repaired or resumed at boot** - the daemon runs no agent [1], so it has none to recover: an agent whose process died is its own tool's to sweep.
 - **The projects' hooks** - once the dashboard listens, every registered project's open hooks [18] run, one project after another; at shutdown, once the sweeps are quiesced, every registered project's close hooks run; the daemon names no tool, and a hook that fails, hangs or is missing never stops the daemon.
 - **What the dashboard is wired to** - the runtime's Start, the quota [7] source the usage panel draws, the models each coding agent offers (asked of Claude Code and Codex on the menu's first read, then kept), the per-project error state the sweeps [2] write, the relay [8] endpoints for devices [9], and preference writes that act the moment they switch the bridge browser [3].
@@ -51,11 +51,11 @@ The port defaults to `4200`; a port of `0` asks the operating system for a free 
 
 **User story**: the user runs `openagent` inside a repository and finds it in the dashboard's Projects list without registering it by hand.
 
-**Problem**: the daemon creates a `.the-framework/` directory for its own state wherever it runs, so a daemon started from a subfolder of a registered repository would otherwise register that subfolder as a second, nested project on every start.
+**Problem**: the daemon creates a `.openagent/` directory for its own state wherever it runs, so a daemon started from a subfolder of a registered repository would otherwise register that subfolder as a second, nested project on every start.
 
 #### Business logic
 
-The directory the daemon is started in is its home project. Its `.the-framework/` directory is created before anything else, so the daemon works as the very first command in a fresh repository, before any agent [1] has written there. When the home directory is activated (it carries the `.the-framework/.gitignore` that activation writes; the rule is in `install.ts`), it is added to the Projects list, deduplicated by path, unless it lies strictly inside a project already registered: strictly, so a directory equal to a registered project is the registered project and one outside every project is its own. A home directory that is not activated is not registered, and the dashboard serves all the same. Both the activation check and the registration are best-effort: a failure of either never keeps the daemon from coming up.
+The directory the daemon is started in is its home project. Its `.openagent/` directory is created before anything else, so the daemon works as the very first command in a fresh repository, before any agent [1] has written there. When the home directory is activated (it carries the `.openagent/.gitignore` that activation writes; the rule is in `install.ts`), it is added to the Projects list, deduplicated by path, unless it lies strictly inside a project already registered: strictly, so a directory equal to a registered project is the registered project and one outside every project is its own. A home directory that is not activated is not registered, and the dashboard serves all the same. Both the activation check and the registration are best-effort: a failure of either never keeps the daemon from coming up.
 
 ### Nothing is repaired or resumed at boot
 
@@ -71,7 +71,7 @@ The daemon starts no agent at boot, and repairs none: it reads an agent's card [
 
 #### Context
 
-**User story**: the user keeps `.the-framework/hooks.yml` in a project with `npx agent-scheduler start` under `open` and `npx agent-scheduler stop --unless-keep-alive` under `close`; from then on the project's scheduler is on whenever the dashboard is, and off when the dashboard closes unless the scheduler was told to keep alive. The daemon knows nothing of the scheduler: it runs the lines the file names.
+**User story**: the user keeps `.openagent/hooks.yml` in a project with `npx agent-scheduler start` under `open` and `npx agent-scheduler stop --unless-keep-alive` under `close`; from then on the project's scheduler is on whenever the dashboard is, and off when the dashboard closes unless the scheduler was told to keep alive. The daemon knows nothing of the scheduler: it runs the lines the file names.
 
 **Problem**: a tool that starts agents on a schedule should follow the dashboard's own life without The Framework naming that tool; and a line a person wrote must never keep the dashboard from coming up or from closing.
 

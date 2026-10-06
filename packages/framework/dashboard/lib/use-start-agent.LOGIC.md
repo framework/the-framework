@@ -10,9 +10,9 @@ Starting an agent [1] from the dashboard, the same way on every surface that doe
 
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] launcher: the Start form on a project's own page.
-[3] start hook: the one shell line under `start:` in the project's `.the-framework/hooks.yml`. The daemon runs it with the prompt and the user's picks in its environment, and the line answers the id of the agent it started.
+[3] start hook: the one shell line under `start:` in the project's `.openagent/hooks.yml`. The daemon runs it with the prompt and the user's picks in its environment, and the line answers the id of the agent it started.
 [4] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[5] preferences: the user's dashboard settings, kept in the registry (`~/.the-framework.json`).
+[5] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`).
 [6] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [7] follow-up: a prompt a start carries besides its own: once the agent ends done with a pull request, the tool the start hook names starts a fresh agent on the same branch with that prompt and the first agent's id, and holds the pull request's merge until that one is done.
 [8] publish level: how far an agent publishes its work when it finishes: `commit` (commit the work and push nothing), `branch` (commit it, push the branch and open no pull request), `pr` (commit it, push the branch and open its pull request) or `merge` (commit it, push the branch and open its pull request, set to merge on its own once its checks pass). An agent given none commits and publishes only what its prompt asks.

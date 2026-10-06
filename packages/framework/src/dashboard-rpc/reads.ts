@@ -367,7 +367,7 @@ export async function onBridgeStatus(): Promise<{
  * page. Revealing it here is not a new exposure: anyone who can load this dashboard can already
  * start runs on this machine, and on a non-loopback bind their browser is holding the same token
  * as a cookie. What it replaces is the alternative, which was telling people to open
- * `~/.the-framework.json` and copy a field out of it.
+ * `~/.openagent.json` and copy a field out of it.
  */
 export async function onBridgeToken(): Promise<string | null> {
   const preferences = await readPreferences().catch((): Preferences => ({}))

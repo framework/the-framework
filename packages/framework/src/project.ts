@@ -23,8 +23,8 @@ function nodeProjectFs(): ProjectFs {
 
 /**
  * A repo is "activated"/installed for The Framework when it has the
- * `.the-framework/.gitignore` install writes — the same marker install's own
- * no-op check reads (#1600), so a `.the-framework/` directory something else
+ * `.openagent/.gitignore` install writes — the same marker install's own
+ * no-op check reads (#1600), so a `.openagent/` directory something else
  * created can never read as activated while the repo still lacks the ignore
  * file that keeps framework state off its branches. Read-only check; writing
  * the marker + the install commit is a separate, deferred concern.

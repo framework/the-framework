@@ -4,7 +4,7 @@ import { readProjectPresets, writeProjectPresets } from '../project-presets.js'
 import type { CustomPreset, Preferences } from '../registry.js'
 
 // The user-preferences surface behind the new dashboard (#410): the driver and model the Start
-// form uses, and the rest of the Settings page. Persisted daemon-side in the same `the-framework.json` as the
+// form uses, and the rest of the Settings page. Persisted daemon-side in the same `openagent.json` as the
 // project list, so they survive restarts with no localStorage. The store is wired into the
 // dashboard context, which the one host always wires in full (D3) — there is no second host left
 // to degrade for.
@@ -49,7 +49,7 @@ export async function patchPreferences(patch: Preferences): Promise<PatchPrefere
 }
 
 /**
- * A project's shared custom presets (#1025), committed into its `.the-framework/` so they travel
+ * A project's shared custom presets (#1025), committed into its `.openagent/` so they travel
  * with the repo — the team-shared counterpart to the user-tier {@link onPreferences} presets. Read
  * from the project's own checkout, so this resolves the project id to its workspace path rather than
  * touching the home registry. `[]` for an unknown project.
@@ -60,7 +60,7 @@ export async function onProjectPresets(projectId: string): Promise<CustomPreset[
   return readProjectPresets(cwd).catch(() => [])
 }
 
-/** Persist a project's shared custom presets into its `.the-framework/` (#1025). */
+/** Persist a project's shared custom presets into its `.openagent/` (#1025). */
 export async function saveProjectPresets(
   projectId: string,
   presets: CustomPreset[],

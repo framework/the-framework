@@ -16,7 +16,7 @@ export const HOOK_LINES: Readonly<Record<string, string | readonly string[]>> = 
 
 export type { InitOutcome }
 
-/** Write the lines into `<repo>/.the-framework/hooks.yml`; nothing where the dashboard has no directory. */
+/** Write the lines into `<repo>/.openagent/hooks.yml`; nothing where the dashboard has no directory. */
 export function initHooks(repo: string): Promise<InitOutcome> {
   return writeHookLines(repo, HOOK_LINES)
 }

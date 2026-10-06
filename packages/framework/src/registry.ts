@@ -7,7 +7,7 @@ import { nodeFs } from './node-fs.js'
 /**
  * The multi-project registry (#390): the list of projects the user has
  * installed The Framework into, kept as a single JSON file `.bashrc`-style —
- * `$HOME/.the-framework.json` — so it is the user's responsibility to re-create
+ * `$HOME/.openagent.json` — so it is the user's responsibility to re-create
  * per machine. The same file also holds the user's dashboard preferences (#410),
  * so the daemon owns one user file and the UI never needs localStorage.
  */
@@ -140,7 +140,7 @@ export interface PreferencesStore {
 }
 
 /** The registry file name: a single file under `$XDG_CONFIG_HOME` (dotted under `$HOME`). */
-export const REGISTRY_FILE = 'the-framework.json'
+export const REGISTRY_FILE = 'openagent.json'
 
 /** Owner read/write only: the file holds the daemon token (#1051). */
 export const REGISTRY_FILE_MODE = 0o600
@@ -164,8 +164,8 @@ export function projectId(path: string): string {
 
 /**
  * The registry file path, resolved from `env` (injectable so tests never touch
- * the real home): `$XDG_CONFIG_HOME/the-framework.json` when set, else the
- * dotted `$HOME/.the-framework.json`. A single file, not a directory (#390).
+ * the real home): `$XDG_CONFIG_HOME/openagent.json` when set, else the
+ * dotted `$HOME/.openagent.json`. A single file, not a directory (#390).
  */
 export function registryPath(env: NodeJS.ProcessEnv): string {
   if (env.XDG_CONFIG_HOME) return join(env.XDG_CONFIG_HOME, REGISTRY_FILE)

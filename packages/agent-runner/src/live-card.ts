@@ -28,8 +28,8 @@ export function inboxPath(checkout: string): string {
 /**
  * Keep the live directory out of git in this checkout alone, so the tree stays clean for the
  * reclaim: a `.gitignore` of `*` inside it. Never a rule in the repository's shared exclude file,
- * which every checkout reads, the project's own included, where it would stop the dashboard from
- * tracking its directory. A `.gitignore` already there is kept as it is.
+ * which every checkout reads, the project's own included, where it would hide a file the project
+ * tracks there. A `.gitignore` already there is kept as it is.
  */
 export async function hideLiveDir(checkout: string): Promise<void> {
   const dir = liveDir(checkout)

@@ -6,7 +6,7 @@ import { gitignorePath } from './framework-gitignore.js'
  * Project-level repo helpers (#380): the activation marker check and a
  * `git ls-files` crawl. Read-only
  * building blocks for the sidebars (#314); activation/install (writing the
- * marker, the install commit) is a separate, deferred concern.
+ * marker) is a separate, deferred concern.
  */
 
 /** Minimal fs seam so activation is unit-testable without touching disk. */
@@ -26,8 +26,8 @@ function nodeProjectFs(): ProjectFs {
  * `.openagent/.gitignore` install writes — the same marker install's own
  * no-op check reads (#1600), so a `.openagent/` directory something else
  * created can never read as activated while the repo still lacks the ignore
- * file that keeps framework state off its branches. Read-only check; writing
- * the marker + the install commit is a separate, deferred concern.
+ * file that keeps framework state out of git. Read-only check; writing
+ * the marker is a separate, deferred concern.
  */
 export async function isActivated(cwd: string, fs: ProjectFs = nodeProjectFs()): Promise<boolean> {
   return fs.exists(gitignorePath(cwd))

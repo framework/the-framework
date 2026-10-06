@@ -7,7 +7,7 @@ import { OPENAGENT_DIR } from './framework-dir.js'
  *
  * Everything under `.openagent/` is this machine's or transient: a run's live files, the
  * hooks file. The lasting records (the runs, the `logs` skill's) live on the data branch
- * (#1582/#1769), so nothing but this file is tracked: main is 100% code.
+ * (#1582/#1769), so nothing is tracked, this file included: git shows no trace of the directory.
  */
 
 /** The `.gitignore` path under `cwd`'s `.openagent/`. */
@@ -15,7 +15,7 @@ export function gitignorePath(cwd: string): string {
   return join(cwd, OPENAGENT_DIR, '.gitignore')
 }
 
-/** The whole file: everything under `.openagent/` stays out of git (#1582). */
+/** The whole file: everything under `.openagent/` stays out of git, the file itself too (#1582). */
 export function frameworkGitignore(): string {
-  return `# OpenAgent: agent state is transient; the lasting records live on the ${DATA_BRANCH} branch.\n*\n!.gitignore\n`
+  return `# OpenAgent: agent state is transient; the lasting records live on the ${DATA_BRANCH} branch.\n*\n`
 }

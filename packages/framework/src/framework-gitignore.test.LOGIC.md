@@ -1,3 +1,3 @@
 What the tests cover, against a real git repository:
 
-- **Everything under `.openagent/` is transient** - with the ignore file in place, the machine's hooks file, an agent's card and diary, and a checkout directory placed under it are all invisible to git, while the ignore file itself is the one thing git offers to track.
+- **Everything under `.openagent/` is hidden from git** - with the ignore file in place, git's status lists nothing: not the machine's hooks file, not an agent's card and diary, not a directory placed under it, and not the ignore file itself.

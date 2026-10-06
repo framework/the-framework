@@ -18,8 +18,8 @@ test('add a project: it is installed, registered, and readable like the sidebar 
   try {
     const project = await world.addProject()
 
-    // Install left its marks in the repo: the framework directory and its ignore file, which is
-    // the one file install writes and commits (B3).
+    // Install left its mark in the repo: the framework directory and its ignore file, which is
+    // the one file install writes (B3).
     await stat(join(project.cwd, '.openagent', '.gitignore'))
 
     // The Projects sidebar shows the repo as an activated project.

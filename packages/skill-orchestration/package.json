@@ -20,6 +20,9 @@
     "bin/orchestration",
     "SKILL.md"
   ],
+  "openagent": {
+    "cleanup": "orchestration"
+  },
   "bin": {
     "orchestration": "bin/orchestration"
   },

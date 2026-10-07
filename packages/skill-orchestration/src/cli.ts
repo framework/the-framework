@@ -6,6 +6,7 @@ import { nodeGitRunner } from '@openagt/agent-data'
 import { projectRoot } from '@openagt/skill-branches'
 import { isPidAlive, readyToRun, spawnRun, withdrawMarker, writeMarker } from '@openagt/agent-runner'
 import { isLevel, LEVELS, parseSettings, readSettings, writeSettings } from './settings.js'
+import { cleanup } from './cleanup.js'
 import { Refused, landSubagent, listSubagents, readSubagent, savePlan, showPlan, startSubagent, stopSubagent, type SubagentDeps } from './subagents.js'
 
 /**
@@ -28,6 +29,8 @@ export const USAGE = `usage: orchestration <command>
   read <id>         one subagent: how it stands, its branch, and its last reply as \`result\`
   stop <id>         stop a subagent that is running
   land <id>         merge an ended subagent's branch into yours, then delete that branch
+  cleanup           remove what this package left in the project: the settings file, then .orchestration/ and the rule hiding it from git once it is empty;
+                    the command a dashboard asks for when a project is removed with its files
 
 JSON on stdout. Exit code 1 for a refusal or a failure (\`reason\` in the JSON, why on stderr), 2 for a usage error.`
 
@@ -141,6 +144,11 @@ const COMMANDS: Record<string, Command> = {
   async land(args, io, deps) {
     const { positionals } = parse(args, {}, 1)
     return { ok: true, ...(await landSubagent(await project(io.cwd, deps), io.env, positionals[0]!, deps)) }
+  },
+
+  async cleanup(args, io, deps) {
+    parse(args, {}, 0)
+    return cleanup(await project(io.cwd, deps), deps.git)
   },
 }
 

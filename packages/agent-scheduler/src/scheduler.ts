@@ -51,7 +51,9 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     ...(opts.stopped ? { stopped: opts.stopped } : {}),
     log,
   })
-  await updateState(repo, s => ({ ...s, lastTick: record }), git)
+  // A tick cut short by a stop records nothing: `stop` already took this scheduler off the state,
+  // and a write now would put the state file back after a clean-up removed it.
+  if (!opts.stopped?.()) await updateState(repo, s => ({ ...s, lastTick: record }), git)
   for (const line of describe(record)) log(line)
   return record
 }
@@ -79,9 +81,10 @@ export async function startScheduler(repo: string, opts: { foreground?: boolean;
 
 /**
  * The scheduler's process: a tick now and every interval, until SIGINT or SIGTERM. The stop waits
- * for the tick in flight, which starts nothing more once the stop is in; and it clears only this
- * process's pid from the state: a dashboard's close hook stops this scheduler and its open hook
- * starts the next one before this tick is over, and that one's pid must stay.
+ * for the tick in flight, which starts nothing more and records nothing once the stop is in; and it
+ * clears only this process's pid from the state, writing nothing when the state names another: a
+ * dashboard's close hook stops this scheduler and its open hook starts the next one before this
+ * tick is over, and that one's pid must stay.
  */
 async function loop(repo: string, everyMs: number, log: (line: string) => void): Promise<void> {
   await updateState(repo, s => ({ ...s, pid: process.pid, startedAt: new Date().toISOString() }))
@@ -103,7 +106,9 @@ async function loop(repo: string, everyMs: number, log: (line: string) => void):
     process.once('SIGTERM', stop)
   })
   await inflight
-  await updateState(repo, s => withoutPid(s, process.pid))
+  // Written only when the state still names this process. After `stop` it does not, and a write
+  // then would only put the state file back, after a clean-up may have removed it.
+  if ((await readState(repo)).pid === process.pid) await updateState(repo, s => withoutPid(s, process.pid))
 }
 
 /**

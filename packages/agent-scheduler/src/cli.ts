@@ -3,6 +3,7 @@ import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { projectRoot } from '@openagt/skill-branches'
 import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
+import { cleanup } from './cleanup.js'
 import { PUBLISH_PICKS, updateState, withPublish, withSwitch, type PublishPick } from './state.js'
 import { readSchedule, type ScheduledCommand } from './schedule.js'
 
@@ -24,6 +25,8 @@ export const USAGE = `usage: agent-scheduler <command>
   switch <command> <on|off>     whether a command of agent-schedule.md runs on this machine, the command as its line names it (quoted when it has a word after it)
   publish <command> <file|nothing|commit|branch|pr|merge>
                                 how far this machine's runs of a command of agent-schedule.md publish, in place of what its line says; file takes the pick back
+  cleanup                       remove what this tool left in the project: the state file and the scheduler's log, then .agent-scheduler/ and the rule hiding it from git once it is empty;
+                                agent-schedule.md is yours and stays; refused while the state names a scheduler that is alive; the command a dashboard asks for when a project is removed with its files
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
 
@@ -145,6 +148,13 @@ const COMMANDS: Record<string, Command> = {
     const repo = await project(io.cwd, git)
     await scheduled(repo, name)
     return { ok: true, ...(await updateState(repo, s => withPublish(s, name, to === 'file' ? undefined : (to as PublishPick)), git)) }
+  },
+
+  async cleanup(args, io, git) {
+    parse(args, {}, 0)
+    const outcome = await cleanup(await project(io.cwd, git), { git })
+    if (outcome.ok) return outcome
+    throw new Refused(outcome, `the scheduler is running here (pid ${outcome.pid}): stop it first with agent-scheduler stop`)
   },
 }
 

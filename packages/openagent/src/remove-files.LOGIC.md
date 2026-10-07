@@ -10,7 +10,7 @@ Removes OpenAgent's files [1] from a project's folder: what the daemon runs when
 
 ## Glossary
 
-[1] OpenAgent's files: what the product and its tools left in a project's folder: the directories `.openagent`, `.branches` and `.agent-runner`, and the local branch `agent-data` with the agents' records.
+[1] OpenAgent's files: what the product and its tools left in a project's folder: the directories `.openagent`, `.branches` and `.agent-runner`, the local branch `agent-data` with the agents' records, and what a tool the project has installed keeps there (the scheduler's `.agent-scheduler`, the subagent settings in `.orchestration`).
 [2] the agents' records: the `agent-data` branch of the project's repository: what the user asked each agent and what it answered, the tickets and the agent queue. On this machine it is a local branch and its checkout at `.branches/agent-data`.
 [3] clean-up: the command a package declares as `"openagent": { "cleanup": "<command>" }` in its `package.json`; `<command> cleanup`, run in the project, removes what that package left there and answers what it removed and what it kept.
 [4] report: the answer of a removal with files, three lists in words for a person: `removed` (paths from the project's root), `kept` (a path and the reason it stayed) and `failed` (what could not be done).
@@ -40,7 +40,7 @@ The steps run one after another: the tools' clean-ups [3], the agents' records [
 
 #### Context
 
-**Problem**: the runner's clean-up refuses while a run of this machine is alive. That includes a run still booting, which the dashboard's own "An agent is working in this project" check does not see (`daemon-runtime.ts`). Nothing may be deleted from under such a run: not its records, not the project's start lines.
+**Problem**: the runner's clean-up refuses while a run of this machine is alive. That includes a run still booting, which the dashboard's own "An agent is working in this project" check does not see (`daemon-runtime.ts`). Nothing may be deleted from under such a run: not its records, not the project's start lines. The scheduler's clean-up refuses while its process is alive: one the user set to keep running is not stopped when the project is removed.
 
 Which packages are asked, and how an answer is read, is `built-in.ts`'s rule.
 

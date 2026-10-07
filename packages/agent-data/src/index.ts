@@ -11,6 +11,7 @@ export {
   pushBranch,
 } from './git.js'
 export { excludeFromGit, unexcludeFromGit, repositoryCheckouts, type ExcludeFs } from './git-exclude.js'
+export { removeOwnDirectory, type KeptEntry, type OwnDirectoryRemoval } from './own-directory.js'
 export {
   fileBranchPath,
   fileBranchRepo,

@@ -6,7 +6,6 @@
   "intent": "ask me question about my fav color with choices..",
   "driver": "claude-code",
   "model": "claude-opus-5-5",
-  "branch": "agent-2026-10-07T13-51-26-168Z",
   "cost": 0.1523682,
   "caller": {
     "runner": {

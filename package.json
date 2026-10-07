@@ -14,12 +14,12 @@
     "clean": "pnpm -r run clean",
     "test": "pnpm -r --workspace-concurrency=1 run test",
     "========= Website": "",
-    "// Develop website https://the-framework.ai locally": "",
-    "website": "cd packages/the-framework.ai/ && pnpm run dev",
+    "// Develop website https://openagent.build locally": "",
+    "website": "cd packages/openagent.build/ && pnpm run dev",
     "// Build website for production": "",
-    "website:build": "cd packages/the-framework.ai/ && pnpm run build",
+    "website:build": "cd packages/openagent.build/ && pnpm run build",
     "// Test website (CI)": "",
-    "website:test": "cd packages/the-framework.ai/ && echo 'no tests yet'"
+    "website:test": "cd packages/openagent.build/ && echo 'no tests yet'"
   },
   "devDependencies": {
     "@openagt/skill-branches": "workspace:*",

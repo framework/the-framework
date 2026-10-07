@@ -11,7 +11,7 @@ Stop babysitting your coding agents. Make the important decisions, let AI do the
 
 ## What is this?
 
-[the-framework.ai](https://the-framework.ai)
+[openagent.build](https://openagent.build)
 
 ## Quickstart
 

@@ -373,6 +373,37 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@20.19.43)(jsdom@29.1.1)(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/openagent.build:
+    dependencies:
+      react:
+        specifier: ^19.2.0
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.7(react@19.2.7)
+      vike:
+        specifier: ^0.4.235
+        version: 0.4.260(hono@4.12.27)(react-streaming@0.4.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(srvx@0.11.21)(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
+      vike-react:
+        specifier: ^0.6.5
+        version: 0.6.25(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vike@0.4.260(hono@4.12.27)(react-streaming@0.4.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(srvx@0.11.21)(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)))
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.0
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.0
+        version: 19.2.3(@types/react@19.2.17)
+      '@vitejs/plugin-react':
+        specifier: ^6.0.3
+        version: 6.0.3(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^8.0.0
+        version: 8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)
+
   packages/skill-branches:
     dependencies:
       '@openagt/agent-data':
@@ -637,37 +668,6 @@ importers:
   packages/skill-ux: {}
 
   packages/skill-work-queue: {}
-
-  packages/the-framework.ai:
-    dependencies:
-      react:
-        specifier: ^19.2.0
-        version: 19.2.7
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.7(react@19.2.7)
-      vike:
-        specifier: ^0.4.235
-        version: 0.4.260(hono@4.12.27)(react-streaming@0.4.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(srvx@0.11.21)(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
-      vike-react:
-        specifier: ^0.6.5
-        version: 0.6.25(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vike@0.4.260(hono@4.12.27)(react-streaming@0.4.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(srvx@0.11.21)(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)))
-    devDependencies:
-      '@types/react':
-        specifier: ^19.2.0
-        version: 19.2.17
-      '@types/react-dom':
-        specifier: ^19.2.0
-        version: 19.2.3(@types/react@19.2.17)
-      '@vitejs/plugin-react':
-        specifier: ^6.0.3
-        version: 6.0.3(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      vite:
-        specifier: ^8.0.0
-        version: 8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)
 
 packages:
 

@@ -2,7 +2,7 @@ The hero at the top of the landing page: the product's pitch in one screen — "
 
 ## Context
 
-**User story**: a visitor lands on the-framework.ai, understands in a glance what OpenAgent is, picks their package manager once, clicks the command and pastes it into a terminal; the dashboard opens on their machine.
+**User story**: a visitor lands on openagent.build, understands in a glance what OpenAgent is, picks their package manager once, clicks the command and pastes it into a terminal; the dashboard opens on their machine.
 
 ## Business logic — TL;DR
 

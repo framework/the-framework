@@ -27,4 +27,4 @@ A script that runs before the page renders reads the saved choice from the brows
 
 #### Business logic
 
-Every page declares the same link-preview metadata: the site's root URL `https://the-framework.ai/` as the canonical address of what is shared, "website" as its kind, and `https://the-framework.ai/banner.jpg` as the preview image. Sharing a subpage such as `/press` therefore unfurls as the home page with the banner. The banner image is a screenshot of the `/banner` page made by hand as described on the press page; that rule is described in `LOGIC.md` beside this file.
+Every page declares the same link-preview metadata: the site's root URL `https://openagent.build/` as the canonical address of what is shared, "website" as its kind, and `https://openagent.build/banner.jpg` as the preview image. Sharing a subpage such as `/press` therefore unfurls as the home page with the banner. The banner image is a screenshot of the `/banner` page made by hand as described on the press page; that rule is described in `LOGIC.md` beside this file.

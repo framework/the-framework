@@ -1,4 +1,4 @@
-The landing page of https://the-framework.ai and the pieces every page of the site is built from. The page is one scroll that makes the product's argument in order: the pitch and how to run it, why babysitting a coding agent [1] is the problem, what runs without a human, the building block behind that, the features, what the visitor keeps control of, and where to join. `styles.css` holds the site's stylesheet and carries no business logic.
+The landing page of https://openagent.build and the pieces every page of the site is built from. The page is one scroll that makes the product's argument in order: the pitch and how to run it, why babysitting a coding agent [1] is the problem, what runs without a human, the building block behind that, the features, what the visitor keeps control of, and where to join. `styles.css` holds the site's stylesheet and carries no business logic.
 
 ## Context
 

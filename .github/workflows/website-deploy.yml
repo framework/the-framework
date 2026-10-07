@@ -6,7 +6,7 @@ on:
       - main
     # Only run this workflow if there are changes in the following
     paths:
-      - packages/the-framework.ai/**
+      - packages/openagent.build/**
       - .github/workflows/website-deploy.yml
 jobs:
   build-and-deploy:
@@ -26,7 +26,7 @@ jobs:
         uses: JamesIves/github-pages-deploy-action@v4.8.0
         with:
           branch: gh-pages
-          folder: packages/the-framework.ai/dist/client
+          folder: packages/openagent.build/dist/client
           # Remove previous build files
           clean: true
           # Remove history — avoiding exploding Git repository size

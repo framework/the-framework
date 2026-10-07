@@ -46,15 +46,16 @@ export async function sendAddProject(path: string, share: boolean): Promise<AddP
 }
 
 /**
- * Remove a project from the dashboard: it leaves the Projects list, and nothing in its folder is
- * deleted. Like `sendAddProject` this is the daemon's to do (it runs the project's close hooks and
+ * Remove a project from the dashboard: it leaves the Projects list. Nothing in its folder is
+ * deleted unless `files` is true: then what OpenAgent left there is removed too, and the answer
+ * says what went and what stayed. Like `sendAddProject` this is the daemon's to do (it runs the project's close hooks and
  * writes the shared registry), so it calls the daemon's own closure off the wired dashboard context.
  * Addressed by id and not by path, so a project whose folder is gone can still be removed.
  */
-export async function sendRemoveProject(projectId: string): Promise<RemoveProjectResult> {
+export async function sendRemoveProject(projectId: string, files: boolean): Promise<RemoveProjectResult> {
   const removeProject = contextRemoveProject()
   if (typeof projectId !== 'string' || !projectId) return { ok: false, error: 'a project id is required' }
-  return removeProject(projectId)
+  return removeProject(projectId, files === true)
 }
 
 /** How far the project's records reach right now, read off its repository; `null` when the project is unknown here. */

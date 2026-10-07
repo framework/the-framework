@@ -1,4 +1,4 @@
-The packages The Framework ships for every project, the built-in packages [1]: which they are, where they are installed, and the three things a project gets from them when it has no package of its own for the job: the provider of a kind of data, the commands a hook line can name, and the hook lines written when the project is added.
+The packages The Framework ships for every project, the built-in packages [1]: which they are, where they are installed, and the three things a project gets from them when it has no package of its own for the job: the provider of a kind of data, the commands a hook line can name, and the hook lines written when the project is added. It also runs every package's clean-up [3] when a project is removed with its files.
 
 ## Context
 
@@ -10,6 +10,7 @@ The packages The Framework ships for every project, the built-in packages [1]: w
 
 [1] built-in package: a package The Framework itself depends on and uses for every project, through the same contract as a project's own package. The list: `@openagt/files`, `@openagt/skill-branches`, `@openagt/skill-github`, `@openagt/skill-logs`, `agent-runner`.
 [2] kind: one sort of The Framework's data a package may provide: `tickets`, `queue`, `runs`, `branches`, `git-host`.
+[3] clean-up: the command a package declares as `"openagent": { "cleanup": "<command>" }` in its `package.json`; `<command> cleanup`, run in the project, removes what that package left there and answers what it removed and what it kept.
 
 ## Business logic — TL;DR
 
@@ -17,6 +18,7 @@ The packages The Framework ships for every project, the built-in packages [1]: w
 - **Who provides a kind** - the project's own packages first, by the shared library's rule; only when none of them declares the kind is a built-in package that declares it the provider.
 - **The commands a hook line can name** - the directories of the built-in packages' commands, which a hook line's `PATH` gains after the project's own installed tools.
 - **Writing hook lines** - every package that declares it writes hook lines is run with `init` in the project: the project's own packages, then the built-in ones the project has no copy of.
+- **Running the clean-ups** - every package that declares a clean-up [3] is run with `cleanup` in the project, the project's own packages first, then the built-in ones the project has no copy of; what each removed and kept is gathered into one answer; a package that refuses, fails or answers something else is one line, and the rest still run.
 
 ## Business logic
 
@@ -59,3 +61,22 @@ The directories holding the built-in packages' [1] commands are listed, each onc
 #### Business logic
 
 A package declares `"openagent": { "hooks": "<command>" }` in its `package.json`, naming one of its own commands. For the project's own installed packages, then for each built-in package [1] the project has no copy of, every such command is run in the project with the argument `init`; the command writes its own lines into the project's hooks file and keeps every line already there. A command that fails is answered as one line, "<package>: <its error>", and the others still run.
+
+### Running the clean-ups
+
+#### Context
+
+**User story**: the user removes a project from the dashboard and ticks "Also delete OpenAgent's files in this folder". The agents' checkouts and the runner's files go, and the user reads what went and what stayed.
+
+**Business logic story**: The Framework holds no list of any tool's files. Each tool removes its own, and is found by what it declares, the way the writers of hook lines are. The built-in packages [1] that declare a clean-up [3] are `@openagt/skill-branches` (`branches cleanup`) and `@openagt/agent-runner` (`agent-runner cleanup`). This runs as the first step of removing a project's files, and a line in `failed` ends that removal there (`remove-files.ts`).
+
+#### Business logic
+
+For the project's own installed packages, then for each built-in package [1] the project has no copy of, every declared clean-up [3] is run in the project with the one argument `cleanup`, one after another. Each is run whatever the one before it answered.
+
+A clean-up that worked prints `{ "ok": true, "removed": [paths], "kept": [{ "path", "reason" }] }`. Its removed paths and its kept entries are added to the one answer, which has three lists: `removed`, `kept` and `failed`.
+
+Anything else is one line in `failed`, and nothing of that package's answer is taken:
+
+- A clean-up that refuses or fails (it exits non-zero, runs too long or prints no JSON): "<package>: <its error>", the error being the command's last line on stderr when it said one. For instance "@openagt/agent-runner: a run is still working here (<id>): stop it first".
+- A clean-up whose answer is not exactly that shape (`ok` not true, `removed` not a list of texts, a `kept` entry without a path and a reason): "<package>: its clean-up answered something else than what it removed and kept".

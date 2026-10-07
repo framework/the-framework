@@ -163,16 +163,21 @@ test('sendAddProject hands the person\u2019s answer on the records to the daemon
   assert.deepEqual(await sendAddProject('  ', true), { ok: false, error: 'a project path is required' })
 })
 
-test('sendRemoveProject hands the project’s id to the daemon and answers what it answers; no id is refused before the daemon is asked', async () => {
+test('sendRemoveProject hands the project’s id to the daemon, with whether its files go too, and answers what it answers; no id is refused before the daemon is asked', async () => {
   const asked: string[] = []
+  const cleanup = { removed: ['.openagent'], kept: [], failed: [] }
   provideTestContext({
-    removeProject: id => {
-      asked.push(id)
+    removeProject: (id, files) => {
+      asked.push(files ? `${id} with files` : id)
+      if (files) return { ok: true, cleanup }
       return id === 'busy-1' ? { ok: false, error: 'An agent is working in this project. Stop it, then remove the project.' } : { ok: true }
     },
   })
-  assert.deepEqual(await sendRemoveProject('app-1'), { ok: true })
-  assert.deepEqual(await sendRemoveProject('busy-1'), { ok: false, error: 'An agent is working in this project. Stop it, then remove the project.' })
-  assert.deepEqual(await sendRemoveProject(''), { ok: false, error: 'a project id is required' })
-  assert.deepEqual(asked, ['app-1', 'busy-1'])
+  assert.deepEqual(await sendRemoveProject('app-1', false), { ok: true })
+  assert.deepEqual(await sendRemoveProject('app-2', true), { ok: true, cleanup })
+  // Only a plain `true` deletes anything.
+  assert.deepEqual(await sendRemoveProject('app-3', 'yes' as unknown as boolean), { ok: true })
+  assert.deepEqual(await sendRemoveProject('busy-1', false), { ok: false, error: 'An agent is working in this project. Stop it, then remove the project.' })
+  assert.deepEqual(await sendRemoveProject('', true), { ok: false, error: 'a project id is required' })
+  assert.deepEqual(asked, ['app-1', 'app-2 with files', 'app-3', 'busy-1'])
 })

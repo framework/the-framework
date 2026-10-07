@@ -11,7 +11,8 @@ import { tailAgentEvents } from './dashboard-rpc/events-tail.js'
 import { addProject, listProjects, projectId, removeProject } from './registry.js'
 import { writeHookLines } from './built-in.js'
 import { installProject } from './install.js'
-import { writeSharing } from '@openagt/agent-data'
+import { fileBranchRepo, writeSharing } from '@openagt/agent-data'
+import { removeProjectFiles } from './remove-files.js'
 import { runProjectHooks, runStartHook } from './project-hooks.js'
 import { publishLevelOf, publishPickIn } from './publish-levels.js'
 import { isBranchName } from './branch-name.js'
@@ -38,7 +39,7 @@ export interface ProjectRuntimeOptions {
 export interface ProjectRuntime {
   onStart: (prompt: string, options?: StartAgentOptions, targetProjectId?: string) => Promise<StartAgentResult>
   onAddProject: (path: string, share: boolean) => Promise<AddProjectResult>
-  onRemoveProject: (projectId: string) => Promise<RemoveProjectResult>
+  onRemoveProject: (projectId: string, files?: boolean) => Promise<RemoveProjectResult>
   /** The live event stream for an agent this daemon is relaying from a device (#1067), else undefined
    *  so `onEvents` falls back to tailing the on-disk log. Wired as the dashboard's events source. */
   remoteEventsSource: EventsSource
@@ -163,8 +164,9 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
 
   // Remove a project: it leaves the Projects list and nothing in its folder is deleted. Found in
   // the list by its id and not through its folder, so a project whose folder is gone goes too.
-  const onRemoveProject = async (id: string): Promise<RemoveProjectResult> => {
-    const record = (await listProjects(undefined, env).catch(() => [])).find(project => project.id === id)
+  const onRemoveProject = async (id: string, files = false): Promise<RemoveProjectResult> => {
+    const listed = await listProjects(undefined, env).catch(() => [])
+    const record = listed.find(project => project.id === id)
     if (!record) return { ok: false, error: 'no project with that id is on the list' }
     const here = await stat(record.path).then(s => s.isDirectory()).catch(() => false)
     if (here) {
@@ -182,7 +184,18 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
     }
     await removeProject(id, undefined, env)
     providedDataChanged(record.path)
-    return { ok: true }
+    if (!files || !here) return { ok: true }
+    // Off the list first, so no background job of this daemon starts on the folder again; then
+    // what OpenAgent left in it. The records are the repository's: while another project on the
+    // list is a checkout of the same repository, they stay.
+    const repository = await fileBranchRepo(record.path)
+    let recordsUsedBy: string | undefined
+    for (const other of listed) {
+      if (other.id !== id && repository !== undefined && (await fileBranchRepo(other.path)) === repository) recordsUsedBy = other.path
+    }
+    const cleanup = await removeProjectFiles(record.path, { recordsUsedBy })
+    providedDataChanged(record.path)
+    return { ok: true, cleanup }
   }
 
   // The dashboard's events source (#1067): a stream for an agent this daemon is relaying from a device,

@@ -1,7 +1,7 @@
 import { dirname, join } from 'node:path'
 import { BRANCHES_DIR } from './names.js'
 import { nodeGitRunner, type GitRunner } from './git.js'
-import { excludeFromGit } from './git-exclude.js'
+import { excludeFromGit, repositoryCheckouts, unexcludeFromGit } from './git-exclude.js'
 import { withCheckoutLock, type CheckoutLockDeps } from './checkout-lock.js'
 
 // A branch used as a file store: a branch of the project's repository that holds files nobody
@@ -106,6 +106,14 @@ export async function readSharing(cwd: string, git: GitRunner = nodeGitRunner())
 /** Turn sharing on or off for the repository `cwd` belongs to. */
 export async function writeSharing(cwd: string, on: boolean, git: GitRunner = nodeGitRunner()): Promise<void> {
   await git(['config', '--local', SHARE_SETTING, String(on)], cwd)
+}
+
+/** Forget the person's answer for the repository `cwd` belongs to: sharing reads as off again. Answers whether there was one. */
+export async function clearSharing(cwd: string, git: GitRunner = nodeGitRunner()): Promise<boolean> {
+  return git(['config', '--local', '--unset', SHARE_SETTING], cwd).then(
+    () => true,
+    () => false,
+  )
 }
 
 /**
@@ -274,6 +282,77 @@ export async function ensureFileBranch(cwd: string, branch: string, deps: FileBr
     await ensureCore(repo, branch, r)
     return { ok: true }
   }).catch(err => ({ ok: false, error: errorMessage(err) }))
+}
+
+/** What {@link removeFileBranch} did: what went, and what stayed with the reason, each in words for a person. */
+export type FileBranchRemoval =
+  | { ok: true; removed: string[]; kept: { path: string; reason: string }[] }
+  | { ok: false; error: string }
+
+/**
+ * Take the branch off this machine: its persistent checkout, then the local branch. For a person
+ * who removes a project and asks for its files to go too. The copy on origin is never touched and
+ * nothing is pushed first, so commits that never reached origin go with the branch.
+ *
+ * Only from the clone's own directory: from a linked worktree the branch is the whole
+ * repository's, and it stays. A directory in the checkout's place that git does not know as a
+ * checkout is left alone, and so is a branch git refuses to delete (checked out somewhere else).
+ * Joins the one-at-a-time order, so a write or a pull under way finishes first. The checkouts
+ * directory goes with the checkout when that leaves it empty, and the rule hiding it when no
+ * checkout of the repository has one. Where there is neither the checkout nor the branch nothing
+ * is touched, the lock included. Never throws.
+ */
+export async function removeFileBranch(cwd: string, branch: string, deps: FileBranchDeps = {}): Promise<FileBranchRemoval> {
+  const r = resolveDeps(deps)
+  const { lstat, realpath } = await import('node:fs/promises')
+  const repo = await cloneHome(cwd, r.git)
+  const path = checkoutPath(repo, branch)
+  const rel = `${BRANCHES_DIR}/${branch}`
+  const label = `branch ${branch}`
+  const there = (): Promise<boolean> => lstat(path).then(() => true, () => false)
+  try {
+    if ((await realpath(cwd)) !== (await realpath(repo))) return { ok: true, removed: [], kept: [{ path: label, reason: `it belongs to the repository at ${repo}` }] }
+    if (!(await there()) && !(await refExists(repo, `refs/heads/${branch}`, r.git))) return { ok: true, removed: [], kept: [] }
+    return await serialize(repo, branch, r.lock, async (): Promise<FileBranchRemoval> => {
+      const removed: string[] = []
+      const kept: { path: string; reason: string }[] = []
+      if (await checkoutRegistered(repo, path, r.git)) {
+        await r.git(['worktree', 'remove', '--force', path], repo)
+        removed.push(rel)
+      } else if (await there()) kept.push({ path: rel, reason: 'not a checkout git knows' })
+      await r.git(['worktree', 'prune'], repo).catch(() => {})
+      if (await refExists(repo, `refs/heads/${branch}`, r.git)) {
+        const refused = await r.git(['branch', '-D', branch], repo).then(() => undefined, errorMessage)
+        if (refused === undefined) removed.push(label)
+        else kept.push({ path: label, reason: refused.trim().split('\n').at(-1) ?? refused })
+      }
+      return { ok: true, removed, kept }
+    }).then(async outcome => {
+      // Outside the cycle: its lock file sits in the directory until the cycle ends.
+      if (outcome.ok && outcome.removed.includes(rel) && (await removeCheckoutsDir(repo, r.git))) outcome.removed.push(BRANCHES_DIR)
+      return outcome
+    })
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) }
+  }
+}
+
+/**
+ * The checkouts directory, once the checkout this module made in it is gone: removed when it is
+ * empty (never with contents: an agent's checkout or anyone's file keeps it), and then the rule
+ * hiding it, unless another checkout of the repository still has such a directory. Answers
+ * whether the directory went.
+ */
+async function removeCheckoutsDir(repo: string, git: GitRunner): Promise<boolean> {
+  const { lstat, rmdir } = await import('node:fs/promises')
+  if (!(await rmdir(join(repo, BRANCHES_DIR)).then(() => true, () => false))) return false
+  const checkouts = await repositoryCheckouts(repo, git).catch(() => undefined)
+  if (checkouts) {
+    let held = false
+    for (const checkout of checkouts) held ||= await lstat(join(checkout, BRANCHES_DIR)).then(() => true, () => false)
+    if (!held) await unexcludeFromGit(repo, '/' + BRANCHES_DIR, undefined, git).catch(() => {})
+  }
+  return true
 }
 
 /**

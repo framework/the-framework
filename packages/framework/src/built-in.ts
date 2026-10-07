@@ -1,6 +1,7 @@
 import { realpath } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
+import type { CleanupReport } from './dashboard/types.js'
 import { declaring, lookupProvidedCommand, packageBins, projectPackages, readManifest, runPackageCommand, type ProjectPackage, type ProvidedCommand, type ProvidedCommandLookup } from '@openagt/agent-data'
 
 /**
@@ -78,4 +79,44 @@ export async function writeHookLines(root: string): Promise<string[]> {
     if (!result.ok) failed.push(`${command.package}: ${result.error}`)
   }
   return failed
+}
+
+/**
+ * Have every package that declares a clean-up remove what it left in the project at `root`: a
+ * package declares `"openagent": { "cleanup": "<command>" }`, and `<command> cleanup`, run in the
+ * project, answers `{ ok: true, removed, kept }`. The project's own packages are asked, then the
+ * built-in ones the project has no copy of, each whatever the one before answered. A package
+ * that refuses, fails or answers something else is one line in `failed`, in words.
+ */
+export async function runCleanups(root: string): Promise<CleanupReport> {
+  const own = await projectPackages(root)
+  const packages = [...own, ...(await builtInPackages()).filter(pkg => !own.some(o => o.name === pkg.name))]
+  const report: CleanupReport = { removed: [], kept: [], failed: [] }
+  for (const command of declaring(packages, 'cleanup')) {
+    const result = await runPackageCommand(root, command, ['cleanup'])
+    if (!result.ok) {
+      report.failed.push(`${command.package}: ${result.error}`)
+      continue
+    }
+    const answer = readCleanupAnswer(result.output)
+    if (!answer) {
+      report.failed.push(`${command.package}: its clean-up answered something else than what it removed and kept`)
+      continue
+    }
+    report.removed.push(...answer.removed)
+    report.kept.push(...answer.kept)
+  }
+  return report
+}
+
+/** A clean-up's answer, read strictly: anything else is not one. */
+function readCleanupAnswer(output: unknown): Pick<CleanupReport, 'removed' | 'kept'> | undefined {
+  if (!output || typeof output !== 'object') return undefined
+  const { ok, removed, kept } = output as { ok?: unknown; removed?: unknown; kept?: unknown }
+  if (ok !== true || !Array.isArray(removed) || !Array.isArray(kept)) return undefined
+  if (!removed.every(path => typeof path === 'string')) return undefined
+  const isKept = (entry: unknown): entry is { path: string; reason: string } =>
+    Boolean(entry) && typeof entry === 'object' && typeof (entry as { path?: unknown }).path === 'string' && typeof (entry as { reason?: unknown }).reason === 'string'
+  if (!kept.every(isKept)) return undefined
+  return { removed: [...removed] as string[], kept: kept.map(entry => ({ path: entry.path, reason: entry.reason })) }
 }

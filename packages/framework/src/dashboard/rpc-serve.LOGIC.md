@@ -81,4 +81,4 @@ See `## Context`.
 
 #### Business logic
 
-Mounting the surface installs one context every RPC reads: the daemon's start closure (a prompt, the start options and the project), its add-project closure, its remove-project closure (a project's id), the events source for relayed [3] agents, the relayed-agent lookup (which device [4] an agent runs on, and a project's relayed agents), the preferences [5] store, the quota [6] source, the source of the models each coding agent offers, each project's current errors, and the daemon's bridge browser with its show, hide and restart.
+Mounting the surface installs one context every RPC reads: the daemon's start closure (a prompt, the start options and the project), its add-project closure, its remove-project closure (a project's id, and whether OpenAgent's files in its folder go too), the events source for relayed [3] agents, the relayed-agent lookup (which device [4] an agent runs on, and a project's relayed agents), the preferences [5] store, the quota [6] source, the source of the models each coding agent offers, each project's current errors, and the daemon's bridge browser with its show, hide and restart.

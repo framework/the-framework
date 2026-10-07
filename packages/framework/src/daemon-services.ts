@@ -123,6 +123,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         every: 2,
         run: async () => {
           for (const project of await projects().catch((): ProjectSummary[] => [])) {
+            // Taken off the list since this turn began: a sync would make its records' checkout again,
+            // right after a person asked for it to go.
+            if (!(await listProjects(undefined, env).catch(() => [])).some(listed => listed.id === project.id)) continue
             await syncProjectData(project.path, deps.projectErrors, log)
             await checkProviders(project.path, deps.projectErrors)
           }

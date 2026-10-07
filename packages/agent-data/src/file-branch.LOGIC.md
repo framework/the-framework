@@ -38,6 +38,7 @@ Implements a branch of the project's repository used as a file store: files that
 - **A one-shot reader opens the branch once** - one fetch, then every read off origin's copy, so a command sees every writer's pushes, its own one-shot writes included; with no fetch, the local branch when the branch stays on this machine, or the copy of origin's the clone already holds when it never made the local branch.
 - **The one-shot write from any clone** - a throwaway checkout of origin's tip, applied, committed, pushed straight to the branch and removed; it never touches the persistent checkout nor moves the local branch; when the branch stays on this machine it is a write cycle instead, ending in a local commit.
 - **A change sees plain files** - the change is handed a directory and reads, writes, deletes and lists plain files in it; a write creates missing parent directories.
+- **The branch taken off this machine** - for a person who removes a project with its files: the branch's persistent checkout, then the local branch, are removed, then the checkouts directory `.branches` and the rule hiding it when that left the directory empty; origin's copy is never touched and nothing is pushed first, so commits that never reached origin go with the branch; only from the clone's own directory; a folder git does not know as the checkout stays; where there is neither checkout nor branch nothing is touched; the sharing [9] answer is forgotten by a call of its own.
 
 ## Business logic
 
@@ -209,3 +210,26 @@ When the branch does not reach origin [9] (no `origin`, or sharing off), a one-s
 #### Business logic
 
 A change is handed the checkout [2] directory and works with plain files under it: read one, write one, delete one, list a directory by file name. A write creates the missing parent directories. A read that cannot be made is reported to the change as a rejection it reads as "absent", and listing a missing directory yields no entries.
+
+### The branch taken off this machine
+
+#### Context
+
+**User story**: the user removes a project from the dashboard and asks for OpenAgent's files in the folder to go too (`packages/framework/src/remove-files.ts`). The branch and its checkout [2] leave this machine. What origin holds of the branch stays there.
+
+**Problem**: the branch belongs to the whole repository, and several folders may be checkouts of it. A write or a pull may be under way in the branch's checkout at that moment. And a directory a person put where the checkout would be is not this module's to delete.
+
+#### Business logic
+
+Taking the branch off this machine answers two lists, in words for a person: what was removed, and what was kept with the reason. It never throws: a failure, a lock that could not be taken in time included, is answered with its reason.
+
+- It works only from the clone's own directory. Asked from a second worktree of the clone, it removes nothing and answers `branch <branch>` as kept, with the reason `it belongs to the repository at <the clone's directory>`.
+- When the repository has neither a directory at `.branches/<branch>` nor the local branch, nothing is touched, the checkout's lock included, and both lists are empty.
+- Otherwise it joins the one-at-a-time order, so a write cycle [3] or a pull under way finishes first.
+- The persistent checkout [2] goes first. When git knows `.branches/<branch>` as a worktree, it is removed, whatever it holds, and named `.branches/<branch>`. When something sits at that path and git does not know it as a worktree, it is left alone and named as kept, with the reason `not a checkout git knows`. Stale worktree registrations are pruned.
+- Then the local branch is deleted and named `branch <branch>`. When git refuses, because the branch is checked out somewhere else, the branch is named as kept with the last line of git's reason.
+- Last, once the turn is over and its lock file is gone, and only when the checkout was removed: the checkouts directory `.branches` is removed when nothing is left in it, and named `.branches`. It is never removed with contents: an agent's [4] checkout or anyone's file keeps it, and it is then not named at all. When the directory went, the rule `/.branches` is taken back out of git's own ignore file (the rule in `git-exclude.ts`), unless another checkout of the repository still has a `.branches` directory. A rule that cannot be taken out, or checkouts that cannot be listed, leave the rule there.
+
+Nothing is fetched and nothing is pushed first. Origin's copy of the branch is never touched. Commits that never reached origin, because the person does not share the records or a push was still owed, are gone with the branch.
+
+Forgetting the sharing [9] answer is a call of its own: the setting `agent-data.share` is removed from the repository's git config, and the call answers whether there was one. Sharing then reads as off, as for a repository that was never asked.

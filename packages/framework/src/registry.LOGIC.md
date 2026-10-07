@@ -68,7 +68,7 @@ A project is registered by path. The path is first made absolute and normalized,
 
 #### Context
 
-**User story**: the user picks "Remove project…" in a project's menu and the project leaves the dashboard's list; their folder is as it was, and adding the folder again brings the project back.
+**User story**: the user picks "Remove project…" in a project's menu and the project leaves the dashboard's list; their folder is as it was, unless they asked for OpenAgent's files in it to go too (the daemon's step after this one, `daemon-runtime.ts`), and adding the folder again brings the project back.
 
 #### Business logic
 

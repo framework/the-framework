@@ -241,13 +241,13 @@ test('with a token set, every route is 401 without a cookie or ?token= (#1051)',
   }
 })
 
-test('a valid ?token= sets the HttpOnly fw_daemon cookie and 302s to the clean path (#1051)', async () => {
+test('a valid ?token= sets the HttpOnly oa_daemon cookie and 302s to the clean path (#1051)', async () => {
   const { base, close } = await guardedDashboard()
   try {
     const res = await fetchAuth(`${base}/?token=${TOKEN}`)
     assert.equal(res.status, 302)
     assert.equal(res.location, '/') // the token is stripped from the redirect target
-    assert.match(res.setCookie ?? '', /^fw_daemon=/)
+    assert.match(res.setCookie ?? '', /^oa_daemon=/)
     assert.match(res.setCookie ?? '', /HttpOnly/)
     // Lax, not Strict, so the cookie survives the cross-origin device-hop redirect (#1052).
     assert.match(res.setCookie ?? '', /SameSite=Lax/)
@@ -269,10 +269,10 @@ test('a wrong ?token= is 401, not admitted (timing-safe compare) (#1051)', async
   }
 })
 
-test('the fw_daemon cookie admits the bundle and /_rpc (#1051)', async () => {
+test('the oa_daemon cookie admits the bundle and /_rpc (#1051)', async () => {
   const { base, close } = await guardedDashboard()
   try {
-    const cookie = `fw_daemon=${TOKEN}`
+    const cookie = `oa_daemon=${TOKEN}`
     const root = await fetchAuth(`${base}/`, cookie)
     assert.equal(root.status, 200)
     assert.match(root.body, /<div id="root">/)
@@ -386,7 +386,7 @@ test('/_relay/start needs the cookie: 401 without it, starts the run with it (#1
     assert.equal(unauth.status, 401) // the shared-token guard (#1051) fronts the relay too
     assert.equal(starts.length, 0)
 
-    const ok = await postAuth(`${base}/_relay/start`, body, `fw_daemon=${TOKEN}`)
+    const ok = await postAuth(`${base}/_relay/start`, body, `oa_daemon=${TOKEN}`)
     assert.equal(ok.status, 200)
     assert.deepEqual(JSON.parse(ok.body), { ok: true, agentId: 'srv-run' })
     assert.equal(starts.length, 1)
@@ -401,7 +401,7 @@ test('/_relay/start strips a nested remote target so a relayed run never relays 
   const { base, starts, close } = await relayDashboard()
   try {
     const body = JSON.stringify({ prompt: 'x', options: { remote: { url: 'http://evil', token: 'z' }, model: 'opus' } })
-    const ok = await postAuth(`${base}/_relay/start`, body, `fw_daemon=${TOKEN}`)
+    const ok = await postAuth(`${base}/_relay/start`, body, `oa_daemon=${TOKEN}`)
     assert.equal(ok.status, 200)
     assert.equal(starts[0]!.options.remote, undefined) // the onward target was dropped
     assert.equal(starts[0]!.options.model, 'opus') // the rest of the options survive
@@ -414,7 +414,7 @@ test('/_relay/start drops the branch to start from: a start relayed to a device 
   const { base, starts, close } = await relayDashboard()
   try {
     const body = JSON.stringify({ prompt: 'x', options: { base: 'a-branch-of-the-caller', model: 'opus' } })
-    const ok = await postAuth(`${base}/_relay/start`, body, `fw_daemon=${TOKEN}`)
+    const ok = await postAuth(`${base}/_relay/start`, body, `oa_daemon=${TOKEN}`)
     assert.equal(ok.status, 200)
     assert.equal(starts.length, 1)
     assert.equal('base' in starts[0]!.options, false) // the caller's branch was dropped
@@ -430,7 +430,7 @@ test('/_relay/events needs the cookie and streams the run\'s events as ndjson (#
     const unauth = await fetchAuth(`${base}/_relay/events?run=srv-run`)
     assert.equal(unauth.status, 401)
 
-    const streamed = await readNdjson(`${base}/_relay/events?run=srv-run`, `fw_daemon=${TOKEN}`, 2)
+    const streamed = await readNdjson(`${base}/_relay/events?run=srv-run`, `oa_daemon=${TOKEN}`, 2)
     assert.equal(streamed.status, 200)
     assert.deepEqual(streamed.lines.map(l => (l as { sessionId?: string }).sessionId), ['e1', 'e2'])
   } finally {
@@ -444,7 +444,7 @@ test('/_relay/ping is 401 without the cookie, 200 with it, and starts nothing (#
     const unauth = await fetchAuth(`${base}/_relay/ping`)
     assert.equal(unauth.status, 401) // the shared-token guard (#1051) fronts the ping too
 
-    const ok = await fetchAuth(`${base}/_relay/ping`, `fw_daemon=${TOKEN}`)
+    const ok = await fetchAuth(`${base}/_relay/ping`, `oa_daemon=${TOKEN}`)
     assert.equal(ok.status, 200)
     assert.equal(ok.body, '') // an empty body: it only proves reachability
     assert.equal(starts.length, 0) // a health check must never spawn a run

@@ -62,7 +62,7 @@ export interface DashboardOptions {
   clientBundleDir?: string
   /**
    * The shared token that guards a non-loopback bind (#1051): with it set, every route (static
-   * bundle, `/_rpc`, `/_relay`) needs a valid `fw_daemon` cookie or a matching
+   * bundle, `/_rpc`, `/_relay`) needs a valid `oa_daemon` cookie or a matching
    * `?token=`, else 401. Omit for a loopback bind, where the guard is a no-op and local UX is
    * byte-identical. A separate concern from the CSRF origin check in rpc-serve.ts.
    */
@@ -290,10 +290,10 @@ function guardBrowserOrigin(req: IncomingMessage, res: ServerResponse, host: str
 }
 
 /** The cookie a bootstrapped browser carries on every same-origin request (#1051). */
-const DAEMON_COOKIE = 'fw_daemon'
+const DAEMON_COOKIE = 'oa_daemon'
 
 /**
- * The non-loopback bind guard (#1051): a request needs a valid `fw_daemon` cookie or a matching
+ * The non-loopback bind guard (#1051): a request needs a valid `oa_daemon` cookie or a matching
  * `?token=`, else 401. A valid `?token=` sets the cookie and 302s to the clean path so the token
  * leaves the URL bar, history, and Referer after one hop; the cookie then rides RPC, the events
  * Channel, and the MJPEG `<img>` screencast alike (all same-origin), which a bearer header cannot

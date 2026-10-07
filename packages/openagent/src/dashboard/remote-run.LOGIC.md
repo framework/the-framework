@@ -4,7 +4,7 @@ The local daemon's half of the relay [1]: running an agent [2] on a saved device
 
 **User story**: the user saves another machine's daemon by URL and token as a device [3], then picks it in the launcher [4]. The agent [2] runs on that machine while its events render in this dashboard like a local agent's; the device's status dot in Settings says whether it is reachable; and the agent's diff and pull request still work from here after it ends.
 
-**Problem**: the browser must never call the device cross-origin, and the device's token must never leave the two daemons. So the local daemon makes every request, authenticating the way a daemon does: the token as the `fw_daemon` cookie with no `Origin` header, which the device's guard admits without the browser-only redirect, and which its same-origin check does not even see on these routes.
+**Problem**: the browser must never call the device cross-origin, and the device's token must never leave the two daemons. So the local daemon makes every request, authenticating the way a daemon does: the token as the `oa_daemon` cookie with no `Origin` header, which the device's guard admits without the browser-only redirect, and which its same-origin check does not even see on these routes.
 
 ## Glossary
 
@@ -33,7 +33,7 @@ The local daemon's half of the relay [1]: running an agent [2] on a saved device
 
 #### Business logic
 
-The daemon asks the device [3] for its relay [1] ping with the token as the `fw_daemon` cookie. Any success status within 3 seconds means reachable; a failure status, an unreachable host or the 3-second timeout means not reachable. The token is held in memory for the check and never written anywhere. The ping starts nothing on the device.
+The daemon asks the device [3] for its relay [1] ping with the token as the `oa_daemon` cookie. Any success status within 3 seconds means reachable; a failure status, an unreachable host or the 3-second timeout means not reachable. The token is held in memory for the check and never written anywhere. The ping starts nothing on the device.
 
 ### Starting the agent on the device
 

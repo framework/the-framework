@@ -39,7 +39,7 @@ function drain(target: { url: string; token: string }, agentId: string, timeoutM
   })
 }
 
-test('startRemoteAgent posts to /_relay/start with the fw_daemon cookie, no Origin, and the run body (#1067)', async () => {
+test('startRemoteAgent posts to /_relay/start with the oa_daemon cookie, no Origin, and the run body (#1067)', async () => {
   let captured: { method?: string | undefined; url?: string | undefined; cookie?: string | undefined; origin?: string | undefined; body: unknown } = { body: null }
   const srv = await server((req, res) => {
     let raw = ''
@@ -55,7 +55,7 @@ test('startRemoteAgent posts to /_relay/start with the fw_daemon cookie, no Orig
     assert.deepEqual(result, { ok: true, agentId: 'r1' })
     assert.equal(captured.method, 'POST')
     assert.equal(captured.url, '/_relay/start')
-    assert.equal(captured.cookie, 'fw_daemon=sekret') // the shared-token cookie (#1051), daemon to daemon
+    assert.equal(captured.cookie, 'oa_daemon=sekret') // the shared-token cookie (#1051), daemon to daemon
     assert.equal(captured.origin, undefined) // NO Origin header, so it passes the remote CSRF guard
     assert.deepEqual(captured.body, { prompt: 'do it', options: { model: 'opus' } })
   } finally {
@@ -77,7 +77,7 @@ test('startRemoteAgent surfaces a non-2xx from the device as an ok:false result 
   }
 })
 
-test('pingRemote GETs /_relay/ping with the fw_daemon cookie and is true on a 2xx (#1072)', async () => {
+test('pingRemote GETs /_relay/ping with the oa_daemon cookie and is true on a 2xx (#1072)', async () => {
   let captured: { method?: string | undefined; url?: string | undefined; cookie?: string | undefined } = {}
   const srv = await server((req, res) => {
     captured = { method: req.method, url: req.url, cookie: req.headers.cookie }
@@ -88,7 +88,7 @@ test('pingRemote GETs /_relay/ping with the fw_daemon cookie and is true on a 2x
     assert.equal(await pingRemote({ url: srv.url, token: 'sekret' }), true)
     assert.equal(captured.method, 'GET')
     assert.equal(captured.url, '/_relay/ping')
-    assert.equal(captured.cookie, 'fw_daemon=sekret') // the shared-token cookie (#1051), daemon to daemon
+    assert.equal(captured.cookie, 'oa_daemon=sekret') // the shared-token cookie (#1051), daemon to daemon
   } finally {
     await srv.close()
   }
@@ -196,7 +196,7 @@ test('RelayedAgents closes cleanly on a 401 with no events (#1067)', async () =>
   }
 })
 
-test('relayRpc posts to /_relay/rpc with the fw_daemon cookie, no Origin, and returns the device result (#1067 slice 2)', async () => {
+test('relayRpc posts to /_relay/rpc with the oa_daemon cookie, no Origin, and returns the device result (#1067 slice 2)', async () => {
   let captured: { method?: string | undefined; url?: string | undefined; cookie?: string | undefined; origin?: string | undefined; body: unknown } = { body: null }
   const srv = await server((req, res) => {
     let raw = ''
@@ -212,7 +212,7 @@ test('relayRpc posts to /_relay/rpc with the fw_daemon cookie, no Origin, and re
     assert.deepEqual(result, { dirty: true, branch: 'main' }) // the device's own result, unwrapped from {result}
     assert.equal(captured.method, 'POST')
     assert.equal(captured.url, '/_relay/rpc')
-    assert.equal(captured.cookie, 'fw_daemon=sekret') // the shared-token cookie (#1051), daemon to daemon
+    assert.equal(captured.cookie, 'oa_daemon=sekret') // the shared-token cookie (#1051), daemon to daemon
     assert.equal(captured.origin, undefined) // NO Origin header, so it passes the remote CSRF guard
     assert.deepEqual(captured.body, { fn: 'onGitStatus', args: ['pid', 'r1'] })
   } finally {

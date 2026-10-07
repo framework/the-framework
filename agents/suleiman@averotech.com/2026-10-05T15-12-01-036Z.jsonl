@@ -9,3 +9,10 @@
 {"kind":"cost","usd":0.056272,"at":"2026-10-05T15:12:07.628Z"}
 {"kind":"question","title":"What is your favorite color?","options":[{"id":"opt:0","label":"Blue","detail":"calm, like the sea and sky"},{"id":"opt:1","label":"Green","detail":"fresh, like leaves and grass"},{"id":"opt:2","label":"Red","detail":"bold and warm"},{"id":"opt:3","label":"Purple","detail":"rich and a bit unusual"}],"recommended":"opt:0","at":"2026-10-05T15:12:07.629Z"}
 {"kind":"ended","status":"waiting","at":"2026-10-05T15:12:08.227Z"}
+{"kind":"start","prompt":"You paused to ask: \"What is your favorite color?\". The user chose: Blue. Continue with that decision.","at":"2026-10-07T13:52:07.728Z"}
+{"kind":"session","sessionId":"733a87cd-d7cf-4dfb-bcd1-903c94263a23","at":"2026-10-07T13:52:08.848Z"}
+{"kind":"said","text":"Blue it is — calm, like the sea and sky. Noted for this conversation; there was no task riding on it, so nothing else to do here.","at":"2026-10-07T13:52:10.080Z"}
+{"kind":"rate-limit","limit":{"status":"allowed","window":"five_hour","resetsAt":1791398400000},"at":"2026-10-07T13:52:10.097Z"}
+{"kind":"result","text":"Blue it is — calm, like the sea and sky. Noted for this conversation; there was no task riding on it, so nothing else to do here.","sessionId":"733a87cd-d7cf-4dfb-bcd1-903c94263a23","at":"2026-10-07T13:52:10.872Z"}
+{"kind":"cost","usd":0.1223308,"at":"2026-10-07T13:52:10.872Z"}
+{"kind":"ended","status":"done","at":"2026-10-07T13:52:11.491Z"}

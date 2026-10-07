@@ -6,7 +6,6 @@
   "intent": "Ask me which color I prefer, red or blue, with your question tool. Change no file.",
   "driver": "claude-code",
   "model": "claude-opus-5-5",
-  "branch": "agent-2026-10-04T22-57-08-632Z",
   "cost": 0.162072,
   "caller": {
     "runner": {

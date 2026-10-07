@@ -216,7 +216,7 @@ export function resolvedDark(theme: ThemePreference, systemDark: boolean): boole
   return theme === 'dark' || (theme === 'system' && systemDark)
 }
 
-// The notification defaults are the framework's (#627), not the dashboard's: the polarities are
+// The notification defaults are OpenAgent's (#627), not the dashboard's: the polarities are
 // not uniform, so they have one home. These stay as named readers because the call sites read
 // better for it — and each one says which axis it is asking about (B5).
 

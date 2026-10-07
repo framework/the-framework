@@ -2,11 +2,11 @@ import { runPackageCommand, type ProvidedCommand } from '@openagt/agent-data'
 import { isBuiltIn, providedCommand } from '../built-in.js'
 
 /**
- * The project's git host, as the framework reads and acts on it (#1820): the pull requests of the
- * project, opening one, landing one, and the project's page there. The framework names no git host
+ * The project's git host, as OpenAgent reads and acts on it (#1820): the pull requests of the
+ * project, opening one, landing one, and the project's page there. OpenAgent names no git host
  * and runs no git host tool: a project's git host comes from whichever of its packages declares that it
  * provides it — `"openagent": { "git-host": "<command>" }` in the package's own package.json — and
- * the framework asks by running that command. Swap the package for another that answers the same
+ * OpenAgent asks by running that command. Swap the package for another that answers the same
  * command line and prints the same shapes, and nothing here changes. No package declares it: the
  * project has no git host, so no pull requests, and a finished run's last step is the push. A
  * built-in package's git host is the project's only when it answers the project's page there: a
@@ -21,7 +21,7 @@ import { isBuiltIn, providedCommand } from '../built-in.js'
  *   `<command> merge <number>`                          land the pull request: armed to merge on green, or merged at once
  *   `<command> home`                                    the project's page on the git host, and the git host's name
  * The branch `open` is asked for must already be on the remote: pushing is the branches
- * provider's step, and the framework runs it first.
+ * provider's step, and OpenAgent runs it first.
  *
  * The shapes, owned here: {@link GitHostRequest}, {@link GitHostHome}.
  */
@@ -60,7 +60,7 @@ export type OpenOutcome = { ok: true; request: { number: number; url: string }; 
 /** What landing a pull request did: armed to merge on green, merged at once, or the provider watching its checks. */
 export type MergeOutcome = { ok: true; outcome: 'auto-armed' | 'merged' | 'watching' } | { ok: false; error: string }
 
-/** A project's git host: what a provider answers, read and moved by the framework. */
+/** A project's git host: what a provider answers, read and moved by OpenAgent. */
 export interface GitHostSource {
   /** The project's pull requests, newest first: all, or one branch's, or by state, or since a time. */
   requests(opts?: { branch?: string; state?: 'open' | 'merged' | 'all'; since?: string }): Promise<RequestsOutcome>
@@ -169,7 +169,7 @@ export function providedGitHost(now: () => number = Date.now): GitHostReader {
   return Object.assign(reader, { changed: (root: string) => sources.delete(root) })
 }
 
-/** The framework's one reader of the git host, shared by every caller. */
+/** OpenAgent's one reader of the git host, shared by every caller. */
 export const projectGitHost: GitHostReader = providedGitHost()
 
 /** A {@link GitHostFor} for a project with no git host package. */

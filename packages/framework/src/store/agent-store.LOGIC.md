@@ -1,4 +1,4 @@
-The read side of a project's agents [1]. The Framework runs no agent and writes no agent's record: the tool that runs an agent keeps the agent's card and diary [2] in the agent's checkout [3] while it works, and a finished agent is whatever the project's runs provider [4] answers. This file reads both places and composes them into what every dashboard surface lists and replays.
+The read side of a project's agents [1]. OpenAgent runs no agent and writes no agent's record: the tool that runs an agent keeps the agent's card and diary [2] in the agent's checkout [3] while it works, and a finished agent is whatever the project's runs provider [4] answers. This file reads both places and composes them into what every dashboard surface lists and replays.
 
 ## Context
 
@@ -11,8 +11,8 @@ The read side of a project's agents [1]. The Framework runs no agent and writes 
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
-[2] card / diary: an agent's record in two shapes, whose definition is The Framework's (`runs.ts`): the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.openagent/`, written by the tool that runs it; a finished agent's are what the runs provider [4] answers.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[2] card / diary: an agent's record in two shapes, whose definition is OpenAgent's (`runs.ts`): the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.openagent/`, written by the tool that runs it; a finished agent's are what the runs provider [4] answers.
 [3] checkout: an agent's own working copy of the project, where it works; the project's branches provider [7] says where it is and which branch it is on. The user's own working copy is "the project's checkout".
 [4] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents, in its own package.json under `"openagent": { "runs": "<command>" }` (the `logs` skill's package declares its `logs` command).
 [5] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its card and diary.

@@ -1,4 +1,4 @@
-import type { AgentWorktree, FrameworkEvent } from '../../src/index.js'
+import type { AgentWorktree, OpenAgentEvent } from '../../src/index.js'
 import { formatBytes } from '../../src/client.js'
 import { AgentActionsMenu } from './AgentActionsMenu.js'
 import { AgentErrorCount } from './AgentErrorCount.js'
@@ -29,7 +29,7 @@ export function AgentActionBar({
   projectId: string
   /** Which run Stop addresses (#749). */
   agentId?: string | null | undefined
-  events: FrameworkEvent[]
+  events: OpenAgentEvent[]
   /** The session's name: it leads the bar, and is the button of the session's menu. */
   label?: string | undefined
   /** The session's project, said in the chip beside the name. */

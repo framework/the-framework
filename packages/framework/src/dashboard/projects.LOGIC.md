@@ -9,7 +9,7 @@ The read side of the registered projects: one summary per project for the sideba
 ## Glossary
 
 [1] launcher: the Start form on a project's own page.
-[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [4] registry: `~/.openagent.json`, which lists the projects and keeps the user's preferences.
 [5] recorded agents: the agents on the `agent-data` branch, written there by the tool that ran them, through the `logs` skill.
 [6] sweep: a background job the daemon runs on its clock.

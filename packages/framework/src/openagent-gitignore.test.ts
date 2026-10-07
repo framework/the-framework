@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { frameworkGitignore } from './framework-gitignore.js'
+import { openagentGitignore } from './openagent-gitignore.js'
 
 test('against real git: everything under .openagent is hidden from git, the ignore file included (#1582)', async () => {
   // The lasting records live on the data branch, so the ignore file is "ignore it all" — a
@@ -19,7 +19,7 @@ test('against real git: everything under .openagent is hidden from git, the igno
 
     const fw = join(repo, '.openagent')
     await mkdir(join(fw, 'branches', 'agent-r9'), { recursive: true })
-    await writeFile(join(fw, '.gitignore'), frameworkGitignore())
+    await writeFile(join(fw, '.gitignore'), openagentGitignore())
     await writeFile(join(fw, 'hooks.yml'), 'start: true\n')
     await writeFile(join(fw, 'r9.json'), '{}\n')
     await writeFile(join(fw, 'r9.jsonl'), '\n')

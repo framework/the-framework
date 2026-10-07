@@ -4,11 +4,11 @@ Carries out every action the user takes on an agent [1] or a project from the da
 
 **User story**: on the agent view the user presses Stop, picks an option on a question's card, types a message in the composer, and, once the agent has ended, pushes its branch, opens a pull request for it, merges it, removes the checkout it kept, or deletes the agent altogether. On the project home the user starts an agent from the launcher. (Putting a ticket on the agent queue, or freeing a ticket a dead agent still holds a claim on, is not a call here: it is the queue package's, or the tickets package's, own module acting through its command, `modules.ts`.) In Settings the user shows or restarts the bridge browser. Each of these is one call from the browser to the daemon, and this is what the call does before it answers.
 
-**Business logic story**: the daemon runs no agent, so every action here reaches an agent through what the agent's tool reads. Events flow from the agent's process through its diary [13] to the browser; the other way, Start is the project's start hook [4], what the user says to an agent is a line in the agent's inbox [14] while it works and the project's resume hook [4] once it has ended, and Stop is a signal to the process the agent's card [13] names. The Framework names no tool in any of them.
+**Business logic story**: the daemon runs no agent, so every action here reaches an agent through what the agent's tool reads. Events flow from the agent's process through its diary [13] to the browser; the other way, Start is the project's start hook [4], what the user says to an agent is a line in the agent's inbox [14] while it works and the project's resume hook [4] once it has ended, and Stop is a signal to the process the agent's card [13] names. OpenAgent names no tool in any of them.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] question: what an agent's turn ended on, asking the user to choose between options; the agent ends `waiting`, its checkout kept, and the answer resumes it.
 [3] message: the user's own words to an agent, the next prompt of the same conversation.
 [4] start hook / resume hook: the one shell line under `start`, and the one under `resume`, in a project's `.openagent/hooks.yml`. The daemon runs the `start` line when the user presses Start and the `resume` line to continue an ended agent; each answers the agent's id as JSON on stdout.
@@ -18,14 +18,14 @@ Carries out every action the user takes on an agent [1] or a project from the da
 [10] the Claude web bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
 [11] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [12] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
-[13] card / diary: an agent's record in two shapes, defined by The Framework (`../store/runs.ts`): the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.openagent/`, written by the tool that runs it; a finished agent's are what the project's runs provider [26] answers.
+[13] card / diary: an agent's record in two shapes, defined by OpenAgent (`../store/runs.ts`): the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.openagent/`, written by the tool that runs it; a finished agent's are what the project's runs provider [26] answers.
 [14] inbox: `.openagent/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
 [16] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [17] pick: the answer to a question: the option or options the user chose.
 [23] the Overview: the dashboard's cross-project page at `/`.
 [26] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents, and that removes a finished agent or sets its pull request (`../store/runs.ts`).
-[30] branches provider: the package of the project that declares it provides the checkouts and branches; The Framework reads a branch's state and pushes branches through the command that package declares (`../store/branches.ts`).
-[31] git host provider: the package of the project that declares it provides the git host; The Framework opens and lands pull requests through the command that package declares (`../store/git-host.ts`).
+[30] branches provider: the package of the project that declares it provides the checkouts and branches; OpenAgent reads a branch's state and pushes branches through the command that package declares (`../store/branches.ts`).
+[31] git host provider: the package of the project that declares it provides the git host; OpenAgent opens and lands pull requests through the command that package declares (`../store/git-host.ts`).
 
 ## Business logic — TL;DR
 
@@ -51,7 +51,7 @@ Carries out every action the user takes on an agent [1] or a project from the da
 
 #### Context
 
-**Problem**: an agent [1] is the process of a tool The Framework does not know. Its card [13], the file the dashboard shows it from, names the process running it. A signal reaches whoever runs the agent, and the daemon names no tool.
+**Problem**: an agent [1] is the process of a tool OpenAgent does not know. Its card [13], the file the dashboard shows it from, names the process running it. A signal reaches whoever runs the agent, and the daemon names no tool.
 
 #### Business logic
 

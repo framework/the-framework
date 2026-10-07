@@ -4,14 +4,14 @@ Fixes how far a run [1] takes its work when its agent finishes: the four publish
 
 **User story**: the user picks in the launcher, before Start, how far the agent takes its work when it finishes: nothing, a commit, its branch pushed, its pull request, or its pull request set to merge once its checks pass. The pick is saved and holds for every next run; until the user picks, the agent commits its work and pushes its branch. In a project with no git host provider [4], where no pull request can be opened, the user is offered "Nothing", "Commit" and "Publish branch" only. In a project whose repository has no remote, where nothing can be pushed, the user is offered "Nothing" and "Commit", and the agent commits its work until the user picks.
 
-**Business logic story**: The Framework publishes nothing itself. A publish level [2] is a word handed to the project's start hook as `PUBLISH`; the four words are the ones `agent-runner run --publish` takes, and the tool the hook names tells the agent, in one sentence after its prompt, to commit its work and how far to publish it. "Nothing" hands the hook no level: the run then commits and publishes nothing unless its prompt asks.
+**Business logic story**: OpenAgent publishes nothing itself. A publish level [2] is a word handed to the project's start hook as `PUBLISH`; the four words are the ones `agent-runner run --publish` takes, and the tool the hook names tells the agent, in one sentence after its prompt, to commit its work and how far to publish it. "Nothing" hands the hook no level: the run then commits and publishes nothing unless its prompt asks.
 
 ## Glossary
 
-[1] run: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it.
+[1] run: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it.
 [2] publish level: how far a run publishes its work when its agent finishes: `commit` (commit the work and push nothing), `branch` (commit it, push the branch and open no pull request), `pr` (commit it, push the branch and open its pull request) or `merge` (commit it, push the branch and open its pull request, set to merge on its own once its checks pass). A run given none commits and publishes only what its prompt asks.
 [3] the publish menu: the part of the launcher's "Auto" menu that lists the options "Nothing", "Commit", "Publish branch", "Open PR" and "Merge on green" (`../dashboard/components/StartAgentForm.tsx`, `../dashboard/components/AutoMenu.tsx`). The option the user picked is saved in the preferences as `publish`.
-[4] git host provider: the package of the project that declares it provides the git host; The Framework opens and lands pull requests through the command that package declares (`store/git-host.ts`). A project with none has no git host: no pull request can be opened for it.
+[4] git host provider: the package of the project that declares it provides the git host; OpenAgent opens and lands pull requests through the command that package declares (`store/git-host.ts`). A project with none has no git host: no pull request can be opened for it.
 
 ## Business logic — TL;DR
 

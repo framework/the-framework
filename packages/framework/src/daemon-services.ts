@@ -66,7 +66,7 @@ export async function syncProjectData(path: string, errors: ProjectErrors, log: 
     errors.clear(path, 'data-sync')
   } else {
     errors.setReach(path, await branchReach(path))
-    log(`[framework] data sync: ${result.error}`)
+    log(`[openagent] data sync: ${result.error}`)
     errors.set(path, 'data-sync', result.error)
   }
 }
@@ -75,7 +75,7 @@ export async function syncProjectData(path: string, errors: ProjectErrors, log: 
  * One project's provider check (#1820), on the data sync's clock: a kind of the project's data
  * that packages declare but none is settled to provide (several declare it and the project's
  * package.json names none, or names one that does not declare it) is the project's `provider`
- * error, every such kind on its own line; every kind settled clears it. The framework never picks
+ * error, every such kind on its own line; every kind settled clears it. OpenAgent never picks
  * the first declarer silently: the project says, or nothing provides and the banner says why.
  */
 export async function checkProviders(path: string, errors: ProjectErrors): Promise<void> {

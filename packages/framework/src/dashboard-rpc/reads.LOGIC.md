@@ -8,7 +8,7 @@ Answers everything the dashboard reads about a project or an agent [1]: the agen
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] the Overview: the dashboard's cross-project page at `/`. project home: a project's own page with the launcher (the Start form) and its composer. agent view: one agent's page.
 [3] checkout: an agent's own working copy of the project, where it works; the project's branches provider (`../store/branches.ts`) says where it is and which branch it is on.
 [4] handoff: what becomes of an agent's work once the agent has ended: its branch pushed, a pull request opened for it, the pull request merged. The agent does it itself only when its task or the person asks; on a finished agent's page the "Open PR" and "Merge" buttons do it by hand.

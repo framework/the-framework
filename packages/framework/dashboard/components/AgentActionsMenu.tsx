@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { GitHostHome, FrameworkEvent, RepositoryOffer, RecordsReach } from '../../src/index.js'
+import type { GitHostHome, OpenAgentEvent, RepositoryOffer, RecordsReach } from '../../src/index.js'
 import { sessionInfo } from '../../src/client.js'
 import { MoreVertical, ChevronDown, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy, CloudUpload, CloudOff, Info } from 'lucide-react'
 import { onGitHostHome, onRepositoryOffer } from '../rpc/reads.js'
@@ -62,7 +62,7 @@ export function AgentActionsMenu({
 }: {
   projectId: string
   agentId?: string | null | undefined
-  events: FrameworkEvent[]
+  events: OpenAgentEvent[]
   /** The session's name: what the session's menu reads. Not known yet, a grey bar holds its place. */
   label?: string | undefined
   retainedWorktree?: boolean

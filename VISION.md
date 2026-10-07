@@ -37,7 +37,7 @@
 
 - "Programs" => mix of skills/loops/on-going-work/routines
 - [Modularity](https://github.com/openagt/openagent/discussions/1681)
-- Make most features headless: no need for dashboard, nor TF's code — new agent capabilities are simply teached via AGENTS.md
+- Make most features headless: no need for dashboard, nor OpenAgent's code — new agent capabilities are simply teached via AGENTS.md
 
 ## Postponed
 

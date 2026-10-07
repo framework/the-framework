@@ -1,7 +1,7 @@
 import { extname } from 'node:path'
 
 /**
- * Content types for the files the framework's two static servers hand out — the dashboard
+ * Content types for the files OpenAgent's two static servers hand out — the dashboard
  * bundle (static.ts) and a project's on-demand Preview (preview.ts). One table so the two
  * cannot drift apart, which they had: each was missing extensions the other listed. The two
  * servers keep their own policies (SPA fallback + immutable cache vs 403 + stream); only this

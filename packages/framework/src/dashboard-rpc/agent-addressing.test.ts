@@ -8,7 +8,7 @@ import { onRetainedWorktrees, onAgents } from './reads.js'
 import { addProject, projectId as idFor } from '../registry.js'
 import { DATA_BRANCH, fileBranchPath, nodeGitRunner } from '@openagt/agent-data'
 import { worktreePath, addWorktree, agentBranchName } from '@openagt/skill-branches'
-import { OPENAGENT_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../openagent-dir.js'
 import { RUN_INBOX_FILE } from '../dashboard/run-inbox.js'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { provideTestContext } from './test-context.js'
@@ -35,7 +35,7 @@ async function projectWithWorktreeAgent(
   rootInbox: string
   restore: () => void
 }> {
-  const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-addressing-')))
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'openagent-addressing-')))
   const agentId = '2026-07-19T10-00-00-000Z'
   // A real repository with a real checkout: the project's branches provider lists the checkouts (#1774).
   const git = nodeGitRunner()
@@ -255,7 +255,7 @@ async function projectWithDirtyWorktree(): Promise<{
   restore: () => void
 }> {
   const git = nodeGitRunner()
-  const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-')))
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'openagent-remove-')))
   await git(['init'], dir)
   await git(['config', 'user.email', 't@t'], dir)
   await git(['config', 'user.name', 't'], dir)

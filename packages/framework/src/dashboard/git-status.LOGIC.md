@@ -7,7 +7,7 @@ Reads the git status bar of a project or of an agent's [1] checkout [2]: the cur
 [3] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [4] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [6] agent view: one agent's page.
-[7] git host provider: the package of the project that declares it provides the git host (`"openagent": { "git-host": "<command>" }`); The Framework reads and moves pull requests through the command that package declares (`../store/git-host.ts`, `pull-requests.ts`). A project with none has no pull requests.
+[7] git host provider: the package of the project that declares it provides the git host (`"openagent": { "git-host": "<command>" }`); OpenAgent reads and moves pull requests through the command that package declares (`../store/git-host.ts`, `pull-requests.ts`). A project with none has no pull requests.
 
 ## Business logic — TL;DR
 

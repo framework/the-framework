@@ -3,10 +3,10 @@ import { providedCommand } from '../built-in.js'
 import { isRunId } from './runs.js'
 
 /**
- * The checkouts and the branches, as the framework reads and acts on them (#1774). The framework
+ * The checkouts and the branches, as OpenAgent reads and acts on them (#1774). OpenAgent
  * keeps no checkout and imports no branches package: a project's checkouts come from whichever of
  * its packages declares that it provides them — `"openagent": { "branches": "<command>" }` in the
- * package's own package.json — and the framework reads and moves them by running that command.
+ * package's own package.json — and OpenAgent reads and moves them by running that command.
  * Swap the package for another that answers the same command line and prints the same shapes,
  * and nothing here changes. No package declares it: the project has no checkouts, so no run with
  * one, no branch to hand off, nothing to remove.
@@ -20,10 +20,10 @@ import { isRunId } from './runs.js'
  *   `<command> merge <b>`                               merge the branch into the default branch, on this machine, then delete it
  *   `<command> push --branch <b>`                       push the branch to the remote; a branch only the remote has is answered as it is
  *   `<command> remove <id> [--from <commit>] [--discard]`  reclaim a run's checkout once its branch holds everything, pushing nothing, its branch measured from the commit it started from; `--discard` drops uncommitted work
- * `list` and `show` read this machine, no network: the framework polls. `show` answers the branch's
+ * `list` and `show` read this machine, no network: OpenAgent polls. `show` answers the branch's
  * git facts only; its pull request is the git host provider's (`git-host.ts`), as every pull request is.
  *
- * That is the whole contract: git, and nothing beyond it (#1820). The framework reads checkouts to
+ * That is the whole contract: git, and nothing beyond it (#1820). OpenAgent reads checkouts to
  * find the runs that have one, and a branch's state for what it composes: the run page's handoff,
  * the Human Queue's unpushed rows. Opening a pull request is the push here, then the git host
  * provider's `open`. What a checkout is, where it lives, how a branch is pushed is the package's.
@@ -96,7 +96,7 @@ export type MergeOutcome = { ok: true; into: string; commit: string; from: strin
 /** What reclaiming a checkout did: done, with the branches that went with it when any did, or the provider's reason it stayed. */
 export type RemoveOutcome = { ok: true; branchesDeleted?: string[] } | { ok: false; error: string }
 
-/** A project's checkouts and branches: what a provider answers, read and moved by the framework. */
+/** A project's checkouts and branches: what a provider answers, read and moved by OpenAgent. */
 export interface BranchesSource {
   /**
    * Every checkout; `[]` when none can be read. `fresh` asks past a list read within the window:
@@ -298,7 +298,7 @@ export function providedBranches(now: () => number = Date.now): BranchesReader {
   return Object.assign(reader, { changed: (root: string) => sources.get(root)?.source?.drop() })
 }
 
-/** The framework's one reader of the checkouts, shared by every caller so they share its cache. */
+/** OpenAgent's one reader of the checkouts, shared by every caller so they share its cache. */
 export const projectBranches: BranchesReader = providedBranches()
 
 /** A {@link BranchesFor} for a project with no provider: no checkouts. */

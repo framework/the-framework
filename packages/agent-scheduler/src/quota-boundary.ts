@@ -1,13 +1,13 @@
 /**
  * The spend boundary: how much of the account's week unattended work may have spent by now.
  *
- * The boundary is The Framework's (its `quota-boundary.ts`, #879/#960), copied here as it is,
+ * The boundary is OpenAgent's (its `quota-boundary.ts`, #879/#960), copied here as it is,
  * and the stand-down is this tool's own: the boundary is the pro-rated share of the week's
  * allowance that has elapsed, rising continuously with the clock, and unattended work stands
  * down once a window in force passes it plus the user's cushion. Two properties fall out of it: nothing is left on the floor, since the boundary
  * reaches the full allowance exactly as the week resets; and work a person asks for cannot be
  * starved by work nobody asked for. Copied rather than imported because this tool depends on
- * @openagt/agent-driver-claude, which reads the windows, and not on The Framework, which only draws the boundary.
+ * @openagt/agent-driver-claude, which reads the windows, and not on OpenAgent, which only draws the boundary.
  */
 
 import type { DriverQuotaWindow } from '@openagt/agent-driver'

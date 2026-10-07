@@ -10,7 +10,7 @@ const line = (message: string): string => JSON.stringify({ message }) + '\n'
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
 async function tmpWorkspace(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'framework-jsonl-tail-'))
+  return mkdtemp(join(tmpdir(), 'openagent-jsonl-tail-'))
 }
 
 /**

@@ -109,7 +109,7 @@ export function startDaemonTick(opts: DaemonTickOptions): DaemonTick {
       try {
         await job.run()
       } catch (err) {
-        opts.log(`[framework] ${job.name} failed this tick: ${errorMessage(err)}`)
+        opts.log(`[openagent] ${job.name} failed this tick: ${errorMessage(err)}`)
       }
     }
   }

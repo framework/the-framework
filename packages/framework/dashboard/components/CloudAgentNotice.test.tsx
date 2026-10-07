@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 
 // The component reads the bridge over three RPCs; unmocked they fetch `/_rpc/<name>`, which no
 // daemon answers behind jsdom, so each read hangs or throws instead of returning a fixture.
@@ -30,7 +30,7 @@ afterEach(() => {
 })
 
 const URL = 'https://claude.ai/code/session_01ABCdefGHIjklMNO?from=cli&m=0'
-const handOff = (url = URL): FrameworkEvent => ({ kind: 'driver', event: { type: 'action', label: `cloud ${url}` } })
+const handOff = (url = URL): OpenAgentEvent => ({ kind: 'driver', event: { type: 'action', label: `cloud ${url}` } })
 
 const QUESTION = {
   sessionId: 'session_01ABCdefGHIjklMNO',
@@ -211,7 +211,7 @@ describe('the mirror row at the log tail (#1265)', () => {
 
   test("the user's turns are one line each, the session's in full (#1225)", async () => {
     onBridgeEvents.mockResolvedValue([
-      { sessionId: 'session_01ABCdefGHIjklMNO', seq: 0, role: 'user', text: 'Fix the flaky publish job\n\nYou are an agent of The Framework.\nProtocol: …', receivedAt: '' },
+      { sessionId: 'session_01ABCdefGHIjklMNO', seq: 0, role: 'user', text: 'Fix the flaky publish job\n\nYou are an agent of OpenAgent.\nProtocol: …', receivedAt: '' },
       { sessionId: 'session_01ABCdefGHIjklMNO', seq: 2, role: 'agent', text: 'Reading the repo\nFound three packages', receivedAt: '' },
       { sessionId: 'session_01ABCdefGHIjklMNO', seq: 3, role: 'user', text: 'Go with the first', receivedAt: '' },
     ])
@@ -220,7 +220,7 @@ describe('the mirror row at the log tail (#1265)', () => {
     // The opening turn is the run's whole prompt: only its first line shows, the rest is a tooltip.
     const prompt = screen.getByText(/Fix the flaky publish job/)
     expect(prompt.textContent).toBe('you › Fix the flaky publish job')
-    expect(prompt.getAttribute('title')).toContain('You are an agent of The Framework.')
+    expect(prompt.getAttribute('title')).toContain('You are an agent of OpenAgent.')
     expect(screen.queryByText(/Protocol:/)).toBeNull()
     expect(screen.getByText(/Go with the first/).textContent).toBe('you › Go with the first')
     // The session's own turn is shown whole.

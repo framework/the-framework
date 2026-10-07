@@ -128,7 +128,7 @@ In the first moments of a week the allowance so far is zero, and any amount is i
 
 #### Context
 
-**User story**: the bar's solid stretch is what has been spent, and the dimmer stretch right after it, labeled "Budget for Autonomous AI", is what The Framework may still spend on its own.
+**User story**: the bar's solid stretch is what has been spent, and the dimmer stretch right after it, labeled "Budget for Autonomous AI", is what OpenAgent may still spend on its own.
 
 #### Business logic
 

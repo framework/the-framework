@@ -2,7 +2,7 @@ Fixes the vocabulary of the driver [1] contract, in words: what every driver pro
 
 ## Context
 
-**Business logic story**: The Framework never calls a model itself. It drives a coding agent [8] the user already pays for as a black box: a prompt goes in, the coding agent's own loop runs to completion, and a final message comes out. The seam is deliberately the prompt, the final message and the code left in the directory, never the coding agent's individual tool calls, so the coding agent keeps its own subscription-based login and its own loop, and a second coding agent slots in behind the same contract without touching anything above it. Everything above the driver, the agent [9] lifecycle included, speaks only this vocabulary.
+**Business logic story**: OpenAgent never calls a model itself. It drives a coding agent [8] the user already pays for as a black box: a prompt goes in, the coding agent's own loop runs to completion, and a final message comes out. The seam is deliberately the prompt, the final message and the code left in the directory, never the coding agent's individual tool calls, so the coding agent keeps its own subscription-based login and its own loop, and a second coding agent slots in behind the same contract without touching anything above it. Everything above the driver, the agent [9] lifecycle included, speaks only this vocabulary.
 
 ## Glossary
 
@@ -116,7 +116,7 @@ Ending a driver session frees whatever the driver holds for it, the coding agent
 
 **User story**: the user follows an agent [9] in the agent view as it works: what it says, which tools it uses, when a turn [3] settles, and anything the driver [1] had to work around. Every surface that shows an agent is built from these.
 
-**Problem**: the seam is the code and the outcome. A caller that branched on which tool the coding agent [8] reached for would bind The Framework to one coding agent's internals.
+**Problem**: the seam is the code and the outcome. A caller that branched on which tool the coding agent [8] reached for would bind OpenAgent to one coding agent's internals.
 
 #### Business logic
 

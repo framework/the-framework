@@ -8,7 +8,7 @@ Drives Claude Code as a driver [1]: each turn [2] is one non-interactive invocat
 - The user revives a finished agent, and its first prompt continues where the earlier conversation left off.
 - The user picks a model for the agent; the dashboard shows the account's quota [8].
 
-**Business logic story**: Claude Code runs on the user's own login, a subscription in the normal case. The Framework holds no model key and passes none: Claude Code authenticates itself, keeps its own loop and its own tools, and The Framework only prompts it and reads what comes back. Running the process, deciding success on its exit code, stopping it and reaping its process tree are the rules of `agent-driver`'s `cli-session.ts`, shared with the Codex driver.
+**Business logic story**: Claude Code runs on the user's own login, a subscription in the normal case. OpenAgent holds no model key and passes none: Claude Code authenticates itself, keeps its own loop and its own tools, and OpenAgent only prompts it and reads what comes back. Running the process, deciding success on its exit code, stopping it and reaping its process tree are the rules of `agent-driver`'s `cli-session.ts`, shared with the Codex driver.
 
 ## Glossary
 
@@ -56,7 +56,7 @@ See `## Context`.
 
 #### Business logic
 
-Every turn [2] spawns the `claude` command, found on `PATH` unless the driver [1] was configured with another command, as one non-interactive invocation: print mode with streamed JSON input and output, verbose so that every message is streamed, and with the pieces of each message as it is written (`-p --input-format stream-json --output-format stream-json --verbose --include-partial-messages`). It runs in the driver session's [3] directory, the agent's [7] checkout [11], with the environment of The Framework's own process unless the driver was configured with another; when the driver session keeps a log, that environment also carries `AGENT_DIARY`, the diary's path (the rule of `agent-driver`'s `session-log.ts`). The prompt is fed over standard input, so a long prompt never hits the command-line length limit, as two JSON lines: first a request that the coding agent's thinking come with its text, summarized by Claude Code itself (`set_max_thinking_tokens` with `thinking_display: summarized`), then the prompt as a user message. Without that request, print mode sends each thinking block with its text empty. Extra command-line arguments the driver was configured with are appended verbatim, last. Spawning, streaming, the exit code, the stop request [12] and the reaping of the process tree follow `agent-driver`'s `cli-session.ts`: a non-zero exit fails the turn even when text streamed first.
+Every turn [2] spawns the `claude` command, found on `PATH` unless the driver [1] was configured with another command, as one non-interactive invocation: print mode with streamed JSON input and output, verbose so that every message is streamed, and with the pieces of each message as it is written (`-p --input-format stream-json --output-format stream-json --verbose --include-partial-messages`). It runs in the driver session's [3] directory, the agent's [7] checkout [11], with the environment of OpenAgent's own process unless the driver was configured with another; when the driver session keeps a log, that environment also carries `AGENT_DIARY`, the diary's path (the rule of `agent-driver`'s `session-log.ts`). The prompt is fed over standard input, so a long prompt never hits the command-line length limit, as two JSON lines: first a request that the coding agent's thinking come with its text, summarized by Claude Code itself (`set_max_thinking_tokens` with `thinking_display: summarized`), then the prompt as a user message. Without that request, print mode sends each thinking block with its text empty. Extra command-line arguments the driver was configured with are appended verbatim, last. Spawning, streaming, the exit code, the stop request [12] and the reaping of the process tree follow `agent-driver`'s `cli-session.ts`: a non-zero exit fails the turn even when text streamed first.
 
 ### Permission mode
 
@@ -112,7 +112,7 @@ The driver session [3] keeps the session id Claude Code reported for its last co
 
 #### Context
 
-**Problem**: the session id The Framework kept can outlive what Claude Code will resume: Claude Code's retention, a cleared history, another machine. There is no way to ask first, and the user has already typed the message, which must not be lost.
+**Problem**: the session id OpenAgent kept can outlive what Claude Code will resume: Claude Code's retention, a cleared history, another machine. There is no way to ask first, and the user has already typed the message, which must not be lost.
 
 #### Business logic
 

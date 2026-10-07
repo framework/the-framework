@@ -1,4 +1,4 @@
-The rules and the processes of `agent-scheduler`: the schedule [1] a person writes and the due rule, the state [2] the tool keeps per user, the spend boundary [3] copied from The Framework, the runs [5] a command has, counted off the run records [4] across machines, the tick's [8] decisions, the scheduler's process [9] and the command line. One run, its marker, its lock and the sweep [7] are `agent-runner`'s, which every run the tool starts is. Every file here has a `LOGIC.md` of its own.
+The rules and the processes of `agent-scheduler`: the schedule [1] a person writes and the due rule, the state [2] the tool keeps per user, the spend boundary [3] copied from OpenAgent, the runs [5] a command has, counted off the run records [4] across machines, the tick's [8] decisions, the scheduler's process [9] and the command line. One run, its marker, its lock and the sweep [7] are `agent-runner`'s, which every run the tool starts is. Every file here has a `LOGIC.md` of its own.
 
 ## Context
 

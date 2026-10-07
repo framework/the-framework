@@ -2,7 +2,7 @@ import { nodeGhRunner, type GhRunner } from './gh.js'
 
 /**
  * The project's pull requests, as one read (#1820): the ones of a branch, the open ones, the ones
- * merged since a time. One shape for every caller, the framework's reads and the scheduler's
+ * merged since a time. One shape for every caller, OpenAgent's reads and the scheduler's
  * record alike, so nothing outside this package knows how GitHub spells a state.
  */
 

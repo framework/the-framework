@@ -1,4 +1,4 @@
-Creates a project's repository on a host, for a project that lives on this machine only, through whichever package declares it can: The Framework names no host and runs no host's tool.
+Creates a project's repository on a host, for a project that lives on this machine only, through whichever package declares it can: OpenAgent names no host and runs no host's tool.
 
 ## Context
 

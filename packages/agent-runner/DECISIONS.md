@@ -16,8 +16,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The runner depends on `@openagt/agent-driver` for the session contract, on each coding agent's
   adapter (`@openagt/agent-driver-claude`, `@openagt/agent-driver-codex`) for its driver and its readiness
   check, on the branches package for the checkout and the reclaim, on the logs package for
-  the records, and on `agent-data` for the branch. It never depends on The Framework, and
-  The Framework never depends on it.
+  the records, and on `agent-data` for the branch. It never depends on OpenAgent, and
+  OpenAgent never depends on it.
 - The runner names no skill and reads no schedule: a run is the prompt it is given.
 
 ## The record
@@ -38,8 +38,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   dashboard spawning the run's process itself, which would name the tool and hold a pid.
 - The run is a checkout from the branches package, a session from `@openagt/agent-driver`, the
   prompt once, and the agent's own loop to the end. No system prompt, no gates, no
-  steering: the command's skill file is the whole instruction. Picked over carrying The
-  Framework's run child over: its flow is the dashboard's, not a scheduled run's.
+  steering: the command's skill file is the whole instruction. Picked over carrying
+  OpenAgent's run child over: its flow is the dashboard's, not a scheduled run's.
 - The agent publishes its own work, when asked to, through the skills in its checkout; the
   run publishes nothing, and reads the pull request back off the branch for the record,
   through the command the project's git host package declares, never through a git host's
@@ -116,7 +116,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A run stops on SIGINT or SIGTERM to its process: the agent's process tree is ended, the
   run is recorded `stopped`, the checkout reclaimed. The pid is in the live log, so a
   dashboard's Stop is that signal. Picked over the run reading the dashboard's control file
-  (the tool would read a file of The Framework's shape), and over dying at once (the agent's
+  (the tool would read a file of OpenAgent's shape), and over dying at once (the agent's
   processes would outlive the run, and the sweep would record it `failed`).
 
 ## When a run needs a person

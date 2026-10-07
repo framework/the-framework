@@ -5,9 +5,9 @@ import { builtInPackages } from './built-in.js'
 
 /**
  * A package that adds to the dashboard (#1774): its browser part, named by its
- * `exports["./dashboard"]`, and optionally its server part, named by `exports["./server"]`. The
- * framework names no package: any dependency of the project that exports `./dashboard` is a
- * module, whoever wrote it, and the framework's own built-in modules come the same way.
+ * `exports["./dashboard"]`, and optionally its server part, named by `exports["./server"]`.
+ * OpenAgent names no package: any dependency of the project that exports `./dashboard` is a
+ * module, whoever wrote it, and OpenAgent's own built-in modules come the same way.
  */
 export interface ProjectModule {
   /** The package's name, as the project's package.json lists it. */
@@ -52,7 +52,7 @@ async function fileInside(pkgDir: string, target: string | undefined): Promise<s
 
 /**
  * The modules a project has: each of its dependencies whose package.json exports `./dashboard` to
- * a file that exists inside the package, plus the modules among the framework's built-in packages (`built-in.ts`). A project that
+ * a file that exists inside the package, plus the modules among OpenAgent's built-in packages (`built-in.ts`). A project that
  * depends on a built-in module's package itself gets its own copy. Sorted by name.
  */
 export async function readProjectModules(root: string): Promise<ProjectModule[]> {
@@ -110,7 +110,7 @@ const MAX_ARG_LENGTH = 4096
 /**
  * Run one of a module package's own commands in the project, with the given arguments, and read
  * its standard output as JSON. This is how a module reads its data: the same command an agent runs
- * (`npx logs`), so the module and the agent see the same thing and the framework knows neither.
+ * (`npx logs`), so the module and the agent see the same thing and OpenAgent knows neither.
  *
  * `command` picks one of the package's commands; a package with exactly one needs none. The
  * command runs with Node (a package's commands are Node scripts), in the project root, never

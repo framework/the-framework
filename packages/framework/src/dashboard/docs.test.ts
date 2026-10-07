@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { readDocs, DOC_CATEGORIES } from './docs.js'
 
 test('readDocs surfaces the flat PLAN.md and the session-scoped PLAN_/TODO_ .agent.md files, in that order (#319/#323/#326)', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-docs-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'openagent-docs-'))
   try {
     await writeFile(join(cwd, 'TODO_my-branch.agent.md'), '- [ ] later\n')
     await writeFile(join(cwd, 'PLAN_my-branch.agent.md'), '# Plan\n')
@@ -23,7 +23,7 @@ test('readDocs surfaces the flat PLAN.md and the session-scoped PLAN_/TODO_ .age
 })
 
 test('the agent queue is not a document: a TODO_AGENTS.md at the root is never surfaced (#1774)', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-docs-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'openagent-docs-'))
   try {
     // The queue is a project package's data, read through that package's command and shown on its
     // own page; a copy at the root is neither the queue nor a document of the checkout.
@@ -36,7 +36,7 @@ test('the agent queue is not a document: a TODO_AGENTS.md at the root is never s
 })
 
 test('readDocs skips missing and blank docs, and never throws', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-docs-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'openagent-docs-'))
   try {
     await writeFile(join(cwd, 'PLAN.md'), '   \n\n')
     // PLAN.md blank, nothing else -> nothing surfaced.

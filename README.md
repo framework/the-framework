@@ -1,6 +1,6 @@
-<img src="./logo.svg?v=2" alt="The Framework" align="left" width="170" />
+<img src="./logo.svg?v=2" alt="OpenAgent" align="left" width="170" />
 
-### The Framework
+### OpenAgent
 
 **Autonomous AI programming.**  
 Stop babysitting your coding agents. Make the important decisions, let AI do the rest.

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { DATA_BRANCH } from '@openagt/agent-data/names'
-import { OPENAGENT_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './openagent-dir.js'
 
 /**
  * The `.openagent/.gitignore` (#313): one file, one content, written at install.
@@ -16,6 +16,6 @@ export function gitignorePath(cwd: string): string {
 }
 
 /** The whole file: everything under `.openagent/` stays out of git, the file itself too (#1582). */
-export function frameworkGitignore(): string {
+export function openagentGitignore(): string {
   return `# OpenAgent: agent state is transient; the lasting records live on the ${DATA_BRANCH} branch.\n*\n`
 }

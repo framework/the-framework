@@ -4,7 +4,7 @@ import { parse as parseYaml } from 'yaml'
 
 /**
  * A project's commands (#1774): the skills written to be run by a person, read off the folders
- * the coding agents read them from. The framework ships no prompt text; what a project can be
+ * the coding agents read them from. OpenAgent ships no prompt text; what a project can be
  * asked to do is what its own command skills say. A skill that teaches the agent how to do
  * something (the tickets, the queue) is not a command: typed alone it starts an agent with
  * nothing to do, so the launcher does not list it.

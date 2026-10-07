@@ -21,7 +21,7 @@ import type { BridgeStartInput, BridgeStartRequest } from './bridge-starts.js'
 export const WEB_START_PREFIX = '/_web-start'
 
 /** The environment variable a run finds its daemon's URL in. */
-export const DAEMON_URL_ENV = 'TF_DAEMON_URL'
+export const DAEMON_URL_ENV = 'OPENAGENT_DAEMON_URL'
 
 /** What the daemon wires behind the routes. Absent when the bridge is off, which 404s them. */
 export interface WebStartHandlers {

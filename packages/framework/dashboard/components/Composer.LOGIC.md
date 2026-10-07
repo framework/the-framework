@@ -4,7 +4,7 @@ The dashboard's prompt editor with the controls around it, shared by the launche
 
 **User story**: the user types what to do on project home [1], or loads a command or a saved prompt, mentions a project or a file with `@` or `#`, chooses the coding agent, the model and where the agent runs, and presses "Start agent". On an agent view the same box talks to that agent: the user types a message and presses "Send".
 
-**Problem**: the launcher and the agent view are the same surface (same editor, same commands, same saved prompts, same preferences), so they share one composer; they differ only in what a submit does and in which controls still mean something. The Framework ships no prompt text: what the `/` list and the menu offer is what the open project's own skills say, plus what people saved.
+**Problem**: the launcher and the agent view are the same surface (same editor, same commands, same saved prompts, same preferences), so they share one composer; they differ only in what a submit does and in which controls still mean something. OpenAgent ships no prompt text: what the `/` list and the menu offer is what the open project's own skills say, plus what people saved.
 
 ## Glossary
 

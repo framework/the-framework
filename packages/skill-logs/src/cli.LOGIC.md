@@ -19,7 +19,7 @@ The `logs` command line: the reads an agent [1] (or a person) makes in a shell, 
 [5] diary: the run's `<id>.jsonl`: what the agent said.
 [6] recording program: the program that ran an agent and records its run when the agent ends; in the product, the runner (`agent-runner`).
 [7] card: the run's `<id>.json`: what was asked, the branch, the pull request, how it ended, what it cost.
-[8] dashboard: a program that shows a project's runs to a person, such as The Framework's; it finds this command through the package's `openagent.runs` declaration.
+[8] dashboard: a program that shows a project's runs to a person, such as OpenAgent's; it finds this command through the package's `openagent.runs` declaration.
 
 ## Business logic — TL;DR
 

@@ -2,13 +2,13 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { BridgeStarts, MAX_START_MODEL, MAX_START_PROMPT, START_CLAIM_TTL_MS, bridgeStarts, resetBridgeStarts } from './bridge-starts.js'
 
-const INPUT = { repo: 'framework/the-framework', branch: 'main', prompt: 'Do the thing' }
+const INPUT = { repo: 'openagt/openagent', branch: 'main', prompt: 'Do the thing' }
 
 test('a queued start carries the repo, branch and prompt (#1328)', () => {
   const starts = new BridgeStarts()
   const queued = starts.request(INPUT, new Date('2026-08-24T10:00:00Z'))
   assert.ok(typeof queued !== 'string', 'accepted')
-  assert.equal(queued.repo, 'framework/the-framework')
+  assert.equal(queued.repo, 'openagt/openagent')
   assert.equal(queued.branch, 'main')
   assert.equal(queued.prompt, 'Do the thing')
   assert.equal(queued.state, 'queued')
@@ -27,11 +27,11 @@ test('a queued start carries the model when the run named one, trimmed; a blank 
 
 test('a repo that is not owner/name is refused (#1328)', () => {
   const starts = new BridgeStarts()
-  for (const repo of ['the-framework', 'a/b/c', '../etc', 'owner/..', './x', 'owner/name; rm -rf /', '']) {
+  for (const repo of ['openagent', 'a/b/c', '../etc', 'owner/..', './x', 'owner/name; rm -rf /', '']) {
     assert.equal(typeof starts.request({ ...INPUT, repo }), 'string', `${JSON.stringify(repo)} refused`)
   }
   // A leading dot is legal in a real repo name, so only the all-dots segments are the traversal.
-  assert.ok(typeof starts.request({ ...INPUT, repo: 'framework/.github' }) !== 'string', 'owner/.github passes')
+  assert.ok(typeof starts.request({ ...INPUT, repo: 'openagt/.github' }) !== 'string', 'owner/.github passes')
 })
 
 test('a branch that could act as syntax is refused (#1328)', () => {

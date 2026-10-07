@@ -10,7 +10,7 @@ import { createRepository, offerRepository, type CreateOffer, type CreateOutcome
 
 /**
  * The command line over the package (#1820): the same functions for an agent in a shell, and for
- * the framework and the scheduler, which run this command as the project's git host provider,
+ * OpenAgent and the scheduler, which run this command as the project's git host provider,
  * declared in package.json as `"openagent": { "git-host": "github" }`. One implementation, every
  * surface a caller.
  *

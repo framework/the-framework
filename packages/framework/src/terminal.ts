@@ -1,13 +1,13 @@
 import type { DriverEvent, DriverRateLimit } from '@openagt/agent-driver'
-import { pickedIds, type ChoiceOption, type FrameworkEvent } from './events.js'
+import { pickedIds, type ChoiceOption, type OpenAgentEvent } from './events.js'
 
-// The terminal surface for the agent's event stream: render one {@link FrameworkEvent} as one
+// The terminal surface for the agent's event stream: render one {@link OpenAgentEvent} as one
 // human-readable line. This is the CLI's counterpart to the dashboard's read-model
 // projections (run-view.ts) — a pure formatter over the same union, kept out of events.ts so
 // the event contract stays a plain data module (and browser-safe for the client bundle).
 
-/** Render a {@link FrameworkEvent} as one human-readable line (terminal surface). */
-export function formatFrameworkEvent(event: FrameworkEvent): string {
+/** Render a {@link OpenAgentEvent} as one human-readable line (terminal surface). */
+export function formatOpenAgentEvent(event: OpenAgentEvent): string {
   switch (event.kind) {
     case 'session':
       return `◆ ${event.fake ? 'fake' : event.driver}${event.model ? ` (${event.model})` : ''} in ${event.workspace}${

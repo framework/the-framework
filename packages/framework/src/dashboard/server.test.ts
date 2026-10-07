@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { startDashboard, type Dashboard, type DashboardOptions } from './server.js'
 import { isExpectedHost, isSameOriginRequest } from './rpc-serve.js'
 import { testDashboardOptions } from '../dashboard-rpc/test-context.js'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 import type { StartAgentOptions, StartAgentResult } from './types.js'
 import type { IncomingMessage } from 'node:http'
 import { EXPECTED_EXTENSION_VERSION, EXTENSION_VERSION_HEADER } from './bridge-endpoints.js'
@@ -359,11 +359,11 @@ async function relayDashboard(opts: { token?: string | undefined } = { token: TO
     starts.push({ prompt, options, ...(projectId ? { projectId } : {}) })
     return { ok: true, agentId: 'srv-run' }
   }
-  const events: FrameworkEvent[] = [
-    { kind: 'session-update', sessionId: 'e1' } as FrameworkEvent,
-    { kind: 'session-update', sessionId: 'e2' } as FrameworkEvent,
+  const events: OpenAgentEvent[] = [
+    { kind: 'session-update', sessionId: 'e1' } as OpenAgentEvent,
+    { kind: 'session-update', sessionId: 'e2' } as OpenAgentEvent,
   ]
-  const tailEvents = (_agentId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => {
+  const tailEvents = (_agentId: string, onEvent: (event: OpenAgentEvent) => void): (() => void) => {
     for (const e of events) onEvent(e)
     return () => {}
   }
@@ -524,13 +524,13 @@ test('a web run\'s model reaches the extension through the start-queue (#1697)',
     const queued = await fetch(`${dash.url}/_web-start`, {
       method: 'POST',
       headers: { authorization: `Bearer ${bridgeToken}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ repo: 'framework/the-framework', branch: 'cloud-1-abcd1234', prompt: 'Add the thing', model: 'sonnet' }),
+      body: JSON.stringify({ repo: 'openagt/openagent', branch: 'cloud-1-abcd1234', prompt: 'Add the thing', model: 'sonnet' }),
     })
     assert.equal(queued.status, 202)
     const { id } = (await queued.json()) as { id: string }
     const claimed = await fetch(`${dash.url}/_bridge/start`, { headers: asExtension })
     assert.deepEqual(await claimed.json(), {
-      start: { id, repo: 'framework/the-framework', branch: 'cloud-1-abcd1234', prompt: 'Add the thing', model: 'sonnet' },
+      start: { id, repo: 'openagt/openagent', branch: 'cloud-1-abcd1234', prompt: 'Add the thing', model: 'sonnet' },
     })
   } finally {
     await dash.close()

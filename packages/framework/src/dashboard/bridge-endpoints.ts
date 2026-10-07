@@ -31,7 +31,7 @@ export const BRIDGE_PREFIX = '/_bridge'
  * The extension version this daemon speaks (#1519). The extension states its own version on
  * every call, in this header, and a daemon expecting another refuses outright: a version-skewed
  * extension does not fail loudly, it half-works — missed messages, silently ignored fields —
- * which reads as a framework bug and burns a debugging session. The extension's manifest must
+ * which reads as an OpenAgent bug and burns a debugging session. The extension's manifest must
  * carry the same number; a test keeps the two in lockstep.
  */
 export const EXPECTED_EXTENSION_VERSION = '0.13.0'

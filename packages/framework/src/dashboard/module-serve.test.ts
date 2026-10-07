@@ -9,7 +9,7 @@ import { serveModuleFile, moduleUrl, MODULES_PREFIX } from './module-serve.js'
 import type { ProjectsProvider } from './projects.js'
 
 test('module files are served per project and package, and nothing outside the module\'s own directory', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-module-serve-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-module-serve-')))
   const dir = join(root, 'node_modules', '@acme', 'logs')
   await mkdir(join(dir, 'dist'), { recursive: true })
   await writeFile(join(root, 'package.json'), JSON.stringify({ dependencies: { '@acme/logs': '1', plain: '1' } }))

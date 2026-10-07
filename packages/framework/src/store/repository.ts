@@ -3,8 +3,8 @@ import { providedCommand } from '../built-in.js'
 
 /**
  * Creating a project's repository on a host, for a project that lives on this machine only. Like
- * every provided kind, the framework names no host: the package that declares
- * `"openagent": { "repository": "<command>" }` creates it, and the framework asks by running that
+ * every provided kind, OpenAgent names no host: the package that declares
+ * `"openagent": { "repository": "<command>" }` creates it, and OpenAgent asks by running that
  * command.
  *
  * The command line a provider answers, each printing one JSON document and exiting 0 (a refusal

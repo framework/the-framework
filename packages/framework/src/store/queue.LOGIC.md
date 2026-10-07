@@ -1,4 +1,4 @@
-How The Framework reads a project's agent queue [1]: through the queue provider [2], a command one of the project's own packages declares, never through a package The Framework knows. It also owns the shape of what that command answers: an entry [3] is one string.
+How OpenAgent reads a project's agent queue [1]: through the queue provider [2], a command one of the project's own packages declares, never through a package OpenAgent knows. It also owns the shape of what that command answers: an entry [3] is one string.
 
 ## Context
 
@@ -6,7 +6,7 @@ How The Framework reads a project's agent queue [1]: through the queue provider 
 - The user opens the Overview and sees, per project, what agents will work on next, as the total of open entries and as the queue package's own card; the tickets page skips a ticket that is already queued.
 - A project that installed no queue package has no queue: the Overview's total counts nothing of it, and the onboarding step about the queue does not apply.
 
-**Business logic story**: The Framework names no skill. A project picks the package that keeps its queue by listing it as a dependency; that package says, in its own package.json, which of its commands answers for the queue (`"openagent": { "queue": "queue" }` for the `queue` skill's package). The Framework only reads: putting something on the queue is the module [4] that package brings, acting through its own command from the browser.
+**Business logic story**: OpenAgent names no skill. A project picks the package that keeps its queue by listing it as a dependency; that package says, in its own package.json, which of its commands answers for the queue (`"openagent": { "queue": "queue" }` for the `queue` skill's package). OpenAgent only reads: putting something on the queue is the module [4] that package brings, acting through its own command from the browser.
 
 **Problem**: the dashboard reads every project's queue on several polls every few seconds, and every read of the provider is a process.
 
@@ -20,7 +20,7 @@ How The Framework reads a project's agent queue [1]: through the queue provider 
 ## Business logic — TL;DR
 
 - **Which command provides** - the first of the project's dependencies, in its package.json's order, that declares a queue provider [2] naming one of its own commands; no dependency declares one, the project has no queue.
-- **The command line it answers** - `<command> --local`: the open entries [3], in order of work, as one JSON array of strings, from the copy on this machine with no network. Nothing else: The Framework never writes the queue.
+- **The command line it answers** - `<command> --local`: the open entries [3], in order of work, as one JSON array of strings, from the copy on this machine with no network. Nothing else: OpenAgent never writes the queue.
 - **The shape** - the non-empty strings of the array, trimmed, in order; anything else, a failure included, reads as no entries, never an error.
 - **Reads are shared for five seconds, and forgotten when a module acts** - the same project's queue read again within five seconds reuses the answer; reads at the same moment share one call; a module's command having run in the project forgets the read, so the next one runs the command again.
 
@@ -40,11 +40,11 @@ The project's own package.json is read; its `dependencies` then `devDependencies
 
 #### Context
 
-**Business logic story**: the command is the same one an agent runs to read the queue; The Framework uses the one flag an agent does not.
+**Business logic story**: the command is the same one an agent runs to read the queue; OpenAgent uses the one flag an agent does not.
 
 #### Business logic
 
-The provider's command runs with Node, in the project's root, never through a shell, for at most 30 seconds and 16 MB of output (the rules of `project-modules.ts`). One call, `<command> --local`, prints the open entries [3] in order of work as one JSON array and exits 0; `--local` asks for the copy kept on this machine, read without contacting the remote, because The Framework polls. Anything else, an exit code, no JSON, JSON that is not an array, reads as no entries. That is the whole contract: The Framework has no call that writes the queue.
+The provider's command runs with Node, in the project's root, never through a shell, for at most 30 seconds and 16 MB of output (the rules of `project-modules.ts`). One call, `<command> --local`, prints the open entries [3] in order of work as one JSON array and exits 0; `--local` asks for the copy kept on this machine, read without contacting the remote, because OpenAgent polls. Anything else, an exit code, no JSON, JSON that is not an array, reads as no entries. That is the whole contract: OpenAgent has no call that writes the queue.
 
 ### The shape
 
@@ -54,13 +54,13 @@ See `## Context`.
 
 #### Business logic
 
-Of the array the command prints, each string is an entry [3], trimmed; an empty string and anything that is not a string are dropped; the order is kept. The Framework reads nothing into an entry beyond its text here.
+Of the array the command prints, each string is an entry [3], trimmed; an empty string and anything that is not a string are dropped; the order is kept. OpenAgent reads nothing into an entry beyond its text here.
 
 ### Reads are shared for five seconds, and forgotten when a module acts
 
 #### Context
 
-**Problem**: see `## Context`. And a module's "Add to queue" writes through the module's own command, which The Framework does not see; a read cached a moment before would show the queue without the new entry for up to five seconds.
+**Problem**: see `## Context`. And a module's "Add to queue" writes through the module's own command, which OpenAgent does not see; a read cached a moment before would show the queue without the new entry for up to five seconds.
 
 #### Business logic
 

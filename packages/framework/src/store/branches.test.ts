@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { parseBranchStates, parseCheckouts, providedBranches } from './branches.js'
 
 // The branches contract (#1774): a project's package declares `"openagent": { "branches": "<command>" }`
-// and the framework reads its checkouts, a branch's state, and moves them, by running that command.
+// and OpenAgent reads its checkouts, a branch's state, and moves them, by running that command.
 // Real processes: a tiny provider script that logs each call it answers, in a throwaway project.
 
 /** A provider command: answers each command line of the contract from JSON files, logging every call. */
@@ -28,7 +28,7 @@ const STATE = { branch: 'agent-run-1', exists: true, base: 'origin/main', commit
 
 /** A project whose package.json lists `deps`, each installed under node_modules with its own package.json. */
 async function project(deps: Record<string, Record<string, unknown>>): Promise<string> {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-branches-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-branches-')))
   await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: Object.fromEntries(Object.keys(deps).map(name => [name, '*'])) }))
   for (const [name, manifest] of Object.entries(deps)) {
     const dir = join(root, 'node_modules', name)
@@ -133,7 +133,7 @@ test('parseCheckouts keeps the rows with an id and a path; parseBranchStates the
     { id: 'run-1', path: ROW.path, branch: ROW.branch },
     { id: 'run-2', path: '/p', sizeBytes: 3 },
   ])
-  // The name the provider answers is kept as printed, and only as a non-empty string: the framework never derives one.
+  // The name the provider answers is kept as printed, and only as a non-empty string: OpenAgent never derives one.
   assert.deepEqual(parseCheckouts([{ ...ROW, name: 'fix-login' }, { ...ROW, name: '' }]), [{ id: 'run-1', path: ROW.path, branch: ROW.branch, name: 'fix-login' }, { id: 'run-1', path: ROW.path, branch: ROW.branch }])
   assert.deepEqual(parseBranchStates([{ ...STATE, name: 'fix-login' }, { ...STATE, name: 7 }]), [{ ...STATE, name: 'fix-login' }, STATE])
   assert.deepEqual(parseBranchStates([STATE, { branch: 'b', exists: false, pushed: false, merged: false, commits: 'x', files: [{ path: '' }, { path: 'f' }] }, { branch: 'c' }]), [

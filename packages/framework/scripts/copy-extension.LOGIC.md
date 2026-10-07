@@ -1,4 +1,4 @@
-Puts the Claude web bridge [1] extension inside the framework package, so the daemon's bridge browser [2] works for a user who runs The Framework from an installed package, not only from a checkout.
+Puts the Claude web bridge [1] extension inside the OpenAgent package, so the daemon's bridge browser [2] works for a user who runs OpenAgent from an installed package, not only from a checkout.
 
 ## Glossary
 

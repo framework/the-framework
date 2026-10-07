@@ -29,7 +29,7 @@ import { nodeGitRunner } from '@openagt/agent-data'
 import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@openagt/skill-branches'
 import { findRun, parseRunCard, readDiary, writeRun, type AnyDiaryLine, type RunCard } from '@openagt/skill-logs'
 import { agentIdFromStartedAt } from '../agent-id.js'
-import { OPENAGENT_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../openagent-dir.js'
 
 const QUESTION = { title: 'Which way?', options: [{ label: 'Left', detail: 'the short way' }, { label: 'Right' }], recommended: 'Left' }
 

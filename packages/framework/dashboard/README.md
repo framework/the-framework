@@ -1,9 +1,9 @@
-# The Framework dashboard
+# OpenAgent dashboard
 
-The Framework's localhost dashboard: **Vite + React + Tailwind v4 + shadcn/ui**, talking to the
+OpenAgent's localhost dashboard: **Vite + React + Tailwind v4 + shadcn/ui**, talking to the
 daemon over plain HTTP.
 
-This directory used to be a package of its own, `@gemstack/framework-dashboard`. It is a directory
+This directory used to be a package of its own. It is a directory
 now: the boundary bought a public export surface, a bundle-copying build step and a task graph to
 sequence it, for a dependency that only ever pointed one way.
 

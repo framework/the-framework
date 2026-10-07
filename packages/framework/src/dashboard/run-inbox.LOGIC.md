@@ -1,4 +1,4 @@
-Hands what the user says to an agent [1] — their own words, or their answer to the question [2] the agent stopped on — to that agent, through what the agent's tool reads: the inbox [3] in the agent's checkout while the agent works, the project's resume hook [4] once it has ended. The Framework names no tool in either.
+Hands what the user says to an agent [1] — their own words, or their answer to the question [2] the agent stopped on — to that agent, through what the agent's tool reads: the inbox [3] in the agent's checkout while the agent works, the project's resume hook [4] once it has ended. OpenAgent names no tool in either.
 
 ## Context
 
@@ -8,7 +8,7 @@ Hands what the user says to an agent [1] — their own words, or their answer to
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] question: what an agent's turn ended on, asking the user to choose between options; the agent ends `waiting`, its checkout kept, and the answer resumes it.
 [3] inbox: `.openagent/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
 [4] resume hook: the one shell line under `resume` in a project's `.openagent/hooks.yml`, which the daemon runs to continue an ended agent, with the agent's id and the user's text or answer; it answers the agent's id as JSON on stdout.

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 import { ModulesContext, type MountedModules } from '../lib/use-modules.js'
 import type { ModuleRunProps } from '../module/index.js'
 
@@ -68,8 +68,8 @@ vi.mock('./AgentComposer.js', () => ({
 
 const { AgentView } = await import('./AgentView.js')
 
-const LIVE_EVENTS = [{ kind: 'log', message: 'the channel delivered this line' }] as FrameworkEvent[]
-const ARCHIVED = [{ kind: 'log', message: 'the archive delivered this line' }] as FrameworkEvent[]
+const LIVE_EVENTS = [{ kind: 'log', message: 'the channel delivered this line' }] as OpenAgentEvent[]
+const ARCHIVED = [{ kind: 'log', message: 'the archive delivered this line' }] as OpenAgentEvent[]
 
 const view = (over: Partial<Parameters<typeof AgentView>[0]> = {}) => (
   <AgentView projectId="p1" agentId="run-1" events={LIVE_EVENTS} live={false} files={[]} {...over} />
@@ -118,7 +118,7 @@ describe('AgentView event source (#1026/#1383)', () => {
       ...ARCHIVED,
       { kind: 'session', driver: 'claude-code', workspace: '/w' },
       { kind: 'log', message: 'the resumed leg streamed this line' },
-    ] as FrameworkEvent[]
+    ] as OpenAgentEvent[]
     render(view({ events: resumed }))
     await waitFor(() => expect(screen.getByText(/the resumed leg streamed this line/)).toBeTruthy())
   })
@@ -132,7 +132,7 @@ describe('AgentView event source (#1026/#1383)', () => {
       { kind: 'log', message: 'a different run wrote this line' },
       { kind: 'session', driver: 'claude-code', workspace: '/w' },
       { kind: 'log', message: 'and its newest segment never ended' },
-    ] as FrameworkEvent[]
+    ] as OpenAgentEvent[]
     render(view({ events: foreign }))
     await waitFor(() => expect(screen.getByText(/the archive delivered this line/)).toBeTruthy())
     expect(screen.queryByText(/a different run wrote this line/)).toBeNull()
@@ -142,8 +142,8 @@ describe('AgentView event source (#1026/#1383)', () => {
     // A line written as the run is recorded only ever lands in the archive — the worktree journal
     // dies with the teardown — so once the feed outgrows the copy on screen the archive is re-read,
     // and the re-read is how the PR line reaches the screen without a manual refresh.
-    const ahead = [...ARCHIVED, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'end', ok: true }] as FrameworkEvent[]
-    const full = [...ahead, { kind: 'pull-request', number: 7, url: 'https://x/pr/7' }] as FrameworkEvent[]
+    const ahead = [...ARCHIVED, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'end', ok: true }] as OpenAgentEvent[]
+    const full = [...ahead, { kind: 'pull-request', number: 7, url: 'https://x/pr/7' }] as OpenAgentEvent[]
     onAgent.mockResolvedValueOnce(ARCHIVED).mockResolvedValue(full)
     render(view({ events: ahead }))
     await waitFor(() => expect(onAgent.mock.calls.length).toBeGreaterThanOrEqual(2))
@@ -153,8 +153,8 @@ describe('AgentView event source (#1026/#1383)', () => {
 
 describe('AgentView: a continued run reads as going', () => {
   test('once the feed showed the new turn, the run stays going while the archive catches up and the poll has not said so yet, and ends with the turn', async () => {
-    const ended = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'log', message: 'first turn' }, { kind: 'end', ok: true }] as FrameworkEvent[]
-    const going = [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'log', message: 'second turn' }] as FrameworkEvent[]
+    const ended = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'log', message: 'first turn' }, { kind: 'end', ok: true }] as OpenAgentEvent[]
+    const going = [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'log', message: 'second turn' }] as OpenAgentEvent[]
     // The archive as it was, then caught up with the channel: the same lines, no more.
     onAgent.mockResolvedValueOnce(ended).mockResolvedValue(going)
     const { rerender } = render(view({ events: ended }))
@@ -169,14 +169,14 @@ describe('AgentView: a continued run reads as going', () => {
     expect(screen.getByTestId('composer-live').textContent).toBe('true')
 
     // The turn ends in the log: the run is over, whatever the poll says.
-    const over = [...going, { kind: 'end', ok: true }] as FrameworkEvent[]
+    const over = [...going, { kind: 'end', ok: true }] as OpenAgentEvent[]
     onAgent.mockResolvedValue(over)
     rerender(view({ events: over }))
     await waitFor(() => expect(screen.getByTestId('composer-live').textContent).toBe('false'))
   })
 
   test('an ended run whose archive holds an open turn the feed never showed starting is not read as going', async () => {
-    const open = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'log', message: 'cut short' }] as FrameworkEvent[]
+    const open = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'log', message: 'cut short' }] as OpenAgentEvent[]
     onAgent.mockResolvedValue(open)
     render(view({ events: open }))
     await waitFor(() => expect(screen.getByText(/cut short/)).toBeTruthy())
@@ -207,13 +207,13 @@ describe('AgentView: the bar above the message box', () => {
   })
 
   test('the checkout is read again the moment a turn ends, not at the next poll', async () => {
-    const going = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a page' } }] as FrameworkEvent[]
+    const going = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a page' } }] as OpenAgentEvent[]
     onAgentWorktree.mockResolvedValue({ branch: 'agent-x', checkout: { path: '/w', dirty: false } })
     const { rerender } = render(view({ events: going, live: true }))
     await waitFor(() => expect(screen.getByTestId('work-checkout').textContent).toContain('"dirty":false'))
     expect(onAgentWorktree).toHaveBeenCalledTimes(1)
     onAgentWorktree.mockResolvedValue({ branch: 'agent-x', checkout: { path: '/w', dirty: true } })
-    rerender(view({ events: [...going, { kind: 'end', ok: true }] as FrameworkEvent[], live: true }))
+    rerender(view({ events: [...going, { kind: 'end', ok: true }] as OpenAgentEvent[], live: true }))
     await waitFor(() => expect(screen.getByTestId('work-checkout').textContent).toContain('"dirty":true'))
     expect(onAgentWorktree).toHaveBeenCalledTimes(2)
   })
@@ -414,7 +414,7 @@ describe('the feed fills in one step (first visit)', () => {
     // was a step of someone else's events before this run's own.
     let log: (v: unknown) => void = () => {}
     onAgent.mockReturnValue(new Promise(resolve => (log = resolve)))
-    render(view({ events: [{ kind: 'log', message: 'a different run wrote this line' }] as FrameworkEvent[] }))
+    render(view({ events: [{ kind: 'log', message: 'a different run wrote this line' }] as OpenAgentEvent[] }))
     expect(screen.queryByText(/a different run wrote this line/)).toBeNull()
     expect(screen.queryByText('Loading agent…')).toBeNull()
     log(ARCHIVED)
@@ -454,7 +454,7 @@ describe('a changed file\'s row in the chat', () => {
     { kind: 'driver', event: { type: 'output', id: 'c1', text: 'ok', changed: [{ path: `${WS}/docs/A.md`, added: 2, removed: 1 }] } },
     { kind: 'driver', event: { type: 'text', text: 'Done.' } },
     { kind: 'end', ok: true },
-  ] as FrameworkEvent[]
+  ] as OpenAgentEvent[]
   const withPanels = (ui: ReactNode, panels: MountedModules['panels']) => {
     const modules: MountedModules = { pages: [], cards: [], linkActions: [], panels, runSlots: [], settings: [], loaded: true }
     return <ModulesContext.Provider value={modules}>{ui}</ModulesContext.Provider>
@@ -532,7 +532,7 @@ describe('a question the agent stopped on', () => {
     { kind: 'driver', event: { type: 'text', text: 'Two would do.' } },
     { kind: 'choice', id: 'await-choices', title: 'Which database?', options: [{ id: 'pg', label: 'Postgres' }, { id: 'lite', label: 'SQLite' }], recommended: 'pg' },
     { kind: 'end', ok: false, waiting: true },
-  ] as FrameworkEvent[]
+  ] as OpenAgentEvent[]
 
   test('it is a panel above the message box, and the chat holds one "Asking" line and none of the choices', async () => {
     onAgent.mockResolvedValue(asked)
@@ -556,7 +556,7 @@ describe('a question the agent stopped on', () => {
   })
 
   test('once the agent has gone on, the panel is gone', async () => {
-    const on = [...asked, { kind: 'driver', event: { type: 'start', prompt: 'MySQL' } }] as FrameworkEvent[]
+    const on = [...asked, { kind: 'driver', event: { type: 'start', prompt: 'MySQL' } }] as OpenAgentEvent[]
     onAgent.mockResolvedValue(on)
     render(view({ events: on, live: true }))
     await waitFor(() => expect(screen.getAllByLabelText('Your message')).toHaveLength(2))
@@ -566,8 +566,8 @@ describe('a question the agent stopped on', () => {
 
 // What was a line above the message box is said by the chat.
 describe('a message sent while the agent works', () => {
-  const start = (prompt: string) => ({ kind: 'driver', event: { type: 'start', prompt } }) as FrameworkEvent
-  const text = { kind: 'driver', event: { type: 'text', text: 'Hi.' } } as FrameworkEvent
+  const start = (prompt: string) => ({ kind: 'driver', event: { type: 'start', prompt } }) as OpenAgentEvent
+  const text = { kind: 'driver', event: { type: 'text', text: 'Hi.' } } as OpenAgentEvent
   const queuedBoxes = () => screen.queryAllByLabelText('Your message, queued')
 
   test('it shows in the chat as queued, each one sent, until the agent\'s next prompt arrives: then it is a read message', () => {
@@ -600,7 +600,7 @@ describe('a message sent while the agent works', () => {
     try {
       const { rerender } = render(view({ live: true, events: [start('go'), text] }))
       fireEvent.click(screen.getByText('queue-one'))
-      const ended = [start('go'), text, { kind: 'end', ok: false, stopped: true }] as FrameworkEvent[]
+      const ended = [start('go'), text, { kind: 'end', ok: false, stopped: true }] as OpenAgentEvent[]
       rerender(view({ live: false, events: ended }))
       act(() => void vi.advanceTimersByTime(4_000))
       expect(queuedBoxes()).toHaveLength(1)
@@ -674,20 +674,20 @@ describe('a run just started', () => {
     const { rerender } = render(view({ live: true, events: [], startedWith: 'Say hi' }))
     expect(screen.getByText('Say hi')).toBeTruthy()
     expect(screen.getByText('Starting session')).toBeTruthy()
-    const started = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'thought', text: 'hm' } }] as FrameworkEvent[]
+    const started = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'thought', text: 'hm' } }] as OpenAgentEvent[]
     rerender(view({ live: true, events: started, startedWith: 'Say hi' }))
     expect(screen.getAllByText('Say hi')).toHaveLength(1)
     expect(screen.getByText('Working…')).toBeTruthy()
   })
 
   test('an agent just started on a device says nothing of a set-up before its card is listed: no checkout is made for it here', () => {
-    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'text', text: 'Hi.' } }] as FrameworkEvent[]
+    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'text', text: 'Hi.' } }] as OpenAgentEvent[]
     render(view({ live: true, events, remoteLabel: 'laptop' }))
     expect(screen.queryByText('Session set up')).toBeNull()
   })
 
   test('the chat says what was set up for the agent, off its card; before the card is listed the line of an agent at work has nothing to open', () => {
-    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'text', text: 'Hi.' } }] as FrameworkEvent[]
+    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }, { kind: 'driver', event: { type: 'text', text: 'Hi.' } }] as OpenAgentEvent[]
     const { rerender } = render(view({ live: true, events }))
     expect(screen.getByText('Session set up')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Session set up' })).toBeNull()
@@ -701,10 +701,10 @@ describe('a run just started', () => {
   })
 
   test('no spinner while the answer is being written, and none once the run has ended', () => {
-    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }] as FrameworkEvent[]
+    const events = [{ kind: 'driver', event: { type: 'start', prompt: 'Say hi' } }] as OpenAgentEvent[]
     const { rerender } = render(view({ live: true, events, writing: 'Hi th' }))
     expect(screen.queryByRole('status')).toBeNull()
-    rerender(view({ live: false, events: [...events, { kind: 'end', ok: true }] as FrameworkEvent[] }))
+    rerender(view({ live: false, events: [...events, { kind: 'end', ok: true }] as OpenAgentEvent[] }))
     expect(screen.queryByText(/Starting…|Working…/)).toBeNull()
   })
 })
@@ -712,7 +712,7 @@ describe('a run just started', () => {
 describe('AgentView: while the agent commits', () => {
   /** An ended run that left a file uncommitted: what the Commit button is offered for. */
   const LEFT = { ...PUSHED, empty: true, pushed: false, hasRemote: false, gitHost: false, commits: [], pendingFiles: ['index.html'] }
-  const ended = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a page' } }, { kind: 'end', ok: true }] as FrameworkEvent[]
+  const ended = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a page' } }, { kind: 'end', ok: true }] as OpenAgentEvent[]
 
   test('Commit pressed: the ask shows in the feed at once and "Committing…" takes the button\'s place; an ask that did not go through gives the button back', async () => {
     onAgent.mockResolvedValue(ended)
@@ -734,7 +734,7 @@ describe('AgentView: while the agent commits', () => {
   test('a working agent whose last prompt is the Commit ask says "Committing…", also with a sentence added after it; any other prompt says nothing, and so does an agent that ended', async () => {
     onAgent.mockResolvedValue(ended)
     onAgentHandoff.mockResolvedValue(LEFT)
-    const asked = (prompt: string, added?: string) => [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt, ...(added !== undefined ? { added } : {}) } }] as FrameworkEvent[]
+    const asked = (prompt: string, added?: string) => [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt, ...(added !== undefined ? { added } : {}) } }] as OpenAgentEvent[]
     const { rerender } = render(view({ events: asked('Commit your work.'), live: true }))
     await waitFor(() => expect(screen.getByText('Committing…')).toBeTruthy())
     rerender(view({ events: asked('Commit your work.', 'When you finish, if you changed any file, commit your work, push your branch and open no pull request.'), live: true }))
@@ -742,15 +742,15 @@ describe('AgentView: while the agent commits', () => {
     rerender(view({ events: asked('Commit your work. Then add a footer.'), live: true }))
     expect(screen.queryByText('Committing…')).toBeNull()
     // Ended: the next step is back, whatever the last prompt was.
-    const over = [...asked('Commit your work.'), { kind: 'end', ok: true }] as FrameworkEvent[]
+    const over = [...asked('Commit your work.'), { kind: 'end', ok: true }] as OpenAgentEvent[]
     onAgent.mockResolvedValue(over)
     rerender(view({ events: over, live: false }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Commit' })).toBeTruthy())
     expect(screen.queryByText('Committing…')).toBeNull()
   })
   test('the agent ended and its checkout is being cleaned up: "Committing…" stays until the branch is read, then the next step takes its place', async () => {
-    const asked = [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Commit your work.' } }] as FrameworkEvent[]
-    const over = [...asked, { kind: 'end', ok: true }] as FrameworkEvent[]
+    const asked = [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Commit your work.' } }] as OpenAgentEvent[]
+    const over = [...asked, { kind: 'end', ok: true }] as OpenAgentEvent[]
     onAgent.mockResolvedValue(ended)
     onAgentHandoff.mockResolvedValue(LEFT)
     // The answer read before the ask is remembered: it is not what the branch holds after it.
@@ -775,7 +775,7 @@ describe('AgentView: while the agent commits', () => {
 
 describe('AgentView: the next step while the agent works again', () => {
   const MERGED = { ...PUSHED, hasRemote: false, gitHost: false, pushed: false, landed: true }
-  const ended = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a page' } }, { kind: 'end', ok: true }] as FrameworkEvent[]
+  const ended = [{ kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a page' } }, { kind: 'end', ok: true }] as OpenAgentEvent[]
 
   test('a message sent to an ended agent takes the last step out of the bar at once, before the agents poll says it works', async () => {
     onAgent.mockResolvedValue(ended)
@@ -784,11 +784,11 @@ describe('AgentView: the next step while the agent works again', () => {
     await waitFor(() => expect(screen.getByText('Merged into the main branch.')).toBeTruthy())
     expect(screen.getByTestId('work-bar').dataset.show).toBe('true')
     // The feed shows the new turn; the poll still says ended.
-    const again = [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a footer' } }] as FrameworkEvent[]
+    const again = [...ended, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'driver', event: { type: 'start', prompt: 'Add a footer' } }] as OpenAgentEvent[]
     rerender(view({ events: again, live: false }))
     await waitFor(() => expect(screen.queryByText('Merged into the main branch.')).toBeNull())
     // It ends with a file left: the bar goes from empty to the new step, the old one never back.
-    const over = [...again, { kind: 'end', ok: true }] as FrameworkEvent[]
+    const over = [...again, { kind: 'end', ok: true }] as OpenAgentEvent[]
     let answer: (handoff: unknown) => void = () => {}
     onAgentHandoff.mockReturnValue(new Promise(resolve => (answer = resolve)) as never)
     onAgent.mockResolvedValue(over)

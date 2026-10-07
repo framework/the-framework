@@ -2,7 +2,7 @@
 //
 // A module's server part is the file its package exports as `./server`. The daemon imports it once,
 // in its own process, and calls one of its reads when the module's browser part asks for it
-// (`host.read(name, input)` there). The server part imports nothing from the framework at run time:
+// (`host.read(name, input)` there). The server part imports nothing from OpenAgent at run time:
 // these are types only, and its default export is a plain object that satisfies `ModuleServer`.
 
 /** What the core knows about one run: facts, never a verdict about what the run's files are. */

@@ -3,9 +3,9 @@ import { readFile, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 
 /**
- * Which of a project's packages provides one kind of the framework's data, and how its command is
+ * Which of a project's packages provides one kind of OpenAgent's data, and how its command is
  * run (#1774, #1820). A package declares what it provides in its own package.json,
- * `"openagent": { "<kind>": "<command>" }`, naming one of its own commands; the framework and the
+ * `"openagent": { "<kind>": "<command>" }`, naming one of its own commands; OpenAgent and the
  * scheduler name no package: whoever declares the kind provides it. When several installed
  * packages declare the same kind, the project's own root package.json says which one, under the
  * same key with the package's name as the value, `"openagent": { "<kind>": "<package>" }`; with
@@ -74,7 +74,7 @@ export function packageBins(name: string, bin: unknown, pkgDir: string): Record<
   return bins
 }
 
-/** The command of a project's package that provides one kind of the framework's data, by the package's declaration. */
+/** The command of a project's package that provides one kind of OpenAgent's data, by the package's declaration. */
 export interface ProvidedCommand {
   /** The package that declares it. */
   package: string

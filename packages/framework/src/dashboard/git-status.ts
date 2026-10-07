@@ -23,7 +23,7 @@ export interface GitStatusDeps {
   /**
    * The agent's start, when the status is read for an agent's checkout (#1255). The default lookup
    * answers the newest PR for the branch *in any state* — so an agent on a reused pinned branch
-   * (`the-framework/triage-quick`) wears a predecessor's merged PR as its own badge.
+   * (`openagent/triage-quick`) wears a predecessor's merged PR as its own badge.
    * With `since` set the PR is picked from the branch's whole history by {@link pickAgentPr}
    * instead: an open PR, or a closed one no older than the agent itself.
    */

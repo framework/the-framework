@@ -7,8 +7,8 @@ import { projectTickets } from './tickets.js'
 
 /**
  * A package's command just ran in the project at `root` (a module's, through the dashboard), and
- * may have written what one of the framework's provided readers caches: every provided reader
- * forgets that project, so its next read runs the provider again. The framework never knows which
+ * may have written what one of OpenAgent's provided readers caches: every provided reader
+ * forgets that project, so its next read runs the provider again. OpenAgent never knows which
  * command writes what; forgetting is cheap and re-reading is what it does anyway.
  */
 export function providedDataChanged(root: string): void {
@@ -19,7 +19,7 @@ export function providedDataChanged(root: string): void {
   projectTickets.changed(root)
 }
 
-/** The kinds of the framework's data a project's package may provide, one reader each (`git-host` is `git-host.ts`). */
+/** The kinds of OpenAgent's data a project's package may provide, one reader each (`git-host` is `git-host.ts`). */
 export const PROVIDED_KINDS = ['tickets', 'queue', 'runs', 'branches', 'git-host', 'repository'] as const
 
 /**

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { parseRequests, providedGitHost } from './git-host.js'
 
 // The git host contract (#1820): a project's package declares `"openagent": { "git-host": "<command>" }`
-// and the framework reads the project's pull requests, opens one, lands one and finds the
+// and OpenAgent reads the project's pull requests, opens one, lands one and finds the
 // project's page by running that command. Real processes: a tiny provider script that logs each
 // call it answers, in a throwaway project.
 
@@ -27,7 +27,7 @@ const REQUEST = { number: 7, url: 'https://x/pull/7', state: 'open', title: 'T',
 
 /** A project whose package.json lists `deps`, each installed under node_modules with its own package.json. */
 async function project(deps: Record<string, Record<string, unknown>>): Promise<string> {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-git host-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-git host-')))
   await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: Object.fromEntries(Object.keys(deps).map(name => [name, '*'])) }))
   for (const [name, manifest] of Object.entries(deps)) {
     const dir = join(root, 'node_modules', name)

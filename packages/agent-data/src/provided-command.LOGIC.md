@@ -1,4 +1,4 @@
-Which of a project's installed packages provides one kind of The Framework's data (the tickets, the agent queue, the runs, the checkouts, the git host), and how such a package's command is run to read it. Neither The Framework nor the runner (`agent-runner`) names a package: a package says in its own `package.json` what it provides, and when two installed packages say the same thing, the project's own `package.json` says which one it takes.
+Which of a project's installed packages provides one kind of OpenAgent's data (the tickets, the agent queue, the runs, the checkouts, the git host), and how such a package's command is run to read it. Neither OpenAgent nor the runner (`agent-runner`) names a package: a package says in its own `package.json` what it provides, and when two installed packages say the same thing, the project's own `package.json` says which one it takes.
 
 ## Context
 
@@ -8,7 +8,7 @@ Which of a project's installed packages provides one kind of The Framework's dat
 
 ## Glossary
 
-[1] kind: one sort of The Framework's data a package may provide: `tickets`, `queue`, `runs`, `branches`, `git-host`. A kind is a word both sides agree on; The Framework knows the kinds, never the packages.
+[1] kind: one sort of OpenAgent's data a package may provide: `tickets`, `queue`, `runs`, `branches`, `git-host`. A kind is a word both sides agree on; OpenAgent knows the kinds, never the packages.
 [2] provided command: the command a package declares, in its own `package.json` under `"openagent": { "<kind>": "<command>" }`, naming one of its own `bin` entries, as answering one kind [1] for the project.
 [3] the project's line: the entry in the project's own root `package.json`, `"openagent": { "<kind>": "<package name>" }`, naming which installed package provides a kind [1] when several declare it.
 
@@ -36,7 +36,7 @@ The providers of a kind [1] are the project's installed packages whose own `pack
 - one provider and no line [3] for the kind: it provides;
 - a line naming a provider: that one provides, whatever the others;
 - a line naming a package that is not a provider: nothing provides, and the problem reads "package.json names <name> for <kind>, which does not provide it", followed by "; the providers are <names>" when there are any;
-- two or more providers and no line: nothing provides, and the problem reads "<n> packages provide <kind>: <names>; name one under \"framework\" in package.json".
+- two or more providers and no line: nothing provides, and the problem reads "<n> packages provide <kind>: <names>; name one under \"openagent\" in package.json".
 
 The command answered names the package, the command and the command's file. A caller that only needs to run the command gets the command or nothing (`readProvidedCommand`); a caller that must tell the user why nothing gets the problem too (`lookupProvidedCommand`).
 

@@ -1,4 +1,4 @@
-Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2] timeline can carry, what each one says happened, and what a reader derives from it. The Framework emits none of them itself — it runs no agent — so this is a reading vocabulary: the lines of an agent's diary are read as these, and the kinds no diary yields are the ones agents recorded before The Framework stopped running them, which still render. A kind that has left this vocabulary is not read at all: an old agent's lines of that kind show nothing. It also fixes the shape of a gate [3] as the agent emits it and of the pick [4] that answers it. The file decides nothing itself, apart from turning a pick into a list of option ids; its vocabulary is what every surface agrees on.
+Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2] timeline can carry, what each one says happened, and what a reader derives from it. OpenAgent emits none of them itself — it runs no agent — so this is a reading vocabulary: the lines of an agent's diary are read as these, and the kinds no diary yields are the ones agents recorded before OpenAgent stopped running them, which still render. A kind that has left this vocabulary is not read at all: an old agent's lines of that kind show nothing. It also fixes the shape of a gate [3] as the agent emits it and of the pick [4] that answers it. The file decides nothing itself, apart from turning a pick into a list of option ids; its vocabulary is what every surface agrees on.
 
 ## Context
 
@@ -19,7 +19,7 @@ Fixes the vocabulary of the event stream [1]: every kind of event an agent's [2]
 [8] view: a markdown document an agent pushes to the dashboard's right rail while it works.
 [9] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [10] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, and the lasting record of every agent — the `logs` skill's card (what was asked, the branch, the pull request, how it ended, what it cost) and diary (what the agent said).
-[12] turn signals: what The Framework reads off a turn's final message: markdown views, reported errors, and the gate it stops at.
+[12] turn signals: what OpenAgent reads off a turn's final message: markdown views, reported errors, and the gate it stops at.
 [13] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later. The user's driver choice is `claude-code` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [14] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [15] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id.
@@ -63,11 +63,11 @@ Three events open an agent's [2] stream:
 
 #### Context
 
-**Business logic story**: the coding agent's [7] own loop reports what it does: its text, its tool calls, the start and end of each turn [14]. The Framework gates on outcomes, never on those steps.
+**Business logic story**: the coding agent's [7] own loop reports what it does: its text, its tool calls, the start and end of each turn [14]. OpenAgent gates on outcomes, never on those steps.
 
 #### Business logic
 
-Every progress event the driver [13] reports is wrapped and forwarded verbatim onto the stream, so the dashboard and the terminal can show the coding agent [7] working. The Framework decides nothing from these events; what it decides on is the turn's final message, read through the turn signals [12].
+Every progress event the driver [13] reports is wrapped and forwarded verbatim onto the stream, so the dashboard and the terminal can show the coding agent [7] working. OpenAgent decides nothing from these events; what it decides on is the turn's final message, read through the turn signals [12].
 
 ### What the agent shows the user
 
@@ -79,8 +79,8 @@ Every progress event the driver [13] reports is wrapped and forwarded verbatim o
 
 - A view [8]: a markdown document the agent [2] pushed, with a title and an id that is stable per title, so pushing a view with the same title again updates it in place rather than adding a duplicate. Non-blocking: the agent goes on.
 - An error: something went wrong that only the user can fix, reported by the agent itself through its error signal, with a headline (the first line) and an optional detail (the rest). It is an event, not a status: it says what happened at that point and stays in the log as history, and nothing clears it, because nothing can undo it. Conditions that are true now and clear themselves once gone (the project-level errors a sweep [16] finds between agents) are a different thing, in `project-errors.ts`.
-- A log line: one line of The Framework's own narration ("Finishing the session (await limit reached).", "Handed off: …").
-- A screen: a live page something the agent ran is showing (a browser, say), with its address and a label naming what it showed at that moment ("browser · <page address>"). The line is not written by the tool that runs the agent: the command itself appends it to the diary, whose path the agent's environment carries (`AGENT_DIARY`, agent-driver's rule), and The Framework knows nothing of what the page is. The same address with `ended` says the screen has gone. The dashboard shows the newest line at an address as the live page when the address is on this machine's loopback and neither an `ended` line for that address nor an end of the agent follows it; only the address and the label travel, never frames.
+- A log line: one line of OpenAgent's own narration ("Finishing the session (await limit reached).", "Handed off: …").
+- A screen: a live page something the agent ran is showing (a browser, say), with its address and a label naming what it showed at that moment ("browser · <page address>"). The line is not written by the tool that runs the agent: the command itself appends it to the diary, whose path the agent's environment carries (`AGENT_DIARY`, agent-driver's rule), and OpenAgent knows nothing of what the page is. The same address with `ended` says the screen has gone. The dashboard shows the newest line at an address as the live page when the address is on this machine's loopback and neither an `ended` line for that address nor an end of the agent follows it; only the address and the label travel, never frames.
 
 ### A gate and its pick
 

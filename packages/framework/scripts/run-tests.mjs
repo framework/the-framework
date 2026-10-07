@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const configHome = mkdtempSync(join(tmpdir(), 'framework-test-config-'))
+const configHome = mkdtempSync(join(tmpdir(), 'openagent-test-config-'))
 const packageDir = fileURLToPath(new URL('..', import.meta.url))
 
 const child = spawn(process.execPath, ['--test', '--test-timeout=60000', ...process.argv.slice(2)], {

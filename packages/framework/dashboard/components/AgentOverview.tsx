@@ -1,4 +1,4 @@
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 import { sessionInfo } from '../../src/client.js'
 import { AgentErrorCount, errorsToCount } from './AgentErrorCount.js'
 import { agentStatusPill } from '../lib/agent-status.js'
@@ -10,7 +10,7 @@ import { cn } from '../lib/utils.js'
 // in `framework`) — the agent's status and a link
 // to the live session. Cards render only when their data has arrived, so an early agent
 // shows nothing extra.
-export function AgentOverview({ events }: { events: FrameworkEvent[] }) {
+export function AgentOverview({ events }: { events: OpenAgentEvent[] }) {
   const session = sessionInfo(events)
   const status = agentStatusPill(events)
   const errors = errorsToCount(events)

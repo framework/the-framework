@@ -1,8 +1,8 @@
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 import { AgentActionsMenu } from './AgentActionsMenu.js'
 
 /** The menu is given no session, so no events: it acts on the project. Stable, so it does not churn on every render. */
-const NO_EVENTS: FrameworkEvent[] = []
+const NO_EVENTS: OpenAgentEvent[] = []
 
 // The bar at the top of the "New agent" page: the ⋮ menu of actions on the project, alone, at the
 // end of the row. The row is laid out as an agent's top bar is (AgentActionBar), so the menu is in

@@ -9,7 +9,7 @@ Lists, removes and deletes the checkouts [1] that a project's agents [2] leave b
 ## Glossary
 
 [1] checkout: an agent's own working copy of the project, where it works; the branches provider [5] says where it is and which branch it is on. The user's own working copy is "the project's checkout" or "the user's checkout".
-[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [3] retained checkout: a checkout still on disk after its agent ended.
 [5] branches provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's checkouts, in its own package.json under `"openagent": { "branches": "<command>" }` (the `branches` skill's package declares its `branches` command); it lists the checkouts, tells what a branch holds, pushes and opens a branch's pull request, lands one, and reclaims a checkout (`store/branches.ts`).
 [7] stop: ending an agent before it finishes: the Stop button, a signal to the process the agent's card names.

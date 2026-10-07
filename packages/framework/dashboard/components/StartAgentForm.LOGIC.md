@@ -4,24 +4,24 @@ The launcher on a project home [1]: the box where the user says what an agent [3
 
 **User story**: the user opens a project's project home [1], types a task into the editor or picks a command [2] from its `/` list or its Commands menu, reviews it, and presses "Start agent". The agent appears in the dashboard at once and the box is empty again, ready for the next one. The section is headed "Start an agent"; under the heading and above the box, a row of chips [16] says where the Start goes.
 
-**Problem**: The Framework ships no prompt text and runs no agent itself. What a project can be asked to do is what its own commands say, and what runs the agent is whatever tool the project's start hook names. So the launcher offers exactly what the project has, and when the project has no start hook it must say so before the user has typed a task into a box that cannot send it.
+**Problem**: OpenAgent ships no prompt text and runs no agent itself. What a project can be asked to do is what its own commands say, and what runs the agent is whatever tool the project's start hook names. So the launcher offers exactly what the project has, and when the project has no start hook it must say so before the user has typed a task into a box that cannot send it.
 
 ## Glossary
 
 [1] project home: a project's own page with the launcher (the Start form) and its composer (the prompt editor, also used to say something to an agent).
 [2] command: one of the project's skills written to be run by a person, never picked up by the coding agent on its own (its front matter says `disable-model-invocation: true`), read off the folders the coding agents read them from (`.claude/skills/`, `.agents/skills/`); typed as `/<name>`, optionally followed by an argument.
 [3] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[4] start hook: the one shell line under `start:` in the project's `.openagent/hooks.yml`. The daemon runs it with the prompt and the user's picks in its environment, and the line answers the id of the agent it started. The Framework names no tool: the line does.
+[4] start hook: the one shell line under `start:` in the project's `.openagent/hooks.yml`. The daemon runs it with the prompt and the user's picks in its environment, and the line answers the id of the agent it started. OpenAgent names no tool: the line does.
 [5] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [6] device: another machine's daemon the user saved by URL and token, to run agents on it from this dashboard.
 [7] relay: running an agent on a device: the local daemon forwards the start to the device, which runs its own project's start hook, and streams the events back, so the agent renders like a local one.
 [8] saved prompt: a prompt the user saved under a name, either for themselves (kept with their preferences) or for the project (committed in the project's repository), and loads back into the editor verbatim.
 [9] preferences: the user's dashboard settings, kept in the registry (`~/.openagent.json`, which also lists the projects).
-[10] check hook: the one shell line under `check:` in the project's `.openagent/hooks.yml`. The daemon runs it with the picked coding agent in its environment, and the line answers a list of problems, which would stop the agent, and a list of warnings, which are only worth knowing; each names its own fix. The Framework names no tool: the line does.
+[10] check hook: the one shell line under `check:` in the project's `.openagent/hooks.yml`. The daemon runs it with the picked coding agent in its environment, and the line answers a list of problems, which would stop the agent, and a list of warnings, which are only worth knowing; each names its own fix. OpenAgent names no tool: the line does.
 [11] Context: the set of paths the user picked to focus an agent on: other registered projects, by their absolute path, and files of the current project, by their path relative to the repository's root. The agent can still reach everything; the Context only says where to look.
 [12] follow-up: a prompt a Start carries besides its own: once the agent ends done with a pull request, the tool the start hook names starts a fresh agent on the same branch with that prompt and the first agent's id, and holds the pull request's merge until that one is done. Handed to the start hook as `THEN`.
 [13] publish level: how far an agent publishes its work when it finishes: `commit` (commit the work and push nothing), `branch` (commit it, push the branch and open no pull request), `pr` (commit it, push the branch and open its pull request) or `merge` (commit it, push the branch and open its pull request, set to merge on its own once its checks pass). An agent given none commits and publishes only what its prompt asks. Handed to the start hook as `PUBLISH`.
-[14] git host provider: the package of the project that declares it provides the git host; The Framework opens and lands pull requests through the command that package declares. A project with none has no git host: no pull request can be opened for it.
+[14] git host provider: the package of the project that declares it provides the git host; OpenAgent opens and lands pull requests through the command that package declares. A project with none has no git host: no pull request can be opened for it.
 [15] publish menu: the part of the launcher's "Auto" menu that lists the publish options: "Nothing", then one option per publish level [13].
 [16] chip: a small, bordered, rounded label in muted text: an icon and a few words that say one thing. A chip is either plain or the button of a menu.
 [17] local branch: the branch the project's folder has checked out, as this machine has it: its commits that are not pushed are included, and edits that are not committed are not.
@@ -184,7 +184,7 @@ A picked device lifts the block: the device runs its own project's start hook, s
 
 **User story**: the user picks Codex, and before typing a task reads under the editor "`codex` is not logged in. Run `codex login`, then start again."; after logging in and picking again, the line is gone.
 
-**Problem**: an agent whose coding agent [5] is missing or logged out would die before its first turn; said after the Start, the user has lost the task they typed and the tool may have spent a branch on it. The Framework does not know which CLI the project's tool needs, so it asks the project's check hook [10].
+**Problem**: an agent whose coding agent [5] is missing or logged out would die before its first turn; said after the Start, the user has lost the task they typed and the tool may have spent a branch on it. OpenAgent does not know which CLI the project's tool needs, so it asks the project's check hook [10].
 
 #### Business logic
 

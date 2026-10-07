@@ -2,7 +2,7 @@ Keeps the list of devices [1] this browser can hop to, and performs the device h
 
 ## Context
 
-**User story**: the user starts The Framework on a second machine and binds it to the network. That machine prints a warning and one address with a token in it. The user pastes that address into the dashboard, which saves the machine as a device [1] with a label. From then on the device is one click away: clicking it opens that machine's dashboard, already signed in, with whatever prompt was being typed carried across. A "Local" entry always comes back to this machine.
+**User story**: the user starts OpenAgent on a second machine and binds it to the network. That machine prints a warning and one address with a token in it. The user pastes that address into the dashboard, which saves the machine as a device [1] with a label. From then on the device is one click away: clicking it opens that machine's dashboard, already signed in, with whatever prompt was being typed carried across. A "Local" entry always comes back to this machine.
 
 **Problem**: a device's token is code execution on that machine for whoever holds it, and it is the only guard on a daemon bound to the network. It is also personal to the browser that was given it. Storing it with the daemon would put one person's secret into a file every browser reading that daemon can see; so the tokens stay in the browser that was told them, and nothing about a device is ever sent to a daemon except as the token on the connecting request.
 

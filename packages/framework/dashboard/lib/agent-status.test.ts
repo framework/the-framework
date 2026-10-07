@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 import { agentStatusPill } from './agent-status.js'
 
-const said = { kind: 'driver', event: { type: 'text', text: 'working' } } as FrameworkEvent
-const ended = (over: Record<string, unknown>) => ({ kind: 'end', ...over }) as FrameworkEvent
+const said = { kind: 'driver', event: { type: 'text', text: 'working' } } as OpenAgentEvent
+const ended = (over: Record<string, unknown>) => ({ kind: 'end', ...over }) as OpenAgentEvent
 
 describe('agentStatusPill', () => {
   test('says nothing with no line in the feed', () => {
@@ -27,7 +27,7 @@ describe('agentStatusPill', () => {
   test('a resumed session builds again — the stopped segment does not hold the pill (#762)', () => {
     // A resume appends a second `session` boundary to the same journal; the yellow "stopped"
     // stuck to a live agent because first-end-wins outranked everything that followed.
-    const resumed = [said, ended({ ok: false, stopped: true }), { kind: 'session' } as FrameworkEvent]
+    const resumed = [said, ended({ ok: false, stopped: true }), { kind: 'session' } as OpenAgentEvent]
     expect(agentStatusPill(resumed)).toMatchObject({ label: 'building…' })
     expect(agentStatusPill([...resumed, ended({ ok: true })])).toMatchObject({ label: 'finished' })
   })
@@ -38,7 +38,7 @@ describe('agentStatusPill', () => {
   })
 
   test('answered, the same run builds again: the leg it waited in is behind it', () => {
-    const next = { kind: 'driver', event: { type: 'text', text: 'On it.' } } as FrameworkEvent
+    const next = { kind: 'driver', event: { type: 'text', text: 'On it.' } } as OpenAgentEvent
     const answered = [said, ended({ ok: false, waiting: true }), next]
     expect(agentStatusPill(answered)).toMatchObject({ label: 'building…' })
     expect(agentStatusPill([...answered, ended({ ok: true })])).toMatchObject({ label: 'finished' })

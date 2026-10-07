@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { readFinishedDiary } from './agent-store.js'
 import { projectBranches, type BranchesFor, type Checkout } from './branches.js'
 import { isRunId, projectRuns, type AnyDiaryLine, type RunsFor } from './runs.js'
-import { OPENAGENT_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../openagent-dir.js'
 
 /**
  * A run's checkout, as the project's branches provider lists it, or `undefined` when it lists

@@ -3,7 +3,7 @@
  * iterators, and replay history from an offset (tail=N replay).
  *
  * Absorbed from `@gemstack/ai-autopilot` when that package was deleted (A2). Its element type
- * used to default to the supervisor's event; the only caller here passes `FrameworkEvent`, so
+ * used to default to the supervisor's event; the only caller here passes `OpenAgentEvent`, so
  * the parameter is now required.
  */
 export class EventStream<E> {

@@ -4,7 +4,7 @@ import { projectQueue, type QueueFor } from '../store/queue.js'
 // The cross-project agent queue (#438, part of #314; #1774): every registered project's open
 // entries in one place, for the Overview's queue total, the onboarding step and the
 // tickets page's dedupe. Each project's queue is read through the command one of its packages
-// declares (`src/store/queue.ts`); the framework knows no queue file and no queue package.
+// declares (`src/store/queue.ts`); OpenAgent knows no queue file and no queue package.
 
 /** One project's queue, as the dashboard reads it. */
 export interface ProjectQueue {

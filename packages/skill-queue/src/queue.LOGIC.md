@@ -1,4 +1,4 @@
-Reads and edits the agent queue [1], `TODO_AGENTS.md` on the `agent-data` branch [2]: which lines of the file are open queue entries [3], in what order they are worked and in which `## Priority N` section each sits, where an entry lands when it is added with a priority or without one, how an entry is removed once done, and how the library's add lands on the branch as one commit through the caller's write cycle. The same rules serve the `queue` command an agent [4] runs and the framework that queues work from the dashboard.
+Reads and edits the agent queue [1], `TODO_AGENTS.md` on the `agent-data` branch [2]: which lines of the file are open queue entries [3], in what order they are worked and in which `## Priority N` section each sits, where an entry lands when it is added with a priority or without one, how an entry is removed once done, and how the library's add lands on the branch as one commit through the caller's write cycle. The same rules serve the `queue` command an agent [4] runs and OpenAgent that queues work from the dashboard.
 
 ## Context
 

@@ -8,7 +8,7 @@ Implements the `openagent` command: four options and no verbs. The bare command 
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] start hook: the one shell line under `start` in a project's `.openagent/hooks.yml`, which the daemon runs when the user presses Start; it answers the id of the agent it began.
 [3] daemon token: the shared secret that authenticates a dashboard exposed to the network: generated once for a daemon bound to a non-loopback address, kept in `~/.openagent.json`, carried by the URL the terminal prints, and required on every request.
 

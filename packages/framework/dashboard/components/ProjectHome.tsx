@@ -1,4 +1,4 @@
-import type { FrameworkEvent, ProjectError } from '../../src/index.js'
+import type { OpenAgentEvent, ProjectError } from '../../src/index.js'
 import { StartAgentForm } from './StartAgentForm.js'
 import { ProjectActions } from './ProjectActions.js'
 import { ProjectErrorBanner } from './ProjectErrorBanner.js'
@@ -34,7 +34,7 @@ export function ProjectHome({
   projectName?: string | null | undefined
   /** The project picked in the sidebar (#1513), or null for all: the open questions shown are its only. */
   scope?: string | null
-  events: FrameworkEvent[]
+  events: OpenAgentEvent[]
   /** Carries the started agent's id through to the shell; dropping it is what #1169 was. */
   onAgentStarted?: ((intent: string, agentId: string, runsOn?: string) => void) | undefined
   files: string[]

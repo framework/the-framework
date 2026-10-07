@@ -2,10 +2,10 @@ import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 
 /**
  * The project's page on GitHub (#489, #1820): derived from the `origin` remote, so the dashboard's
- * project bar can link straight to it. The framework asks this command and never spells the host.
+ * project bar can link straight to it. OpenAgent asks this command and never spells the host.
  */
 
-/** The git host's name, as the framework labels the link. */
+/** The git host's name, as OpenAgent labels the link. */
 export const GIT_HOST_NAME = 'GitHub'
 
 /**

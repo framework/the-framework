@@ -1,4 +1,4 @@
-import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
+import type { AgentMeta, OpenAgentEvent } from '../../src/index.js'
 import { describe, expect, test } from 'vitest'
 import { holdsMainAgent, isOpenSubagent, nestRows, startedBefore, subagentEnd, subagentStartedAt, subagentsOf, taskLabel } from './subagents.js'
 
@@ -83,10 +83,10 @@ describe('subagentEnd', () => {
 })
 
 describe('startedBefore', () => {
-  const at = (time: string): FrameworkEvent => ({ kind: 'log', message: time, at: `2026-10-01T10:${time}.000Z` }) as FrameworkEvent
+  const at = (time: string): OpenAgentEvent => ({ kind: 'log', message: time, at: `2026-10-01T10:${time}.000Z` }) as OpenAgentEvent
 
   test('a subagent goes before the first event written after it started; one started after the last event goes at the end', () => {
-    const events = [at('00:00'), at('02:00'), { kind: 'log', message: 'no time' } as FrameworkEvent, at('04:00')]
+    const events = [at('00:00'), at('02:00'), { kind: 'log', message: 'no time' } as OpenAgentEvent, at('04:00')]
     const rows = startedBefore(events, [agent('a', { startedAt: '2026-10-01T10:01:00.000Z' }), agent('b', { startedAt: '2026-10-01T10:01:30.000Z' }), agent('c', { startedAt: '2026-10-01T10:03:00.000Z' }), agent('d', { startedAt: '2026-10-01T10:09:00.000Z' })])
     expect([...rows].map(([index, agents]) => [index, agents.map(a => a.id)])).toEqual([
       [1, ['a', 'b']],
@@ -103,7 +103,7 @@ describe('subagentStartedAt', () => {
   })
 
   test("a subagent's row keeps its place when its card's start time moves past the next line of the log", () => {
-    const events = [{ kind: 'log', message: 'a', at: '2026-10-01T10:00:59.000Z' }, { kind: 'log', message: 'b', at: '2026-10-01T10:01:05.000Z' }] as FrameworkEvent[]
+    const events = [{ kind: 'log', message: 'a', at: '2026-10-01T10:00:59.000Z' }, { kind: 'log', message: 'b', at: '2026-10-01T10:01:05.000Z' }] as OpenAgentEvent[]
     const rows = startedBefore(events, [agent('2026-10-01T10-01-00-000Z', { startedAt: '2026-10-01T10:01:07.500Z' })])
     expect([...rows.keys()]).toEqual([1])
   })

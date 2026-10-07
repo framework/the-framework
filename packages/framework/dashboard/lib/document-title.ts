@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 // tab alone tells you, e.g. `(2) gemstack — OpenAgent`.
 
 /** Compose the tab title from the needs-you count and the selected project name. */
-export function frameworkTitle(needsYou: number, projectName?: string | null): string {
+export function openagentTitle(needsYou: number, projectName?: string | null): string {
   const prefix = needsYou > 0 ? `(${needsYou}) ` : ''
   const scope = projectName ? `${projectName} — ` : ''
   return `${prefix}${scope}OpenAgent`
@@ -15,6 +15,6 @@ export function frameworkTitle(needsYou: number, projectName?: string | null): s
 export function useDocumentTitle(needsYou: number, projectName?: string | null): void {
   useEffect(() => {
     if (typeof document === 'undefined') return
-    document.title = frameworkTitle(needsYou, projectName)
+    document.title = openagentTitle(needsYou, projectName)
   }, [needsYou, projectName])
 }

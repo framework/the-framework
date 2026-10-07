@@ -29,7 +29,7 @@ export function entryLabel(entry: string): EntryLabel {
   return /^https?:\/\//.test(target) ? { text, url: target } : { text }
 }
 
-/** A link as a dashboard page hands it to an action: the framework's `ModuleLink`, by structure. */
+/** A link as a dashboard page hands it to an action: OpenAgent's `ModuleLink`, by structure. */
 export interface LinkToQueue {
   text: string
   href?: string
@@ -46,7 +46,7 @@ export function addArgs(link: LinkToQueue): string[] {
   return ['add', queueLine(link), ...(link.priority !== undefined ? ['--priority', String(link.priority)] : [])]
 }
 
-/** What running one command in a project answers: the framework's `ModuleCommandResult`, by structure. */
+/** What running one command in a project answers: OpenAgent's `ModuleCommandResult`, by structure. */
 export type CommandResult = { ok: true; output: unknown } | { ok: false; error: string }
 
 /** What the action did: every link queued, or stopped at the first that was not, with why. */
@@ -113,7 +113,7 @@ export function fanOutLabel(count: number): string {
   return count === 1 ? 'Spin up an agent working on the top entry' : `Spin up ${count} agents working on the top ${count} entries`
 }
 
-/** What starting one run answered: the framework's `StartRunResult`, by structure. */
+/** What starting one run answered: OpenAgent's `StartRunResult`, by structure. */
 export type StartOutcome = { ok: true; agentId: string } | { ok: false; error: string }
 
 /**

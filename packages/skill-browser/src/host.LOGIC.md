@@ -113,7 +113,7 @@ Any failure (a refusal from `page.ts`, the page closing, Chrome's own error) ans
 
 **User story**: the person watching sees the browser live at the row where the agent opened it, and sees it go when the browser closes.
 
-**Business logic story**: the process learns the diary's path from `AGENT_DIARY` in the environment of the `browser open` that started it (see `host-main.ts`), and keeps that diary for its whole life: a later command run from another environment, another agent's or a person's shell in the same project, reuses the browser and its `open`s write into that first diary, or into none when the browser was started with no diary; the dashboard reads the diary and frames the newest open screen line at an address (the rule of the framework's transcript).
+**Business logic story**: the process learns the diary's path from `AGENT_DIARY` in the environment of the `browser open` that started it (see `host-main.ts`), and keeps that diary for its whole life: a later command run from another environment, another agent's or a person's shell in the same project, reuses the browser and its `open`s write into that first diary, or into none when the browser was started with no diary; the dashboard reads the diary and frames the newest open screen line at an address (the rule of OpenAgent's transcript).
 
 #### Business logic
 

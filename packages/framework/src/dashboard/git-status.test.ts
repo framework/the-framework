@@ -42,11 +42,11 @@ test('readGitStatus degrades to no PR when the lookup fails', async () => {
 })
 
 test('a run-scoped read does not wear a predecessor PR from a reused pinned branch (#1255)', async () => {
-  // The default lookup is `gh pr view`, newest PR in any state — on `the-framework/triage-quick`
+  // The default lookup is `gh pr view`, newest PR in any state — on `openagent/triage-quick`
   // that is a merged PR from a previous firing. With `since` the pick runs through pickAgentPr.
   const old = { number: 1177, url: 'https://x/1177', state: 'MERGED', title: 'old triage', createdAt: '2026-07-25T00:00:00Z' }
   const status = await readGitStatus('/repo', {
-    git: gitWith('the-framework/triage-quick', ''),
+    git: gitWith('openagent/triage-quick', ''),
     since: '2026-07-27T14:38:59Z',
     prs: async () => [old],
   })
@@ -58,7 +58,7 @@ test('a run-scoped read still shows the run its own PR, open or just merged (#12
   const own = { number: 1301, url: 'https://x/1301', state: 'MERGED', title: 'this run', createdAt: '2026-07-27T15:00:00Z' }
   const older = { number: 1177, url: 'https://x/1177', state: 'MERGED', title: 'old triage', createdAt: '2026-07-25T00:00:00Z' }
   const status = await readGitStatus('/repo', {
-    git: gitWith('the-framework/triage-quick', ''),
+    git: gitWith('openagent/triage-quick', ''),
     since,
     prs: async () => [own, older],
   })
@@ -66,7 +66,7 @@ test('a run-scoped read still shows the run its own PR, open or just merged (#12
 
   const open = { number: 1302, url: 'https://x/1302', state: 'OPEN', title: 'open pr' }
   const withOpen = await readGitStatus('/repo', {
-    git: gitWith('the-framework/triage-quick', ''),
+    git: gitWith('openagent/triage-quick', ''),
     since,
     prs: async () => [open, older],
   })

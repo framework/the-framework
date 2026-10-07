@@ -7,7 +7,7 @@ Gives the dashboard the models each coding agent [1] offers, as the daemon [2] a
 ## Glossary
 
 [1] coding agent: the CLI doing the actual work: Claude Code or Codex.
-[2] daemon: The Framework's long-running local process that serves the dashboard and starts agents.
+[2] daemon: OpenAgent's long-running local process that serves the dashboard and starts agents.
 
 ## Business logic — TL;DR
 

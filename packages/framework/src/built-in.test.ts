@@ -7,14 +7,14 @@ import { basename, join } from 'node:path'
 import { BUILT_IN_PACKAGES, builtInBinDirs, builtInPackages, lookupProvided, providedCommand, runCleanups } from './built-in.js'
 import { providedGitHost } from './store/git-host.js'
 
-test('every built-in package is installed with the framework, and their commands have a directory each', async () => {
+test('every built-in package is installed with OpenAgent, and their commands have a directory each', async () => {
   assert.deepEqual((await builtInPackages()).map(pkg => pkg.name), [...BUILT_IN_PACKAGES])
   const dirs = await builtInBinDirs()
   assert.ok(dirs.length > 0 && dirs.every(dir => basename(dir) === 'bin'), JSON.stringify(dirs))
 })
 
 test('a project with nothing installed gets its runs, its branches and a repository to create from the built-in packages, and nothing it has no package for', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-built-in-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-built-in-')))
   try {
     assert.equal((await providedCommand(root, 'runs'))?.package, '@openagt/skill-logs')
     assert.equal((await providedCommand(root, 'branches'))?.package, '@openagt/skill-branches')
@@ -26,7 +26,7 @@ test('a project with nothing installed gets its runs, its branches and a reposit
 })
 
 test('a project\'s own package for a kind wins over the built-in one', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-built-in-own-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-built-in-own-')))
   try {
     const own = join(root, 'node_modules', 'my-logs')
     await mkdir(join(own, 'bin'), { recursive: true })
@@ -41,7 +41,7 @@ test('a project\'s own package for a kind wins over the built-in one', async () 
 })
 
 test('a built-in git host is a project\'s only when the project\'s remote is on that host', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-built-in-host-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-built-in-host-')))
   try {
     execFileSync('git', ['init', '-q'], { cwd: root })
     assert.equal(await providedGitHost()(root), undefined, 'no remote: no git host')
@@ -56,7 +56,7 @@ test('a built-in git host is a project\'s only when the project\'s remote is on 
 })
 
 test('every package that declares a clean-up is asked, the project\'s own first; a refusal, a failure and an answer that is not one are each a line, and the rest still run', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-built-in-cleanup-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-built-in-cleanup-')))
   try {
     execFileSync('git', ['init', '-q'], { cwd: root })
     const tool = async (name: string, script: string): Promise<void> => {

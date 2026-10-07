@@ -1,4 +1,4 @@
-Reads where the account's quota [1] stands by asking Claude Code for its own usage readout and parsing the prose it prints: one window per line, each with its label, its kind, the percentage used and, when printed, when it resets. Claude Code answers locally with its own credentials, so the reading costs no model turn and The Framework never handles the user's token. A reading that yields no window is reported as unavailable with a reason that says whether this attempt failed or the setup has no quota to report, never as an empty list that would read as nothing used.
+Reads where the account's quota [1] stands by asking Claude Code for its own usage readout and parsing the prose it prints: one window per line, each with its label, its kind, the percentage used and, when printed, when it resets. Claude Code answers locally with its own credentials, so the reading costs no model turn and OpenAgent never handles the user's token. A reading that yields no window is reported as unavailable with a reason that says whether this attempt failed or the setup has no quota to report, never as an empty list that would read as nothing used.
 
 ## Context
 
@@ -34,7 +34,7 @@ See `## Context`.
 
 #### Business logic
 
-The reading runs the `claude` command, found on `PATH` unless another command is configured, in print mode with JSON output and the prompt `/usage`, Claude Code's own usage command (`claude -p /usage --output-format json`). Claude Code answers it locally rather than by prompting a model, so the reading spends zero turns and zero tokens; it reaches Anthropic itself with its own login, so the caller never reads or handles the user's token. The command is never run in Claude Code's bare mode, which pins it to API-key login and would hide the subscription quota [1] this reads. The working directory is incidental, since the reading is account-wide; the process runs with the environment of The Framework's own process unless another is configured.
+The reading runs the `claude` command, found on `PATH` unless another command is configured, in print mode with JSON output and the prompt `/usage`, Claude Code's own usage command (`claude -p /usage --output-format json`). Claude Code answers it locally rather than by prompting a model, so the reading spends zero turns and zero tokens; it reaches Anthropic itself with its own login, so the caller never reads or handles the user's token. The command is never run in Claude Code's bare mode, which pins it to API-key login and would hide the subscription quota [1] this reads. The working directory is incidental, since the reading is account-wide; the process runs with the environment of OpenAgent's own process unless another is configured.
 
 ### Unwrapping the answer
 

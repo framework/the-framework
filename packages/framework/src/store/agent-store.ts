@@ -1,7 +1,7 @@
 import { join } from 'node:path'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
-import { OPENAGENT_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../openagent-dir.js'
 import { projectBranches, type BranchesFor, type Checkout } from './branches.js'
 import { isRunId, parseRunCard, projectRuns, type AnyDiaryLine, type RunsFor } from './runs.js'
 import { eventsOf, fromRunCard } from './run-record.js'
@@ -197,8 +197,8 @@ export interface StoreFs {
 const byIdDesc = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
 
 /**
- * A project's finished runs, most-recent first: what its runs provider answers, unfolded into the
- * framework's meta. No provider, or one that cannot be read, is no runs, never a throw.
+ * A project's finished runs, most-recent first: what its runs provider answers, unfolded into
+ * OpenAgent's meta. No provider, or one that cannot be read, is no runs, never a throw.
  *
  * `since` (epoch ms) is for a caller that only wants recent runs — a poll on a cadence, not the
  * history list. `fresh` asks the provider past its last answer: the caller knows a run just finished.
@@ -297,7 +297,7 @@ function parseDiary(raw: string): AnyDiaryLine[] {
  * one (it is the newer of the two), else the finished run's diary from the runs provider.
  * `undefined` for an unknown or unsafe id.
  */
-export async function loadAgentEvents(cwd: string, id: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns, branches: BranchesFor = projectBranches): Promise<FrameworkEvent[] | undefined> {
+export async function loadAgentEvents(cwd: string, id: string, fs: StoreFs = nodeStoreFs(), runs: RunsFor = projectRuns, branches: BranchesFor = projectBranches): Promise<OpenAgentEvent[] | undefined> {
   if (!isRunId(id)) return undefined
   const live = (await readLiveMetas(cwd, fs, branches).catch((): LiveAgent[] => [])).find(agent => agent.id === id)
   const liveDiary = live ? join(live.cwd, OPENAGENT_DIR, `${id}.jsonl`) : undefined
@@ -372,7 +372,7 @@ export async function readAllAgents(cwd: string, fs: StoreFs = nodeStoreFs(), ru
   const archived = await listAgents(cwd, runs, { fresh }).catch(() => [] as AgentMeta[])
   // A run that is both (a stopped run keeps its checkout, and is recorded) reads as its checkout's
   // card, plus the one late fact the record alone learns: the pull request the dashboard's own
-  // Open PR wrote onto the record, since the framework never writes a checkout's card.
+  // Open PR wrote onto the record, since OpenAgent never writes a checkout's card.
   const recorded = new Map(archived.map(agent => [agent.id, agent]))
   const withRecordedPr = (agent: LiveAgent): AgentMeta => {
     const pr = recorded.get(agent.id)?.pr

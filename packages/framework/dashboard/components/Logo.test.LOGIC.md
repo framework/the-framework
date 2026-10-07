@@ -1,4 +1,4 @@
-What the tests cover, for The Framework's mark:
+What the tests cover, for OpenAgent's mark:
 
 - **Idle** - the idle mark paints its six strands from the neutral theme ramp and animates nothing.
 - **Working** - the working mark paints every strand from its own animated gradient: six gradients, two color stops each, one animation per stop.

@@ -16,7 +16,7 @@ import { ScrollArea } from './ui/scroll-area.js'
 // The Overview landing page (#1139): a focused at-a-glance board — usage first, then what needs a
 // human (Human Queue) beside the agents working now stacked on the cards the installed packages
 // declare (#1818: the queue package's AI Queue, the tickets package's hot tickets, the scheduler
-// package's Scheduler). The framework's own cards are projections of the same .openagent files
+// package's Scheduler). OpenAgent's own cards are projections of the same .openagent files
 // over the `onDashboard` RPC, polled so they stay live; selecting a row jumps into its project or
 // straight into a session. With one project picked in the sidebar's project select (#1513), every
 // part but the usage bar shows that project's only.

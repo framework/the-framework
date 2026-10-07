@@ -1,8 +1,8 @@
-Maps a run [3] — a card and a diary, in the shape The Framework defines (`runs.ts`) — onto the record and the events the dashboard draws, so every reader of an agent's [4] card and diary — the list of agents, the replay of an ended agent, the live tail of a working one — comes through the one mapping. Reading is the only direction: the tool that runs an agent writes the card and the diary itself, and The Framework records no run of its own.
+Maps a run [3] — a card and a diary, in the shape OpenAgent defines (`runs.ts`) — onto the record and the events the dashboard draws, so every reader of an agent's [4] card and diary — the list of agents, the replay of an ended agent, the live tail of a working one — comes through the one mapping. Reading is the only direction: the tool that runs an agent writes the card and the diary itself, and OpenAgent records no run of its own.
 
 ## Context
 
-**Business logic story**: the card's plain fields and four kinds of diary line are what an agent [4] reads back about earlier runs [3] through the `logs` skill [2]; everything else the program that ran an agent knows about it is its own bookkeeping, kept on the card under one key, `caller`. The Framework reads both halves, from the agent's checkout while it works and from the runs provider once it is finished (`runs.ts`).
+**Business logic story**: the card's plain fields and four kinds of diary line are what an agent [4] reads back about earlier runs [3] through the `logs` skill [2]; everything else the program that ran an agent knows about it is its own bookkeeping, kept on the card under one key, `caller`. OpenAgent reads both halves, from the agent's checkout while it works and from the runs provider once it is finished (`runs.ts`).
 
 ## Glossary
 
@@ -41,7 +41,7 @@ See `## Context`.
 
 #### Business logic
 
-A `said` line becomes the coding agent's [8] text, a `result` line the turn's final answer, an `ended` line the end event (finished well only when the status is `done`, marked stopped only when it is `stopped`, with its detail), a `cost` line the usage event with the price as its cost. A line of any other kind is an event as written, when its kind is one of the event stream's (`events.ts`). A line whose kind is not, such as the kinds runs wrote before The Framework stopped running agents (`bootstrap`, `system-prompt`, `handoff`, `handoff-armed`), reads as nothing: the replay and the live tail both leave it out, so an old agent's page shows no empty rows for it.
+A `said` line becomes the coding agent's [8] text, a `result` line the turn's final answer, an `ended` line the end event (finished well only when the status is `done`, marked stopped only when it is `stopped`, with its detail), a `cost` line the usage event with the price as its cost. A line of any other kind is an event as written, when its kind is one of the event stream's (`events.ts`). A line whose kind is not, such as the kinds runs wrote before OpenAgent stopped running agents (`bootstrap`, `system-prompt`, `handoff`, `handoff-armed`), reads as nothing: the replay and the live tail both leave it out, so an old agent's page shows no empty rows for it.
 
 ### A line's time is its event's
 

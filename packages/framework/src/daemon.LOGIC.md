@@ -1,4 +1,4 @@
-Runs The Framework's one daemon per machine, in the foreground: it binds the dashboard on a port and host, decides whether a shared token guards it, runs each registered project's open hooks [18] once the dashboard listens, wires the dashboard to the runtime that starts agents [1] through a project's start hook and to the sweeps [2] that work in the background, runs the bridge browser [3] when asked, and on Ctrl-C runs each registered project's close hooks [18] and closes all of it. The daemon runs no agent itself, and registers no project itself: a directory is in the Projects list only when the user adds it.
+Runs OpenAgent's one daemon per machine, in the foreground: it binds the dashboard on a port and host, decides whether a shared token guards it, runs each registered project's open hooks [18] once the dashboard listens, wires the dashboard to the runtime that starts agents [1] through a project's start hook and to the sweeps [2] that work in the background, runs the bridge browser [3] when asked, and on Ctrl-C runs each registered project's close hooks [18] and closes all of it. The daemon runs no agent itself, and registers no project itself: a directory is in the Projects list only when the user adds it.
 
 ## Context
 
@@ -8,7 +8,7 @@ Runs The Framework's one daemon per machine, in the foreground: it binds the das
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption. None of them starts an agent.
 [3] the bridge: the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the pick back into the session. The bridge token is the secret the extension presents; the bridge browser is the Chrome for Testing the daemon runs for it; the Driver tab is the extension's one pinned tab that reads claude.ai's session list, visits sessions and types answers.
 [4] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` (what was asked, the branch, the pull request, how it ended, what it cost) and the diary `<id>.jsonl` (what the agent said, one line per event). While the agent has a checkout they sit under the checkout's `.openagent/`, written by the tool that runs it; a finished agent's are on the `agent-data` branch.
@@ -73,11 +73,11 @@ The daemon starts no agent at boot, and repairs none: it reads an agent's card [
 
 **User story**: the user keeps `.openagent/hooks.yml` in a project with `npx agent-scheduler start` under `open` and `npx agent-scheduler stop --unless-keep-alive` under `close`; from then on the project's scheduler is on whenever the dashboard is, and off when the dashboard closes unless the scheduler was told to keep alive. The daemon knows nothing of the scheduler: it runs the lines the file names.
 
-**Problem**: a tool that starts agents on a schedule should follow the dashboard's own life without The Framework naming that tool; and a line a person wrote must never keep the dashboard from coming up or from closing.
+**Problem**: a tool that starts agents on a schedule should follow the dashboard's own life without OpenAgent naming that tool; and a line a person wrote must never keep the dashboard from coming up or from closing.
 
 #### Business logic
 
-The hooks [18] are the project's own: the rules for the file and for running a line are in `project-hooks.ts`. Once the dashboard listens and its URL is reported, the daemon runs the open hooks of every registered project, one project after another, each in that project's root, so a slow line delays the background sweeps [2] at most, never the URL. A project added from the dashboard while the daemon runs gets its open hooks run at that moment (the rule is in `daemon-runtime.ts`), since the boot never saw it. At shutdown, once the sweeps are quiesced, the close hooks of every registered project run the same way. A project removed from the dashboard while the daemon runs gets its close hooks run at that moment (the rule is in `daemon-runtime.ts`), since the shutdown will not see it. The home directory's hooks run only when it is a registered project. The `start`, `resume` and `check` lines are not run here: they run on the user's click (`daemon-runtime.ts`, `dashboard/run-inbox.ts`, `dashboard-rpc/projects.ts`). Every line's outcome is logged as "[framework] open hook (<project>): <line>: exit <code>" (or "timed out after 60s", or "could not start: <why>"), and what the line said on stderr is logged under it. A project without the file has no hooks and nothing is logged for it.
+The hooks [18] are the project's own: the rules for the file and for running a line are in `project-hooks.ts`. Once the dashboard listens and its URL is reported, the daemon runs the open hooks of every registered project, one project after another, each in that project's root, so a slow line delays the background sweeps [2] at most, never the URL. A project added from the dashboard while the daemon runs gets its open hooks run at that moment (the rule is in `daemon-runtime.ts`), since the boot never saw it. At shutdown, once the sweeps are quiesced, the close hooks of every registered project run the same way. A project removed from the dashboard while the daemon runs gets its close hooks run at that moment (the rule is in `daemon-runtime.ts`), since the shutdown will not see it. The home directory's hooks run only when it is a registered project. The `start`, `resume` and `check` lines are not run here: they run on the user's click (`daemon-runtime.ts`, `dashboard/run-inbox.ts`, `dashboard-rpc/projects.ts`). Every line's outcome is logged as "[openagent] open hook (<project>): <line>: exit <code>" (or "timed out after 60s", or "could not start: <why>"), and what the line said on stderr is logged under it. A project without the file has no hooks and nothing is logged for it.
 
 ### What the dashboard is wired to
 
@@ -115,7 +115,7 @@ The cloud sessions the Driver tab serves are gathered across every registered pr
 
 #### Context
 
-**User story**: Ctrl-C closes the dashboard; nothing of The Framework keeps running afterwards. An agent [1] in flight belongs to the tool that started it and goes on to its end; the next dashboard shows it.
+**User story**: Ctrl-C closes the dashboard; nothing of OpenAgent keeps running afterwards. An agent [1] in flight belongs to the tool that started it and goes on to its end; the next dashboard shows it.
 
 **Problem**: a sweep [2] still committing while the rest closes would be cut mid-write; a bridge browser [3] left running would serve a daemon that is gone and hold its profile against the next daemon; a start that fails after the port is bound would leave a process squatting the port.
 

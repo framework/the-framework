@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { hasRemote } from './has-remote.js'
 
 test('a repository has a remote only when one is named origin; a folder that is no repository has none', async () => {
-  const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-has-remote-')))
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'openagent-has-remote-')))
   try {
     assert.equal(await hasRemote(dir), false, 'no repository')
     execFileSync('git', ['init', '-q'], { cwd: dir })

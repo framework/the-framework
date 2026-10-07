@@ -3,7 +3,7 @@ import { hostnameFromHostHeader, isLoopbackHost } from '../loopback-host.js'
 import { setDashboardContext } from '../dashboard-rpc/context.js'
 import { RPC_HANDLERS, RPC_EVENT_STREAM } from '../dashboard-rpc/index.js'
 import { errorMessage } from '../error-message.js'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 import type { PreferencesStore } from '../registry.js'
 import type { QuotaSource } from './quota.js'
 import type { ModelsSource } from './models.js'
@@ -28,7 +28,7 @@ export type RemoveProjectHandler = (projectId: string, files: boolean) => Remove
 /** Resolve an agent to its live event stream: the relay feeds `onEvents` from its own in-memory stream
  * rather than a file on disk (#426), and the daemon feeds an agent it is relaying from a device (#1067).
  * Returns undefined when there is no in-memory stream, so `onEvents` falls back to tailing the log. */
-export type EventsSource = (projectId: string, agentId?: string) => AsyncIterable<FrameworkEvent> | undefined
+export type EventsSource = (projectId: string, agentId?: string) => AsyncIterable<OpenAgentEvent> | undefined
 
 /** Look up the device a relayed agent (#1067) executes on, or undefined for an ordinary local agent. The
  *  daemon wires this from its live relayed-agent map; a run-scoped RPC uses it to forward a remote agent's

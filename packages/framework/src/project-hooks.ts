@@ -4,7 +4,7 @@ import { basename, delimiter, join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { builtInBinDirs } from './built-in.js'
 import { errorMessage } from './error-message.js'
-import { OPENAGENT_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './openagent-dir.js'
 
 /**
  * A project's hooks (#1774): the shell lines a project's own `.openagent/hooks.yml` names to
@@ -120,11 +120,11 @@ export interface RunHooksOptions {
  */
 export async function runProjectHooks(cwd: string, kind: HookKind, opts: RunHooksOptions = {}): Promise<void> {
   const log = opts.log ?? (() => {})
-  const hooks = await readProjectHooks(cwd, message => log(`[framework] ${kind} hook (${basename(cwd)}): ${message}`))
+  const hooks = await readProjectHooks(cwd, message => log(`[openagent] ${kind} hook (${basename(cwd)}): ${message}`))
   for (const line of hooks[kind]) {
     const outcome = await runLine(cwd, line, opts.timeoutMs ?? HOOK_TIMEOUT_MS, opts.env ?? process.env)
-    log(`[framework] ${kind} hook (${basename(cwd)}): ${line}: ${outcome.summary}`)
-    for (const said of outcome.stderr.split('\n').map(s => s.trimEnd()).filter(Boolean)) log(`[framework]   ${said}`)
+    log(`[openagent] ${kind} hook (${basename(cwd)}): ${line}: ${outcome.summary}`)
+    for (const said of outcome.stderr.split('\n').map(s => s.trimEnd()).filter(Boolean)) log(`[openagent]   ${said}`)
   }
 }
 

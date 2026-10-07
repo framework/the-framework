@@ -2,10 +2,10 @@ import { runPackageCommand, type ProvidedCommand } from '@openagt/agent-data'
 import { providedCommand } from '../built-in.js'
 
 /**
- * Finished runs, as the framework reads them (#1774). The framework keeps no run and imports no
+ * Finished runs, as OpenAgent reads them (#1774). OpenAgent keeps no run and imports no
  * records package: a project's finished runs come from whichever of its packages declares that it
  * provides them — `"openagent": { "runs": "<command>" }` in the package's own package.json — and
- * the framework reads them by running that command. Swap the package for another that answers
+ * OpenAgent reads them by running that command. Swap the package for another that answers
  * the same command line and prints the same shapes, and nothing here changes. No package declares
  * it: the project has no finished runs, only the ones still running in a checkout.
  *
@@ -14,7 +14,7 @@ import { providedCommand } from '../built-in.js'
  *   `<command> show <id> --local --full`   one run: the whole card plus `diary`, every line
  *   `<command> delete <id>`                remove a run
  *   `<command> patch <id> [--branch <b>] [--pr <n> --pr-url <url>] [--landed <commit> --from <commit>]`   the late facts
- * `--local` reads the copy on this machine, no network: the framework polls.
+ * `--local` reads the copy on this machine, no network: OpenAgent polls.
  *
  * The shapes, owned here: {@link RunCard} and {@link AnyDiaryLine}. A running agent's own card in
  * its checkout is the same shape, written by the tool that runs it.
@@ -57,7 +57,7 @@ export interface FinishedRun {
   diary: AnyDiaryLine[]
 }
 
-/** A project's finished runs: what a provider answers, read by the framework. */
+/** A project's finished runs: what a provider answers, read by OpenAgent. */
 export interface RunsSource {
   /**
    * Every finished run's card, newest first; `[]` when none can be read. `fresh` skips a list read
@@ -126,7 +126,7 @@ function diaryLines(value: unknown): AnyDiaryLine[] {
 
 /**
  * How many runs a list asks for: every run the project has, in practice. The command line takes a
- * cap, and the framework's lists (the sidebar's history, a ticket's holder, the activity feed) have
+ * cap, and OpenAgent's lists (the sidebar's history, a ticket's holder, the activity feed) have
  * always read the whole record.
  */
 const LIST_LIMIT = 10_000
@@ -213,7 +213,7 @@ export function providedRuns(now: () => number = Date.now): RunsReader {
   return Object.assign(reader, { changed: (root: string) => sources.get(root)?.source?.drop() })
 }
 
-/** The framework's one reader of finished runs, shared by every caller so they share its cache. */
+/** OpenAgent's one reader of finished runs, shared by every caller so they share its cache. */
 export const projectRuns: RunsReader = providedRuns()
 
 /** A {@link RunsFor} for a project with no provider: no finished runs. */

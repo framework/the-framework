@@ -173,7 +173,7 @@ The word, by the first rule that applies:
 
 - "waiting": the agent's [1] stored status is `waiting` (it ended on its question and waits for the user's answer), or it is a web agent whose cloud session the bridge [9] reports as parked on a question.
 - "in cloud": a web agent whose local half is done, with no pull request known, no question pending, and started within the last 12 hours (the window in `src/cloud-run-state.ts`). This outranks "saving…": the cloud side owns its own push and pull request.
-- "merged": a web agent whose adopted work (cloud work adoption [10]) had its pull request merged by The Framework.
+- "merged": a web agent whose adopted work (cloud work adoption [10]) had its pull request merged by OpenAgent.
 - "saving…": a non-web agent the daemon marks saving [7]: it ended cleanly and its process is still alive on this machine.
 - Otherwise the stored status: "running", "done", "stopped" or "failed". A main agent that is `done` while one of its subagents [16] holds its job counts as `running` here and is not marked saving (see "Subagents under their main agent"). A web agent past the 12-hour window with nothing adopted, or with a pull request, reads "done"; a web agent that was stopped or failed reads that.
 

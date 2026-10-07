@@ -21,8 +21,8 @@ async function pkg(dir: string, manifest: Record<string, unknown>, files: Record
 }
 
 test('a project\'s modules are the dependencies whose package exports ./dashboard to a file inside it', async () => {
-  const root = await tempDir('framework-modules-')
-  const elsewhere = await tempDir('framework-modules-linked-')
+  const root = await tempDir('openagent-modules-')
+  const elsewhere = await tempDir('openagent-modules-linked-')
   try {
     await pkg(root, {
       dependencies: { '@acme/logs': '1', plain: '1', missing: '1', escapes: '1', 'no-file': '1' },
@@ -61,7 +61,7 @@ test('a project\'s modules are the dependencies whose package exports ./dashboar
 })
 
 test('a module may bring a server part; every project has the built-in modules, and its own copy of one wins', async () => {
-  const root = await tempDir('framework-modules-server-')
+  const root = await tempDir('openagent-modules-server-')
   try {
     await pkg(root, { dependencies: { withServer: '1', '@openagt/files': '1' } })
     const nodeModules = join(root, 'node_modules')
@@ -72,9 +72,9 @@ test('a module may bring a server part; every project has the built-in modules, 
     assert.equal(modules.find(module => module.package === 'withServer')?.server, join(nodeModules, 'withServer', 's.js'))
     const files = modules.filter(module => module.package === '@openagt/files')
     assert.equal(files.length, 1)
-    assert.equal(files[0]!.version, '9.9.9', 'the project’s own copy, not the framework’s')
+    assert.equal(files[0]!.version, '9.9.9', 'the project’s own copy, not OpenAgent’s')
 
-    // Without its own copy, a project has the framework's: its browser part and its server part.
+    // Without its own copy, a project has OpenAgent's: its browser part and its server part.
     const builtIn = (await readProjectModules(join(root, 'no-such-project'))).find(module => module.package === '@openagt/files')
     assert.ok(builtIn, 'the built-in Files module is there for every project')
     assert.ok(builtIn.server, 'with its server part')
@@ -84,7 +84,7 @@ test('a module may bring a server part; every project has the built-in modules, 
 })
 
 test('a module serves only the files inside its module\'s own directory', async () => {
-  const root = await tempDir('framework-module-files-')
+  const root = await tempDir('openagent-module-files-')
   try {
     await pkg(root, { dependencies: { w: '1' } })
     const dir = join(root, 'node_modules', 'w')
@@ -102,7 +102,7 @@ test('a module serves only the files inside its module\'s own directory', async 
 })
 
 test('a module runs its own package\'s command in the project and gets its JSON, or the reason it has none', async () => {
-  const root = await tempDir('framework-module-command-')
+  const root = await tempDir('openagent-module-command-')
   try {
     await pkg(root, { dependencies: { one: '1', two: '1' } })
     const script = (body: string) => `#!/usr/bin/env node\n${body}\n`

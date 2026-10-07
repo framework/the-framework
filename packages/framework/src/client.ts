@@ -1,10 +1,10 @@
 // Browser-safe entry for the dashboard client (#431). Only pure event projections live
-// here — `formatFrameworkEvent` and the run-view derivations — with no Node imports, so
+// here — `formatOpenAgentEvent` and the run-view derivations — with no Node imports, so
 // the client can import these at runtime without dragging the server barrel (relay,
 // sandbox, node:fs/http, …) into the browser bundle. Types come from the root entry.
 export { DRIVERS, DRIVER_LABELS, isDriverName, driverFromImpl, type DriverName } from './driver-names.js'
 export { PUBLISH_LABELS, isPublishPick, offeredPublishPicks, publishPickIn, type PublishPick } from './publish-levels.js'
-export { formatFrameworkEvent } from './terminal.js'
+export { formatOpenAgentEvent } from './terminal.js'
 export { formatBytes } from './format-bytes.js'
 export { errorMessage } from './error-message.js'
 export { pickedIds } from './events.js'

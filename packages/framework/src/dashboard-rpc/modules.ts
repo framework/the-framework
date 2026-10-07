@@ -42,12 +42,12 @@ export async function onModules(): Promise<DashboardModule[]> {
  * Run one of a module package's commands in one project and answer its JSON output: how a module
  * reads (and changes) its own data. Refused for an unknown project and for a package that is not a
  * module of that project, so a page can run only its own package's commands, never an arbitrary
- * program. Once the command has run, the framework forgets what it had read of that project's
+ * program. Once the command has run, OpenAgent forgets what it had read of that project's
  * provided data (its queue, its runs): the command may have written it, and the next read sees
  * that at once instead of a cached copy.
  *
  * `acts` says the command is a module's action on the project (a link action), not a page's read:
- * the framework then also converges the project's data branch with origin, as its clock does
+ * OpenAgent then also converges the project's data branch with origin, as its clock does
  * every minute, before forgetting — in a project that shares its records a package's command
  * writes as a remote writer, straight to origin, and this machine's copy would otherwise show the
  * write only at the next sync.

@@ -1,7 +1,7 @@
 import { hostname } from 'node:os'
 import { join } from 'node:path'
 import { appendInbox, takeInbox, type InboxLine } from '@openagt/agent-driver'
-import { OPENAGENT_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../openagent-dir.js'
 import { runResumeHook } from '../project-hooks.js'
 import { findAgent, isPidAlive, resolveAgentCheckout } from '../store/index.js'
 
@@ -9,7 +9,7 @@ import { findAgent, isPidAlive, resolveAgentCheckout } from '../store/index.js'
  * What a person says to a run (#1774): their own words, or their answer to the question the run
  * stopped on. The daemon runs no agent, so the line reaches the run through what the run's tool
  * reads: the inbox file in the run's checkout while the run works, the project's `resume` hook
- * line once it has ended. The framework names no tool in either.
+ * line once it has ended. OpenAgent names no tool in either.
  */
 
 /**

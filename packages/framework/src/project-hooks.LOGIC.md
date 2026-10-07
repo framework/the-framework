@@ -2,14 +2,14 @@ A project's hooks [1]: the shell lines the project's own `.openagent/hooks.yml` 
 
 ## Context
 
-**User story**: the user writes `open: [npx agent-scheduler start]` and `close: [npx agent-scheduler stop --unless-keep-alive]` in the project's `.openagent/hooks.yml`; the project's scheduler then starts whenever the dashboard does and stops when it closes or when the user removes the project from the dashboard, with nothing of the scheduler known to The Framework. A user with no such file sees nothing change. The file also holds `start: agent-runner run --detach "$PROMPT" --driver "$DRIVER"` and a `resume:` line, written when the project was added or by the user; pressing Start in the dashboard then runs that line, and answering an ended agent's question runs the other, with the daemon calling no tool itself. In an empty folder with nothing installed, the line still reaches `agent-runner`: it is one of the built-in packages. And `check: agent-runner check ${DRIVER:+--driver "$DRIVER"}`: the launcher runs that line and says under the prompt box, before the Start, what would stop the agent (a coding agent not installed or logged out) and what is only worth knowing. A setting of a package (the scheduler's spend offset, say) is no hook: the package's own part of the dashboard reads and saves it through the package's own command.
+**User story**: the user writes `open: [npx agent-scheduler start]` and `close: [npx agent-scheduler stop --unless-keep-alive]` in the project's `.openagent/hooks.yml`; the project's scheduler then starts whenever the dashboard does and stops when it closes or when the user removes the project from the dashboard, with nothing of the scheduler known to OpenAgent. A user with no such file sees nothing change. The file also holds `start: agent-runner run --detach "$PROMPT" --driver "$DRIVER"` and a `resume:` line, written when the project was added or by the user; pressing Start in the dashboard then runs that line, and answering an ended agent's question runs the other, with the daemon calling no tool itself. In an empty folder with nothing installed, the line still reaches `agent-runner`: it is one of the built-in packages. And `check: agent-runner check ${DRIVER:+--driver "$DRIVER"}`: the launcher runs that line and says under the prompt box, before the Start, what would stop the agent (a coding agent not installed or logged out) and what is only worth knowing. A setting of a package (the scheduler's spend offset, say) is no hook: the package's own part of the dashboard reads and saves it through the package's own command.
 
-**Problem**: a line written `npx <tool>` downloads whatever package holds that name on npm when the project has not installed it, which for a name another publisher holds is a stranger's code run in the user's project. And the tool that starts agents on a schedule should follow the dashboard's life, but The Framework must not depend on it or name it; and a line a person wrote can fail, hang or be missing without keeping the dashboard from coming up or from closing.
+**Problem**: a line written `npx <tool>` downloads whatever package holds that name on npm when the project has not installed it, which for a name another publisher holds is a stranger's code run in the user's project. And the tool that starts agents on a schedule should follow the dashboard's life, but OpenAgent must not depend on it or name it; and a line a person wrote can fail, hang or be missing without keeping the dashboard from coming up or from closing.
 
 ## Glossary
 
 [1] hooks: the shell lines a project's own `.openagent/hooks.yml` names: the `open` and `close` lists, run in the project by the daemon when the dashboard opens and closes (the `close` list also when the user removes the project), and the `start`, `resume` and `check` lines, one shell line each, run when the user starts an agent, continues an ended one, or opens the launcher.
-[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 
 ## Business logic — TL;DR
 
@@ -18,7 +18,7 @@ A project's hooks [1]: the shell lines the project's own `.openagent/hooks.yml` 
 - **The start and resume lines** - one line each, run with the user's input in its environment; the line answers one JSON document on stdout whose `id` names the agent; no line, a failing line, a line that answers no id and a line that hangs are each an error in words.
 - **Whether the start line takes the branch to start from** - it does when it mentions `$BASE` or `${BASE`; another variable whose name only begins with `BASE` does not count.
 - **The check line** - one line, run with the picked coding agent in `DRIVER` when picked; it answers one JSON document on stdout with `problems` and `warnings`, each a list of lines; no line is an error marked as "no hook"; a broken file, a failing line, a line that answers no such lists and a line that hangs are each an error in words.
-- **What is logged** - one line per hook line, "[framework] <open|close> hook (<project>): <line>: exit <code>", or "timed out after 60s", or "could not start: <why>", followed by whatever the line printed on stderr, indented; a refused file is logged once as the reason it was ignored; a missing file logs nothing.
+- **What is logged** - one line per hook line, "[openagent] <open|close> hook (<project>): <line>: exit <code>", or "timed out after 60s", or "could not start: <why>", followed by whatever the line printed on stderr, indented; a refused file is logged once as the reason it was ignored; a missing file logs nothing.
 
 ## Business logic
 
@@ -60,7 +60,7 @@ The `start` line runs like an `open` line (through `sh -c`, in the project's roo
 
 **User story**: the user opens the launcher, or picks another coding agent in it, and reads under the prompt box, before pressing Start, what would stop the agent [2] (in red: "`claude` is not logged in. Run `claude auth login`, then start again.") and what is only worth knowing (in amber: `gh` missing); `dashboard-rpc/projects.ts` runs the line.
 
-**Problem**: only the tool that runs the agent knows which coding agent's CLI it needs and how to ask it; The Framework must not name the tool nor the CLI, so the question is the project's line, like the start line.
+**Problem**: only the tool that runs the agent knows which coding agent's CLI it needs and how to ask it; OpenAgent must not name the tool nor the CLI, so the question is the project's line, like the start line.
 
 #### Business logic
 
@@ -74,4 +74,4 @@ The `check` line runs like an `open` line (through `sh -c`, in the project's roo
 
 #### Business logic
 
-Each line is logged once it ends as "[framework] open hook (<project directory name>): <the line>: exit <code>", "…: killed by <signal>" when a signal ended it, "…: timed out after 60s" when the bound did, or "…: could not start: <why>" when it never ran; then every non-empty line the hook printed on stderr, each as "[framework]   <what it said>", since a tool's one line for a person goes there. A file that was refused is logged once as "[framework] <kind> hook (<project>): ignoring <why>". A missing file logs nothing.
+Each line is logged once it ends as "[openagent] open hook (<project directory name>): <the line>: exit <code>", "…: killed by <signal>" when a signal ended it, "…: timed out after 60s" when the bound did, or "…: could not start: <why>" when it never ran; then every non-empty line the hook printed on stderr, each as "[openagent]   <what it said>", since a tool's one line for a person goes there. A file that was refused is logged once as "[openagent] <kind> hook (<project>): ignoring <why>". A missing file logs nothing.

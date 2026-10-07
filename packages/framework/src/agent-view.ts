@@ -1,7 +1,7 @@
-import type { FrameworkEvent } from './events.js'
+import type { OpenAgentEvent } from './events.js'
 
 // Derived agent state for the dashboard's overview cards (#431): the errors a run hit and the
-// live session link — each a pure projection of the same FrameworkEvent stream the log renders,
+// live session link — each a pure projection of the same OpenAgentEvent stream the log renders,
 // so the live dashboard and a past-agent replay show the identical summary. Kept here (not in the
 // dashboard) so it is unit-tested against the real event shapes.
 
@@ -23,7 +23,7 @@ export interface AgentError {
  * A fold over the log rather than state of its own: an error is an event that happened, so the
  * list only ever grows, and reopening a finished agent shows exactly what it showed while it ran.
  */
-export function agentErrors(events: readonly FrameworkEvent[]): AgentError[] {
+export function agentErrors(events: readonly OpenAgentEvent[]): AgentError[] {
   const errors: AgentError[] = []
   for (const event of events) {
     if (event.kind === 'error') {
@@ -56,7 +56,7 @@ export interface SessionInfo {
  * event, then the id and any deep link from the latest `session-update`. Null before the
  * session opens. The link is what the old dashboard surfaced as "open session".
  */
-export function sessionInfo(events: readonly FrameworkEvent[]): SessionInfo | null {
+export function sessionInfo(events: readonly OpenAgentEvent[]): SessionInfo | null {
   let info: SessionInfo | null = null
   for (const event of events) {
     if (event.kind === 'session') {

@@ -21,7 +21,7 @@ const RUN_ID = 'run1'
 async function repoWithDirtyWorktree(opts: { remote?: boolean } = {}): Promise<{ repo: string; path: string; branch: string }> {
   const git = nodeGitRunner()
   // realpath so the mkdtemp path matches what git reports (the /var -> /private/var symlink).
-  const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-worktrees-')))
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'openagent-worktrees-')))
   await git(['init'], repo)
   await git(['config', 'user.email', 't@t'], repo)
   await git(['config', 'user.name', 't'], repo)
@@ -67,8 +67,8 @@ test("a branches/ directory that is not a git worktree is refused before any git
   const { repo, path: worktree } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()
   try {
-    // Turn the run's checkout into residue: gone as a worktree, its directory holding only the
-    // framework's bookkeeping. And leave the user's own checkout dirty, which is what must survive.
+    // Turn the run's checkout into residue: gone as a worktree, its directory holding only
+    // OpenAgent's bookkeeping. And leave the user's own checkout dirty, which is what must survive.
     await git(['worktree', 'remove', '--force', worktree], repo)
     await mkdir(join(worktree, '.openagent'), { recursive: true })
     await writeFile(join(worktree, '.openagent', `${RUN_ID}.json`), JSON.stringify({ id: RUN_ID, startedAt: '2026-01-01T00:00:00.000Z', status: 'failed' }))
@@ -88,7 +88,7 @@ test("a branches/ directory that is not a git worktree is refused before any git
 })
 
 test('the run-id branch the agent branched away from goes with the checkout when the kept branch contains it (#1657)', async () => {
-  // The framework names the checkout's birth branch to the rule; without it nothing would go.
+  // OpenAgent names the checkout's birth branch to the rule; without it nothing would go.
   const { repo, path, branch: runBranch } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()
   try {

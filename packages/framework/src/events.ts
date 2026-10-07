@@ -14,7 +14,7 @@ export interface ChoiceOption {
 
 /**
  * An interactive choice the agent pauses on until a pick arrives (#304). Emitted as
- * a `choice` {@link FrameworkEvent}; the dashboard renders it in a panel and posts
+ * a `choice` {@link OpenAgentEvent}; the dashboard renders it in a panel and posts
  * the pick back. The recommended option is what an agent nobody is watching takes.
  */
 export interface ChoiceRequest {
@@ -43,7 +43,7 @@ export interface ChoiceRequest {
 /** Who resolved a {@link ChoiceRequest}: a human, or a headless auto-accept. */
 export type ChoiceBy = 'user' | 'auto'
 
-/** What a {@link import('./agent.js').RunFrameworkOptions.requestChoice} handler resolves with. */
+/** What a {@link import('./agent.js').RunOpenAgentOptions.requestChoice} handler resolves with. */
 export interface ChoicePick {
   /** The picked option id, or (for a {@link ChoiceRequest.multi} select) the selected subset of ids. */
   picked: string | readonly string[]
@@ -57,21 +57,21 @@ export function pickedIds(picked: string | readonly string[]): string[] {
 }
 
 /**
- * The single type a run's timeline is read as. The framework emits none of these itself (#1774):
+ * The single type a run's timeline is read as. OpenAgent emits none of these itself (#1774):
  * a run's tool writes the run's diary, and every line of it is read as one of these so the
  * dashboard and the terminal render one timeline whatever wrote it.
  *
  * What a diary yields today is the agent's own progress (`driver`), the session id it reports
  * (`session-update`), the question a turn ended on (`choice`), what it cost (`usage`) and how it
  * ended (`end`). **The rest of this union is a reading vocabulary for runs recorded before the
- * daemon stopped running agents** — the framework's own narration back then. They are kept
+ * daemon stopped running agents** — OpenAgent's own narration back then. They are kept
  * because that history is still on the data branch and still has to render.
  *
  * Every event read from a diary line that says when it was written carries that time as `at`
  * (ISO 8601), so the timeline shows the same times live, after a reload, and once the run has
  * ended. Lines written before the diary kept times have none, and show none.
  */
-export type FrameworkEvent = { at?: string } & (
+export type OpenAgentEvent = { at?: string } & (
   /**
    * Emitted once at start: which agent is wrapped, the workspace, and a link. `model` is the
    * model id the driver was started with (#1438), recorded per leg — a continuation (#762) emits
@@ -94,11 +94,11 @@ export type FrameworkEvent = { at?: string } & (
    * A live screen something the agent ran is showing: a page on this machine's loopback, shown in
    * the chat where the line is, while it is the newest open screen at that address and the run
    * has not ended. `label` names what it showed then. The same address with `ended` says the
-   * screen has gone. A diary line a command appends itself (agent-driver's `DIARY_ENV`); the
-   * framework knows nothing of what the page is.
+   * screen has gone. A diary line a command appends itself (agent-driver's `DIARY_ENV`);
+   * OpenAgent knows nothing of what the page is.
    */
   | { kind: 'screen'; url: string; label: string; ended?: true }
-  /** A framework-level log line. */
+  /** An OpenAgent-level log line. */
   | { kind: 'log'; message: string }
   /**
    * Something went wrong that only the user can fix (#1500), reported by the agent itself

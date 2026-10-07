@@ -12,7 +12,7 @@ import { serveClientBundle } from './static.js'
 // always revalidate, so a dashboard upgrade reaches a browser that kept the old ones.
 
 async function bundle(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'framework-static-'))
+  const dir = await mkdtemp(join(tmpdir(), 'openagent-static-'))
   await mkdir(join(dir, 'assets'))
   await mkdir(join(dir, 'host'))
   await writeFile(join(dir, 'index.html'), '<html></html>')

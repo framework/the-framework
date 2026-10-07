@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net'
 import { startRemoteAgent, streamRemoteEvents, pingRemote, relayRpc, RelayedAgents } from './remote-run.js'
 import { type AgentMeta } from '../store/index.js'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 
 // A throwaway loopback server; the handler decides how it answers. Returns its base url + close.
 async function server(handler: (req: IncomingMessage, res: ServerResponse) => void): Promise<{ url: string; close: () => Promise<void> }> {
@@ -28,9 +28,9 @@ async function drainAgent(agents: RelayedAgents, agentId: string): Promise<void>
 }
 
 /** Wait until the stream ends (its `onEnd` fires) or a timeout trips, collecting events meanwhile. */
-function drain(target: { url: string; token: string }, agentId: string, timeoutMs = 4000): Promise<{ events: FrameworkEvent[]; ended: boolean }> {
+function drain(target: { url: string; token: string }, agentId: string, timeoutMs = 4000): Promise<{ events: OpenAgentEvent[]; ended: boolean }> {
   return new Promise(resolvePromise => {
-    const events: FrameworkEvent[] = []
+    const events: OpenAgentEvent[] = []
     const timer = setTimeout(() => resolvePromise({ events, ended: false }), timeoutMs)
     streamRemoteEvents(target, agentId, e => events.push(e), () => {
       clearTimeout(timer)
@@ -169,7 +169,7 @@ test('RelayedAgents feeds a run stream from the device and drops its token when 
     agents.register('r1', { url: srv.url, token: 't' }, stubMeta('r1'), 'proj-1')
     const stream = agents.get('r1') // grabbed synchronously, before the remote stream ends
     assert.ok(stream)
-    const got: FrameworkEvent[] = []
+    const got: OpenAgentEvent[] = []
     for await (const e of stream!) got.push(e) // replays, then ends when the device closes the body
     assert.deepEqual(got.map(e => (e as { sessionId?: string }).sessionId), ['hi'])
     assert.equal(agents.get('r1'), undefined) // dropped: the token no longer lives here
@@ -188,7 +188,7 @@ test('RelayedAgents closes cleanly on a 401 with no events (#1067)', async () =>
     agents.register('r1', { url: srv.url, token: 'stale' }, stubMeta('r1'), 'proj-1')
     const stream = agents.get('r1')
     assert.ok(stream)
-    const got: FrameworkEvent[] = []
+    const got: OpenAgentEvent[] = []
     for await (const e of stream!) got.push(e)
     assert.equal(got.length, 0) // a clean close, so the browser sees `done`, not `lost`
   } finally {
@@ -254,7 +254,7 @@ test('RelayedAgents.list surfaces a relayed run as a remote row, scoped to its p
 
 // Register a relayed agent against a device that emits one log line then an optional end line and closes,
 // and return the status left on its list row once RelayedAgents has fully drained the stream (#1077).
-async function relayEndStatus(endEvent: FrameworkEvent | null): Promise<string | undefined> {
+async function relayEndStatus(endEvent: OpenAgentEvent | null): Promise<string | undefined> {
   const srv = await server((_req, res) => {
     res.writeHead(200, { 'content-type': 'application/x-ndjson' })
     res.write(`${JSON.stringify({ kind: 'session-update', sessionId: 'working' })}\n`)
@@ -272,11 +272,11 @@ async function relayEndStatus(endEvent: FrameworkEvent | null): Promise<string |
 }
 
 test("a relayed run's list row flips to the device's ending, or stopped if the stream just drops (#1077)", async () => {
-  assert.equal(await relayEndStatus({ kind: 'end', ok: true } as FrameworkEvent), 'done')
-  assert.equal(await relayEndStatus({ kind: 'end', stopped: true, ok: false } as FrameworkEvent), 'stopped')
-  assert.equal(await relayEndStatus({ kind: 'end', ok: false } as FrameworkEvent), 'failed')
+  assert.equal(await relayEndStatus({ kind: 'end', ok: true } as OpenAgentEvent), 'done')
+  assert.equal(await relayEndStatus({ kind: 'end', stopped: true, ok: false } as OpenAgentEvent), 'stopped')
+  assert.equal(await relayEndStatus({ kind: 'end', ok: false } as OpenAgentEvent), 'failed')
   // A run that ended on a question waits for its answer: the row says so, as the device's own does.
-  assert.equal(await relayEndStatus({ kind: 'end', ok: false, waiting: true } as FrameworkEvent), 'waiting')
+  assert.equal(await relayEndStatus({ kind: 'end', ok: false, waiting: true } as OpenAgentEvent), 'waiting')
   assert.equal(await relayEndStatus(null), 'stopped') // no end event: the stream dropped, so it is no longer live
 })
 

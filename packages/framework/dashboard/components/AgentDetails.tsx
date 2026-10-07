@@ -1,4 +1,4 @@
-import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
+import type { AgentMeta, OpenAgentEvent } from '../../src/index.js'
 import { DRIVER_LABELS, driverFromImpl } from '../../src/client.js'
 import { modelName, useModels } from '../lib/models.js'
 
@@ -11,7 +11,7 @@ import { modelName, useModels } from '../lib/models.js'
 // branch / PR / changes sit in the bar row right above this, so they are not repeated here.
 
 /** What the record says the agent spent: the priced turns added up, and the turns it answered. */
-function spend(events: FrameworkEvent[]): { costUsd?: number; turns: number } {
+function spend(events: OpenAgentEvent[]): { costUsd?: number; turns: number } {
   let costUsd: number | undefined
   let turns = 0
   for (const event of events) {
@@ -33,7 +33,7 @@ function Fact({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function AgentDetails({ events, card }: { events: FrameworkEvent[]; card?: AgentDetailsCard | undefined }) {
+export function AgentDetails({ events, card }: { events: OpenAgentEvent[]; card?: AgentDetailsCard | undefined }) {
   const picked = driverFromImpl(card?.driver)
   const agent = picked ? DRIVER_LABELS[picked] : card?.driver
   const models = useModels()

@@ -17,8 +17,8 @@ const git = promisify(execFile)
  * git, because the two outcomes are git's own: no remote at all, then a bare remote added.
  */
 test('a project whose data branch cannot reach a remote carries a data-sync error until a sync converges (#1599)', async () => {
-  const project = await mkdtemp(join(tmpdir(), 'framework-sync-proj-'))
-  const remote = await mkdtemp(join(tmpdir(), 'framework-sync-remote-'))
+  const project = await mkdtemp(join(tmpdir(), 'openagent-sync-proj-'))
+  const remote = await mkdtemp(join(tmpdir(), 'openagent-sync-remote-'))
   try {
     await git('git', ['init', '-q', '-b', 'main'], { cwd: project })
     await git('git', ['config', 'user.email', 'test@example.com'], { cwd: project })
@@ -74,7 +74,7 @@ test('a project whose data branch cannot reach a remote carries a data-sync erro
  * clears it at the next turn.
  */
 test('a project where two packages provide the same kind carries a provider error until its package.json names one (#1820)', async () => {
-  const project = await mkdtemp(join(tmpdir(), 'framework-providers-'))
+  const project = await mkdtemp(join(tmpdir(), 'openagent-providers-'))
   try {
     const manifest = (named?: Record<string, string>) => JSON.stringify({ devDependencies: { a: '*', b: '*' }, ...(named ? { openagent: named } : {}) })
     await writeFile(join(project, 'package.json'), manifest())

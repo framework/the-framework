@@ -9,12 +9,12 @@ import type { AgentMeta } from '../store/index.js'
 
 // The handoff over the two providers (#1774, #1820): the branch's facts come from the branches
 // provider's `show` and its push from `push`; every pull request goes through the git host provider's
-// `open` and `merge`; and what is tested here is what the framework decides on top: which PR is
+// `open` and `merge`; and what is tested here is what OpenAgent decides on top: which PR is
 // the run's, when an existing PR is the answer, what the PR says, and what each button refuses.
 
 /** A branch with work on it, as the provider answers `show`. */
 const state = (over: Partial<BranchState> = {}): BranchState => ({
-  branch: 'the-framework/work',
+  branch: 'openagent/work',
   exists: true,
   base: 'origin/main',
   commits: [
@@ -111,9 +111,9 @@ test('a session that changed nothing is reported empty, not as an empty branch',
 })
 
 test('commits, files and line counts come back for a branch with work, as the provider answered them (#799)', async () => {
-  const { branches, calls } = fakeBranches({ 'the-framework/work': state() })
-  const handoff = await readAgentHandoff('/repo', 'the-framework/work', { branches, pr: noPr })
-  assert.deepEqual(calls, [['show', 'the-framework/work']])
+  const { branches, calls } = fakeBranches({ 'openagent/work': state() })
+  const handoff = await readAgentHandoff('/repo', 'openagent/work', { branches, pr: noPr })
+  assert.deepEqual(calls, [['show', 'openagent/work']])
   assert.equal(handoff?.exists, true)
   assert.equal(handoff?.empty, false)
   assert.equal(handoff?.base, 'origin/main')
@@ -151,16 +151,16 @@ test('pushed, merged, no remote, and uncommitted work in the checkout are carrie
 })
 
 test('the PR is looked up for the session branch (#799), and a gone branch still reports its PR: it is a remote question (#1255)', async () => {
-  const { branches } = fakeBranches({ 'the-framework/x': state({ branch: 'the-framework/x' }), gone: state({ branch: 'gone', exists: false, commits: [], files: [] }) })
+  const { branches } = fakeBranches({ 'openagent/x': state({ branch: 'openagent/x' }), gone: state({ branch: 'gone', exists: false, commits: [], files: [] }) })
   const asked: string[] = []
-  const handoff = await readAgentHandoff('/repo', 'the-framework/x', {
+  const handoff = await readAgentHandoff('/repo', 'openagent/x', {
     branches,
     pr: async (_cwd, branch) => {
       asked.push(branch)
       return { number: 7, url: 'https://example.test/7', state: 'OPEN', title: 'the pr' }
     },
   })
-  assert.deepEqual(asked, ['the-framework/x'])
+  assert.deepEqual(asked, ['openagent/x'])
   assert.equal(handoff?.pr?.number, 7)
   const goneHandoff = await readAgentHandoff('/repo', 'gone', {
     branches,
@@ -170,32 +170,32 @@ test('the PR is looked up for the session branch (#799), and a gone branch still
   assert.equal(goneHandoff?.pr?.number, 1254)
 })
 
-const agent = (over: Partial<AgentMeta> = {}): AgentMeta => ({ id: 'r1', status: 'done', startedAt: '2026-07-26T00:00:00Z', updatedAt: '2026-07-26T01:00:00Z', branch: 'the-framework/work', intent: 'fix it', ...over })
+const agent = (over: Partial<AgentMeta> = {}): AgentMeta => ({ id: 'r1', status: 'done', startedAt: '2026-07-26T00:00:00Z', updatedAt: '2026-07-26T01:00:00Z', branch: 'openagent/work', intent: 'fix it', ...over })
 const { branch: _branch, ...unbranched } = agent()
 
 test('the Open PR button pushes the branch through the branches provider, then opens its pull request through the git host, with the title and body the run gives it', async () => {
-  const { branches, gitHost, calls } = fakeBranches({ 'the-framework/work': state() })
+  const { branches, gitHost, calls } = fakeBranches({ 'openagent/work': state() })
   const result = await openAgentPullRequest('/repo', agent(), { branches, gitHost })
   assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/9', number: 9 })
   assert.deepEqual(calls.slice(-2), [
-    ['push', 'the-framework/work'],
-    ['open', 'the-framework/work', { title: 'the-framework/work', body: 'fix it\n\nOpened from OpenAgent session `r1`.' }],
+    ['push', 'openagent/work'],
+    ['open', 'openagent/work', { title: 'openagent/work', body: 'fix it\n\nOpened from OpenAgent session `r1`.' }],
   ])
   // A caller not asking for review opens a draft.
   await openAgentPullRequest('/repo', agent(), { branches, gitHost, draft: true })
-  assert.deepEqual((calls.at(-1) as unknown[])[2], { title: 'the-framework/work', body: 'fix it\n\nOpened from OpenAgent session `r1`.', draft: true })
+  assert.deepEqual((calls.at(-1) as unknown[])[2], { title: 'openagent/work', body: 'fix it\n\nOpened from OpenAgent session `r1`.', draft: true })
 })
 
 test('a run started from another branch is read from the commit its own work begins at; a subagent is never opened a pull request', async () => {
-  const { branches, gitHost, calls } = fakeBranches({ 'the-framework/work': state() })
-  const read = await readAgentHandoff('/repo', 'the-framework/work', { branches, gitHost, pr: async () => undefined, from: 'b'.repeat(40) })
+  const { branches, gitHost, calls } = fakeBranches({ 'openagent/work': state() })
+  const read = await readAgentHandoff('/repo', 'openagent/work', { branches, gitHost, pr: async () => undefined, from: 'b'.repeat(40) })
   assert.equal(read?.exists, true)
-  assert.deepEqual(calls, [['show', 'the-framework/work', { from: 'b'.repeat(40) }]])
+  assert.deepEqual(calls, [['show', 'openagent/work', { from: 'b'.repeat(40) }]])
 
   // The button's own read measures the same way, so "nothing to open" is judged on the run's own commits.
   calls.length = 0
   await openAgentPullRequest('/repo', agent({ baseCommit: 'b'.repeat(40) }), { branches, gitHost })
-  assert.deepEqual(calls[0], ['show', 'the-framework/work', { from: 'b'.repeat(40) }])
+  assert.deepEqual(calls[0], ['show', 'openagent/work', { from: 'b'.repeat(40) }])
 
   calls.length = 0
   assert.deepEqual(await openAgentPullRequest('/repo', agent({ parent: 'r0' }), { branches, gitHost }), { ok: false, error: 'this run is a subagent: its main agent lands its work and opens the pull request' })
@@ -231,7 +231,7 @@ test('a run’s handoff off its record: its branch from where its own work begin
 })
 
 test('the Open PR button refuses a session with no branch, a gone branch, an empty branch, a merged branch, a project with no branches provider, and one with no git host', async () => {
-  const { branches, gitHost } = fakeBranches({ gone: state({ branch: 'gone', exists: false, commits: [], files: [] }), empty: state({ branch: 'empty', commits: [], files: [] }), merged: state({ branch: 'merged', merged: true }), 'the-framework/work': state() })
+  const { branches, gitHost } = fakeBranches({ gone: state({ branch: 'gone', exists: false, commits: [], files: [] }), empty: state({ branch: 'empty', commits: [], files: [] }), merged: state({ branch: 'merged', merged: true }), 'openagent/work': state() })
   assert.deepEqual(await openAgentPullRequest('/repo', agent({ branch: 'merged' }), { branches, gitHost }), { ok: false, error: 'this session’s work is already merged' })
   assert.deepEqual(await openAgentPullRequest('/repo', unbranched, { branches, gitHost }), { ok: false, error: 'this session recorded no branch to open a PR from' })
   assert.deepEqual(await openAgentPullRequest('/repo', agent({ branch: 'gone' }), { branches, gitHost }), { ok: false, error: 'branch gone no longer exists' })
@@ -241,11 +241,11 @@ test('the Open PR button refuses a session with no branch, a gone branch, an emp
 })
 
 test("a provider's refusal is the button's answer, never a throw: a dirty checkout stops before the git host is asked, a refused open is the git host's line", async () => {
-  const dirty = fakeBranches({ 'the-framework/work': state() }, { push: { ok: false, error: 'the-framework/work has uncommitted work; commit or delete it, then push' } })
-  assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches: dirty.branches, gitHost: dirty.gitHost }), { ok: false, error: 'the-framework/work has uncommitted work; commit or delete it, then push' })
-  assert.deepEqual(await openRemoteBranchPullRequest('/repo', agent(), 'claude/x', { branches: dirty.branches, gitHost: dirty.gitHost }), { ok: false, error: 'the-framework/work has uncommitted work; commit or delete it, then push' })
+  const dirty = fakeBranches({ 'openagent/work': state() }, { push: { ok: false, error: 'openagent/work has uncommitted work; commit or delete it, then push' } })
+  assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches: dirty.branches, gitHost: dirty.gitHost }), { ok: false, error: 'openagent/work has uncommitted work; commit or delete it, then push' })
+  assert.deepEqual(await openRemoteBranchPullRequest('/repo', agent(), 'claude/x', { branches: dirty.branches, gitHost: dirty.gitHost }), { ok: false, error: 'openagent/work has uncommitted work; commit or delete it, then push' })
   assert.deepEqual(dirty.calls.filter(call => call[0] === 'open'), [], 'nothing asked of the git host')
-  const refused = fakeBranches({ 'the-framework/work': state() }, { open: { ok: false, error: 'gh: not logged in' } })
+  const refused = fakeBranches({ 'openagent/work': state() }, { open: { ok: false, error: 'gh: not logged in' } })
   assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches: refused.branches, gitHost: refused.gitHost }), { ok: false, error: 'gh: not logged in' })
 })
 
@@ -257,14 +257,14 @@ test('a remote-only branch gets its draft PR through the two providers, and the 
 })
 
 test('the Push button pushes a finished session\'s branch through the branches provider: the last step where the project has no git host (#1820)', async () => {
-  const { branches, gitHost, calls } = fakeBranches({ 'the-framework/work': state() })
+  const { branches, gitHost, calls } = fakeBranches({ 'openagent/work': state() })
   assert.deepEqual(await pushAgentBranch('/repo', agent(), { branches }), { ok: true })
-  assert.deepEqual(calls, [['push', 'the-framework/work']])
+  assert.deepEqual(calls, [['push', 'openagent/work']])
   assert.deepEqual(await pushAgentBranch('/repo', unbranched, { branches }), { ok: false, error: 'this session recorded no branch to push' })
   assert.deepEqual(await pushAgentBranch('/repo', agent(), { branches: noBranches }), { ok: false, error: 'this project has no branches provider to push with' })
-  const handoff = await readAgentHandoff('/repo', 'the-framework/work', { branches, gitHost: noGitHost, pr: noPr })
+  const handoff = await readAgentHandoff('/repo', 'openagent/work', { branches, gitHost: noGitHost, pr: noPr })
   assert.equal(handoff?.gitHost, false, 'the handoff says the project has no git host, so the bar offers Push')
-  assert.equal((await readAgentHandoff('/repo', 'the-framework/work', { branches, gitHost, pr: noPr }))?.gitHost, true)
+  assert.equal((await readAgentHandoff('/repo', 'openagent/work', { branches, gitHost, pr: noPr }))?.gitHost, true)
 })
 
 test('pickAgentPr trusts an open PR, and otherwise only one created after the run started (#1251)', () => {
@@ -280,7 +280,7 @@ test('pickAgentPr trusts an open PR, and otherwise only one created after the ru
 })
 
 test('an existing PR is the Open PR answer, unless the session kept committing after it closed (#1255/#1512)', async () => {
-  const { branches, gitHost, calls } = fakeBranches({ 'the-framework/work': state({ commits: [{ sha: 'tip0000000', subject: 'more' }] }), gone: state({ branch: 'gone', exists: false, commits: [], files: [] }) })
+  const { branches, gitHost, calls } = fakeBranches({ 'openagent/work': state({ commits: [{ sha: 'tip0000000', subject: 'more' }] }), gone: state({ branch: 'gone', exists: false, commits: [], files: [] }) })
   const open = { number: 5, url: 'u5', state: 'OPEN', title: 'open' }
   assert.deepEqual(await openAgentPullRequest('/repo', agent(), { branches, pr: async () => open }), { ok: true, url: 'u5', number: 5 }, 'an open PR is the answer')
   // A hands-off web agent's branch only ever existed on the remote: its PR is still the answer.
@@ -343,7 +343,7 @@ test("the Merge action lands the session's open PR through the git host (#1391)"
   const { gitHost, calls } = fakeBranches({})
   const result = await mergeAgentPr(
     '/repo',
-    { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'https://github.com/o/r/pull/7' } },
+    { id: 'r1', branch: 'openagent/x', pr: { number: 7, url: 'https://github.com/o/r/pull/7' } },
     { gitHost, prs: async () => ({ value: { number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', title: 'x' }, pending: false }) },
   )
   assert.deepEqual(calls, [['merge', 7]])
@@ -356,9 +356,9 @@ test('the Merge action refuses a session with no PR, one already landed, and a p
   assert.deepEqual(none, { ok: false, error: 'this session has no pull request to merge' })
   // A closed/merged PR is an answer, not an action: nothing to press twice.
   const open = { value: { number: 7, url: 'u', state: 'OPEN', title: 'x' }, pending: false }
-  const landed = await mergeAgentPr('/repo', { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } }, { gitHost, prs: async () => ({ ...open, value: { ...open.value, state: 'MERGED' } }) })
+  const landed = await mergeAgentPr('/repo', { id: 'r1', branch: 'openagent/x', pr: { number: 7, url: 'u' } }, { gitHost, prs: async () => ({ ...open, value: { ...open.value, state: 'MERGED' } }) })
   assert.deepEqual(landed, { ok: false, error: "this session's PR is already merged" })
-  const unprovided = await mergeAgentPr('/repo', { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } }, { gitHost: noGitHost, prs: async () => open })
+  const unprovided = await mergeAgentPr('/repo', { id: 'r1', branch: 'openagent/x', pr: { number: 7, url: 'u' } }, { gitHost: noGitHost, prs: async () => open })
   assert.deepEqual(unprovided, { ok: false, error: 'this project has no git host package to merge with' })
 })
 
@@ -366,7 +366,7 @@ test('a Merge the git host refuses comes back as the error, not a success (#1391
   const { gitHost } = fakeBranches({}, { merge: { ok: false, error: 'Pull request is not mergeable: the base branch requires review' } })
   const result = await mergeAgentPr(
     '/repo',
-    { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } },
+    { id: 'r1', branch: 'openagent/x', pr: { number: 7, url: 'u' } },
     { gitHost, prs: async () => ({ value: { number: 7, url: 'u', state: 'OPEN', title: 'x' }, pending: false }) },
   )
   assert.deepEqual(result, { ok: false, error: 'Pull request is not mergeable: the base branch requires review' })
@@ -397,7 +397,7 @@ test('"Merge into main" merges a finished session\'s branch through the branches
   const patches: unknown[][] = []
   const runs = async () => ({ list: async () => [], show: async () => undefined, remove: async () => ({ ok: true as const }), patch: async (id: string, patch: unknown) => (patches.push([id, patch]), { ok: true as const }) })
   assert.deepEqual(await mergeAgentBranch('/repo', agent(), { branches, runs }), { ok: true })
-  assert.deepEqual(calls, [['merge-branch', 'the-framework/work']])
+  assert.deepEqual(calls, [['merge-branch', 'openagent/work']])
   assert.deepEqual(patches, [[agent().id, { landed: { commit: 'c'.repeat(40), from: 'b'.repeat(40) } }]], 'the branch is gone: the record keeps where its work began and ended')
 
   // A branch the provider merged and kept (no agent's branch) still has its branch: nothing to record.

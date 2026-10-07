@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 import type { AgentMeta } from './agent-store.js'
 import { eventsOf, fromDiaryLine, fromRunCard } from './run-record.js'
 
@@ -48,11 +48,11 @@ test('a diary reads as events: the skill\'s four kinds mapped, every other line 
       { kind: 'end', ok: true },
       { kind: 'end', ok: false, stopped: true, detail: 'its process died' },
       { kind: 'end', ok: false, detail: 'API 500' },
-    ] satisfies FrameworkEvent[],
+    ] satisfies OpenAgentEvent[],
   )
 })
 
-test('a diary agent-driver\'s own log wrote reads back as the framework\'s events: driver lines, the session id, the question as a gate, a waiting end (#1774)', () => {
+test('a diary agent-driver\'s own log wrote reads back as OpenAgent\'s events: driver lines, the session id, the question as a gate, a waiting end (#1774)', () => {
   assert.deepEqual(fromDiaryLine({ kind: 'start', prompt: '/work-queue' }), { kind: 'driver', event: { type: 'start', prompt: '/work-queue' } })
   assert.deepEqual(fromDiaryLine({ kind: 'action', label: 'Bash' }), { kind: 'driver', event: { type: 'action', label: 'Bash' } })
   assert.deepEqual(fromDiaryLine({ kind: 'action', label: 'Bash', detail: 'git status' }), { kind: 'driver', event: { type: 'action', label: 'Bash', detail: 'git status' } })
@@ -64,7 +64,7 @@ test('a diary agent-driver\'s own log wrote reads back as the framework\'s event
   // An `error` block of a run recorded before the daemon stopped running agents is the agent's own report, not a driver's.
   assert.deepEqual(fromDiaryLine({ kind: 'error', headline: 'gh is not logged in', detail: 'ran gh auth status' }), { kind: 'error', headline: 'gh is not logged in', detail: 'ran gh auth status' })
   assert.deepEqual(fromDiaryLine({ kind: 'session', sessionId: 's-1' }), { kind: 'session-update', sessionId: 's-1' })
-  // The framework's own session event, written by its run child, still reads as itself.
+  // OpenAgent's own session event, written by its run child, still reads as itself.
   assert.deepEqual(fromDiaryLine({ kind: 'session', driver: 'claude-code', workspace: '/w', fake: false }), { kind: 'session', driver: 'claude-code', workspace: '/w', fake: false })
   assert.deepEqual(fromDiaryLine({ kind: 'question', title: 'Ship it?', options: [{ id: 'opt:0', label: 'Approve' }, { id: 'opt:1', label: 'Decline', stop: true }], recommended: 'opt:0' }), {
     kind: 'choice',
@@ -87,11 +87,11 @@ test('a line\'s time is its event\'s, on every kind; a line with none reads with
 })
 
 test('a line whose kind is no longer an event reads as nothing, so an old run shows no empty rows', () => {
-  // Kinds runs wrote before The Framework stopped running agents: nothing reads them any more.
+  // Kinds runs wrote before OpenAgent stopped running agents: nothing reads them any more.
   assert.equal(fromDiaryLine({ kind: 'handoff', outcome: 'done', pushed: true, url: 'https://x/pr/1' }), undefined)
   assert.equal(fromDiaryLine({ kind: 'bootstrap', at: '2026-07-26T14:50:54.113Z' }), undefined)
   assert.deepEqual(
     eventsOf([{ kind: 'said', text: 'hi' }, { kind: 'handoff-armed', push: true, pr: true }, { kind: 'open-pr', title: 't' }, { kind: 'ready-for-merge' }, { kind: 'settled' }]),
-    [{ kind: 'driver', event: { type: 'text', text: 'hi' } }, { kind: 'settled' }] satisfies FrameworkEvent[],
+    [{ kind: 'driver', event: { type: 'text', text: 'hi' } }, { kind: 'settled' }] satisfies OpenAgentEvent[],
   )
 })

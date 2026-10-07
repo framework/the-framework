@@ -83,7 +83,7 @@ export interface DashboardOptions {
    * `token` guard above, so a device without the cookie cannot start or read a run.
    */
   relay?: {
-    tailEvents: (agentId: string, onEvent: (event: import('../events.js').FrameworkEvent) => void) => () => void
+    tailEvents: (agentId: string, onEvent: (event: import('../events.js').OpenAgentEvent) => void) => () => void
     /** Run one whitelisted run-scoped RPC against this daemon's own checkout (#1067 slice 2). */
     rpc?: (fn: string, args: unknown[]) => Promise<unknown>
   }

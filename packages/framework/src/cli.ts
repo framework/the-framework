@@ -24,7 +24,7 @@ const defaultIO: CliIO = {
  * the first read; falls back to `unknown` if the file is somehow unreadable.
  */
 let cachedVersion: string | undefined
-export function frameworkVersion(): string {
+export function openagentVersion(): string {
   if (cachedVersion !== undefined) return cachedVersion
   try {
     const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json')
@@ -123,7 +123,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     return 0
   }
   if (args.version) {
-    io.out(frameworkVersion())
+    io.out(openagentVersion())
     return 0
   }
   // Everything else is bare `openagent`: serve the dashboard in the foreground until Ctrl-C.
@@ -131,7 +131,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
 }
 
 /**
- * Bare `framework`: run the dashboard server in the foreground (#456), so its logs and any
+ * Bare `openagent`: run the dashboard server in the foreground (#456), so its logs and any
  * server-thrown errors are visible and Ctrl+C stops it. Blocks until the server is signalled
  * (SIGINT/SIGTERM).
  */
@@ -189,7 +189,7 @@ function printNonLoopbackAccess(io: CliIO, host: string, url: string, token: str
  * offline or slow (2.5s cap) resolves to 'unknown', which prints nothing.
  */
 export function printStartupFooter(io: CliIO, opts: { fetchLatest?: VersionFetcher } = {}): Promise<void> {
-  const version = frameworkVersion()
+  const version = openagentVersion()
   io.out('')
   io.out('Type a prompt on the dashboard to start an agent, or use:')
   io.out('  openagent --help              All options')

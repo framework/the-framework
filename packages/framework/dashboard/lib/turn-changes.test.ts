@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'vitest'
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 import { inCheckout, turnChanges } from './turn-changes.js'
 
 const WS = '/repo/.branches/agent-1'
-const prompt = (text: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'start', prompt: text } })
-const said: FrameworkEvent = { kind: 'driver', event: { type: 'text', text: 'Done.' } }
-const edit = (path: string, added: number, removed: number, created = false): FrameworkEvent => ({
+const prompt = (text: string): OpenAgentEvent => ({ kind: 'driver', event: { type: 'start', prompt: text } })
+const said: OpenAgentEvent = { kind: 'driver', event: { type: 'text', text: 'Done.' } }
+const edit = (path: string, added: number, removed: number, created = false): OpenAgentEvent => ({
   kind: 'driver',
   event: { type: 'output', id: `call-${path}-${added}`, text: 'ok', changed: [{ path, added, removed, ...(created ? { created: true as const } : {}) }] },
 })
-const printed: FrameworkEvent = { kind: 'driver', event: { type: 'output', id: 'cmd', text: '12 passed' } }
+const printed: OpenAgentEvent = { kind: 'driver', event: { type: 'output', id: 'cmd', text: '12 passed' } }
 
 describe('inCheckout', () => {
   test('a path inside the checkout is said from the checkout; any other is left as it is', () => {

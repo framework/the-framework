@@ -7,7 +7,7 @@ Fixes the user's driver [1] choice — `claude-code` or `codex`, listed in that 
 ## Glossary
 
 [1] driver: the coding agent a person picks for an agent: `claude-code` or `codex`. An agent's record names the driver that ran it; older records also name `claude-web` and `github-actions`.
-[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 
 ## Business logic — TL;DR
 

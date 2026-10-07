@@ -8,8 +8,8 @@
   "scripts": {
     "build": "pnpm -r --filter '!__private__website' run build",
     "// Serve the production build the way an install does: the daemon, not a static server": "",
-    "preview": "pnpm build && pnpm -C packages/framework preview",
-    "dev": "pnpm build && pnpm -C packages/framework dev",
+    "preview": "pnpm build && pnpm -C packages/openagent preview",
+    "dev": "pnpm build && pnpm -C packages/openagent dev",
     "typecheck": "pnpm -r run typecheck",
     "clean": "pnpm -r run clean",
     "test": "pnpm -r --workspace-concurrency=1 run test",

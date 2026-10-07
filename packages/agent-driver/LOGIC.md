@@ -6,7 +6,7 @@ The driver family: one contract for driving a coding agent [1] as a black box, a
 
 | | this machine | a GitHub Actions runner | the vendor's cloud |
 |---|---|---|---|
-| Claude Code | `claude/` | `github-actions/` | Claude Code in a cloud session, still in the product (`packages/framework`) |
+| Claude Code | `claude/` | `github-actions/` | Claude Code in a cloud session, still in the product (`packages/openagent`) |
 | Codex | `codex/` | not yet | not yet |
 
 ## Glossary

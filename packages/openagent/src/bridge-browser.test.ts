@@ -47,7 +47,7 @@ test('the extension is the checkout’s, next to this package', () => {
 
 test('the extension comes from the checkout first, then from the package’s dist copy, and only when its manifest is the bridge’s (#1720)', async () => {
   const root = await mkdtemp(join(tmpdir(), 'agent-bridge-source-'))
-  const moduleUrl = pathToFileURL(join(root, 'framework/dist/bridge-browser.js')).href
+  const moduleUrl = pathToFileURL(join(root, 'openagent/dist/bridge-browser.js')).href
   const manifest = async (dir: string, name: string) => {
     await mkdir(dir, { recursive: true })
     await writeFile(join(dir, 'manifest.json'), JSON.stringify({ name }))
@@ -57,8 +57,8 @@ test('the extension comes from the checkout first, then from the package’s dis
   await manifest(join(root, 'chrome-extension'), 'Some other package')
   assert.equal(bridgeExtensionSource(moduleUrl), undefined, 'a foreign chrome-extension folder is not the bridge')
 
-  await manifest(join(root, 'framework/dist/chrome-extension'), 'OpenAgent: Claude web bridge')
-  assert.deepEqual(bridgeExtensionSource(moduleUrl), { dir: join(root, 'framework/dist/chrome-extension/'), checkout: false })
+  await manifest(join(root, 'openagent/dist/chrome-extension'), 'OpenAgent: Claude web bridge')
+  assert.deepEqual(bridgeExtensionSource(moduleUrl), { dir: join(root, 'openagent/dist/chrome-extension/'), checkout: false })
 
   await manifest(join(root, 'chrome-extension'), 'OpenAgent: Claude web bridge')
   assert.deepEqual(bridgeExtensionSource(moduleUrl), { dir: join(root, 'chrome-extension/'), checkout: true })

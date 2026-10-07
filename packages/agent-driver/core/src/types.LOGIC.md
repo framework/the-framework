@@ -178,7 +178,7 @@ A quota [7] reading is either available, with a list of windows, or unavailable,
 
 #### Context
 
-**Business logic story**: the daemon keeps a recent quota [7] reading on hand and re-reads it on a slow clock; the rules for keeping or dropping a retained reading live in `packages/framework/src/quota-poller.ts` and rest on this split.
+**Business logic story**: the daemon keeps a recent quota [7] reading on hand and re-reads it on a slow clock; the rules for keeping or dropping a retained reading live in `packages/openagent/src/quota-poller.ts` and rest on this split.
 
 #### Business logic
 
@@ -191,7 +191,7 @@ An unavailable quota [7] reading carries one of five reasons, split into two gro
 
 #### Context
 
-**Business logic story**: the user's driver [1] choice is `claude` or `codex`; where the agent [9] runs is its location [17]. Which implementation carried an agent is recorded on the agent, and the product maps it back to the choice in `packages/framework/src/driver-names.ts`.
+**Business logic story**: the user's driver [1] choice is `claude` or `codex`; where the agent [9] runs is its location [17]. Which implementation carried an agent is recorded on the agent, and the product maps it back to the choice in `packages/openagent/src/driver-names.ts`.
 
 #### Business logic
 

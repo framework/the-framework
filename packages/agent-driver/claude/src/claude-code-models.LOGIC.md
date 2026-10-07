@@ -4,7 +4,7 @@ Lists the models Claude Code offers: the same list its own `/model` picker shows
 
 **User story**: the user opens the agent and model menu and sees the models their Claude Code offers, by Claude Code's own names ("Opus 5.5", "Fable 5.1"), and the list follows Claude Code when it adds or retires a model.
 
-**Business logic story**: the Claude Code driver lists the models through this reader (`claude-code.ts`); the product asks once and keeps the answer (`packages/framework/src/dashboard/models.ts`).
+**Business logic story**: the Claude Code driver lists the models through this reader (`claude-code.ts`); the product asks once and keeps the answer (`packages/openagent/src/dashboard/models.ts`).
 
 ## Glossary
 

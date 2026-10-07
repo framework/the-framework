@@ -4,7 +4,7 @@ Reads where the account's quota [1] stands by asking Claude Code for its own usa
 
 **User story**: the dashboard shows the account's quota [1] as bars, one per window, and unattended work stands down past the quota boundary [2]; a wrong reading of "nothing used" would let unattended agents [3] run the account dry.
 
-**Business logic story**: Claude Code prints its usage as prose for a person, not as data, so this is a text parse and a reworded readout is a real failure mode. Every empty reading therefore carries a reason, and the daemon's rules for keeping or dropping an earlier reading rest on that reason (`packages/framework/src/quota-poller.ts`). The Claude Code driver [4] reads the quota through this reader (`claude-code.ts`).
+**Business logic story**: Claude Code prints its usage as prose for a person, not as data, so this is a text parse and a reworded readout is a real failure mode. Every empty reading therefore carries a reason, and the daemon's rules for keeping or dropping an earlier reading rest on that reason (`packages/openagent/src/quota-poller.ts`). The Claude Code driver [4] reads the quota through this reader (`claude-code.ts`).
 
 ## Glossary
 
@@ -80,7 +80,7 @@ A `claude` command that cannot be started at all, because it is not installed or
 
 #### Context
 
-**Business logic story**: the daemon keeps a recent quota [1] reading on hand and re-reads it on a slow clock; whether an earlier reading may stand in for a failed one depends on what the failure says (`packages/framework/src/quota-poller.ts`).
+**Business logic story**: the daemon keeps a recent quota [1] reading on hand and re-reads it on a slow clock; whether an earlier reading may stand in for a failed one depends on what the failure says (`packages/openagent/src/quota-poller.ts`).
 
 #### Business logic
 

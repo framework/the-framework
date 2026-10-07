@@ -215,7 +215,7 @@ A change is handed the checkout [2] directory and works with plain files under i
 
 #### Context
 
-**User story**: the user removes a project from the dashboard and asks for OpenAgent's files in the folder to go too (`packages/framework/src/remove-files.ts`). The branch and its checkout [2] leave this machine. What origin holds of the branch stays there.
+**User story**: the user removes a project from the dashboard and asks for OpenAgent's files in the folder to go too (`packages/openagent/src/remove-files.ts`). The branch and its checkout [2] leave this machine. What origin holds of the branch stays there.
 
 **Problem**: the branch belongs to the whole repository, and several folders may be checkouts of it. A write or a pull may be under way in the branch's checkout at that moment. And a directory a person put where the checkout would be is not this module's to delete.
 

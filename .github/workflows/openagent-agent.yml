@@ -80,8 +80,8 @@ jobs:
       # The runner and its checkout vanish when the job ends, so the only way the driver can
       # read the agent's work (diffs, file contents) or run the next turn on top of it is a
       # branch on origin. The action does not create one for a workflow_dispatch run, so we
-      # push it here, to the name the driver chose. This mirrors the local flow, where the
-      # framework (not the agent) pushes the session branch (#799); the agent just commits.
+      # push it here, to the name the driver chose. On a person's machine it is the other way
+      # round: the agent's branch stays there, and the agent pushes it itself when it is asked to.
       - name: Push the run branch
         if: always()
         id: runbranch

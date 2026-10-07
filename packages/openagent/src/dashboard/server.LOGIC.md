@@ -22,7 +22,7 @@ The daemon's one HTTP server on its port. It serves the built dashboard and the 
 
 - **A broken install answers 503 everywhere** - without a built dashboard, every request gets 503 "the dashboard bundle is not installed" and nothing else is mounted.
 - **One route order for every request** - an unparseable request target is 400; the bridge and the web-start routes come first; then the shared-token guard; then the relay, the RPC mount, the modules' files, and finally the built dashboard.
-- **The shared token on a non-loopback bind** - a valid `?token=` sets the `fw_daemon` cookie and redirects to the clean URL, a valid cookie is admitted, anything else is 401, the comparison is constant-time, and with no token configured the guard does not exist.
+- **The shared token on a non-loopback bind** - a valid `?token=` sets the `oa_daemon` cookie and redirects to the clean URL, a valid cookie is admitted, anything else is 401, the comparison is constant-time, and with no token configured the guard does not exist.
 - **The same-origin and Host guards on a loopback bind** - the relay refuses a cross-origin or rebound-Host request with 403, exactly as the RPC mount does, because on loopback nothing else guards it.
 - **The bridge and the web-start routes carry their own token** - both are 404 unless a bridge token is configured, both authenticate with it as a bearer token, and both are reached before the shared-token guard.
 - **The relay endpoints, when the daemon wires them** - present only when the daemon supplies an events tail, starting agents through the daemon's own start closure.
@@ -72,8 +72,8 @@ The RPC surface acts through what the daemon wires into it, all of it required: 
 
 The guard exists only when the daemon configures a token, which it does for a non-loopback bind (`../daemon.ts`); on a loopback bind there is no token and local behavior is byte-identical to a daemon without the guard. With a token configured, every request past the bridge and web-start routes goes through it:
 
-- A request carrying `?token=` equal to the shared token is answered with a 302 to the same path, with the `token` parameter removed and the rest of the query kept. The response sets the cookie `fw_daemon=<token>` marked `HttpOnly`, `SameSite=Lax` and `Path=/`, so the token leaves the URL bar, the history and the Referer after one hop, and the cookie then rides the RPC calls, the live event stream [1] and the browser preview images alike.
-- A request carrying a `fw_daemon` cookie equal to the shared token is admitted.
+- A request carrying `?token=` equal to the shared token is answered with a 302 to the same path, with the `token` parameter removed and the rest of the query kept. The response sets the cookie `oa_daemon=<token>` marked `HttpOnly`, `SameSite=Lax` and `Path=/`, so the token leaves the URL bar, the history and the Referer after one hop, and the cookie then rides the RPC calls, the live event stream [1] and the browser preview images alike.
+- A request carrying an `oa_daemon` cookie equal to the shared token is admitted.
 - Any other request is answered 401 "unauthorized".
 
 The comparison is constant-time, and a value of a different length never matches. The cookie is `Lax` rather than `Strict` on purpose: opening this dashboard from another daemon's dashboard is a cross-origin top-level navigation, and a `Strict` cookie set on it would be withheld from the redirect that follows, so the clean URL would 401. Cross-site request forgery stays covered by the same-origin check on `/_rpc`.

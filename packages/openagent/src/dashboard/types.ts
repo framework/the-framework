@@ -72,7 +72,7 @@ export interface StartAgentOptions {
   then?: string
   /**
    * Run this session on a connected device (#1067): the local daemon relays the start to the remote
-   * daemon at `url` (authenticating with `token` as the `fw_daemon` cookie) and streams its events
+   * daemon at `url` (authenticating with `token` as the `oa_daemon` cookie) and streams its events
    * back into the local agent view. The device `label` rides along (memory-only, like `url`/`token`) so
    * the local session list + notice can show which device the agent is on after a reload (#1077).
    * Memory-only relay config the dashboard sets at submit time from a saved device. NEVER persisted to

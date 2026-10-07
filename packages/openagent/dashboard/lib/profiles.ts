@@ -4,7 +4,7 @@ import { isLoopbackHost } from '../../src/client.js'
 // Client connection profiles (#1052): the saved daemons this browser can hop to. "A device I have"
 // is a CONNECTION, not an agent driver — the SPA is served by its daemon and every transport is
 // same-origin, so switching devices means navigating the browser to that daemon's origin, where the
-// #1051 bootstrap sets the fw_daemon cookie from `?token=` and everything is same-origin again.
+// #1051 bootstrap sets the oa_daemon cookie from `?token=` and everything is same-origin again.
 //
 // Storage is client-side localStorage on purpose: the token is a per-browser secret, so it must
 // never reach the daemon's registry file (the wrong home, shared across browsers). Node-free leaf

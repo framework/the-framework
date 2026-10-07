@@ -11,7 +11,7 @@ import { errorMessage } from '../error-message.js'
  * {@link EventStream}, which the dashboard reads over its normal same-origin `onEvents` channel. So
  * the browser never talks cross-origin and the token never leaves the two daemons (issue #1067 (b)).
  *
- * Authentication is the shared-token cookie (#1051), sent daemon-to-daemon: `Cookie: fw_daemon=<token>` with no
+ * Authentication is the shared-token cookie (#1051), sent daemon-to-daemon: `Cookie: oa_daemon=<token>` with no
  * `Origin` header. The remote's guard admits a matching cookie without the browser-only `?token=`
  * 302, and its `/_rpc` CSRF check (absent Origin passes) is not even on these raw routes.
  */
@@ -42,7 +42,7 @@ const PING_TIMEOUT_MS = 3_000
 export async function pingRemote(target: RemoteTarget): Promise<boolean> {
   try {
     const res = await fetch(`${trimSlashes(target.url)}/_relay/ping`, {
-      headers: { cookie: `fw_daemon=${target.token}` },
+      headers: { cookie: `oa_daemon=${target.token}` },
       signal: AbortSignal.timeout(PING_TIMEOUT_MS),
     })
     return res.ok
@@ -53,7 +53,7 @@ export async function pingRemote(target: RemoteTarget): Promise<boolean> {
 
 /** The two headers every relay request carries: JSON, and the shared-token cookie (#1051). No Origin on purpose. */
 function relayHeaders(token: string): Record<string, string> {
-  return { 'content-type': 'application/json', cookie: `fw_daemon=${token}` }
+  return { 'content-type': 'application/json', cookie: `oa_daemon=${token}` }
 }
 
 /**

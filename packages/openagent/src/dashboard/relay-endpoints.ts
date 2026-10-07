@@ -7,7 +7,7 @@ import { end, readJsonBody, requireGet, sendJson } from './http.js'
  * The device-side of the remote-agent relay (#1067): the two endpoints a daemon exposes so another
  * daemon (holding this device's token) can run a session here and watch it. They live under
  * `/_relay`, behind the shared-token guard (#1051) in {@link startDashboard}. The guard admits a matching
- * `fw_daemon` cookie without the browser-only `?token=` 302, so a daemon-to-daemon call passes with
+ * `oa_daemon` cookie without the browser-only `?token=` 302, so a daemon-to-daemon call passes with
  * a cookie and a token-less caller is already 401'd before it reaches here.
  *
  * - `POST /_relay/start`  starts an ordinary local agent and returns its {@link StartAgentResult}. It

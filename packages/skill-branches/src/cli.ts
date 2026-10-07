@@ -22,6 +22,7 @@ import { discardWorktree, reclaimWorktree, type ReclaimOutcome, type ReclaimRefu
 import { pushBranchByName, pushCheckout, type PushOutcome } from './push.js'
 import { mergeBranch, type MergeOutcome } from './merge.js'
 import { readBranchStates } from './branch-state.js'
+import { cleanup } from './cleanup.js'
 
 /**
  * The command line over the package (#1725): the same functions a caller's code calls, for an agent
@@ -60,6 +61,8 @@ export const USAGE = `usage: branches <command>
                                <commit> is the one its branch started from, in place of the default branch
          [--discard]           ... or drop it whatever it holds, uncommitted work included; the branch stays
   prune                        remove, for every checkout
+  cleanup                      remove what this tool left in the project: prune, then .branches/ and the rules hiding this tool's files from git once no checkout is left;
+                               a checkout with uncommitted work stays, and every branch with work on it; the command a dashboard asks for when a project is removed with its files
 
 JSON on stdout. Exit code 1 for a refusal or a git failure (the reason on stderr), 2 for a usage error.`
 
@@ -218,6 +221,12 @@ const COMMANDS: Record<string, Command> = {
     // Once for the whole pass: a reconcile reads every checkout that is left.
     if (removed.length) await reconcileBranchLinks(repo, { git })
     return { ok: true, removed, skipped }
+  },
+
+  async cleanup(args, cwd, git) {
+    parse(args, {}, 0)
+    const repo = await project(cwd, git)
+    return cleanup(repo, agentId => reclaim(repo, agentId, git).then(outcome => (outcome.ok ? undefined : refusalLine(agentId, outcome))), git)
   },
 }
 

@@ -20,7 +20,8 @@
     "agent-runner": "bin/agent-runner"
   },
   "openagent": {
-    "hooks": "agent-runner"
+    "hooks": "agent-runner",
+    "cleanup": "agent-runner"
   },
   "exports": {
     ".": {

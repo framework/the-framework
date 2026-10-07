@@ -1,8 +1,8 @@
-Gives an agent [1] in a shell, the user, and the dashboard's server the `branches` command over this package: `create`, `attach`, `name`, `status`, `show`, `push`, `list`, `remove` and `prune`, the same operations the runner (`agent-runner`) calls as a library, so one implementation serves every surface. Git only: no command opens or lands a pull request, and none names the project's git host. The dashboard's server names no package: it runs whichever command the project's `package.json` dependencies declare as the framework's `branches` provider (this package declares its own `branches` command), and reads or acts through `list`, `show`, `push --branch` and `remove`. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
+Gives an agent [1] in a shell, the user, and the dashboard's server the `branches` command over this package: `create`, `attach`, `name`, `status`, `show`, `push`, `list`, `remove` and `prune`, the same operations the runner (`agent-runner`) calls as a library, so one implementation serves every surface, and `cleanup`, which only the command line offers. Git only: no command opens or lands a pull request, and none names the project's git host. The dashboard's server names no package: it runs whichever command the project's `package.json` dependencies declare as the framework's `branches` provider (this package declares its own `branches` command), and reads or acts through `list`, `show`, `push --branch` and `remove`. Every run prints one JSON document on stdout, at most one line for a person on stderr, and exits with a code that says how it went: 0 for a result, 1 for a refusal or a git failure, 2 for a command line that could not be read.
 
 ## Context
 
-**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, `npx branches name <name>` to name its work, and, when its task or the person asks it to publish its work, `npx branches push` to push it, as its `branches` skill [3] instructs. The user runs `create`, `attach`, `list`, `remove` and `prune` from the project's checkout or from inside any agent's checkout. The dashboard's server runs `list` and `show` to show a run's checkout and what its branch holds, `push --branch` when the user picks "Publish branch" on a finished run, or presses "Open PR", whose first half is this push, and `remove`, with `--discard` for a run the user throws away. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
+**User story**: an agent [1] runs `npx branches status` to learn its branch and whether its checkout [2] is clean, `npx branches name <name>` to name its work, and, when its task or the person asks it to publish its work, `npx branches push` to push it, as its `branches` skill [3] instructs. The user runs `create`, `attach`, `list`, `remove`, `prune` and `cleanup` from the project's checkout or from inside any agent's checkout. The dashboard's server runs `list` and `show` to show a run's checkout and what its branch holds, `push --branch` when the user picks "Publish branch" on a finished run, or presses "Open PR", whose first half is this push, and `remove`, with `--discard` for a run the user throws away. A program parsing stdout learns the outcome and its reason; a person reading stderr learns why in one line.
 
 ## Glossary
 
@@ -21,7 +21,7 @@ Gives an agent [1] in a shell, the user, and the dashboard's server the `branche
 
 - **One JSON document, one line, an exit code** - the result or the refusal on stdout, the reason for a person on stderr, exit 0 for a result and 1 for a refusal or a git failure.
 - **A command line that cannot be read** - an unknown command, an unknown flag or the wrong argument count prints the usage on stderr, nothing on stdout, and exits 2.
-- **Where a command acts** - `create`, `attach`, `show`, `list`, `merge`, `remove`, `prune` and `push --branch` act on the project found from the `.branches/` layout, even from inside a checkout; `name`, `status` and a bare `push` act on the checkout the command runs in.
+- **Where a command acts** - `create`, `attach`, `show`, `list`, `merge`, `remove`, `prune`, `cleanup` and `push --branch` act on the project found from the `.branches/` layout, even from inside a checkout; `name`, `status` and a bare `push` act on the checkout the command runs in.
 - **Outside a repository** - a command that needs one is refused as `not-a-repo`; only git's own "not a git repository" reads as that.
 - **An agent id is checked before anything runs** - `create`, `attach` and `remove` refuse an id outside the charset, or `data`, as `invalid-id`, before the repository is even looked for.
 - **`create`: a checkout for a new agent** - `.branches/agent-<id>` on the fresh branch `agent-<id>`, from `--base` or origin's default branch, fully set up.
@@ -34,6 +34,7 @@ Gives an agent [1] in a shell, the user, and the dashboard's server the `branche
 - **`list`: every checkout under `.branches/`** - a bare JSON array, one row per checkout directory, with its branch when git knows it, the name the agent gave its work (`name`: the branch minus `agent-`, absent while the checkout is still on the branch it was created on) and its size on request.
 - **`remove`: reclaim one checkout** - under the reclaim rule, the branch kept on this machine and nothing pushed, with a line for each refusal and `no-checkout` for a missing one; with `--discard`, the checkout goes whatever it holds, uncommitted work included, the branch kept; the branch links follow at once.
 - **`prune`: reclaim every checkout** - `remove` for each checkout directory, reporting the removed and the skipped, never refusing as a whole.
+- **`cleanup`: remove what this tool left in the project** - `prune`'s reclaim for each checkout directory, then `.branches/` once it is empty, then the rules hiding this tool's files from git once no checkout of the repository still holds what they hide; reporting what was removed and what was kept, each kept path with its reason; a kept checkout never a refusal (`cleanup.ts`).
 
 ## Business logic
 
@@ -65,7 +66,7 @@ An unknown command, an unknown flag or the wrong number of arguments never reach
 
 #### Business logic
 
-The working directory decides. `create`, `attach`, `show`, `list`, `remove`, `prune`, and `push` given `--branch`, act on the project: the checkout [2] whose `.branches/` directory the working directory is under, or, when it is under none, the checkout containing the working directory (the rule is in `worktree.ts`). `name`, `status` and a bare `push` act on the checkout containing the working directory, found from anywhere inside it. `status` alone also takes the path of a checkout root as an argument, resolved against the working directory.
+The working directory decides. `create`, `attach`, `show`, `list`, `remove`, `prune`, `cleanup`, and `push` given `--branch`, act on the project: the checkout [2] whose `.branches/` directory the working directory is under, or, when it is under none, the checkout containing the working directory (the rule is in `worktree.ts`). `name`, `status` and a bare `push` act on the checkout containing the working directory, found from anywhere inside it. `status` alone also takes the path of a checkout root as an argument, resolved against the working directory.
 
 ### Outside a repository
 
@@ -180,3 +181,13 @@ See `## Context`.
 #### Business logic
 
 `prune` runs `remove`'s reclaim [9] for every checkout [2] directory under `.branches/`, each measured from `origin`'s default branch, and never refuses as a whole: the result is `{"ok": true, "removed": [ids], "skipped": [{agentId, reason, detail}]}`, each skipped entry carrying the refusal's reason and its one-line explanation, and the exit code is 0 even when every checkout was skipped. A git failure inside a removal itself ends the pass as `git-failed`. The branch links [6] are reconciled once for the whole pass, after the last checkout, and only when something was removed.
+
+### `cleanup`: remove what this tool left in the project
+
+#### Context
+
+**User story**: the user removes a project from the dashboard and asks for the tools' files in the folder to go too, or wants the same by hand and runs `branches cleanup` in the project. It is the command a dashboard asks for by the declared `cleanup` kind when a project is removed with its files: the package declares the kind in its `package.json` (`cleanup.ts`).
+
+#### Business logic
+
+`cleanup` takes no argument. It runs `prune`'s reclaim [9] for every checkout [2] directory under `.branches/`, each measured from `origin`'s default branch, then removes what `prune` leaves (`cleanup.ts`): `.branches/` once it is empty, and the rules hiding this tool's files from git, each only when this pass removed what it hid and no checkout of the repository still holds such a thing. Like `prune`, it does not check for a live run. A checkout with uncommitted work stays, every branch with work on it stays, and nothing is pushed. A kept checkout never makes it a refusal: the result is `{"ok": true, "removed": [paths], "kept": [{path, reason}]}`, paths from the project's root, a kept checkout carrying the same one-line explanation `prune` gives and anything else left under `.branches/` carrying `not made by branches` (a branch link [6] to a kept checkout stays with it and is not named), and the exit code is 0 even when everything was kept. A git failure inside a removal itself ends the pass as `git-failed`. The branch links [6] are reconciled once, after the last checkout.

@@ -1,0 +1,24 @@
+Removes what this tool left in a project: every agent's checkout [1] the reclaim [2] rule lets go, then the checkouts directory `.branches/` once it is empty, then the rules hiding this tool's files from git once no checkout of the repository still holds what they hide. What `branches cleanup` runs. It is the command a dashboard asks for by the declared `cleanup` kind when a project is removed with its files: the package declares `"openagent": { "branches": "branches", "cleanup": "branches" }` in its `package.json`. Nothing in this repository calls it yet.
+
+## Context
+
+**User story**: the user removes a project from the dashboard and asks for the tools' files in the folder to go too. The agents' checkouts [1] disappear, and no work does: a checkout with uncommitted work stays, every branch with work on it stays, and nothing reaches the remote. A user who wants the same by hand runs `branches cleanup` in the project.
+
+**Business logic story**: a dashboard holds no list of any tool's files, so the tool removes its own, and a dashboard asks for the command by the `cleanup` kind. The clean-up removes a checkout the way `prune` does, under the reclaim [2] rule of `reclaim.ts`, and adds what `prune` leaves: the directory and the rules in the repository's exclude file. It never touches the remote, the person's commits or branch, the working tree of the project's checkout, or another tool's files. Like `prune`, it does not check for a live run: whoever runs it stops the agents first, and `agent-runner cleanup` is the command that refuses while a run's process is alive.
+
+**Problem**: `.branches/` is shared. Another tool keeps its own checkout there (`.branches/agent-data`), and a person may have put a file there. Removing the directory with its contents would take those with it. The rules that hide this tool's files from git are the repository's, read by every checkout of it, the main checkout and every linked worktree: taking them out for one project would show another checkout's files in its status.
+
+## Glossary
+
+[1] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[2] reclaim: removing a finished agent's checkout once its branch holds everything in it.
+[3] branch link: a symbolic link under `.branches/`, named as the branch a checkout is on now and pointing at that checkout's directory, so `.branches/<branch>` reaches the checkout by its current branch name.
+
+## Business logic — TL;DR
+
+- **Every checkout, under the reclaim rule** - each checkout [1] directory under `.branches/` is reclaimed [2] as `prune` reclaims it, measured from `origin`'s default branch: one that goes is named in `removed` as `.branches/agent-<id>`; one that stays is named in `kept` with the refusal's line as its reason (`<branch> has uncommitted work; the checkout was kept`, `agent <id>'s checkout is on no branch; kept`, `agent <id>'s directory is not a git worktree; left alone`). A branch with work on it is never deleted, and nothing is pushed.
+- **The branch links follow** - the branch links [3] are reconciled once after the last checkout, so a link to a checkout that went goes with it. A branch link that points at a kept checkout stays with it and is not named.
+- **Whatever else is in the directory stays** - anything else still under `.branches/` is named in `kept` with the reason `not made by branches`: another tool's checkout, a person's file.
+- **The directory goes only when empty** - only when nothing was kept: `.branches/` is removed as an empty directory, never with its contents, and named last in `removed` as `.branches`; when it is still there after that removal failed, it is kept with `not empty`.
+- **The rules are the repository's** - a pass that removed nothing never touches the exclude file, so a rule written by hand stays. After a pass that removed something: the lines `/node_modules/.bin/branches`, `/.claude/skills/branches` and `/.agents/skills/branches` are taken out only when no agent's directory was kept here and git knows no agent's checkout anywhere in the repository, in this project or under another checkout's `.branches/`; the line `/.branches` is taken out only when this pass removed the directory and no checkout of the repository, the main one and every linked worktree, still has a `.branches`. A failure to list the checkouts or to take a rule out leaves the rules and changes nothing in the answer.
+- **The answer** - `{"ok":true,"removed":[<paths>],"kept":[{"path":…,"reason":…}]}`, paths from the project's root; a kept checkout never makes the clean-up a refusal. A project the tool never worked in, and a second clean-up, answer `{"ok":true,"removed":[],"kept":[]}` and change nothing. The command around it refuses `not-a-repo` outside a repository, and a git failure inside a removal ends the pass as `git-failed` (`cli.ts`).

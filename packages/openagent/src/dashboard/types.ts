@@ -57,7 +57,7 @@ export interface StartAgentOptions {
   model?: string
   /** Which coding agent the run is on: `claude-code` or `codex`. */
   driver?: string
-  /** The person's saved pick of how far the run takes its work when the agent finishes. Absent, none is saved: the daemon starts the run as far as the project goes with no pull request. A pick the project is not offered is held to that too. */
+  /** The person's saved pick of how far the run takes its work when the agent finishes. Absent, none is saved: the daemon starts the run at `commit`. A saved pick the project is not offered is held to the furthest the project goes with no pull request. */
   publish?: PublishPick
   /**
    * The branch the agent's own branch starts from, as this machine has it, commits that are not

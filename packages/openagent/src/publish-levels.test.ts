@@ -7,9 +7,9 @@ test('a project with a git host is offered every pick; one without is offered No
   assert.deepEqual(offeredPublishPicks(false), ['nothing', 'commit', 'branch'])
 })
 
-test('the pick in force: Publish branch until one is saved; a pull request pick is Publish branch where there is no git host', () => {
-  assert.equal(publishPickIn(undefined, true), 'branch')
-  assert.equal(publishPickIn(undefined, false), 'branch')
+test('the pick in force: Commit until one is saved; a pull request pick is Publish branch where there is no git host', () => {
+  assert.equal(publishPickIn(undefined, true), 'commit')
+  assert.equal(publishPickIn(undefined, false), 'commit')
   assert.equal(publishPickIn('nothing', true), 'nothing')
   assert.equal(publishPickIn('commit', true), 'commit')
   assert.equal(publishPickIn('merge', true), 'merge')
@@ -34,6 +34,6 @@ test('a project with no remote is offered Nothing and Commit; a publish pick is 
   assert.equal(publishPickIn('branch', false, false), 'commit')
   assert.equal(publishPickIn(undefined, true, false), 'commit')
   assert.equal(publishPickIn('nothing', true, false), 'nothing')
-  // With a remote, as before: a pick the project is not offered falls back to the branch.
+  // With a remote, a saved pick the project is not offered falls back to the branch.
   assert.equal(publishPickIn('merge', false, true), 'branch')
 })

@@ -41,8 +41,8 @@ const STARTING = 'Starting session'
 // does by itself when it finishes. Its button reads the picks, so nothing is hidden.
 // In it, how far the run takes its work: Nothing, Commit, Publish branch, Open PR, Merge on green.
 // The level is handed to the start hook as `PUBLISH`; Nothing hands it none. Until the person
-// picks, the button shows the pick the daemon will start the run at: Publish branch, or Commit
-// with no remote. Saved, so the pick holds for every next run. A project with no git host package
+// picks, the button shows the pick the daemon will start the run at: Commit, which pushes
+// nothing. Saved, so the pick holds for every next run. A project with no git host package
 // is offered Nothing, Commit and Publish branch only, and one with no remote Nothing and Commit.
 // In it too, the "Post-merge cleanup" box, where the project has that command: ticked, the run is
 // followed by a fresh agent running the command on its branch before its pull request merges. The

@@ -2,7 +2,7 @@ Fixes how far a run [1] takes its work when its agent finishes: the four publish
 
 ## Context
 
-**User story**: the user picks in the launcher, before Start, how far the agent takes its work when it finishes: nothing, a commit, its branch pushed, its pull request, or its pull request set to merge once its checks pass. The pick is saved and holds for every next run; until the user picks, the agent commits its work and pushes its branch. In a project with no git host provider [4], where no pull request can be opened, the user is offered "Nothing", "Commit" and "Publish branch" only. In a project whose repository has no remote, where nothing can be pushed, the user is offered "Nothing" and "Commit", and the agent commits its work until the user picks.
+**User story**: the user picks in the launcher, before Start, how far the agent takes its work when it finishes: nothing, a commit, its branch pushed, its pull request, or its pull request set to merge once its checks pass. The pick is saved and holds for every next run; until the user picks, the agent commits its work and pushes nothing. In a project with no git host provider [4], where no pull request can be opened, the user is offered "Nothing", "Commit" and "Publish branch" only. In a project whose repository has no remote, where nothing can be pushed, the user is offered "Nothing" and "Commit".
 
 **Business logic story**: OpenAgent publishes nothing itself. A publish level [2] is a word handed to the project's start hook as `PUBLISH`; the four words are the ones `agent-runner run --publish` takes, and the tool the hook names tells the agent, in one sentence after its prompt, to commit its work and how far to publish it. "Nothing" hands the hook no level: the run then commits and publishes nothing unless its prompt asks.
 
@@ -19,7 +19,7 @@ Fixes how far a run [1] takes its work when its agent finishes: the four publish
 - **Five options, in one order** - `nothing`, then the four levels, labelled "Nothing", "Commit", "Publish branch", "Open PR" and "Merge on green"; the publish menu [3] lists them in that order.
 - **Only a known word counts** - a value is a publish level [2] an option only when it is one of the five words.
 - **What a project is offered** - all five options; "Nothing", "Commit" and "Publish branch" only for a project with no git host provider [4]; "Nothing" and "Commit" only for a project whose repository has no remote, since nothing can be published from it.
-- **The option in force** - the saved option when the project is offered it; otherwise, and when none is saved, "Publish branch", or "Commit" in a project whose repository has no remote.
+- **The option in force** - "Commit" until the user saves one; then the saved option when the project is offered it, and otherwise "Publish branch", or "Commit" in a project whose repository has no remote.
 - **The level an option hands over** - none for "Nothing"; for any other option, the publish level of the same word.
 
 ## Business logic
@@ -68,11 +68,11 @@ A project with a git host provider [4] is offered all five options. A project wi
 
 #### Context
 
-**Problem**: the saved option is one setting for every project, so an option saved in a project that has a git host provider [4] can be one another project is not offered. And a user who never opened the menu has saved none: an agent that then committed nothing would leave its work only in its checkout.
+**Problem**: the saved option is one setting for every project, so an option saved in a project that has a git host provider [4] can be one another project is not offered. And a user who never opened the menu has saved none: an agent that then committed nothing would leave its work only in its checkout, and one that then pushed its branch would put on the remote what nobody asked to publish.
 
 #### Business logic
 
-The option in force in a project is the saved one when the project is offered it. When the project is not offered that option ("Open PR" or "Merge on green" in a project with no git host provider, or any of those and "Publish branch" in a project whose repository has no remote), the option in force is the furthest that project goes with no pull request: "Publish branch", or "Commit" where the repository has no remote. The same option is in force until the user saves one. A saved "Nothing" is in force in every project. The saved option itself is not changed. The publish menu [3] shows the option in force, and the daemon's Start applies the same rule to the saved option it was sent, or to none (`daemon-runtime.ts`), so every Start goes as the menu reads: a start that asks for a pull request in a project with no git host provider is started at `branch`, and one that asks for anything past the commit in a project with no remote is started at `commit`.
+Until the user saves an option, "Commit" is in force in every project: the agent commits its work on its own branch and nothing leaves the machine. Once one is saved, the option in force in a project is the saved one when the project is offered it. When the project is not offered that option ("Open PR" or "Merge on green" in a project with no git host provider, or any of those and "Publish branch" in a project whose repository has no remote), the option in force is the furthest that project goes with no pull request: "Publish branch", or "Commit" where the repository has no remote. A saved "Nothing" is in force in every project. The saved option itself is not changed. The publish menu [3] shows the option in force, and the daemon's Start applies the same rule to the saved option it was sent, or to none (`daemon-runtime.ts`), so every Start goes as the menu reads: a start that names no option is started at `commit`, a start that asks for a pull request in a project with no git host provider is started at `branch`, and one that asks for anything past the commit in a project with no remote is started at `commit`.
 
 ### The level an option hands over
 

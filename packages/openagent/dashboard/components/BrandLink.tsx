@@ -19,8 +19,10 @@ export function BrandLink({ working, href = '/', onNavigate }: { working: boolea
     >
       <Logo className="h-6 w-auto shrink-0" working={working} />
       {/* Below sm the wordmark folds away so the nav fits a narrow viewport (#980); the mark stays,
-          and it is still the link home (#909). */}
-      <span className="hidden shrink-0 font-semibold sm:inline">OpenAgent</span>
+          and it is still the link home (#909). Said with a screen-size class alone, never a bare
+          `hidden` undone at a width: a tool page's stylesheet is loaded after the page's and has
+          its own `.hidden`, which then won and hid the word at every width. */}
+      <span className="shrink-0 font-semibold max-sm:hidden">OpenAgent</span>
     </a>
   )
 }

@@ -33,7 +33,8 @@ export function ConnectionIndicator() {
           <span
             className={
               isLocal
-                ? 'hidden items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground sm:inline-flex'
+                ? // Folded away below sm with screen-size classes alone, as the wordmark is (BrandLink.tsx).
+                  'items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground max-sm:hidden sm:inline-flex'
                 : 'inline-flex items-center gap-1.5 rounded-md border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/10 px-2 py-1 text-xs text-[var(--color-primary)]'
             }
           />

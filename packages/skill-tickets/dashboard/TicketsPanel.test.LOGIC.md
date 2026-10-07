@@ -1,6 +1,6 @@
 What the tests cover:
 
-- **A ticket as a one-liner** - the row shows the title, the claim marker with its holder inline, the topics, "Priority: 8" spelled out rather than a bare number, "Effort: 2" and "Uncertainty: 4" when the plan recorded them, and a readable age ("2d ago"); the ticket's summary is not on the row, it belongs to the ticket's own page.
+- **A ticket as a one-liner** - the row shows the title, the claim marker with its holder inline, the topics, "Priority: 8" spelled out rather than a bare number, "Effort: 2" and "Uncertainty: 4" when the plan recorded them, and a readable age ("2d ago"); the topics fold away below the small breakpoint with a screen-size class alone, never a bare `hidden`; the ticket's summary is not on the row, it belongs to the ticket's own page.
 - **Column order** - priority sits left of the age, the age left of the issue link.
 - **The order of the rows** - the panel renders the tickets in the order it is given and never re-sorts behind its caller.
 - **Opening a ticket** - clicking the title hands back the ticket's file name, the same name the ticket's own address uses.

@@ -111,8 +111,9 @@ export function TicketRow({
       {projectName && <span className="flex shrink-0 items-center pr-2 text-xs text-muted-foreground">{projectName}</span>}
       {/* The tags, content-sized and packed against the priority column (#1265): their right edge
           is the aligned one, so rows with one tag and rows with four read as the same
-          right-aligned column. */}
-      <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
+          right-aligned column. Folded away below sm with screen-size classes alone: a bare
+          `hidden` undone at a width loses to the `.hidden` of a stylesheet loaded later. */}
+      <span className="shrink-0 items-center gap-1.5 max-sm:hidden sm:flex">
         {ticket.topics?.map(topic =>
           onTopicClick ? (
             <button

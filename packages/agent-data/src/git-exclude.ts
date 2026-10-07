@@ -7,6 +7,8 @@ export interface ExcludeFs {
   /** Recursive mkdir. */
   mkdir(path: string): Promise<void>
   append(path: string, contents: string): Promise<void>
+  /** Replace the file in one step: a reader sees the old contents or the new, never half. */
+  write(path: string, contents: string): Promise<void>
 }
 
 function nodeExcludeFs(): ExcludeFs {
@@ -15,6 +17,12 @@ function nodeExcludeFs(): ExcludeFs {
     read: path => fs().then(f => f.readFile(path, 'utf8')),
     mkdir: path => fs().then(f => f.mkdir(path, { recursive: true })).then(() => {}),
     append: (path, contents) => fs().then(f => f.appendFile(path, contents)),
+    write: async (path, contents) => {
+      const f = await fs()
+      const temp = `${path}.${process.pid}.tmp`
+      await f.writeFile(temp, contents)
+      await f.rename(temp, path)
+    },
   }
 }
 
@@ -39,4 +47,38 @@ export async function excludeFromGit(
   if (current.split('\n').some(line => line.trim() === rule)) return
   await fs.mkdir(infoDir)
   await fs.append(path, (current && !current.endsWith('\n') ? '\n' : '') + rule + '\n')
+}
+
+/**
+ * Take one ignore rule back out of the repository's `info/exclude`: the undo of
+ * {@link excludeFromGit}, for a tool that removes what the rule hid. Only a line that is exactly
+ * the rule goes; every other line, a person's own included, stays as it was. A rule that is not
+ * there, and a repository with no exclude file, change nothing. Answers whether a line went.
+ */
+export async function unexcludeFromGit(
+  repo: string,
+  rule: string,
+  fs: ExcludeFs = nodeExcludeFs(),
+  git: GitRunner = nodeGitRunner(),
+): Promise<boolean> {
+  const common = (await git(['rev-parse', '--git-common-dir'], repo)).trim()
+  if (!common) return false
+  const path = join(isAbsolute(common) ? common : join(repo, common), 'info', 'exclude')
+  const current = await fs.read(path).catch(() => undefined)
+  if (current === undefined) return false
+  const lines = current.split('\n')
+  const left = lines.filter(line => line.trim() !== rule)
+  if (left.length === lines.length) return false
+  await fs.write(path, left.join('\n'))
+  return true
+}
+
+/**
+ * Every checkout of the repository `repo` belongs to, by its root: the main one and each linked
+ * worktree, an agent's included. They all read the one exclude file, so a tool asks this before
+ * it takes a rule out: a rule goes only when no checkout holds what it hides.
+ */
+export async function repositoryCheckouts(repo: string, git: GitRunner = nodeGitRunner()): Promise<string[]> {
+  const list = await git(['worktree', 'list', '--porcelain'], repo)
+  return list.split('\n').filter(line => line.startsWith('worktree ')).map(line => line.slice('worktree '.length))
 }

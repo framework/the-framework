@@ -1,0 +1,21 @@
+Removes what this tool left in a project: the runs' locks and stderr files under `.agent-runner/runs/`, one by one, then the directories they left empty, `.agent-runner/runs/` and `.agent-runner/`, then the rule hiding the tool's directory from git once no checkout of the repository has one. What `agent-runner cleanup` runs. It is the command a dashboard asks for by the declared `cleanup` kind when a project is removed with its files: the package declares `"openagent": { "hooks": "agent-runner", "cleanup": "agent-runner" }` in its `package.json`. Nothing in this repository calls it yet.
+
+## Context
+
+**User story**: the user removes a project from the dashboard and asks for the tools' files in the folder to go too. The folder is then as this tool found it, except for what the user wrote themselves. A user who wants the same by hand runs `agent-runner cleanup` in the project.
+
+**Business logic story**: a dashboard holds no list of any tool's files, so the tool removes its own, and a dashboard asks for the command by the `cleanup` kind, the way it finds `init` by the `hooks` kind when a project is added (`init.ts`). The tool removes only what it made on this machine. It never touches the remote, a commit, a branch, a checkout, the working tree outside its directory, a file git tracks, or another tool's files.
+
+**Problem**: the tool's directory also holds the person's own settings file, `.agent-runner/config.yml`, and a person may have put anything else there, in `runs/` too. A run may still be working: its lock is what keeps a second process off the run. The rule that hides the directory from git is the repository's, read by every checkout of it, the main checkout and every linked worktree: taking it out for one project would show another checkout's `.agent-runner/` in its status.
+
+## Business logic — TL;DR
+
+- **No directory, nothing touched** - where the project has no `.agent-runner` the answer is `{"ok":true,"removed":[],"kept":[]}` and nothing changes, the exclude file included: a rule written by hand stays.
+- **A link is followed nowhere** - an `.agent-runner` that is not a real directory (a link, a file) is kept, named `.agent-runner` with the reason `not made by agent-runner`, and nothing else happens: what a link points at may lie outside the project.
+- **Refused while a run works** - a lock under `.agent-runner/runs/` whose pid is a live process refuses the whole clean-up, `{"ok":false,"reason":"running","runs":[<ids>]}`, with nothing removed; a lock whose process died holds nothing. Only this machine's processes are seen.
+- **The runs' files go one by one** - in `.agent-runner/runs/`, a regular file ending `.lock` or `.stderr` that git does not track is removed. A file git tracks is kept, named by its own path with the reason `git tracks it`. Any other entry is kept with `not made by agent-runner`. A `runs` that is not a real directory is kept with `not made by agent-runner`.
+- **`runs/` goes only when empty** - it is removed as an empty directory, never with its contents, and named `.agent-runner/runs` in `removed`; when it could not be removed and nothing under it is already in `kept`, it is kept with `not empty`.
+- **The person's files stay** - `config.yml` stays, named in `kept` with the reason `your settings for agent-runner`; anything else in the directory stays, named with `not made by agent-runner`.
+- **The directory goes last** - only when nothing was kept: `.agent-runner/` is removed as an empty directory and named in `removed` after `.agent-runner/runs`; when that removal fails it is kept with `not empty`.
+- **The rule is the repository's** - the line `/.agent-runner` is taken out of the repository's exclude file only when this pass removed the directory and no checkout of the repository, the main one and every linked worktree, still has an `.agent-runner`. A pass that did not remove the directory never touches the exclude file, so what stays is still hidden from git. A failure to list the checkouts or to take the rule out leaves the rule and changes nothing in the answer.
+- **The answer** - `{"ok":true,"removed":[<paths>],"kept":[{"path":…,"reason":…}]}`, paths from the project's root; a second clean-up answers `{"ok":true,"removed":[],"kept":[]}`.

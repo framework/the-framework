@@ -10,7 +10,7 @@ export {
   gitReason,
   pushBranch,
 } from './git.js'
-export { excludeFromGit, type ExcludeFs } from './git-exclude.js'
+export { excludeFromGit, unexcludeFromGit, repositoryCheckouts, type ExcludeFs } from './git-exclude.js'
 export {
   fileBranchPath,
   fileBranchRepo,

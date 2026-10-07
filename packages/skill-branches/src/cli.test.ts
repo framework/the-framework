@@ -303,7 +303,7 @@ test('prune: removes what the rule allows and reports each checkout it kept, wit
 test('outside a repository every command refuses rather than failing on git', async () => {
   const dir = await realpath(await mkdtemp(join(tmpdir(), 'branches-norepo-')))
   try {
-    for (const argv of [['list'], ['create', 'a1'], ['name', 'x'], ['status'], ['remove', 'a1'], ['prune']]) {
+    for (const argv of [['list'], ['create', 'a1'], ['name', 'x'], ['status'], ['remove', 'a1'], ['prune'], ['cleanup']]) {
       const ran = await run(dir, ...argv)
       assert.equal(ran.code, 1, argv.join(' '))
       assert.deepEqual(ran.out, { ok: false, reason: 'not-a-repo' }, argv.join(' '))

@@ -4,6 +4,7 @@ import { projectRoot } from '@openagt/skill-branches'
 import { findRun } from '@openagt/skill-logs'
 import { DRIVER_NAMES, detachResume, detachRun, isDriverName, readyToRun, resumeProject, runProject } from './runner.js'
 import { initHooks } from './init.js'
+import { cleanup } from './cleanup.js'
 import { isPublish, PUBLISH_LEVELS } from './records.js'
 
 /**
@@ -29,6 +30,8 @@ export const USAGE = `usage: agent-runner <command>
   check [--driver <claude-code|codex>]
                                 whether a run can start here: the coding agent's CLI installed and logged in, and its warnings; what a dashboard's check hook runs
   init                          this tool's lines in the dashboard's .openagent/hooks.yml, so its Start works; a line already there is kept
+  cleanup                       remove what this tool left in the project: the runs' locks and stderr files, then .agent-runner/ and the rule hiding it from git once it is empty;
+                                config.yml is yours and stays; refused while a run's process is alive; the command a dashboard asks for when a project is removed with its files
 
 When a run ends waiting on a question, or ends done with a pull request it did not have, the \`ended:\` line in the
 project's .agent-runner/config.yml runs, if there is one, in the project's root, with MESSAGE (one line for a person),
@@ -176,6 +179,14 @@ const COMMANDS: Record<string, Command> = {
     if (outcome.ok) return outcome
     const line = outcome.reason === 'no-dashboard' ? 'no .openagent/ here: add the project in the dashboard first' : `${outcome.file}: ${outcome.detail ?? 'unreadable'}`
     throw new Refused(outcome, line)
+  },
+
+  async cleanup(args, io, git) {
+    parse(args, {}, 0)
+    const repo = await project(io.cwd, git)
+    const outcome = await cleanup(repo, { git })
+    if (outcome.ok) return outcome
+    throw new Refused(outcome, `a run is still working here (${outcome.runs.join(', ')}): stop it first`)
   },
 }
 

@@ -23,8 +23,8 @@ The `@openagt/agent-runner` package: a standalone tool, like `@openagt/agent-dri
 
 ## Business logic — TL;DR
 
-- **The executable** (`bin/`) - `agent-runner`, the one command line: `run` (also `--detach`, `--resume`, `--then`, `--publish`, `--parent`, `--base`, `--model`, `--driver`, and `--id` for a run spawned with its id, with `--mark` when it is to write its marker itself), `check`, `init`; JSON on stdout, one line for a person on stderr, exit 0, 1 or 2.
-- **The rules and the processes** (`src/`) - run records as markers, the live record the dashboard reads, the run's lock, one run's [10] life and its resume, the person's `ended:` line [11], the telling of a run's parent, the sweep, the detached run and whether a run can start here, the dashboard's hooks written by `init`, and the command line; told in `src/LOGIC.md`.
+- **The executable** (`bin/`) - `agent-runner`, the one command line: `run` (also `--detach`, `--resume`, `--then`, `--publish`, `--parent`, `--base`, `--model`, `--driver`, and `--id` for a run spawned with its id, with `--mark` when it is to write its marker itself), `check`, `init`, `cleanup`; JSON on stdout, one line for a person on stderr, exit 0, 1 or 2.
+- **The rules and the processes** (`src/`) - run records as markers, the live record the dashboard reads, the run's lock, one run's [10] life and its resume, the person's `ended:` line [11], the telling of a run's parent, the sweep, the detached run and whether a run can start here, the dashboard's hooks written by `init`, what the tool left in a project removed by `cleanup` (the runs' locks and stderr files one by one, then the directories they left empty, then the rule hiding `.agent-runner/` from git once no checkout of the repository has one, the person's `config.yml` kept, nothing removed while a run's process is alive on this machine; the command a dashboard asks for by the declared `cleanup` kind when a project is removed with its files), and the command line; told in `src/LOGIC.md`.
 
 ## Business logic
 

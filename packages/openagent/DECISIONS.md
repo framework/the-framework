@@ -182,3 +182,16 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   old and idle, when a run's record names it, aged by that record. Picked over a naming
   pattern, `agent-<timestamp>`, which was OpenAgent knowing how the package names a
   branch and missed a branch the agent renamed.
+
+## Removing a project
+- "Remove project" takes the project off the dashboard's list and leaves the folder as it
+  is. Deleting OpenAgent's files in the folder is a box in the same dialog, not ticked.
+  Picked over deleting the files with every removal.
+- With the box ticked, each tool removes its own files with its own clean-up command, and
+  the dashboard asks each one. Picked over the dashboard deleting the tools' folders itself,
+  which would have it keep a list of every tool's files.
+- The agents' records on this machine go with the files, and the dialog says so before.
+  Picked over keeping the records' branch in a folder OpenAgent has otherwise left.
+- It never touches the remote, a commit, a branch with work on it, uncommitted work or a
+  file git tracks. The dialog says what will go, and after it lists what went and what
+  stayed. Picked over a removal that ends with one line, done or failed.

@@ -186,3 +186,7 @@ ending.
   removing it would take the agent's diary with it. A branch that is no agent's is kept. Picked over
   leaving the conflict in the person's folder to fix by hand, and over keeping the merged
   branch.
+- `branches cleanup` removes the agents' checkouts the reclaim rule lets go, then
+  `.branches` once it is empty, and is what a dashboard runs when a project is removed with
+  its files. A checkout with uncommitted work and a branch with work on it stay. Picked over
+  a dashboard deleting `.branches` itself.

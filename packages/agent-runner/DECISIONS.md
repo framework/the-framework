@@ -140,3 +140,6 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   run this project has no record of is refused while someone is still listening; anything
   after that is the resumed run's own record. Picked over the hook running the resume in
   the foreground, which would hold the dashboard's request open for the whole turn.
+- `agent-runner cleanup` removes what the tool left in a project, and is what a dashboard
+  runs when a project is removed with its files. Picked over a dashboard deleting
+  `.agent-runner` itself.

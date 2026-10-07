@@ -5,7 +5,7 @@ import { SubagentsSettings } from './SubagentsSettings.js'
 import { runnerChoices, runnerOf, runnerValue } from './choices.js'
 
 // The coding agents' own lists, as the dashboard asked them: Claude Code answered, Codex listed one.
-vi.mock('../../framework/dashboard/rpc/models.js', () => ({
+vi.mock('../../openagent/dashboard/rpc/models.js', () => ({
   onModels: vi.fn(async () => ({
     'claude-code': { models: [{ id: 'opus', name: 'Opus 5.5' }] },
     codex: { models: [{ id: 'gpt-5.6-luna', name: 'GPT-5.6-Luna' }] },

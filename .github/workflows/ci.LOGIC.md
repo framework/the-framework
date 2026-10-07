@@ -36,11 +36,11 @@ The workflow, named "CI", runs on every pull request event and on every push to 
 Five jobs run at the same time, each on its own latest Ubuntu runner with pnpm, Node 22 and pnpm's download cache. Each runs three commands at the repository root, each only if the previous one succeeded:
 
 1. `pnpm install`: every package's dependencies.
-2. `pnpm build`: every package of the monorepo that has a build, except the website package. Each package builds only itself, once. A package is built after the packages it depends on, as its `package.json` names them, and packages that do not depend on each other are built at the same time. OpenAgent's build compiles it, copies the browser extension into it (`packages/framework/scripts/copy-extension.mjs`) and builds the dashboard. Packages OpenAgent does not import, `agent-runner` and `agent-scheduler` among them, are built all the same: the project's hooks the daemon runs start them.
+2. `pnpm build`: every package of the monorepo that has a build, except the website package. Each package builds only itself, once. A package is built after the packages it depends on, as its `package.json` names them, and packages that do not depend on each other are built at the same time. OpenAgent's build compiles it, copies the browser extension into it (`packages/openagent/scripts/copy-extension.mjs`) and builds the dashboard. Packages OpenAgent does not import, `agent-runner` and `agent-scheduler` among them, are built all the same: the project's hooks the daemon runs start them.
 3. The job's own part, one of:
    - "typecheck": `pnpm typecheck`, every package that has a type check (each package's dashboard included), the website package too.
-   - "framework browser tests": the OpenAgent dashboard's tests.
-   - "framework node tests": OpenAgent's other tests.
+   - "dashboard browser tests": the OpenAgent dashboard's tests.
+   - "dashboard node tests": OpenAgent's other tests.
    - "agent packages tests": the tests of `agent-runner`, `agent-scheduler` and `skill-orchestration`, one package at a time.
    - "other packages tests": the tests of every other package, one package at a time. This group is named by the packages it leaves out, so a new package's tests run here without a change to the workflow.
 

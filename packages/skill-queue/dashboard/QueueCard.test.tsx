@@ -3,7 +3,7 @@ import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { QueueCard } from './QueueCard.js'
 import { fakeHost, renderWithHost, type FakeHost } from './test-host.js'
 import { workOnEntryPrompt } from '../src/module.js'
-import { configureFirst } from '../../framework/dashboard/test-utils.js'
+import { configureFirst } from '../../openagent/dashboard/test-utils.js'
 
 // The card on the Overview, rendered from nothing but this package: a host answering the queue
 // command, and no other module mounted. A queued ticket is a link into a repository the card has

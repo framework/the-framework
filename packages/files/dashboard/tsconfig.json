@@ -17,8 +17,8 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "@openagt/dashboard/module": ["../../framework/dashboard/module/index.ts"],
-      "@openagt/dashboard/module-server": ["../../framework/src/module-server.d.ts"]
+      "@openagt/dashboard/module": ["../../openagent/dashboard/module/index.ts"],
+      "@openagt/dashboard/module-server": ["../../openagent/src/module-server.d.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"]

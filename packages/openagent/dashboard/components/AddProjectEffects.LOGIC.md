@@ -16,7 +16,7 @@ The text that says what adding a project does to the folder, shown before the us
 
 #### Context
 
-See `## Context`. The statements describe what activation does (`packages/framework/src/install.ts`), what the records branch holds and when it is pushed (the `agent-data` branch), and where an agent works (its own checkout under `.branches/`).
+See `## Context`. The statements describe what activation does (`packages/openagent/src/install.ts`), what the records branch holds and when it is pushed (the `agent-data` branch), and where an agent works (its own checkout under `.branches/`).
 
 #### Business logic
 

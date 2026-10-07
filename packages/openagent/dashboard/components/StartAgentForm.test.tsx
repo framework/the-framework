@@ -121,11 +121,11 @@ describe('StartAgentForm (#1774)', () => {
     expect(context.compareDocumentPosition(autoMenu()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  test('the publish options: the button reads Publish branch until the person picks, and the Start carries no pick, left to the daemon; a saved pick is shown and carried, Nothing too; a change writes the saved setting', async () => {
+  test('the publish options: the button reads Commit until the person picks, and the Start carries no pick, left to the daemon; a saved pick is shown and carried, Nothing too; a change writes the saved setting', async () => {
     onCommands.mockResolvedValue({ commands: [], startHook: true, gitHost: true })
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} />)
-    expect(autoMenu().textContent).toBe('Auto: Publish branch')
+    expect(autoMenu().textContent).toBe('Auto: Commit')
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
 
@@ -197,7 +197,7 @@ describe('StartAgentForm (#1774)', () => {
     prefs.current = { postMergeCleanup: true }
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} />)
-    await waitFor(() => expect(autoMenu().textContent).toBe('Auto: Publish branch · cleanup'))
+    await waitFor(() => expect(autoMenu().textContent).toBe('Auto: Commit · cleanup'))
     await openMenu(autoMenu())
     const box = screen.getByRole('menuitemcheckbox', { name: /^Post-merge cleanup/ })
     expect(box.getAttribute('aria-checked')).toBe('true')
@@ -215,7 +215,7 @@ describe('StartAgentForm (#1774)', () => {
     start.mockResolvedValue({ agentId: 'r1' })
     render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onCommands).toHaveBeenCalled())
-    expect(autoMenu().textContent).toBe('Auto: Publish branch')
+    expect(autoMenu().textContent).toBe('Auto: Commit')
     await openMenu(autoMenu())
     expect(screen.queryByRole('menuitemcheckbox')).toBeNull()
     fireEvent.click(screen.getByText('submit-typed'))
@@ -229,7 +229,7 @@ describe('StartAgentForm (#1774)', () => {
     await openMenu(autoMenu())
     const box = await screen.findByRole('menuitemcheckbox', { name: /^Post-merge cleanup/ })
     expect(box.getAttribute('aria-checked')).toBe('false')
-    expect(autoMenu().textContent).toBe('Auto: Publish branch')
+    expect(autoMenu().textContent).toBe('Auto: Commit')
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(start).toHaveBeenCalledWith('p1', 'do the thing', {}))
   })

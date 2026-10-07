@@ -58,7 +58,7 @@ test('onStart refuses in words: an unknown project, a project with no start line
   }
 })
 
-test('a Start goes no further than the project can, the commit with no remote, the branch with a remote and no git host; with no pick it goes that far, and with Nothing it is given no level', async () => {
+test('a Start goes no further than the project can, the commit with no remote, the branch with a remote and no git host; with no pick it commits, and with Nothing it is given no level', async () => {
   const PUBLISH = `start: 'printf "%s" "\${PUBLISH-unset}" > started.txt; echo "{\\"id\\":\\"run-8\\"}"'\n`
   const home = await project(PUBLISH)
   const env = { XDG_CONFIG_HOME: join(home, 'cfg') }
@@ -68,7 +68,7 @@ test('a Start goes no further than the project can, the commit with no remote, t
     execFileSync('git', ['init', '-q'], { cwd: home })
     assert.deepEqual(await runtime.onStart('Fix it', { publish: 'merge' }), { ok: true, agentId: 'run-8' })
     assert.equal(await readFile(join(home, 'started.txt'), 'utf8'), 'commit', 'no remote: the commit')
-    // No pick saved: the daemon starts the run as far as the project goes with no pull request.
+    // No pick saved: the daemon starts the run at the commit, which pushes nothing.
     assert.deepEqual(await runtime.onStart('Fix it'), { ok: true, agentId: 'run-8' })
     assert.equal(await readFile(join(home, 'started.txt'), 'utf8'), 'commit', 'no pick, no remote: the commit')
     // Nothing is a pick: the line is given no level.
@@ -78,7 +78,7 @@ test('a Start goes no further than the project can, the commit with no remote, t
     assert.deepEqual(await runtime.onStart('Fix it', { publish: 'merge' }), { ok: true, agentId: 'run-8' })
     assert.equal(await readFile(join(home, 'started.txt'), 'utf8'), 'branch', 'a remote and no git host: the branch')
     assert.deepEqual(await runtime.onStart('Fix it'), { ok: true, agentId: 'run-8' })
-    assert.equal(await readFile(join(home, 'started.txt'), 'utf8'), 'branch', 'no pick, a remote: the branch')
+    assert.equal(await readFile(join(home, 'started.txt'), 'utf8'), 'commit', 'no pick, a remote: the commit all the same')
     assert.deepEqual(await runtime.onStart('Fix it', { publish: 'commit' }), { ok: true, agentId: 'run-8' })
     assert.equal(await readFile(join(home, 'started.txt'), 'utf8'), 'commit', 'Commit saved: the commit, the remote or not')
   } finally {

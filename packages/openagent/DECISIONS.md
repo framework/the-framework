@@ -127,12 +127,14 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The line gets the prompt, and the coding agent, the model and how far to publish when the
   person picked them; anything else is the line's own business. The publish pick is one menu
   beside Start: Nothing, Commit, Publish branch, Open PR, Merge on green. It is saved like the
-  coding agent. Until a person picks, it is Publish branch. A project with no git host package
+  coding agent. A project with no git host package
   is offered Nothing, Commit and Publish branch only. A project with no remote can publish
-  nothing, so it is offered Nothing and Commit, and Commit is its pick until a person picks
-  and for a saved pick it is not offered.
+  nothing, so it is offered Nothing and Commit, and a saved pick it is not offered counts
+  as Commit.
   Picked over handing over every option the launcher once had, which is how the options
   became the thing to maintain.
+- Until a person picks in that menu, a run commits its work and pushes nothing. Picked over
+  Publish branch until then, which put on the remote a branch nobody asked to publish.
 - The line also gets the branch to start from, when the person picked their own local branch
   on the launcher's chip: the branch the project's folder is on, as this machine has it,
   commits that are not pushed included. With no pick the agent starts from the project's main

@@ -4,8 +4,8 @@
  * The levels are the words a project's start hook is handed as `PUBLISH`, the ones
  * `agent-runner run --publish` takes. The launcher's menu offers them after "Nothing", the pick
  * that hands the hook no level: the run then commits and publishes nothing unless its prompt asks.
- * Until a person picks, a run goes as far as it can without a pull request: its branch pushed, or
- * its work committed where the project has no remote.
+ * Until a person picks, a run commits its work and pushes nothing: what leaves the machine is the
+ * person's to ask for.
  */
 
 /** The levels a run can be started at, each going further than the one before. */
@@ -48,11 +48,12 @@ function furthestWithoutRequest(remote: boolean): PublishPick {
 }
 
 /**
- * The saved pick as this project can hold it: a pick it is not offered falls back to the furthest
- * it goes with no pull request, which is also the pick in force until a person saves one.
+ * The pick in force in this project. Until a person saves one it is Commit, which pushes nothing.
+ * A saved pick the project is not offered falls back to the furthest it goes with no pull request.
  */
 export function publishPickIn(saved: PublishPick | undefined, gitHost: boolean, remote = true): PublishPick {
-  if (saved !== undefined && offeredPublishPicks(gitHost, remote).includes(saved)) return saved
+  if (saved === undefined) return 'commit'
+  if (offeredPublishPicks(gitHost, remote).includes(saved)) return saved
   return furthestWithoutRequest(remote)
 }
 

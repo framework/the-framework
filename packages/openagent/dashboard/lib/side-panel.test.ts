@@ -11,14 +11,14 @@ test('an agent has its own name, and every "New agent" page shares one', () => {
 
 test('only the last 200 open panels are remembered: one more forgets the oldest', () => {
   for (let i = 0; i <= 200; i++) setSidePanelOpen(`p/${i}`, true)
-  const kept = JSON.parse(localStorage.getItem('fw.side-panel')!) as string[]
+  const kept = JSON.parse(localStorage.getItem('oa.side-panel')!) as string[]
   expect(kept).toHaveLength(200)
   expect(kept[0]).toBe('p/1')
   expect(kept.at(-1)).toBe('p/200')
 })
 
 test('something unreadable kept there reads as nothing open', () => {
-  localStorage.setItem('fw.side-panel', 'open')
+  localStorage.setItem('oa.side-panel', 'open')
   setSidePanelOpen('p/1', true)
-  expect(localStorage.getItem('fw.side-panel')).toBe('["p/1"]')
+  expect(localStorage.getItem('oa.side-panel')).toBe('["p/1"]')
 })

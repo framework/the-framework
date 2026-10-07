@@ -36,7 +36,7 @@ describe('profiles.ts (#1052)', () => {
   test('profiles survive a reload (a fresh read of localStorage)', () => {
     addProfile({ url: 'http://192.168.1.5:4200', token: 'aaa' })
     // Nothing cached across a real navigation — read straight from storage.
-    const reread = JSON.parse(localStorage.getItem('fw.devices')!)
+    const reread = JSON.parse(localStorage.getItem('oa.devices')!)
     expect(reread[0].token).toBe('aaa')
   })
 

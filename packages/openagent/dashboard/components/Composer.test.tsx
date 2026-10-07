@@ -203,11 +203,11 @@ describe('Composer (#721)', () => {
   // #1066: a draft carried across a device hop lands in sessionStorage; the launcher seeds it into
   // the editor on mount, and takes it once.
   test('the launcher rehydrates a draft carried from another device (#1066)', () => {
-    sessionStorage.setItem('fw.pending-draft', 'carried from the studio box')
+    sessionStorage.setItem('oa.pending-draft', 'carried from the studio box')
     const { onSubmit } = renderComposer({ submitLabel: 'Start session' })
     fireEvent.click(screen.getByRole('button', { name: /Start session/ }))
     expect(onSubmit).toHaveBeenCalledWith('carried from the studio box')
-    expect(sessionStorage.getItem('fw.pending-draft')).toBeNull() // taken once
+    expect(sessionStorage.getItem('oa.pending-draft')).toBeNull() // taken once
   })
 
   test('a carried draft is IN the editor, not just in what Start would send (#1139)', () => {
@@ -216,15 +216,15 @@ describe('Composer (#721)', () => {
     // facts from cancelling out. Asserted on the box rather than on submit, because submit was
     // right the whole time this was broken — the user was the one looking at an empty composer.
     const draft = 'Work on tickets/a.md. Do not start any other ticket.'
-    sessionStorage.setItem('fw.pending-draft', draft)
+    sessionStorage.setItem('oa.pending-draft', draft)
     renderComposer({ submitLabel: 'Start session' })
     expect(editorText()).toBe(draft)
   })
 
   test('an in-session composer does not rehydrate a carried draft (#1066)', () => {
-    sessionStorage.setItem('fw.pending-draft', 'not for here')
+    sessionStorage.setItem('oa.pending-draft', 'not for here')
     renderComposer({ inAgent: true })
-    expect(sessionStorage.getItem('fw.pending-draft')).toBe('not for here') // launcher-only
+    expect(sessionStorage.getItem('oa.pending-draft')).toBe('not for here') // launcher-only
     expect(screen.queryByRole('button', { name: 'Send' })).toBeNull() // nothing seeded
   })
 

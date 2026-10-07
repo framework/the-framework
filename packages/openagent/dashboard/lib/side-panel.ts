@@ -7,7 +7,7 @@ import { useSyncExternalStore } from 'react'
 // frame.
 
 /** localStorage key holding the names of the pages whose side panel is open, oldest first. */
-const SIDE_PANEL_KEY = 'fw.side-panel'
+const SIDE_PANEL_KEY = 'oa.side-panel'
 
 /** How many open panels are remembered; opening one more forgets the oldest. */
 const REMEMBERED = 200

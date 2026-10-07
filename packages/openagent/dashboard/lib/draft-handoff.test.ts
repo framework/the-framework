@@ -11,7 +11,7 @@ describe('draft-handoff (#1066)', () => {
   test('stashDraftFromUrl moves ?draft= into sessionStorage and strips it from the URL', () => {
     history.replaceState(null, '', '/?draft=' + encodeURIComponent('ship the thing') + '&keep=1')
     stashDraftFromUrl()
-    expect(sessionStorage.getItem('fw.pending-draft')).toBe('ship the thing')
+    expect(sessionStorage.getItem('oa.pending-draft')).toBe('ship the thing')
     // The prompt leaves the address bar (and so history + Referer); other params stay.
     expect(window.location.search).toBe('?keep=1')
   })

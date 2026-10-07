@@ -3,7 +3,7 @@ The tool behind the end-to-end stories' start and resume hooks [1]: a stand-in f
 ## Glossary
 
 [1] start hook / resume hook: the one shell line under `start`, and the one under `resume`, in a project's `.openagent/hooks.yml`; each answers the agent's id as JSON on stdout.
-[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [3] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory.
 [4] inbox: `.openagent/inbox.jsonl` in an agent's checkout: one JSON line per message or answer, which the agent's session takes when a turn ends.
 [5] card / diary: an agent's record in the `logs` skill's two shapes: the card `<id>.json` and the diary `<id>.jsonl`, under the checkout's `.openagent/` while the agent has a checkout, on the `agent-data` branch once recorded.

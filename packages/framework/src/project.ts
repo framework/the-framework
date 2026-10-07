@@ -1,6 +1,6 @@
 import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { nodeFs } from './node-fs.js'
-import { gitignorePath } from './framework-gitignore.js'
+import { gitignorePath } from './openagent-gitignore.js'
 
 /**
  * Project-level repo helpers (#380): the activation marker check and a
@@ -22,11 +22,11 @@ function nodeProjectFs(): ProjectFs {
 }
 
 /**
- * A repo is "activated"/installed for The Framework when it has the
+ * A repo is "activated"/installed for OpenAgent when it has the
  * `.openagent/.gitignore` install writes — the same marker install's own
  * no-op check reads (#1600), so a `.openagent/` directory something else
  * created can never read as activated while the repo still lacks the ignore
- * file that keeps framework state out of git. Read-only check; writing
+ * file that keeps OpenAgent state out of git. Read-only check; writing
  * the marker is a separate, deferred concern.
  */
 export async function isActivated(cwd: string, fs: ProjectFs = nodeProjectFs()): Promise<boolean> {

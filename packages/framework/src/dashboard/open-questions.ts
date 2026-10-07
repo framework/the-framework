@@ -1,6 +1,6 @@
 import { loadAgentEvents, readAllAgents, readLiveMetas, type AgentMeta, type LiveAgent } from '../store/index.js'
 import { pendingChoices } from '../open-choices.js'
-import type { ChoiceRequest, FrameworkEvent } from '../events.js'
+import type { ChoiceRequest, OpenAgentEvent } from '../events.js'
 import { bridgeChoiceRequest, type BridgeQuestion } from './bridge-question.js'
 import { bridgeQuestions } from './bridge-store.js'
 import type { ProjectSummary } from './projects.js'
@@ -30,7 +30,7 @@ export interface OpenQuestionsDeps {
   /** The reader of the runs that have a checkout (default {@link readLiveMetas}): a waiting run keeps its own. */
   liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   /** One run's events, by the project's path and the run's id (default {@link loadAgentEvents}). */
-  events?: (cwd: string, agentId: string) => Promise<FrameworkEvent[] | undefined>
+  events?: (cwd: string, agentId: string) => Promise<OpenAgentEvent[] | undefined>
   /**
    * The questions the browser bridge holds, minus those with an answer already on its way
    * (default: the daemon's bridge store).

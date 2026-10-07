@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { parseTickets, providedTickets } from './tickets.js'
 
 // The tickets contract (#1774): a project's package declares `"openagent": { "tickets": "<command>" }`
-// and the framework reads the tickets by running `<command> list --local`. Real processes: a tiny
+// and OpenAgent reads the tickets by running `<command> list --local`. Real processes: a tiny
 // provider script that logs each call it answers, in a throwaway project.
 
 /** A provider command: prints the rows of a JSON file, logging every call. */
@@ -21,7 +21,7 @@ const ROW = { file: '2026-01-01_a.md', title: 'A', summary: 'the first', date: '
 
 /** A project whose package.json lists `deps`, each installed under node_modules with its own package.json. */
 async function project(deps: Record<string, Record<string, unknown>>, tickets = JSON.stringify([ROW])): Promise<string> {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-tickets-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-tickets-')))
   await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: Object.fromEntries(Object.keys(deps).map(name => [name, '*'])) }))
   for (const [name, manifest] of Object.entries(deps)) {
     const dir = join(root, 'node_modules', name)

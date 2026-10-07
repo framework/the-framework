@@ -1,12 +1,12 @@
-How The Framework reads a project's pull requests and acts on them: through the git host provider [1], a command one of the project's own packages declares, never through a git host's own tool and never through a package The Framework knows. It also owns the shape of what that command answers: a pull request [2], and the project's page on the git host [3].
+How OpenAgent reads a project's pull requests and acts on them: through the git host provider [1], a command one of the project's own packages declares, never through a git host's own tool and never through a package OpenAgent knows. It also owns the shape of what that command answers: a pull request [2], and the project's page on the git host [3].
 
 ## Context
 
 **User story**:
-- The user opens a pull request for an ended agent's branch ("Open PR") or merges the one it has ("Merge PR"); the dashboard finds the pull requests a project has. A project on GitHub has the GitHub package installed; a project on another git host installs that git host's package instead, and nothing in The Framework changes.
+- The user opens a pull request for an ended agent's branch ("Open PR") or merges the one it has ("Merge PR"); the dashboard finds the pull requests a project has. A project on GitHub has the GitHub package installed; a project on another git host installs that git host's package instead, and nothing in OpenAgent changes.
 - A project none of whose packages provides a git host has no pull requests: nothing is opened or landed for it, and an ended agent's last step is the push. The answer is "no git host", never an error.
 
-**Business logic story**: The Framework names no git host. A project picks the package that speaks to its git host by listing it as a dependency; that package says, in its own package.json, which of its commands answers for the git host. The branches provider (`branches.ts`) pushes; this provider opens and lands. Opening a pull request from the dashboard is the two composed: the push, then the open (`../dashboard/agent-handoff.ts`).
+**Business logic story**: OpenAgent names no git host. A project picks the package that speaks to its git host by listing it as a dependency; that package says, in its own package.json, which of its commands answers for the git host. The branches provider (`branches.ts`) pushes; this provider opens and lands. Opening a pull request from the dashboard is the two composed: the push, then the open (`../dashboard/agent-handoff.ts`).
 
 **Problem**: "the branch has no pull request" and "the git host could not be asked" are different answers, and a caller that takes the second for the first opens a second pull request or announces every open one as new.
 
@@ -41,13 +41,13 @@ The provider is found by the shared library's rule (`agent-data`'s `provided-com
 
 #### Context
 
-**Business logic story**: the command is the same one an agent runs to open its own pull request; The Framework uses the forms a person's click and the dashboard's reads need.
+**Business logic story**: the command is the same one an agent runs to open its own pull request; OpenAgent uses the forms a person's click and the dashboard's reads need.
 
 #### Business logic
 
 The provider's command runs with Node, in the project's root, never through a shell, for at most 30 seconds and 16 MB of output. Each call prints one JSON document and exits 0; a refusal exits 1 with its reason on its last line of error output, which is the answer given back:
 - `<command> requests`, with `--branch <branch>` for one branch's, `--state open|merged|all` for a state, `--since <time>` for the ones since a time, in any combination: the project's pull requests [2], newest first, as an array. A refusal is answered as the refusal's line, not as an empty list.
-- `<command> open --branch <branch> --title <title> [--body <body>] [--draft]`: open the branch's pull request, as a draft when asked; a branch that already has an open pull request is answered with that one. The answer is the pull request's number and link, and whether it was open already; an answer with no pull request is a failure ("<command> opened no pull request"). The branch must already be on the remote: the push is the branches provider's step, and The Framework runs it first.
+- `<command> open --branch <branch> --title <title> [--body <body>] [--draft]`: open the branch's pull request, as a draft when asked; a branch that already has an open pull request is answered with that one. The answer is the pull request's number and link, and whether it was open already; an answer with no pull request is a failure ("<command> opened no pull request"). The branch must already be on the remote: the push is the branches provider's step, and OpenAgent runs it first.
 - `<command> merge <number>`: land the pull request: armed to merge when its checks pass, merged at once, or the provider watching its checks; any other answer is a failure ("<command> did not merge"), a refusal in the provider's words.
 - `<command> home`: the project's page on the git host [3], its link and the git host's name; a refusal, or an answer without both, is nothing.
 

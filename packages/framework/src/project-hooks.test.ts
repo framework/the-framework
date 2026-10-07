@@ -5,14 +5,14 @@ import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { PROJECT_HOOKS_FILE, parseProjectHooks, readProjectHooks, runCheckHook, runProjectHooks, runResumeHook, runStartHook, startLineTakesBase } from './project-hooks.js'
-import { OPENAGENT_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './openagent-dir.js'
 import { initHooks } from '@openagt/agent-runner'
 
 // The hooks file and the runner (#1774), for real: `sh -c` in a throwaway project, the lines
 // leaving traces in files the assertions read back.
 
 async function project(hooks?: string): Promise<string> {
-  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-hooks-')))
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'openagent-hooks-')))
   await mkdir(join(cwd, OPENAGENT_DIR), { recursive: true })
   if (hooks !== undefined) await writeFile(join(cwd, PROJECT_HOOKS_FILE), hooks)
   return cwd
@@ -58,11 +58,11 @@ test('the lines run in order, in the project, through the shell; a failing line 
     await runProjectHooks(cwd, 'open', { log: line => log.push(line) })
     assert.equal(await readFile(join(cwd, 'hooks.log'), 'utf8'), `open-1\n${cwd}\nopen-2\n`)
     assert.deepEqual(log, [
-      `[framework] open hook (${cwd.split('/').pop()}): echo open-1 >> hooks.log: exit 0`,
-      `[framework] open hook (${cwd.split('/').pop()}): pwd -P >> hooks.log: exit 0`,
-      `[framework] open hook (${cwd.split('/').pop()}): echo said-so >&2; exit 3: exit 3`,
-      '[framework]   said-so',
-      `[framework] open hook (${cwd.split('/').pop()}): echo open-2 >> hooks.log: exit 0`,
+      `[openagent] open hook (${cwd.split('/').pop()}): echo open-1 >> hooks.log: exit 0`,
+      `[openagent] open hook (${cwd.split('/').pop()}): pwd -P >> hooks.log: exit 0`,
+      `[openagent] open hook (${cwd.split('/').pop()}): echo said-so >&2; exit 3: exit 3`,
+      '[openagent]   said-so',
+      `[openagent] open hook (${cwd.split('/').pop()}): echo open-2 >> hooks.log: exit 0`,
     ])
     await runProjectHooks(cwd, 'close', { log: line => log.push(line) })
     assert.equal(await readFile(join(cwd, 'hooks.log'), 'utf8'), `open-1\n${cwd}\nopen-2\nclose\n`)
@@ -94,7 +94,7 @@ test('no file runs nothing and logs nothing; a broken file logs why it was ignor
     assert.equal(log.length, 0)
     await runProjectHooks(broken, 'close', { log: line => log.push(line) })
     assert.equal(log.length, 1)
-    assert.match(log[0]!, /^\[framework\] close hook \(.*\): ignoring .*hooks\.yml/)
+    assert.match(log[0]!, /^\[openagent\] close hook \(.*\): ignoring .*hooks\.yml/)
   } finally {
     await rm(none, { recursive: true, force: true })
     await rm(broken, { recursive: true, force: true })

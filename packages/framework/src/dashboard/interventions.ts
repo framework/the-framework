@@ -1,6 +1,6 @@
 import { listAgents, loadAgentEvents, readLiveMetas, type LiveAgent, type AgentMeta } from '../store/index.js'
 import { pendingChoices } from '../open-choices.js'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 import type { ProjectSummary, ProjectionRead } from './projects.js'
 import { agentBranchFor } from './agent-handoff.js'
 import { projectBranches, type BranchesFor, type BranchState } from '../store/branches.js'
@@ -53,7 +53,7 @@ export interface InterventionsDeps {
   /** The reader of the runs that have a checkout (default {@link readLiveMetas}): a waiting run keeps its own; drives the `awaiting` source (#636). */
   liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   /** One run's events, by the project's path and the run's id (default {@link loadAgentEvents}): where a waiting run's question is read. */
-  events?: (cwd: string, agentId: string) => Promise<FrameworkEvent[] | undefined>
+  events?: (cwd: string, agentId: string) => Promise<OpenAgentEvent[] | undefined>
   /** The finished-agent reader (default {@link listAgents}); drives the `unpushed` source (#860). */
   agents?: (cwd: string) => Promise<AgentMeta[]>
   /** The project's checkouts and branches (default the project's provider, {@link projectBranches}): where a branch's state is read; drives the `unpushed` source (#860). */

@@ -1,4 +1,4 @@
-import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
+import type { AgentMeta, OpenAgentEvent } from '../../src/index.js'
 import { startedAtFromAgentId } from '../../src/agent-id.js'
 import { agentLabel } from './agent-label.js'
 
@@ -92,7 +92,7 @@ export function subagentStartedAt(agent: Pick<AgentMeta, 'id' | 'startedAt'>): s
  * Where each subagent's row goes in a log: before the first event written after the subagent
  * started, by index, or at the log's length when none was. An event with no time is passed over.
  */
-export function startedBefore(events: readonly FrameworkEvent[], subagents: readonly AgentMeta[]): Map<number, AgentMeta[]> {
+export function startedBefore(events: readonly OpenAgentEvent[], subagents: readonly AgentMeta[]): Map<number, AgentMeta[]> {
   const rows = new Map<number, AgentMeta[]>()
   for (const agent of subagents) {
     const started = Date.parse(subagentStartedAt(agent))

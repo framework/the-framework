@@ -1,4 +1,4 @@
-The deliverables The Framework ships, one directory each. The product is the `@openagt/dashboard` package; every other package is either a library the product is built from — the driver [2] seam, a branch used as a file store, and the four skills [3] — or a skill the product does not depend on (the browser, Discord), a command skill, the runner, the scheduler, or a companion: the Chrome extension of the Claude web bridge, and the marketing website.
+The deliverables OpenAgent ships, one directory each. The product is the `@openagt/dashboard` package; every other package is either a library the product is built from — the driver [2] seam, a branch used as a file store, and the four skills [3] — or a skill the product does not depend on (the browser, Discord), a command skill, the runner, the scheduler, or a companion: the Chrome extension of the Claude web bridge, and the marketing website.
 
 ## Glossary
 

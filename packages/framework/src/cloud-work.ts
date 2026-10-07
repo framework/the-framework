@@ -257,10 +257,10 @@ export function startCloudWorkAdoption(opts: CloudWorkAdoptionOptions): ProjectP
     const { adopted, failed } = await adopt(cwd).catch((): CloudWorkResult => ({ adopted: [], failed: [] }))
     for (const adoption of adopted) {
       const prLine = adoption.pr ? (adoption.opened ? `; opened its armed draft PR ${adoption.pr.url}` : `; its PR is ${adoption.pr.url}`) : ''
-      opts.log(`[framework] session ${adoption.agentId}'s cloud work landed on ${adoption.branch} — adopted as its branch (#1601)${prLine}`)
+      opts.log(`[openagent] session ${adoption.agentId}'s cloud work landed on ${adoption.branch} — adopted as its branch (#1601)${prLine}`)
     }
     for (const failure of failed) {
-      opts.log(`[framework] cloud work adoption for session ${failure.agentId}: ${failure.error}`)
+      opts.log(`[openagent] cloud work adoption for session ${failure.agentId}: ${failure.error}`)
     }
   })
 }

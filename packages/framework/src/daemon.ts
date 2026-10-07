@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { OPENAGENT_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './openagent-dir.js'
 import { startDashboard, type Dashboard } from './dashboard/index.js'
 import { createProjectRuntime } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
@@ -85,7 +85,7 @@ export interface RunDaemonOptions {
 }
 
 /**
- * The daemon body, run in the foreground by bare `framework`. Serves the built dashboard bundle
+ * The daemon body, run in the foreground by bare `openagent`. Serves the built dashboard bundle
  * (#405/#426): the SPA reads each run's files over an event stream, so the daemon just serves
  * the files and runs the project's hooks. Resolves on SIGINT/SIGTERM after tearing the dashboard
  * down.

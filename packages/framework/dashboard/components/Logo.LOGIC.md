@@ -1,4 +1,4 @@
-The Framework's mark, the six-strand hexknot from the brand site, drawn as the same shape in two states: idle, and working while an agent [1] is running. The mark never moves; only its color says whether the AI is at work, and its label says so in words.
+OpenAgent's mark, the six-strand hexknot from the brand site, drawn as the same shape in two states: idle, and working while an agent [1] is running. The mark never moves; only its color says whether the AI is at work, and its label says so in words.
 
 ## Glossary
 

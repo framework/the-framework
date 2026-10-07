@@ -17,7 +17,7 @@ import type { AgentWorktree } from '../dashboard/types.js'
 import { crawlRepoFiles } from '../project.js'
 import { contextBridgeBrowser, contextProjects, contextRemote, resolveProjectPath, resolveAgentPath } from './context.js'
 import { relayOr } from './relay-agent.js'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import type { BridgeEvent, BridgeHello, BridgeQuestion } from '../dashboard/bridge-endpoints.js'
 import type { BridgeAnswer, BridgeContact, BridgeVersion } from '../dashboard/bridge-store.js'
@@ -194,7 +194,7 @@ export async function onAgentWorktree(projectId: string, agentId: string): Promi
 }
 
 /** One archived agent's event log for replay (or `[]` when the agent or project is gone). */
-export async function onAgent(projectId: string, agentId: string): Promise<FrameworkEvent[]> {
+export async function onAgent(projectId: string, agentId: string): Promise<OpenAgentEvent[]> {
   return relayOr(agentId, 'onAgent', [projectId, agentId], async () => {
     const cwd = await resolveProjectPath(projectId)
     if (!cwd) return []

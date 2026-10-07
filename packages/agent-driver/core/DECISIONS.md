@@ -11,7 +11,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   streams what it does, writes the log and reads the inbox, and says when the agent asked.
   Every other piece only passes paths or writes lines. Picked over the runner tailing the
   inbox and detecting the question itself (the session's protocol in two packages), and
-  over a steering library imported from The Framework (a tool depending on the product).
+  over a steering library imported from OpenAgent (a tool depending on the product).
 - Drain, then end. When a turn ends, every line already waiting in the inbox is sent as a
   further prompt of the same session, and the prompt returns when the inbox is empty; a
   line that comes later is for a new session resumed by its id. Picked over a session that
@@ -20,7 +20,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   on the record, not a state in a process.
 
 ## The question
-- The question is the fenced `await-choices` block The Framework's agents already end a
+- The question is the fenced `await-choices` block OpenAgent's agents already end a
   turn with, now the driver's contract and parsed here alone; the words that teach an
   agent when to ask are the caller's. Picked over a format of the driver's own (a second
   parser and a second thing for agents to learn) and over no format (a question in free

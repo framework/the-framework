@@ -9,7 +9,7 @@ Serves the live event stream [1] for one selected agent [2] to the browser: ever
 ## Glossary
 
 [1] event stream / diary: everything an agent does, as the browser receives it, one event per line of the agent's diary: `<id>.jsonl`, written by the tool that runs the agent under the `.openagent/` of the agent's checkout while it works, and answered whole by the project's runs provider [7] once it has ended.
-[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [3] relay: running an agent on a device: the local daemon forwards the start, streams the events back and forwards steering, so the agent renders like a local one.
 [4] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [5] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.

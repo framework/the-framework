@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildOpenQuestions } from './open-questions.js'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 import type { LiveAgent } from '../store/index.js'
 
 const PROJECTS = [{ id: 'p1', path: '/one', name: 'one', activated: true, gitHost: false }]
@@ -18,7 +18,7 @@ function liveAgent(overrides: Partial<LiveAgent> = {}): LiveAgent {
   }
 }
 
-const CHOICE: FrameworkEvent = {
+const CHOICE: OpenAgentEvent = {
   kind: 'choice',
   id: 'await-choices',
   title: 'Approve the plan?',
@@ -28,7 +28,7 @@ const CHOICE: FrameworkEvent = {
   ],
   recommended: 'yes',
 }
-const WAITING: FrameworkEvent = { kind: 'end', ok: false, waiting: true }
+const WAITING: OpenAgentEvent = { kind: 'end', ok: false, waiting: true }
 
 test('a waiting run yields its question whole, options and recommendation, read off the run\'s own diary (#1455/#1774)', async () => {
   const readFor: string[] = []
@@ -40,7 +40,7 @@ test('a waiting run yields its question whole, options and recommendation, read 
     },
   })
   assert.deepEqual(readFor, ['/one run-1'])
-  const { kind: _kind, ...choice } = CHOICE as FrameworkEvent & { kind: 'choice' }
+  const { kind: _kind, ...choice } = CHOICE as OpenAgentEvent & { kind: 'choice' }
   assert.deepEqual(questions, [
     {
       projectId: 'p1',

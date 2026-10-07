@@ -1,5 +1,5 @@
 import { EventStream } from '../event-stream.js'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 import type { AgentMeta } from '../store/index.js'
 import type { StartAgentOptions, StartAgentResult } from './types.js'
 import { errorMessage } from '../error-message.js'
@@ -106,7 +106,7 @@ export async function relayRpc(target: RemoteTarget, fn: string, args: unknown[]
 export function streamRemoteEvents(
   target: RemoteTarget,
   agentId: string,
-  onEvent: (event: FrameworkEvent) => void,
+  onEvent: (event: OpenAgentEvent) => void,
   onEnd?: () => void,
 ): () => void {
   const controller = new AbortController()
@@ -150,12 +150,12 @@ export function streamRemoteEvents(
   }
 }
 
-/** Parse one NDJSON line as a {@link FrameworkEvent} and forward it; a blank or malformed line is skipped. */
-function emitLine(line: string, onEvent: (event: FrameworkEvent) => void): void {
+/** Parse one NDJSON line as a {@link OpenAgentEvent} and forward it; a blank or malformed line is skipped. */
+function emitLine(line: string, onEvent: (event: OpenAgentEvent) => void): void {
   const trimmed = line.trim()
   if (!trimmed) return
   try {
-    onEvent(JSON.parse(trimmed) as FrameworkEvent)
+    onEvent(JSON.parse(trimmed) as OpenAgentEvent)
   } catch {
     // A partial or malformed line is dropped rather than crashing the pump.
   }
@@ -163,7 +163,7 @@ function emitLine(line: string, onEvent: (event: FrameworkEvent) => void): void 
 
 interface RelayedAgent {
   target: RemoteTarget
-  stream: EventStream<FrameworkEvent>
+  stream: EventStream<OpenAgentEvent>
   cancel: () => void
 }
 
@@ -193,7 +193,7 @@ export class RelayedAgents {
     this.targets.set(agentId, target) // kept past the stream, for post-run reads/push/PR (slice 2)
     this.metas.set(agentId, { meta, projectId }) // the local list row, so a reload re-opens the run (#1077)
     this.agents.get(agentId)?.cancel() // a re-register (same id) replaces the old pump
-    const stream = new EventStream<FrameworkEvent>()
+    const stream = new EventStream<OpenAgentEvent>()
     const cancel = streamRemoteEvents(target, agentId, event => {
       stream.push(event)
       this.apply(agentId, event) // fold the event into the run's list row, mirroring the device
@@ -202,7 +202,7 @@ export class RelayedAgents {
   }
 
   /** The live event stream for a relayed agent, or undefined when this daemon is not relaying it. */
-  get(agentId: string | undefined): EventStream<FrameworkEvent> | undefined {
+  get(agentId: string | undefined): EventStream<OpenAgentEvent> | undefined {
     return agentId ? this.agents.get(agentId)?.stream : undefined
   }
 
@@ -222,7 +222,7 @@ export class RelayedAgents {
   /** Fold each relayed event into the agent's list row via the store's own reducer (#1077), so the
    *  local stub mirrors the device: the terminal status on `end`, the waiting flag while it is parked
    *  (#785), the driver once its session starts. Events carry no write time, so this stamps its own. */
-  private apply(agentId: string, event: FrameworkEvent): void {
+  private apply(agentId: string, event: OpenAgentEvent): void {
     const entry = this.metas.get(agentId)
     if (!entry) return
     entry.meta = foldRelayedEvent(entry.meta, event, new Date().toISOString())
@@ -261,7 +261,7 @@ function trimSlashes(url: string): string {
  * card would say, kept here because that card is on the device. The events are the ones a run's
  * diary yields: the agent's session id, its cost, its end.
  */
-export function foldRelayedEvent(meta: AgentMeta, event: FrameworkEvent, at: string): AgentMeta {
+export function foldRelayedEvent(meta: AgentMeta, event: OpenAgentEvent, at: string): AgentMeta {
   const next: AgentMeta = { ...meta, updatedAt: at }
   if (event.kind === 'session-update') next.sessionId = event.sessionId
   else if (event.kind === 'usage') next.cost = (next.cost ?? 0) + event.costUsd

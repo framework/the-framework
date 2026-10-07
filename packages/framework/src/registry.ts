@@ -6,7 +6,7 @@ import { nodeFs } from './node-fs.js'
 
 /**
  * The multi-project registry (#390): the list of projects the user has
- * installed The Framework into, kept as a single JSON file `.bashrc`-style —
+ * installed OpenAgent into, kept as a single JSON file `.bashrc`-style —
  * `$HOME/.openagent.json` — so it is the user's responsibility to re-create
  * per machine. The same file also holds the user's dashboard preferences (#410),
  * so the daemon owns one user file and the UI never needs localStorage.
@@ -63,7 +63,7 @@ export interface Preferences {
    * The "needs you" category (#627): notify when an agent is awaiting your answer or a PR is ready
    * to review. A *category* toggle, like {@link notifyNewActivity}, composing with the method
    * toggle {@link notifyBrowser}. **Absent = on**: unlike the other
-   * flat opt-in booleans, human-intervention pings are the baseline The Framework leans on, so an
+   * flat opt-in booleans, human-intervention pings are the baseline OpenAgent leans on, so an
    * unset preference keeps them firing; a user turns them off explicitly.
    */
   notifyHumanIntervention?: boolean

@@ -14,7 +14,7 @@
  */
 
 export type { AgentError, SessionInfo } from './agent-view.js'
-export type { ChoiceRequest, FrameworkEvent } from './events.js'
+export type { ChoiceRequest, OpenAgentEvent } from './events.js'
 export type { QuotaBoundary } from './quota-boundary.js'
 export type { CustomPreset, Preferences } from './registry.js'
 export type { PublishPick } from './publish-levels.js'

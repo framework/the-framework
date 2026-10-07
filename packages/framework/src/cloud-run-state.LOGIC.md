@@ -2,7 +2,7 @@ Decides the one word every surface shows for what a web agent [1]'s cloud side i
 
 ## Context
 
-**User story**: the user starts several web agents [1] and watches the dashboard's agent list and the Overview [5]. An agent whose cloud session [4] is still working reads "in cloud", one whose session stopped to ask something reads "waiting", one whose pull request The Framework merged reads "merged", and one that is over reads "done" like any other finished agent.
+**User story**: the user starts several web agents [1] and watches the dashboard's agent list and the Overview [5]. An agent whose cloud session [4] is still working reads "in cloud", one whose session stopped to ask something reads "waiting", one whose pull request OpenAgent merged reads "merged", and one that is over reads "done" like any other finished agent.
 
 **Problem**: a web agent's local half ends the moment it hands the task to a cloud session, so from then on its stored status is "done" — which says nothing about whether the session is still working on claude.ai, is parked on a question, or finished long ago. Marking every such agent "in cloud" forever is the opposite error: an agent whose pull request merged two days ago is not in the cloud. The word has to come from what is actually known about the session.
 
@@ -24,7 +24,7 @@ Decides the one word every surface shows for what a web agent [1]'s cloud side i
 
 - **Which agents get a cloud word at all** - only an agent [1] whose location [6] is `web` and whose local half ended cleanly; every other agent is described by its own status.
 - **Parked on a human comes first** - a cloud session [4] the bridge [2] reports as holding an unanswered question reads "waiting", whatever else is known.
-- **Merged outranks everything else known** - an agent whose pull request The Framework merged reads "merged".
+- **Merged outranks everything else known** - an agent whose pull request OpenAgent merged reads "merged".
 - **A recorded pull request means the work landed** - once a pull request is on the agent's record, the word is "done" and the pull request's own badge carries its live state.
 - **Inside the cloud session window, still in the cloud** - with no pull request, an agent started within the last 12 hours reads "in cloud"; past that window [7], or with an unreadable start time, it reads "done".
 - **What still counts as an agent at work** - "waiting" and "in cloud" mean the cloud side is still working or still owed an answer; "merged" and "done" mean it is over.
@@ -55,7 +55,7 @@ When the agent [1]'s record is marked as having a cloud session [4] parked on a 
 
 #### Context
 
-**Business logic story**: an agent [1]'s handoff [8] records how its merge half went, and cloud work adoption [9] records the pull request a cloud session [4] opened; between them, "The Framework merged this agent's pull request" is a fact on the record.
+**Business logic story**: an agent [1]'s handoff [8] records how its merge half went, and cloud work adoption [9] records the pull request a cloud session [4] opened; between them, "OpenAgent merged this agent's pull request" is a fact on the record.
 
 #### Business logic
 

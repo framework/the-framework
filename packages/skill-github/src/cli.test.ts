@@ -7,7 +7,7 @@ import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import type { GhRunner } from './gh.js'
 import { runCli, USAGE } from './cli.js'
 
-// The command line the framework, the scheduler and an agent run: JSON on stdout, a line for a
+// The command line OpenAgent, the scheduler and an agent run: JSON on stdout, a line for a
 // person on stderr, an exit code that says refusal or usage error. gh is scripted throughout.
 
 interface Ran {

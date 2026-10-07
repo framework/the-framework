@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Cloud, ExternalLink, Loader2, TriangleAlert } from 'lucide-react'
-import type { BridgeAnswer, BridgeEvent, BridgeQuestion, FrameworkEvent } from '../../src/index.js'
+import type { BridgeAnswer, BridgeEvent, BridgeQuestion, OpenAgentEvent } from '../../src/index.js'
 import { bridgeChoiceRequest } from '../../src/client.js'
 import { onBridgeQuestion, onBridgeEvents, onBridgeAnswer } from '../rpc/reads.js'
 import { sendBridgeAnswer, sendBridgeAnswerCancel } from '../rpc/control.js'
@@ -23,7 +23,7 @@ export function CloudAgentNotice({
   agentId,
 }: {
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
-  events: readonly FrameworkEvent[]
+  events: readonly OpenAgentEvent[]
   /** The agent this notice belongs to: what the question panel is given. */
   projectId: string
   agentId: string
@@ -202,7 +202,7 @@ export function CloudMirrorRow({
   events,
 }: {
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
-  events: readonly FrameworkEvent[]
+  events: readonly OpenAgentEvent[]
 }) {
   const session = target === 'web' ? cloudSession(events) : undefined
   const transcript = useBridgeEvents(session?.id)

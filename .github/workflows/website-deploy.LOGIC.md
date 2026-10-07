@@ -7,7 +7,7 @@ Publishes the marketing website, the `packages/the-framework.ai` package, to Git
 ## Business logic — TL;DR
 
 - **When it deploys** - only a push to `main` that changes the website package or this workflow.
-- **What it builds** - the framework package, then the website's production build, after a website test step that has no tests yet.
+- **What it builds** - the OpenAgent package, then the website's production build, after a website test step that has no tests yet.
 - **How it publishes** - the built site replaces the `gh-pages` branch as one single commit, with the custom domain and the no-Jekyll marker carried inside the build.
 
 ## Business logic
@@ -33,7 +33,7 @@ The workflow, named "Website Deployment", runs on a push to the `main` branch on
 One job on the latest Ubuntu runner, with pnpm, runs four commands at the repository root, each only if the previous one succeeded:
 
 1. `pnpm install`: every package's dependencies.
-2. `pnpm run build`: the framework package's build.
+2. `pnpm run build`: the OpenAgent package's build.
 3. `pnpm run website:test`: the website's tests. There are none yet: the command prints "no tests yet" and succeeds, so this step cannot fail today.
 4. `pnpm run website:build`: the website's production build, which lands in `packages/the-framework.ai/dist/client`.
 

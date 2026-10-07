@@ -75,7 +75,7 @@ The bridge [1] answers no CORS headers on any route. An extension worker holding
 
 #### Context
 
-**Problem**: a version-skewed extension does not fail loudly; it half-works — missed messages, silently ignored fields — which reads as a bug in The Framework and burns a debugging session.
+**Problem**: a version-skewed extension does not fail loudly; it half-works — missed messages, silently ignored fields — which reads as a bug in OpenAgent and burns a debugging session.
 
 #### Business logic
 

@@ -413,7 +413,7 @@ const CLOSE_GRACE_MS = 3_000
 
 /**
  * Make sure nothing else holds the profile: a browser a dead daemon left behind is stopped,
- * gently first. It is the framework's own profile, so whatever holds it is the framework's own
+ * gently first. It is OpenAgent's own profile, so whatever holds it is OpenAgent's own
  * leftover; nothing the user runs shares it.
  */
 export async function freeProfile(profileDir: string, deps: BridgeBrowserDeps): Promise<boolean> {
@@ -581,19 +581,19 @@ export function bridgeBrowserOwner(launch: BridgeBrowserLauncher, log: (line: st
         }
         browser = launched
         current = { state: 'running', since: new Date().toISOString(), visible: false, signIn: false }
-        log('[framework] the bridge browser is running')
+        log('[openagent] the bridge browser is running')
         launched.onExit(detail => {
           if (browser !== launched) return
           browser = undefined
           current = { state: 'stopped', detail }
-          log(`[framework] the bridge browser stopped: ${detail}`)
+          log(`[openagent] the bridge browser stopped: ${detail}`)
         })
       })
       .catch((err: unknown) => {
         if (generation !== mine) return
         const detail = err instanceof Error ? err.message : String(err)
         current = { state: 'stopped', detail }
-        log(`[framework] the bridge browser could not start: ${detail}`)
+        log(`[openagent] the bridge browser could not start: ${detail}`)
       })
       .finally(() => {
         launching = undefined

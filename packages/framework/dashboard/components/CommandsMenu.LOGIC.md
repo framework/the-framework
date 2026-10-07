@@ -4,7 +4,7 @@ The "Commands" button beside the composer [1]: one dropdown that lists the open 
 
 **User story**: a first-time user with an empty composer sees a button that reveals what this project can be asked to do and clicks one to load it; a returning user deletes a saved prompt they no longer use from the same menu. Typing `/` in the editor stays the fast path for those who know it.
 
-**Problem**: The Framework ships no prompts of its own. The menu therefore has nothing to list but what the project's own skills say and what people saved, and a project with no skills must not look broken.
+**Problem**: OpenAgent ships no prompts of its own. The menu therefore has nothing to list but what the project's own skills say and what people saved, and a project with no skills must not look broken.
 
 ## Glossary
 

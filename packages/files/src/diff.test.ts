@@ -72,7 +72,7 @@ test('a long patch is cut and says it was cut', async () => {
 test('a long untracked file is counted whole, though its preview is cut', async () => {
   // The Changes list takes an untracked file's added count from this read, and the SPEC says that
   // count is the file's line count — counting the cut preview reported every big new file as 500.
-  const dir = await mkdtemp(join(tmpdir(), 'framework-diff-'))
+  const dir = await mkdtemp(join(tmpdir(), 'openagent-diff-'))
   await writeFile(join(dir, 'big.ts'), Array.from({ length: 900 }, (_, i) => `line ${i}`).join('\n') + '\n')
   const diff = await readFileDiff(dir, 'big.ts', 'untracked', fakeGit(''))
   assert.ok(diff)

@@ -1,4 +1,4 @@
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 import { afterEach, describe, expect, test } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { AgentErrorCount } from './AgentErrorCount.js'
@@ -27,7 +27,7 @@ describe('AgentErrorCount', () => {
 
   test("the error a failed run's state already names is not counted again", () => {
     const usage = "You've hit your usage limit."
-    const failed: FrameworkEvent[] = [
+    const failed: OpenAgentEvent[] = [
       { kind: 'driver', event: { type: 'error', message: usage } },
       { kind: 'end', ok: false, detail: `codex exited (1): ${usage}` },
     ]
@@ -40,7 +40,7 @@ describe('AgentErrorCount', () => {
   })
 
   test('several errors read plural, and the LATEST headline is the one shown', () => {
-    const events: FrameworkEvent[] = [
+    const events: OpenAgentEvent[] = [
       { kind: 'error', headline: 'first thing broke' },
       { kind: 'error', headline: 'second thing broke' },
     ]

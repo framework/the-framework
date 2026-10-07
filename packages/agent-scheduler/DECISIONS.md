@@ -9,7 +9,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## The tool
 - A tool, a package with a command line, like `agent-driver`; not a skill. It owns one
   small process with a clock, and nothing else runs agents on a schedule. Picked over a
-  skill the agent would read, and over a job inside The Framework's daemon: the daemon
+  skill the agent would read, and over a job inside OpenAgent's daemon: the daemon
   becomes a dashboard, a projection of files, and this is the thing that decides when
   agents start.
 - Two tools: `agent-runner` runs one agent from start to end, `agent-scheduler` keeps the
@@ -25,7 +25,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The scheduler depends on `@openagt/agent-runner` for the runs, the records and the sweep, on
   `@openagt/agent-driver` for the quota reading, on the branches package for the project root, on
   the logs package to count the records, and on `agent-data` for the branch. It never
-  depends on The Framework, and The Framework never depends on it. Its dashboard part is
+  depends on OpenAgent, and OpenAgent never depends on it. Its dashboard part is
   the exception: it is drawn with the dashboard's module contract, and the tool itself runs
   without it.
 - The tool names no skill and no command. What runs comes from the schedule file, and a
@@ -76,7 +76,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The checks in the cheapest order: the command exists, the check says due, the cap, then
   the quota. The quota is read only when everything else says start, because the reading
   spawns the agent's CLI and its usage fetch is refused upstream when asked too often.
-- The quota gate is The Framework's spend boundary, copied: a window in force may be used
+- The quota gate is OpenAgent's spend boundary, copied: a window in force may be used
   only as far as the week has elapsed, plus the user's cushion, half a day when unset.
   Picked over a plainer line (a window at 100% stands down): nothing would pace the week.
   Copied rather than moved into `agent-driver`, which is not this tool's to change.
@@ -88,18 +88,18 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A run counts for the schedule line its prompt names, and the scheduler decides that when
   it counts the records; the run's record holds only the prompt. Picked over the runner
   reading the schedule to name the command: the runner reads no scheduler file.
-- The daily heartbeat and the transport retry The Framework's daemon had are dropped: a
+- The daily heartbeat and the transport retry OpenAgent's daemon had are dropped: a
   failed run leaves its queue entry for the next tick.
 
 ## The command line
 - Every command prints one JSON document on stdout, one line for a person on stderr, and
   exits 0 for a result, 1 for a refusal or a failure, 2 for a command line that cannot be
   read: the skills' contract, so a person and a dashboard read it the same way.
-- `start` is the only clock: The Framework's daemon does not tick. A dashboard that wants
+- `start` is the only clock: OpenAgent's daemon does not tick. A dashboard that wants
   the scheduler on while it is open runs `start` when it opens and `stop
   --unless-keep-alive` when it closes, from a hook file of the user's that names the tool;
-  The Framework itself names no tool. Picked over the daemon calling the tick, which would
-  have made The Framework name the tool.
+  OpenAgent itself names no tool. Picked over the daemon calling the tick, which would
+  have made OpenAgent name the tool.
 - A stop waits for the tick in flight, and that tick starts nothing more: the readings are
   where a tick spends its seconds, and a person who said stop gets no new agent. The ending
   scheduler clears only its own pid from the state, since a dashboard's close hook stops one

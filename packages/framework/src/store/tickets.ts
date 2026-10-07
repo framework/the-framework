@@ -2,18 +2,18 @@ import { runPackageCommand, type ProvidedCommand } from '@openagt/agent-data'
 import { providedCommand } from '../built-in.js'
 
 /**
- * The tickets, as the framework reads them (#1774). The framework keeps no ticket and imports no
+ * The tickets, as OpenAgent reads them (#1774). OpenAgent keeps no ticket and imports no
  * tickets package: a project's tickets come from whichever of its packages declares that it
  * provides them — `"openagent": { "tickets": "<command>" }` in the package's own package.json —
- * and the framework reads them by running that command. Swap the package for another that answers
+ * and OpenAgent reads them by running that command. Swap the package for another that answers
  * the same command line and prints the same shape, and nothing here changes. No package declares
  * it: the project has no tickets, and the dashboard shows it none.
  *
  * The command line a provider answers, printing one JSON document and exiting 0:
  *   `<command> list --local`   every open ticket, as an array of {@link Ticket}
- * `--local` reads the copy on this machine, no network: the framework polls.
+ * `--local` reads the copy on this machine, no network: OpenAgent polls.
  *
- * That is the whole contract. The framework reads tickets for what it composes across skills: the
+ * That is the whole contract. OpenAgent reads tickets for what it composes across skills: the
  * onboarding step, a queued link's title. Showing them, planning them, claiming and releasing them,
  * and the Overview's hot-tickets card, are the tickets package's own module, through its own command.
  *
@@ -44,7 +44,7 @@ export interface Ticket {
   uncertainty?: number
 }
 
-/** A project's tickets: what a provider answers, read by the framework. */
+/** A project's tickets: what a provider answers, read by OpenAgent. */
 export interface TicketsSource {
   /** Every open ticket; `[]` when none can be read. */
   list(): Promise<Ticket[]>
@@ -117,7 +117,7 @@ export function providedTickets(now: () => number = Date.now): TicketsReader {
   return Object.assign(reader, { changed: (root: string) => sources.get(root)?.source?.drop() })
 }
 
-/** The framework's one reader of the tickets, shared by every caller so they share its cache. */
+/** OpenAgent's one reader of the tickets, shared by every caller so they share its cache. */
 export const projectTickets: TicketsReader = providedTickets()
 
 /** A {@link TicketsFor} for a project with no provider: no tickets. */

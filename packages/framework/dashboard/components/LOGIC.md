@@ -2,7 +2,7 @@ The dashboard's [1] view layer: every page the user sees and every control on it
 
 ## Context
 
-**User story**: everything the user does with The Framework happens here — starting an agent [3], watching it, answering the questions it stops at, chatting with it, deciding what becomes of its work, working the tickets and the agent queue [4], seeing what the account has spent, and changing every setting.
+**User story**: everything the user does with OpenAgent happens here — starting an agent [3], watching it, answering the questions it stops at, chatting with it, deciding what becomes of its work, working the tickets and the agent queue [4], seeing what the account has spent, and changing every setting.
 
 ## Glossary
 

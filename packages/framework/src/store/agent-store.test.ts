@@ -147,7 +147,7 @@ test('readAllAgents and findAgent: the checkout\'s card wins over the record of 
   assert.deepEqual((await readAllAgents(CWD, fs, noRuns, branches)).map(agent => agent.id), ['r1'])
 })
 
-test('loadAgentEvents replays a run\'s diary as the framework\'s events: the checkout\'s while it has one, else the finished run\'s (#1769)', async () => {
+test('loadAgentEvents replays a run\'s diary as OpenAgent\'s events: the checkout\'s while it has one, else the finished run\'s (#1769)', async () => {
   const diary = [{ kind: 'said', text: 'Reading.' }, { kind: 'result', text: 'Done.', sessionId: 's1' }, { kind: 'cost', usd: 0.5 }, { kind: 'ended', status: 'failed', detail: 'API 500' }]
   const recorded = diary.map(line => JSON.stringify(line)).join('\n') + '\n'
   const fs = memFs()

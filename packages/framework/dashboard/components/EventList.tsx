@@ -1,5 +1,5 @@
-import type { AgentMeta, ChoiceRequest, FrameworkEvent } from '../../src/index.js'
-import { formatFrameworkEvent } from '../../src/client.js'
+import type { AgentMeta, ChoiceRequest, OpenAgentEvent } from '../../src/index.js'
+import { formatOpenAgentEvent } from '../../src/client.js'
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { pendingChoices } from '../lib/live-state.js'
@@ -53,7 +53,7 @@ import {
 
 // The conversation text — the user's prompt and the agent's reply (AGENT). Both are rendered
 // as Markdown: the agent writes in Markdown, and a prompt may too.
-function messageText(e: FrameworkEvent): string | null {
+function messageText(e: OpenAgentEvent): string | null {
   if (e.kind !== 'driver') return null
   if (e.event.type === 'start') return e.event.prompt
   if (e.event.type === 'text') return e.event.text
@@ -67,14 +67,14 @@ function isLong(text: string): boolean {
 }
 
 /** Grouping key for a run of same-kind rows: the user's prompt stands apart from the agent's work. */
-function rowGroup(e: FrameworkEvent): string {
+function rowGroup(e: OpenAgentEvent): string {
   if (e.kind === 'driver') return e.event.type === 'start' ? 'you' : 'agent'
   return e.kind
 }
 
 // A driver `start` opens a fresh prompt turn — the natural anchor the scroller keeps in view.
 // Only the newest one is handed to the scroller as its anchor (see `anchor` in EventList).
-function isTurnBoundary(e: FrameworkEvent): boolean {
+function isTurnBoundary(e: OpenAgentEvent): boolean {
   return e.kind === 'driver' && e.event.type === 'start'
 }
 
@@ -84,7 +84,7 @@ function isTurnBoundary(e: FrameworkEvent): boolean {
  * the user asked for that, and neither is a run *waiting* on the question it ended on (#1774): both
  * stay neutral rather than being coloured like a fault.
  */
-function isFailure(e: FrameworkEvent): boolean {
+function isFailure(e: OpenAgentEvent): boolean {
   if (e.kind === 'driver') return e.event.type === 'error'
   // An error the agent reported itself (#1500) is a failure like any other: the log already has
   // one red lane, and a second vocabulary for the same thing would only make both quieter.
@@ -93,7 +93,7 @@ function isFailure(e: FrameworkEvent): boolean {
 }
 
 /** The row's colour: a failure is red (#1199), and everything else keeps the muted log tone. */
-function rowTone(e: FrameworkEvent): string {
+function rowTone(e: OpenAgentEvent): string {
   return isFailure(e) ? 'text-danger' : ''
 }
 
@@ -104,7 +104,7 @@ function rowTone(e: FrameworkEvent): string {
  * already) — and at a whisper of alpha, so the
  * text keeps the contrast and the bulk of the log stays plain canvas.
  */
-function rowWash(e: FrameworkEvent): string {
+function rowWash(e: OpenAgentEvent): string {
   return isFailure(e) ? 'bg-danger/10' : ''
 }
 
@@ -117,7 +117,7 @@ function rowWash(e: FrameworkEvent): string {
  * happened. The rows it jumps keep their order, so the log reads as "what I asked, then
  * everything that followed".
  */
-function promptFirst(events: FrameworkEvent[]): FrameworkEvent[] {
+function promptFirst(events: OpenAgentEvent[]): OpenAgentEvent[] {
   const at = events.findIndex(isTurnBoundary)
   if (at <= 0) return events
   return [events[at]!, ...events.slice(0, at), ...events.slice(at + 1)]
@@ -143,14 +143,14 @@ type ChoiceRow = { choice: ChoiceRequest; pick?: string | readonly string[] }
  * a control nobody reads must not look answerable. Earlier firings' "✓ chose" lines stay put:
  * they are the only record of a superseded decision.
  */
-function foldChoiceRows(events: FrameworkEvent[]): {
-  rows: Map<FrameworkEvent, ChoiceRow>
-  hidden: Set<FrameworkEvent>
+function foldChoiceRows(events: OpenAgentEvent[]): {
+  rows: Map<OpenAgentEvent, ChoiceRow>
+  hidden: Set<OpenAgentEvent>
 } {
-  const rows = new Map<FrameworkEvent, ChoiceRow>()
-  const hidden = new Set<FrameworkEvent>()
-  const lastFiring = new Map<string, { e: FrameworkEvent; at: number }>()
-  const lastResolved = new Map<string, { e: Extract<FrameworkEvent, { kind: 'choice-resolved' }>; at: number }>()
+  const rows = new Map<OpenAgentEvent, ChoiceRow>()
+  const hidden = new Set<OpenAgentEvent>()
+  const lastFiring = new Map<string, { e: OpenAgentEvent; at: number }>()
+  const lastResolved = new Map<string, { e: Extract<OpenAgentEvent, { kind: 'choice-resolved' }>; at: number }>()
   events.forEach((e, at) => {
     if (e.kind === 'choice') lastFiring.set(e.id, { e, at })
     else if (e.kind === 'choice-resolved') lastResolved.set(e.id, { e, at })
@@ -182,8 +182,8 @@ function foldChoiceRows(events: FrameworkEvent[]): {
  * loopback address. Every `ended` line is hidden: the live row going back to its one line says
  * the screen has gone.
  */
-export function foldScreenRows(events: readonly FrameworkEvent[]): { live: Set<FrameworkEvent>; hidden: Set<FrameworkEvent> } {
-  const hidden = new Set<FrameworkEvent>()
+export function foldScreenRows(events: readonly OpenAgentEvent[]): { live: Set<OpenAgentEvent>; hidden: Set<OpenAgentEvent> } {
+  const hidden = new Set<OpenAgentEvent>()
   const newest = new Map<string, number>()
   let lastEnd = -1
   events.forEach((e, at) => {
@@ -195,7 +195,7 @@ export function foldScreenRows(events: readonly FrameworkEvent[]): { live: Set<F
       newest.delete(e.url)
     } else newest.set(e.url, at)
   })
-  const live = new Set<FrameworkEvent>()
+  const live = new Set<OpenAgentEvent>()
   for (const [url, at] of newest) if (at > lastEnd && isLoopbackScreen(url)) live.add(events[at]!)
   return { live, hidden }
 }
@@ -206,7 +206,7 @@ export function foldScreenRows(events: readonly FrameworkEvent[]): { live: Set<F
  * line under them said it twice. A failed or stopped end is a row where it happened: it says why
  * the agent is not going on, and why the next prompt was needed.
  */
-export function quietEnds(events: readonly FrameworkEvent[]): Set<FrameworkEvent> {
+export function quietEnds(events: readonly OpenAgentEvent[]): Set<OpenAgentEvent> {
   return new Set(events.filter(e => e.kind === 'end' && (e.ok || e.waiting)))
 }
 
@@ -214,9 +214,9 @@ export function quietEnds(events: readonly FrameworkEvent[]): Set<FrameworkEvent
  * The replies a question follows: the agent's last message before each question it stopped on.
  * It is what the question is about (a plan to approve), so it is shown whole, not folded.
  */
-export function askedReplies(events: readonly FrameworkEvent[]): Set<FrameworkEvent> {
-  const asked = new Set<FrameworkEvent>()
-  let reply: FrameworkEvent | undefined
+export function askedReplies(events: readonly OpenAgentEvent[]): Set<OpenAgentEvent> {
+  const asked = new Set<OpenAgentEvent>()
+  let reply: OpenAgentEvent | undefined
   for (const e of events) {
     if (isTurnBoundary(e)) reply = undefined
     else if (e.kind === 'driver' && e.event.type === 'text') reply = e
@@ -361,12 +361,12 @@ function Message({ text }: { text: string }) {
 }
 
 /** A tool call or a thought of the coding agent: a step between two of its messages. */
-function stepOf(e: FrameworkEvent): ToolStep | undefined {
+function stepOf(e: OpenAgentEvent): ToolStep | undefined {
   return e.kind === 'driver' && (e.event.type === 'action' || e.event.type === 'thought') ? { ...e.event } : undefined
 }
 
 /** What a tool call gave back: no row and no step of its own, a part of its call. */
-function outputOf(e: FrameworkEvent): (CallOutput & { id: string }) | undefined {
+function outputOf(e: OpenAgentEvent): (CallOutput & { id: string }) | undefined {
   return e.kind === 'driver' && e.event.type === 'output' ? e.event : undefined
 }
 
@@ -379,15 +379,15 @@ function outputOf(e: FrameworkEvent): (CallOutput & { id: string }) | undefined 
  * line says it.
  */
 export function foldSteps(
-  events: readonly FrameworkEvent[],
+  events: readonly OpenAgentEvent[],
   live = false,
-): { rows: FrameworkEvent[]; steps: Map<FrameworkEvent, ToolStep[]>; current?: Extract<ToolStep, { type: 'action' }> } {
+): { rows: OpenAgentEvent[]; steps: Map<OpenAgentEvent, ToolStep[]>; current?: Extract<ToolStep, { type: 'action' }> } {
   const last = events[events.length - 1]
   const going = live && last !== undefined ? stepOf(last) : undefined
   if (going?.type === 'action') return { ...foldSteps(events.slice(0, -1)), current: going }
-  const rows: FrameworkEvent[] = []
-  const steps = new Map<FrameworkEvent, ToolStep[]>()
-  let run: { head: FrameworkEvent; steps: ToolStep[] } | undefined
+  const rows: OpenAgentEvent[] = []
+  const steps = new Map<OpenAgentEvent, ToolStep[]>()
+  let run: { head: OpenAgentEvent; steps: ToolStep[] } | undefined
   const calls = new Map<string, Extract<ToolStep, { type: 'action' }>>()
   const close = (): void => {
     if (run?.steps.some(step => step.type === 'action')) {
@@ -433,7 +433,7 @@ const NOTHING_DOING: Record<string, string> = {}
  * only when the quota is running low or used up; the agent reports it after every turn,
  * "allowed" included.
  */
-function shownAsRow(e: FrameworkEvent): boolean {
+function shownAsRow(e: OpenAgentEvent): boolean {
   if (e.kind === 'session-update' || e.kind === 'usage') return false
   if (e.kind === 'driver' && e.event.type === 'result') return false
   if (e.kind === 'driver' && e.event.type === 'rate-limit') return e.event.limit.status !== 'allowed'
@@ -457,7 +457,7 @@ export function EventList({
   onOpenAgent,
   onOpenChange,
 }: {
-  events: FrameworkEvent[]
+  events: OpenAgentEvent[]
   /** The message the agent is writing, as far as it has got: an AGENT row after the last, drawn
    *  as a finished reply is. Never an event: its whole message's row replaces it. */
   writing?: string
@@ -506,9 +506,9 @@ export function EventList({
   const asked = useMemo(() => askedReplies(events), [events])
   const logged = promptFirst(events).filter(e => shownAsRow(e) && !choiceRows?.hidden.has(e) && !screenRows.hidden.has(e))
   // Every row and every passed end, in order, a message just sent last; `shown` is the rows alone.
-  const kept: FrameworkEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
+  const kept: OpenAgentEvent[] = sending === undefined ? logged : [...logged, { kind: 'driver', event: { type: 'start', prompt: sending } }]
   // The text of a row's message: the reply a question follows, without the question's block.
-  const textOf = (e: FrameworkEvent): string | null => {
+  const textOf = (e: OpenAgentEvent): string | null => {
     const text = messageText(e)
     return text !== null && asked.has(e) ? withoutQuestionBlock(text) : text
   }
@@ -520,7 +520,7 @@ export function EventList({
   // Nothing has come since the prompt, not even a thought that is no row: the agent is starting.
   const starting = unfolded.length > 0 && isTurnBoundary(unfolded[unfolded.length - 1]!)
   // The prompts that told this run one of its subagents ended: SUBAGENT rows, not the reader's own.
-  const ends = new Map<FrameworkEvent, SubagentEnd>()
+  const ends = new Map<OpenAgentEvent, SubagentEnd>()
   for (const e of shown) {
     const end = e.kind === 'driver' && e.event.type === 'start' ? subagentEnd(e.event.prompt, subagents) : undefined
     if (end) ends.set(e, end)
@@ -528,7 +528,7 @@ export function EventList({
   // A row is known by its event's place in the whole log, not among the rows shown: a row that
   // stops being shown (an end the run went on after) then changes no other row's identity, and
   // the scroller keeps its place. A message just sent has no place yet.
-  const idOf = (e: FrameworkEvent): string => rowIds.get(e) ?? 'sending'
+  const idOf = (e: OpenAgentEvent): string => rowIds.get(e) ?? 'sending'
   // The scroller's anchor is the newest prompt alone. It brings an anchor it has not yet brought
   // into view to the top whenever one row takes another's place, and it starts with the oldest:
   // with every prompt an anchor, a log opened with several turns in it jumped to its first prompt
@@ -538,9 +538,9 @@ export function EventList({
   // An end that is no longer a row keeps an empty place in the list, where it was. The scroller
   // brings a new prompt to the top only when it finds it past the rows it already had: with the
   // end gone from the list, the prompt that follows it would sit at the end's old place, unseen.
-  const passedAbove = new Map<FrameworkEvent, FrameworkEvent[]>()
-  const passedLast: FrameworkEvent[] = []
-  for (let at = 0, waiting: FrameworkEvent[] = []; at <= kept.length; at++) {
+  const passedAbove = new Map<OpenAgentEvent, OpenAgentEvent[]>()
+  const passedLast: OpenAgentEvent[] = []
+  for (let at = 0, waiting: OpenAgentEvent[] = []; at <= kept.length; at++) {
     const e = kept[at]
     if (e === undefined) passedLast.push(...waiting)
     else if (passed.has(e)) waiting.push(e)
@@ -549,8 +549,8 @@ export function EventList({
       waiting = []
     }
   }
-  const placeOf = (e: FrameworkEvent): ReactNode => <MessageScrollerItem key={`passed-${idOf(e)}`} messageId={idOf(e)} hidden />
-  const groupOf = (e: FrameworkEvent): string => (ends.has(e) ? SUBAGENT : rowGroup(e))
+  const placeOf = (e: OpenAgentEvent): ReactNode => <MessageScrollerItem key={`passed-${idOf(e)}`} messageId={idOf(e)} hidden />
+  const groupOf = (e: OpenAgentEvent): string => (ends.has(e) ? SUBAGENT : rowGroup(e))
   const started = startedBefore(shown, subagents)
   const startedRows = (at: number): ReactNode =>
     started.get(at)?.map(agent => (
@@ -644,7 +644,7 @@ export function EventList({
                     </div>
                   ) : (
                     <span className={`min-w-0 flex-1 whitespace-pre-wrap break-words ${rowTone(e) || 'text-foreground'}`}>
-                      {(formatFrameworkEvent(e) ?? '').trim()}
+                      {(formatOpenAgentEvent(e) ?? '').trim()}
                     </span>
                   )}
                   {!own && chunkHead && at !== undefined && (

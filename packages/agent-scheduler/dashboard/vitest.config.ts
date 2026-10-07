@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
 // Unit tests for the module's Settings section and Overview card: the JSX transform, a DOM, and `@openagt/dashboard/module` resolved to
-// the framework's own source, since the tests render the pages inside a fake host and never
+// OpenAgent's own source, since the tests render the pages inside a fake host and never
 // load the dashboard.
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),

@@ -20,7 +20,7 @@ export const DEFAULT_MODEL = 'opus'
 
 /**
  * How far past the spend boundary unattended work may go, in percentage points: half a day of
- * the week's allowance, the same cushion The Framework's daemon used.
+ * the week's allowance, the same cushion OpenAgent's daemon used.
  */
 export const DEFAULT_SPEND_OFFSET = 100 / 14
 

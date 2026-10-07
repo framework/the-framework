@@ -22,7 +22,7 @@ import { appendQueueEntry, insertQueueEntry, parseQueueEntries, parseQueueSectio
  * package: `--local` reads this machine's copy of the branch (the persistent checkout a writer keeps
  * at `.branches/agent-data`, else the local branch) with no fetch, fast enough to poll, and `--full`
  * prints each entry with the priority section it sits in, so the dashboard can show the sections.
- * The package declares the command as the framework's queue provider (`"openagent": { "queue":
+ * The package declares the command as OpenAgent's queue provider (`"openagent": { "queue":
  * "queue" }`), which reads `queue --local`; the package's own module reads `queue --local --full`.
  */
 

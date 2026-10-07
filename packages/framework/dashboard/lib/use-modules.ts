@@ -89,7 +89,7 @@ function load(url: string): Promise<ModuleDefinition | undefined> {
         return definition
       },
       (error: unknown) => {
-        console.warn(`[framework] the module at ${url} did not load:`, error)
+        console.warn(`[openagent] the module at ${url} did not load:`, error)
         return undefined
       },
     )

@@ -7,7 +7,7 @@ in the LOGIC.md files; a choice made while implementing is the implementer's jud
 not a decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## Discord as a skill
-- Discord is a skill with one command, `discord send`, like the browser. The Framework knows
+- Discord is a skill with one command, `discord send`, like the browser. OpenAgent knows
   no Discord. Picked over the dashboard's own poster, with its watchers, its settings and
   its stored credentials.
 - It posts what it is given and decides nothing: when to post is whoever calls it, the

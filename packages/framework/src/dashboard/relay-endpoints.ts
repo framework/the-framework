@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 import type { StartAgentOptions, StartAgentResult } from './types.js'
 import { end, readJsonBody, requireGet, sendJson } from './http.js'
 
@@ -25,7 +25,7 @@ export const RELAY_PREFIX = '/_relay'
 /** What the daemon wires behind the relay endpoints: its own start closure and an events tail. */
 export interface RelayHandlers {
   start: (prompt: string, options: StartAgentOptions, projectId?: string) => StartAgentResult | Promise<StartAgentResult>
-  tailEvents: (agentId: string, onEvent: (event: FrameworkEvent) => void) => () => void
+  tailEvents: (agentId: string, onEvent: (event: OpenAgentEvent) => void) => () => void
   /** Run one whitelisted read/steer/handoff RPC against THIS device's own checkout, for the daemon
    *  relaying an agent here (#1067 slice 2); the caller wraps the result as {result}. */
   rpc?: (fn: string, args: unknown[]) => Promise<unknown>

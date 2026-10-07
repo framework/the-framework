@@ -16,7 +16,7 @@ const { useAgentHandoff } = await import('../lib/use-agent-handoff.js')
 
 /** A handoff for a session that did real work, on a repo with a remote and no PR yet. */
 const worked = {
-  branch: 'the-framework/dark-mode',
+  branch: 'openagent/dark-mode',
   exists: true,
   base: 'origin/main',
   commits: [{ sha: 'aaaaaaa1', short: 'aaaaaaa', subject: 'add dark mode' }],
@@ -73,7 +73,7 @@ describe('run handoff (#799)', () => {
     onAgentHandoff.mockResolvedValue(worked)
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('1 commit')).toBeTruthy())
-    expect(screen.queryByText('the-framework/dark-mode')).toBeNull()
+    expect(screen.queryByText('openagent/dark-mode')).toBeNull()
   })
 
   test('a session that changed nothing reads no changes and says nothing more', async () => {

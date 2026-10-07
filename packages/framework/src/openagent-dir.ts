@@ -1,5 +1,5 @@
 /**
- * The directory, under a project root, that holds The Framework's own files.
+ * The directory, under a project root, that holds OpenAgent's own files.
  *
  * Its own module so every reader and writer of the directory (the hooks file, the project's saved
  * prompts, the activation's `.gitignore`, a run's card, diary and inbox) spells it the same way.

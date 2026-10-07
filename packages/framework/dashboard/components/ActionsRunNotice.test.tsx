@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 import { ActionsRunNotice } from './ActionsRunNotice.js'
 
 afterEach(cleanup)
 
-const runAction = (url: string): FrameworkEvent => ({ kind: 'driver', event: { type: 'action', label: `run ${url}` } })
+const runAction = (url: string): OpenAgentEvent => ({ kind: 'driver', event: { type: 'action', label: `run ${url}` } })
 
 describe('ActionsRunNotice (#1053)', () => {
   test('an Actions run explains the burst wait while it runs', () => {

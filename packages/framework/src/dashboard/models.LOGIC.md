@@ -2,7 +2,7 @@ Answers which models each coding agent [1] a person can pick offers, by asking t
 
 ## Context
 
-**User story**: the user opens the agent and model menu and sees exactly the models their own Claude Code and Codex offer for their login, by the names those tools show ("Opus 5.5", "GPT-5.6-Terra"), instead of a list written into The Framework that goes stale when a coding agent adds or retires a model.
+**User story**: the user opens the agent and model menu and sees exactly the models their own Claude Code and Codex offer for their login, by the names those tools show ("Opus 5.5", "GPT-5.6-Terra"), instead of a list written into OpenAgent that goes stale when a coding agent adds or retires a model.
 
 **Problem**: asking a coding agent starts its CLI, which takes about a second; a menu opened many times must not start a CLI each time.
 
@@ -10,7 +10,7 @@ Answers which models each coding agent [1] a person can pick offers, by asking t
 
 [1] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [2] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
-[3] daemon: The Framework's long-running local process that serves the dashboard and starts agents.
+[3] daemon: OpenAgent's long-running local process that serves the dashboard and starts agents.
 
 ## Business logic — TL;DR
 

@@ -14,19 +14,16 @@ test('editorCommand defaults to code, honoring $OPENAGENT_EDITOR', () => {
   assert.deepEqual(editorCommand('/p', 'subl'), { command: 'subl', args: ['/p'] })
 })
 
-test('the editor is read from $OPENAGENT_EDITOR in the environment, and from no other name', () => {
-  const before = { now: process.env.OPENAGENT_EDITOR, old: process.env.FRAMEWORK_EDITOR }
+test('the editor is read from $OPENAGENT_EDITOR in the environment', () => {
+  const before = process.env.OPENAGENT_EDITOR
   try {
     delete process.env.OPENAGENT_EDITOR
-    process.env.FRAMEWORK_EDITOR = 'old-name-editor'
-    assert.deepEqual(editorCommand('/p'), { command: 'code', args: ['/p'] }, 'the old name is not read')
+    assert.deepEqual(editorCommand('/p'), { command: 'code', args: ['/p'] }, 'unset, the default')
     process.env.OPENAGENT_EDITOR = 'zed'
     assert.deepEqual(editorCommand('/p'), { command: 'zed', args: ['/p'] })
   } finally {
-    for (const [key, value] of [['OPENAGENT_EDITOR', before.now], ['FRAMEWORK_EDITOR', before.old]] as const) {
-      if (value === undefined) delete process.env[key]
-      else process.env[key] = value
-    }
+    if (before === undefined) delete process.env.OPENAGENT_EDITOR
+    else process.env.OPENAGENT_EDITOR = before
   }
 })
 

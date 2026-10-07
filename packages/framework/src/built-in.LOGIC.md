@@ -1,4 +1,4 @@
-The packages The Framework ships for every project, the built-in packages [1]: which they are, where they are installed, and the three things a project gets from them when it has no package of its own for the job: the provider of a kind of data, the commands a hook line can name, and the hook lines written when the project is added. It also runs every package's clean-up [3] when a project is removed with its files.
+The packages OpenAgent ships for every project, the built-in packages [1]: which they are, where they are installed, and the three things a project gets from them when it has no package of its own for the job: the provider of a kind of data, the commands a hook line can name, and the hook lines written when the project is added. It also runs every package's clean-up [3] when a project is removed with its files.
 
 ## Context
 
@@ -8,13 +8,13 @@ The packages The Framework ships for every project, the built-in packages [1]: w
 
 ## Glossary
 
-[1] built-in package: a package The Framework itself depends on and uses for every project, through the same contract as a project's own package. The list: `@openagt/files`, `@openagt/skill-branches`, `@openagt/skill-github`, `@openagt/skill-logs`, `agent-runner`.
-[2] kind: one sort of The Framework's data a package may provide: `tickets`, `queue`, `runs`, `branches`, `git-host`.
+[1] built-in package: a package OpenAgent itself depends on and uses for every project, through the same contract as a project's own package. The list: `@openagt/files`, `@openagt/skill-branches`, `@openagt/skill-github`, `@openagt/skill-logs`, `agent-runner`.
+[2] kind: one sort of OpenAgent's data a package may provide: `tickets`, `queue`, `runs`, `branches`, `git-host`.
 [3] clean-up: the command a package declares as `"openagent": { "cleanup": "<command>" }` in its `package.json`; `<command> cleanup`, run in the project, removes what that package left there and answers what it removed and what it kept.
 
 ## Business logic — TL;DR
 
-- **The list** - five packages, named in one place; nothing else in The Framework names a package. Each is found in The Framework's own install, once; one that is not installed is skipped.
+- **The list** - five packages, named in one place; nothing else in OpenAgent names a package. Each is found in OpenAgent's own install, once; one that is not installed is skipped.
 - **Who provides a kind** - the project's own packages first, by the shared library's rule; only when none of them declares the kind is a built-in package that declares it the provider.
 - **The commands a hook line can name** - the directories of the built-in packages' commands, which a hook line's `PATH` gains after the project's own installed tools.
 - **Writing hook lines** - every package that declares it writes hook lines is run with `init` in the project: the project's own packages, then the built-in ones the project has no copy of.
@@ -30,7 +30,7 @@ See `## Context`.
 
 #### Business logic
 
-The built-in packages [1] are resolved from The Framework's own install, by name, the first time they are asked for; a package that cannot be found there is skipped. What a built-in package brings is decided by the package itself, exactly as for a project's own package: it is a module when it exports `./dashboard` (`project-modules.ts`), a provider when its `package.json` declares a kind [2], and a writer of hook lines when it declares `hooks`.
+The built-in packages [1] are resolved from OpenAgent's own install, by name, the first time they are asked for; a package that cannot be found there is skipped. What a built-in package brings is decided by the package itself, exactly as for a project's own package: it is a module when it exports `./dashboard` (`project-modules.ts`), a provider when its `package.json` declares a kind [2], and a writer of hook lines when it declares `hooks`.
 
 ### Who provides a kind
 
@@ -68,7 +68,7 @@ A package declares `"openagent": { "hooks": "<command>" }` in its `package.json`
 
 **User story**: the user removes a project from the dashboard and ticks "Also delete OpenAgent's files in this folder". The agents' checkouts and the runner's files go, and the user reads what went and what stayed.
 
-**Business logic story**: The Framework holds no list of any tool's files. Each tool removes its own, and is found by what it declares, the way the writers of hook lines are. The built-in packages [1] that declare a clean-up [3] are `@openagt/skill-branches` (`branches cleanup`) and `@openagt/agent-runner` (`agent-runner cleanup`). This runs as the first step of removing a project's files, and a line in `failed` ends that removal there (`remove-files.ts`).
+**Business logic story**: OpenAgent holds no list of any tool's files. Each tool removes its own, and is found by what it declares, the way the writers of hook lines are. The built-in packages [1] that declare a clean-up [3] are `@openagt/skill-branches` (`branches cleanup`) and `@openagt/agent-runner` (`agent-runner cleanup`). This runs as the first step of removing a project's files, and a line in `failed` ends that removal there (`remove-files.ts`).
 
 #### Business logic
 

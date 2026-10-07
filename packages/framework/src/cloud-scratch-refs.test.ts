@@ -289,8 +289,8 @@ test('every other branch is never even a candidate: a name no run\'s record name
     'claude/implement-something-abc123': SHA,
     'agent-some-session-name': SHA,
     'agent-not-a-timestamp': SHA,
-    'the-framework/some-session-name': SHA,
-    'the-framework/agent-not-a-timestamp': SHA,
+    'openagent/some-session-name': SHA,
+    'openagent/agent-not-a-timestamp': SHA,
     'feature/cloud-1-3955352b': SHA,
   }
   const { git, deleted } = fakeGit({ heads })

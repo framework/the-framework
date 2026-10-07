@@ -99,7 +99,7 @@ A ref that cleared every gate is deleted on origin. A deletion that fails is rep
 
 #### Business logic
 
-Each deletion is logged as "[framework] deleted the leftover cloud hand-off ref <ref> on origin: its session settled long ago and nothing consumes it". Each failed deletion is logged as "[framework] could not delete the leftover ref <ref> on origin: <error>". Kept refs are not mentioned.
+Each deletion is logged as "[openagent] deleted the leftover cloud hand-off ref <ref> on origin: its session settled long ago and nothing consumes it". Each failed deletion is logged as "[openagent] could not delete the leftover ref <ref> on origin: <error>". Kept refs are not mentioned.
 
 ### The pass lifecycle
 

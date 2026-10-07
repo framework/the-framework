@@ -25,7 +25,7 @@ function fakeGitHost(answer: RequestsOutcome): { gitHost: GitHostFor; asked: unk
 }
 const noGitHost: GitHostFor = async () => undefined
 
-test('a request is kept as the framework\'s own shape: the state upper-cased, the head as the commit, and a field the git host did not answer absent rather than undefined-valued', () => {
+test('a request is kept as OpenAgent\'s own shape: the state upper-cased, the head as the commit, and a field the git host did not answer absent rather than undefined-valued', () => {
   assert.deepEqual(linkedPrOf(REQUEST), { number: 2, url: 'https://github.com/o/r/pull/2', state: 'OPEN', title: 'Add a LICENSE file', createdAt: '2026-08-21T10:47:50Z', headRefOid: 'f1789c5ebaab4cfb79e4ea214508daee147a4092' })
   // "We do not know" must stay distinguishable from "it has none": the CI-age decision reads createdAt (#1334).
   const bare = linkedPrOf({ ...REQUEST, createdAt: '', head: '' })

@@ -5,7 +5,7 @@ import type { OpenPr } from './pull-requests.js'
 import type { BranchState, BranchesFor } from '../store/branches.js'
 import type { ProjectSummary } from './projects.js'
 import type { LiveAgent, AgentMeta } from '../store/index.js'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 
 const project = (id: string, path: string): ProjectSummary => ({ id, path, name: id, activated: true, gitHost: false })
 
@@ -90,7 +90,7 @@ test('buildInterventions dedupes a PR shared by two registered projects (same re
 const noPrs = async (): Promise<OpenPr[]> => []
 
 /** A run that ended on a question: its meta says `waiting`, its diary holds the question. */
-const waitingOn = (id: string, title: string): FrameworkEvent[] => [
+const waitingOn = (id: string, title: string): OpenAgentEvent[] => [
   { kind: 'choice', id, title, options: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }] },
   { kind: 'end', ok: false, waiting: true },
 ]
@@ -114,7 +114,7 @@ test('buildInterventions adds no awaiting item for a run that is not waiting, or
   const running = async (): Promise<LiveAgent[]> => [live(runningAgentMeta())]
   assert.deepEqual((await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents: running, events })).items, [])
   const waiting = async (): Promise<LiveAgent[]> => [live(runningAgentMeta({ status: 'waiting' }))]
-  const answered = async (): Promise<FrameworkEvent[]> => [...waitingOn('gate-1', 'q?'), { kind: 'driver', event: { type: 'start', prompt: 'Yes' } }]
+  const answered = async (): Promise<OpenAgentEvent[]> => [...waitingOn('gate-1', 'q?'), { kind: 'driver', event: { type: 'start', prompt: 'Yes' } }]
   assert.deepEqual((await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents: waiting, events: answered })).items, [])
   const unreadable = async () => undefined
   assert.deepEqual((await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents: waiting, events: unreadable })).items, [])
@@ -151,14 +151,14 @@ const doneMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
   id: 'r1',
   startedAt: '2026-07-16T00:00:00Z',
   updatedAt: '2026-07-16T01:00:00Z',
-  branch: 'the-framework/add-cart',
+  branch: 'openagent/add-cart',
   intent: 'add the cart',
   ...over,
 })
 
 /** A branch with work on it that never left the machine, as the branches provider answers it. */
 const waiting = (over: Partial<BranchState> = {}): BranchState => ({
-  branch: 'the-framework/add-cart',
+  branch: 'openagent/add-cart',
   exists: true,
   base: 'main',
   commits: [{ sha: 'abc1234', subject: 'add the cart' }],
@@ -205,7 +205,7 @@ test('a finished run with unpushed commits lands on the queue (#860)', async () 
   assert.equal(items.length, 1)
   assert.equal(items[0]?.kind, 'unpushed')
   assert.equal(items[0]?.title, 'add the cart', 'what was asked, not the branch name')
-  assert.equal(items[0]?.branch, 'the-framework/add-cart')
+  assert.equal(items[0]?.branch, 'openagent/add-cart')
   assert.equal(items[0]?.commits, 1)
   assert.equal(items[0]?.agentId, 'r1')
 })

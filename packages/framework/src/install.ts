@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
-import { OPENAGENT_DIR } from './framework-dir.js'
-import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
+import { OPENAGENT_DIR } from './openagent-dir.js'
+import { openagentGitignore, gitignorePath } from './openagent-gitignore.js'
 import { nodeStoreFs, type StoreFs } from './store/index.js'
 import { errorMessage } from './error-message.js'
 
@@ -61,7 +61,7 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
     await fs.mkdir(join(cwd, OPENAGENT_DIR))
     // Keep what lives under `.openagent/` (a run's live files, the hooks file) out of git
     // (#313). The early return above established the file is absent.
-    await fs.write(gitignorePath(cwd), frameworkGitignore())
+    await fs.write(gitignorePath(cwd), openagentGitignore())
     return insideRepo ? { ok: true } : { ok: true, initialized: true }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }

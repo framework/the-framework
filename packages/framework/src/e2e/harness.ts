@@ -22,7 +22,7 @@ import { tailAgentEvents } from '../dashboard-rpc/events-tail.js'
 import { sendAddProject } from '../dashboard-rpc/projects.js'
 import { sendStart, sendStop } from '../dashboard-rpc/control.js'
 import { onAgents } from '../dashboard-rpc/reads.js'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 import type { StartAgentOptions } from '../dashboard/types.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
@@ -48,7 +48,7 @@ const PROVIDER_PACKAGES: Record<string, string> = {
 // resolve through $XDG_CONFIG_HOME at call time, and run-tests.mjs gives the whole suite ONE
 // shared throwaway home — so without this, story files running as sibling processes would see
 // each other's registered projects in every cross-project rollup (onProjects, onQueue, onOverview).
-process.env.XDG_CONFIG_HOME = mkdtempSync(join(tmpdir(), 'framework-e2e-config-'))
+process.env.XDG_CONFIG_HOME = mkdtempSync(join(tmpdir(), 'openagent-e2e-config-'))
 
 const exec = promisify(execFile)
 
@@ -69,7 +69,7 @@ export interface StoryProject {
 /** A live tail of one agent's event log — the same source `onEvents` streams to the browser. */
 export interface AgentTail {
   /** Every event seen so far, in arrival order. Poll with {@link waitFor}. */
-  events: FrameworkEvent[]
+  events: OpenAgentEvent[]
   stop(): void
 }
 
@@ -159,7 +159,7 @@ export async function release(project: StoryProject, agentId: string): Promise<v
  * live poller (quota), which a story controls through a mutable stub instead.
  */
 export async function makeWorld(): Promise<StoryWorld> {
-  const home = mkdtempSync(join(tmpdir(), 'framework-e2e-home-'))
+  const home = mkdtempSync(join(tmpdir(), 'openagent-e2e-home-'))
   const startsFile = join(home, 'hook-calls.jsonl')
   process.env.OPENAGENT_E2E_STARTS_FILE = startsFile
   const fakeRun = fileURLToPath(new URL('./fake-run-bin.js', import.meta.url))
@@ -210,7 +210,7 @@ export async function makeWorld(): Promise<StoryWorld> {
     },
 
     async addProject(files = {}) {
-      const cwd = mkdtempSync(join(tmpdir(), 'framework-e2e-repo-'))
+      const cwd = mkdtempSync(join(tmpdir(), 'openagent-e2e-repo-'))
       repos.push(cwd)
       await git(cwd, 'init', '-q', '-b', 'main')
       await git(cwd, 'config', 'user.email', 'e2e@test')
@@ -295,7 +295,7 @@ export async function makeWorld(): Promise<StoryWorld> {
     },
 
     async tailAgent(project, agentId) {
-      const events: FrameworkEvent[] = []
+      const events: OpenAgentEvent[] = []
       // The relocating tail — the same seam the dashboard's onEvents rides: when the run's tool
       // records the run and reclaims the checkout, the tail asks again and sends the finished run's
       // lines it had not sent, so the feed keeps the final lines even when their fs.watch signal was lost.

@@ -36,12 +36,12 @@ export function agentLockKey(cwd: string, agentId: string): string {
 // reaches a run through what the run's tool reads: Start is the project's `start` hook line; what
 // a person says to a run (their words, their answer to its question) is a line in the run's inbox
 // file while the run works, and the project's `resume` hook line once it has ended; Stop is a
-// signal to the pid the run's card names. The framework names no tool in any of them.
+// signal to the pid the run's card names. OpenAgent names no tool in any of them.
 
 /**
  * Stop a live agent (the Stop button): SIGINT to the process the run's own card names, when it is
  * this machine's and alive. The card is the file the dashboard shows the run from, and its pid is
- * whoever runs the agent; the framework names no tool. Nothing else: a run without a live pid
+ * whoever runs the agent; OpenAgent names no tool. Nothing else: a run without a live pid
  * here has nothing to stop.
  */
 export async function sendStop(projectId: string, agentId?: string): Promise<void> {

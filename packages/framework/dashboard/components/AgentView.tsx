@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { AgentMeta, AgentWorktree, FrameworkEvent } from '../../src/index.js'
+import type { AgentMeta, AgentWorktree, OpenAgentEvent } from '../../src/index.js'
 import { onAgent, onAgentsDoing, onRetainedWorktrees } from '../rpc/reads.js'
 import { useLoaded, usePolled } from '../lib/use-async.js'
 import { useAgentHandoff } from '../lib/use-agent-handoff.js'
@@ -70,7 +70,7 @@ export function AgentView({
   /** Which run this is (#749); absent right after Start, before the poll adopts its id. */
   agentId: string
   /** The live channel's events for this agent — all there is while it runs. */
-  events: FrameworkEvent[]
+  events: OpenAgentEvent[]
   /** Whether the agent is still running; `null` while the daemon's list of agents has not been read, so it is not known yet. */
   live: boolean | null
   /** What the run's card says, off the runs poll: what the feed cannot carry (the details strip's facts, how the agent was set up, whether it is a subagent, whether its record is being saved). Absent until the card is listed. */
@@ -112,7 +112,7 @@ export function AgentView({
   // line written as a clean run is recorded only ever lands in the archive — its worktree journal is
   // torn down with the worktree — so without this the PR line waited for a manual refresh.
   const [archiveBehind, setArchiveBehind] = useState(0)
-  const archived = useLoaded<FrameworkEvent[] | null>(
+  const archived = useLoaded<OpenAgentEvent[] | null>(
     live === false ? () => onAgent(projectId, agentId) : null,
     null,
     [projectId, agentId, live, archiveBehind],

@@ -113,7 +113,7 @@ describe('the tickets import lands on the session it starts (#1169)', () => {
     await clickImport()
 
     // The project travels with it: this surface has none selected, so an id alone cannot be routed.
-    // The prompt is the project's own command: the framework ships no prompt text.
+    // The prompt is the project's own command: OpenAgent ships no prompt text.
     expect(startAgent.start).toHaveBeenCalledWith('p1', '/update-tickets', {})
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', '/update-tickets', 'run-7'))
   })

@@ -1,4 +1,4 @@
-How The Framework reads a project's checkouts [1] and acts on its branches: through the branches provider [2], a command one of the project's own packages declares, never through a package The Framework knows. It also owns the shape of what that command answers: a checkout, and a branch's state [3].
+How OpenAgent reads a project's checkouts [1] and acts on its branches: through the branches provider [2], a command one of the project's own packages declares, never through a package OpenAgent knows. It also owns the shape of what that command answers: a checkout, and a branch's state [3].
 
 ## Context
 
@@ -6,7 +6,7 @@ How The Framework reads a project's checkouts [1] and acts on its branches: thro
 - The user sees every agent that is working in the project, each in its own checkout, opens one and sees which checkout it has and how much disk it takes once ended; removes a kept checkout or deletes an agent; pushes an ended agent's branch, or opens a pull request for it (the push here, then the git host provider's `open`, `git-host.ts`); sees in the Human Queue the agents whose work is not published.
 - A project none of whose packages provides its checkouts shows no working agent, offers nothing to remove, and has no branch to hand off: the answer is "none", never an error.
 
-**Business logic story**: The Framework names no skill. A project picks the package that keeps its checkouts by listing it as a dependency; that package says, in its own package.json, which of its commands answers for them. Swap it for another package that answers the same command line and prints the same shapes, and nothing in The Framework changes. What a checkout is, where it lives, how a branch is pushed is that package's business; git, and nothing beyond it: the pull request is the git host provider's (`git-host.ts`).
+**Business logic story**: OpenAgent names no skill. A project picks the package that keeps its checkouts by listing it as a dependency; that package says, in its own package.json, which of its commands answers for them. Swap it for another package that answers the same command line and prints the same shapes, and nothing in OpenAgent changes. What a checkout is, where it lives, how a branch is pushed is that package's business; git, and nothing beyond it: the pull request is the git host provider's (`git-host.ts`).
 
 **Problem**: the dashboard reads the checkouts many times per poll, and every read of the provider is a process; a caller looking for a checkout that may have appeared a moment ago must not turn every look into a process either.
 
@@ -14,12 +14,12 @@ How The Framework reads a project's checkouts [1] and acts on its branches: thro
 
 [1] checkout: an agent's own working copy of the project, where it works: the branches provider [2] says where it is and which branch it is on.
 [2] branches provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's checkouts, in its own package.json under `"openagent": { "branches": "<command>" }` (the `branches` skill's package declares its `branches` command); it lists the checkouts, tells what a branch holds, pushes a branch, and reclaims a checkout (`store/branches.ts`). Git only: the pull request is the git host provider's (`git-host.ts`).
-[3] a branch's state: what a branch holds and where it stands, as the provider answers it: whether the branch exists on this machine, what it is measured against (the project's default branch, or the commit The Framework names as the one the branch was made at, whichever tells the branch's own work), its own commits beyond that base (newest first), the files it changed against the base with their line counts, whether the project has a remote, whether the remote has the branch at the same tip, whether the base already contains it, and, when a checkout is on the branch, the paths uncommitted in it. Git facts only: the branch's pull request is the git host provider's read (`git-host.ts`), as every pull request is.
+[3] a branch's state: what a branch holds and where it stands, as the provider answers it: whether the branch exists on this machine, what it is measured against (the project's default branch, or the commit OpenAgent names as the one the branch was made at, whichever tells the branch's own work), its own commits beyond that base (newest first), the files it changed against the base with their line counts, whether the project has a remote, whether the remote has the branch at the same tip, whether the base already contains it, and, when a checkout is on the branch, the paths uncommitted in it. Git facts only: the branch's pull request is the git host provider's read (`git-host.ts`), as every pull request is.
 
 ## Business logic — TL;DR
 
 - **Which command provides** - the shared library's rule: the one dependency that declares a branches provider [2] naming one of its own commands, or, when several declare it, the one the project's own package.json names; no dependency declares one, the project has no checkouts.
-- **The command line it answers** - the checkouts (with sizes on request), the state of one or several branches, measured with the commit they were made at when The Framework names one, and of a full commit id in place of a branch, a merge of a branch into the default branch on this machine, a push of a branch, and the removal of a checkout (with its uncommitted work discarded on request); reads touch this machine only.
+- **The command line it answers** - the checkouts (with sizes on request), the state of one or several branches, measured with the commit they were made at when OpenAgent names one, and of a full commit id in place of a branch, a merge of a branch into the default branch on this machine, a push of a branch, and the removal of a checkout (with its uncommitted work discarded on request); reads touch this machine only.
 - **The shapes** - a checkout is kept only with a safe id and a path; a branch's state only with its branch and its three verdicts; the name the agent gave its work, when the provider answers one, is kept as printed; every other field only with the right type; anything that fails to answer is read as "nothing", never an error.
 - **Reads are shared for five seconds** - the same list or the same branches asked again within five seconds reuse the answer; a write drops every read; a caller looking for a checkout that just appeared asks fresh, but a list read less than a second ago still answers.
 
@@ -39,7 +39,7 @@ The provider is found by the shared library's rule (`agent-data`'s `provided-com
 
 #### Context
 
-**Business logic story**: the command is the same one an agent and the tool that runs it use for the checkouts; The Framework uses the forms a person's click needs.
+**Business logic story**: the command is the same one an agent and the tool that runs it use for the checkouts; OpenAgent uses the forms a person's click needs.
 
 #### Business logic
 
@@ -48,7 +48,7 @@ The provider's command runs with Node, in the project's root, never through a sh
 - `<command> show <branch> [<branch>...]`: the state [3] of each branch named, as an array in the order asked; a branch the provider did not answer for is simply missing. Nothing is run when no branch is named. When the caller names the commit the branches were made at, the call is `<command> show --from <commit> <branch> [<branch>...]`: the commits and files of each branch are then its own, measured from that commit for a branch made from another branch and for one the default branch already contains, and from the default branch otherwise. It is how an agent started from another agent's branch (a subagent, from its main agent's) is shown its own work and not the other branch's, and how a merged agent is still shown what it did. A full commit id in place of a branch is answered as a branch that ends at that commit: what a branch held, for an agent whose branch is gone and whose record kept its last commit.
 - `<command> push --branch <branch>`: push the branch to the remote: the checkout on it under the provider's clean rule, else the branch itself; a branch only the remote has is answered as it is, with `pushed` false. The answer says whether anything was pushed; a refusal (uncommitted work in the checkout, a push that did not land, a branch nowhere) is a failure in the provider's own last line.
 - `<command> remove <id>`, `<command> remove <id> --from <commit>`, or `<command> remove <id> --discard`: reclaim the agent's checkout once its branch holds everything in it, pushing nothing, its branch told empty by the commit the caller says it was made at, when the caller names one, or by the remote's default branch already having all of it; or, with `--discard`, whatever it holds, its uncommitted work gone with it. The answer carries the branches that went with the checkout, when any did. An id that is not letters, digits, `-` and `_` never reaches the command.
-`list` and `show` read this machine only, no network: The Framework polls them.
+`list` and `show` read this machine only, no network: OpenAgent polls them.
 
 ### The shapes
 

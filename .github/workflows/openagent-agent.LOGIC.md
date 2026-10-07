@@ -56,7 +56,7 @@ The driver dispatches the first turn on the repository's configured ref (its def
 
 The workflow is granted three permissions: writing the repository's contents (the push of the run branch), writing pull requests (the agent [1] may open one), and minting an identity token. The identity token is not optional: the action exchanges it to authenticate the subscription OAuth token, and without that permission every run fails with "Could not fetch an OIDC token".
 
-The coding agent [4] authenticates with the repository secret `CLAUDE_CODE_OAUTH_TOKEN`, an OAuth token produced by `claude setup-token`: the run spends the user's subscription, never an API key of The Framework's. Without that secret the action cannot authenticate and the run fails.
+The coding agent [4] authenticates with the repository secret `CLAUDE_CODE_OAUTH_TOKEN`, an OAuth token produced by `claude setup-token`: the run spends the user's subscription, never an API key of OpenAgent's. Without that secret the action cannot authenticate and the run fails.
 
 The coding agent is started with all permissions skipped, because in this mode it is otherwise granted none and an unattended run could neither edit nor run anything.
 

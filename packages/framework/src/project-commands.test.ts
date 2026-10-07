@@ -11,7 +11,7 @@ async function skill(cwd: string, dir: string, name: string, skillMd: string | u
 }
 
 test('a project\'s commands are its skills written to be run by a person, from both folders, each once, by name', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-commands-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'openagent-commands-'))
   try {
     await skill(cwd, '.claude/skills', 'work-queue', '---\nname: work-queue\ndescription: Work the agent queue.\ndisable-model-invocation: true\n---\nDo it.\n')
     // The same skill in the shared folder is the same command: the first copy decides.
@@ -40,7 +40,7 @@ test('a project\'s commands are its skills written to be run by a person, from b
 })
 
 test('a project with no skills folder has no commands', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-commands-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'openagent-commands-'))
   try {
     assert.deepEqual(await readProjectCommands(cwd), [])
   } finally {

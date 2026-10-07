@@ -1,5 +1,5 @@
 /**
- * The quota boundary (#879): how much of the account's week The Framework may
+ * The quota boundary (#879): how much of the account's week OpenAgent may
  * have spent by now.
  *
  * The whole policy is one line — the boundary is the pro-rated share of the week's allowance that
@@ -10,7 +10,7 @@
  * Nothing is left on the floor: the boundary rises on its own and reaches the full allowance
  * exactly as the week resets, so a quiet week still gets spent rather than expiring.
  *
- * The Framework only draws it. Whether work stops at it, or how far past it, is the business of
+ * OpenAgent only draws it. Whether work stops at it, or how far past it, is the business of
  * whatever starts unattended work, which puts its own stop line on the usage bar.
  */
 

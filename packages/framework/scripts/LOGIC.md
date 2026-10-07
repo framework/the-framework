@@ -1,4 +1,4 @@
-The two scripts the framework package's own build and test commands call: the copy that puts the Claude web bridge [1] extension inside the published package, and the test runner that keeps the package's test suite away from the machine's real configuration. `run-tests.BUG-ANALYSIS.md` is an analysis note holding only the date of its last analysis and carries no business logic.
+The two scripts the OpenAgent package's own build and test commands call: the copy that puts the Claude web bridge [1] extension inside the published package, and the test runner that keeps the package's test suite away from the machine's real configuration. `run-tests.BUG-ANALYSIS.md` is an analysis note holding only the date of its last analysis and carries no business logic.
 
 ## Glossary
 

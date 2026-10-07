@@ -1,6 +1,6 @@
 import { fromDiaryLine, resolveAgentDiary, type AgentDiarySource, type AnyDiaryLine } from '../store/index.js'
 import { contextEventsSource, resolveProjectPath } from './context.js'
-import type { FrameworkEvent } from '../events.js'
+import type { OpenAgentEvent } from '../events.js'
 import { partialReader, tailAgentEvents } from './events-tail.js'
 import { forwardStream } from './stream-forward.js'
 
@@ -19,7 +19,7 @@ async function resolveEventsDiary(projectId: string, agentId?: string, opts: { c
  * and without a boundary a reconnecting client cannot tell "replay still streaming" from "the
  * log is genuinely this short" — so it blanked a populated feed and refilled it line by line.
  * Sent once per subscription, after the on-disk replay is delivered. Wire-only: it is not a
- * {@link FrameworkEvent}, is never written to any journal, and the client swallows it.
+ * {@link OpenAgentEvent}, is never written to any journal, and the client swallows it.
  */
 export type StreamSync = { kind: 'stream-sync' }
 
@@ -31,7 +31,7 @@ export type StreamSync = { kind: 'stream-sync' }
 export type PartialMessage = { kind: 'partial'; text: string }
 
 /** What `onEvents` streams: the agent's events, plus the wire-only end-of-replay marker and partial message. */
-export type LiveFeedEvent = FrameworkEvent | StreamSync | PartialMessage
+export type LiveFeedEvent = OpenAgentEvent | StreamSync | PartialMessage
 
 /**
  * Follow one agent's events: `send` is called per event until the returned stop function runs.

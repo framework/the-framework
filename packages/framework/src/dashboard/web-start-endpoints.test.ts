@@ -28,7 +28,7 @@ function wired(starts: BridgeStarts, alive = true): WebStartHandlers {
   return { token: TOKEN, extensionAlive: () => alive, request: input => starts.request(input), get: id => starts.get(id) }
 }
 
-const INPUT = { repo: 'framework/the-framework', branch: 'cloud-1-abcd1234', prompt: 'Add the thing' }
+const INPUT = { repo: 'openagt/openagent', branch: 'cloud-1-abcd1234', prompt: 'Add the thing' }
 
 function post(url: string, body: unknown, token: string | null = TOKEN): Promise<Response> {
   return fetch(`${url}${WEB_START_PREFIX}`, {

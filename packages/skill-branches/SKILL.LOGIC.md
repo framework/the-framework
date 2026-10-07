@@ -95,7 +95,7 @@ When the branch does not start with `agent-` and the checkout [3] sits under `.b
 
 #### Context
 
-**User story**: an agent [1] started outside The Framework's checkouts [3], a cloud session [7] on a plain clone of the repository say, still ends on a branch of its own, named the same way, so its work is found and published like any agent's.
+**User story**: an agent [1] started outside OpenAgent's checkouts [3], a cloud session [7] on a plain clone of the repository say, still ends on a branch of its own, named the same way, so its work is found and published like any agent's.
 
 #### Business logic
 

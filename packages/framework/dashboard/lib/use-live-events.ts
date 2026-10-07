@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 import type { LiveFeedEvent } from '../../src/dashboard-rpc/index.js'
 import { onEvents, type EventChannel } from '../rpc/events.js'
 import { currentAgentEvents } from './live-state.js'
 
 // The live agent feed (#405), shared. The dashboard is a projection of the selected run's diary,
 // the file the run's own tool writes as the agent works, streamed over Server-Sent Events that
-// push one `FrameworkEvent` per new line. Both the main event view and the right rail's choice
+// push one `OpenAgentEvent` per new line. Both the main event view and the right rail's choice
 // gates (#440) read this same stream, so the subscription lives here and each consumer owns one
 // channel rather than opening a second.
 //
@@ -17,7 +17,7 @@ import { currentAgentEvents } from './live-state.js'
 
 /** The live feed plus whether its channel is currently down (#948). */
 export interface LiveEvents {
-  events: FrameworkEvent[]
+  events: OpenAgentEvent[]
   /** True while the stream is lost and being retried — the feed may be behind reality. */
   lost: boolean
   /** The server closed the channel on purpose (relay stream ended, unknown run) — final. */
@@ -42,7 +42,7 @@ function retryDelay(attempt: number): number {
 const SYNC_GRACE_MS = 1500
 
 export function useLiveEvents(projectId: string | null, agentId?: string | null, resetKey?: unknown): LiveEvents {
-  const [events, setEvents] = useState<FrameworkEvent[]>([])
+  const [events, setEvents] = useState<OpenAgentEvent[]>([])
   const [lost, setLost] = useState(false)
   const [done, setDone] = useState(false)
   const [writing, setWriting] = useState('')
@@ -99,7 +99,7 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
         channel = ch
         attempt = 0
         setLost(false)
-        let buffer: FrameworkEvent[] | undefined = reconnect ? [] : undefined
+        let buffer: OpenAgentEvent[] | undefined = reconnect ? [] : undefined
         // The whole message just arrived: its pieces, read a beat late, would show it twice.
         let finished = ''
         const swap = () => {

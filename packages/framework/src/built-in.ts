@@ -5,18 +5,18 @@ import type { CleanupReport } from './dashboard/types.js'
 import { declaring, lookupProvidedCommand, packageBins, projectPackages, readManifest, runPackageCommand, type ProjectPackage, type ProvidedCommand, type ProvidedCommandLookup } from '@openagt/agent-data'
 
 /**
- * The packages the framework ships for every project, by name: dependencies of the framework
+ * The packages OpenAgent ships for every project, by name: dependencies of OpenAgent
  * itself, resolved from its own install, so a project installs nothing for them and an empty
  * folder starts an agent and shows it. Each comes through the same contract as a project's own
  * package: a module by its `./dashboard` export, a provider of a kind of data and the writer of
- * its hook lines by its `openagent` key. This list is the one place the framework names a
+ * its hook lines by its `openagent` key. This list is the one place OpenAgent names a
  * package, and a project's own copy of any of them wins.
  */
 export const BUILT_IN_PACKAGES: readonly string[] = ['@openagt/files', '@openagt/skill-branches', '@openagt/skill-github', '@openagt/skill-logs', '@openagt/agent-runner']
 
 let resolved: Promise<ProjectPackage[]> | undefined
 
-/** The built-in packages, resolved from the framework's own install, once; one that is not installed is skipped. */
+/** The built-in packages, resolved from OpenAgent's own install, once; one that is not installed is skipped. */
 export function builtInPackages(): Promise<ProjectPackage[]> {
   return (resolved ??= resolveBuiltIn())
 }

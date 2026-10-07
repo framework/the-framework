@@ -1,4 +1,4 @@
-A project's commands [1]: the skills it has written to be run by a person, read off the folders the coding agents read them from. The Framework ships no prompt text; what a project can be asked to do is what its own command skills say.
+A project's commands [1]: the skills it has written to be run by a person, read off the folders the coding agents read them from. OpenAgent ships no prompt text; what a project can be asked to do is what its own command skills say.
 
 ## Context
 

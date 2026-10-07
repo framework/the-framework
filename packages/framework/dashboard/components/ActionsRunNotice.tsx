@@ -1,5 +1,5 @@
 import { Github, ExternalLink } from 'lucide-react'
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 import { actionsRunUrl } from '../lib/live-state.js'
 
 // The agent view's affordance for a GitHub Actions target (#1053). An Actions run replays its
@@ -12,7 +12,7 @@ export function ActionsRunNotice({
   live,
 }: {
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
-  events: readonly FrameworkEvent[]
+  events: readonly OpenAgentEvent[]
   /** Whether the agent is still going: the "updates on completion" line only applies while it runs. */
   live: boolean
 }) {

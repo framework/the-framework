@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 import { AgentDetails } from './AgentDetails.js'
 
 const onModels = vi.hoisted(() =>
@@ -10,8 +10,8 @@ vi.mock('../rpc/models.js', () => ({ onModels }))
 
 afterEach(cleanup)
 
-const answered: FrameworkEvent = { kind: 'driver', event: { type: 'result', text: 'Done.' } }
-const priced = (usd: number): FrameworkEvent => ({ kind: 'usage', costUsd: usd })
+const answered: OpenAgentEvent = { kind: 'driver', event: { type: 'result', text: 'Done.' } }
+const priced = (usd: number): OpenAgentEvent => ({ kind: 'usage', costUsd: usd })
 const shown = (label: string) => screen.getByText(label).nextSibling?.textContent
 
 describe('AgentDetails', () => {

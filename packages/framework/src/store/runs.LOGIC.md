@@ -1,4 +1,4 @@
-How The Framework reads, and changes, a project's finished agents [1]: through the runs provider [2], a command one of the project's own packages declares, never through a package The Framework knows. It also owns the shape of what that command answers: the card and the diary [3].
+How OpenAgent reads, and changes, a project's finished agents [1]: through the runs provider [2], a command one of the project's own packages declares, never through a package OpenAgent knows. It also owns the shape of what that command answers: the card and the diary [3].
 
 ## Context
 
@@ -6,13 +6,13 @@ How The Framework reads, and changes, a project's finished agents [1]: through t
 - The user sees every agent of a project in the history, working and finished, including those other machines recorded; opens a finished agent and reads everything it said; opens a pull request or deletes an agent from its page.
 - A project that installed no logs skill still shows its working agents; a finished agent is gone once its checkout is removed.
 
-**Business logic story**: The Framework names no skill. A project picks the package that keeps its finished agents by listing it as a dependency; that package says, in its own package.json, which of its commands answers for them (`"openagent": { "runs": "logs" }` for the `logs` skill's package). Swap it for another package that answers the same command line and prints the same shapes, and nothing in The Framework changes.
+**Business logic story**: OpenAgent names no skill. A project picks the package that keeps its finished agents by listing it as a dependency; that package says, in its own package.json, which of its commands answers for them (`"openagent": { "runs": "logs" }` for the `logs` skill's package). Swap it for another package that answers the same command line and prints the same shapes, and nothing in OpenAgent changes.
 
 **Problem**: the dashboard reads the same list many times per second across its polls, and every read of the provider is a process.
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] runs provider: the command, among the commands of a project's dependencies, that a package declares as answering for the project's finished agents, in its own package.json under `"openagent": { "runs": "<command>" }`.
 [3] card / diary: an agent's record in two shapes. The card, `<id>.json`: the agent id, the start time, the status, and when known the end time, the intent, the coding agent, the model, the branch, the pull request (its number and link), the ticket and the cost, plus one key, `caller`, where the program that ran the agent keeps its own bookkeeping (its process id, host, session id and so on). The diary, `<id>.jsonl`: one JSON object per line, each with a `kind`. The tool that runs an agent writes both in the agent's checkout while it works; once the agent is finished, the runs provider [2] answers them.
 [4] status: how an agent stands: `running`, `done`, `stopped`, `failed`, or `waiting` (it ended on a question, and the answer resumes it).
@@ -40,7 +40,7 @@ The project's own package.json is read; its `dependencies` then `devDependencies
 
 #### Context
 
-**Business logic story**: the command is the same one an agent runs to look back at earlier agents; The Framework uses the flags an agent does not.
+**Business logic story**: the command is the same one an agent runs to look back at earlier agents; OpenAgent uses the flags an agent does not.
 
 #### Business logic
 
@@ -49,7 +49,7 @@ The provider's command runs with Node, in the project's root, never through a sh
 - `<command> show <id> --local --full`: one agent's whole card with `diary`, every line of it. A failure, or a refusal because there is no such agent, is no agent.
 - `<command> delete <id>`: remove the agent, card and diary. A failure answers the command's last line of error output.
 - `<command> patch <id> [--branch <branch>] [--pr <number> --pr-url <link>] [--landed <commit> --from <commit>]`: set the branch the agent's work is on, its pull request, or that its work landed (its branch's last commit and the commit its work began at, once the branch was merged and deleted). A failure answers the same way.
-`--local` asks for the copy of the agent records kept on this machine, read without contacting the remote, because The Framework polls. An id that is not letters, digits, `-` and `_` never reaches the command.
+`--local` asks for the copy of the agent records kept on this machine, read without contacting the remote, because OpenAgent polls. An id that is not letters, digits, `-` and `_` never reaches the command.
 
 ### The shape
 

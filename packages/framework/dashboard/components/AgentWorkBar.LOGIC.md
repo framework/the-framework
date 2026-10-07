@@ -59,7 +59,7 @@ See the first user story in `## Context`.
 From left to right:
 
 - the project's name, in grey, when the page gives one;
-- a branch icon and the agent's branch, in grey. The `the-framework/` prefix every agent branch shares is not shown. The tooltip shows the full branch and, while the agent has its checkout [3], the checkout's path on a second line;
+- a branch icon and the agent's branch, in grey, as it is named. The tooltip shows the branch again, never cut short, and, while the agent has its checkout [3], the checkout's path on a second line;
 - the summary: what the branch holds, as the page words it (`AgentView.tsx`). For an ended agent it is the one-line verdict, such as "2 commits · 3 files" with the lines added and removed (`AgentHandoff.tsx`);
 - when the branch has a pull request: a link reading "PR #<number>" followed by the pull request's state in lowercase inside a small pill ("open", "merged", "closed"). It opens the pull request in a new tab and shows the pull request's title in its tooltip;
 - at the far end, the page's next step [2] slot: a button ("Commit", "Open PR" with its arrow, "Publish branch", "Merge", "Merge PR"), or the words that stand where the button would be ("Committing…", "not published", "Merged into main.", and the other sentences of `AgentHandoff.tsx`). The slot is empty while the agent works.

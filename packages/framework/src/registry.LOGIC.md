@@ -1,4 +1,4 @@
-Keeps the one file The Framework owns for the user, the registry [1] at `~/.openagent.json`: the projects the user registered, the preferences [2] behind the dashboard's Settings [3] page, and the daemon token that authenticates a dashboard exposed to the network. Every read forgives a damaged or hand-edited file; every write is validated, atomic, owner-only and serialized with the other writes.
+Keeps the one file OpenAgent owns for the user, the registry [1] at `~/.openagent.json`: the projects the user registered, the preferences [2] behind the dashboard's Settings [3] page, and the daemon token that authenticates a dashboard exposed to the network. Every read forgives a damaged or hand-edited file; every write is validated, atomic, owner-only and serialized with the other writes.
 
 ## Context
 
@@ -95,7 +95,7 @@ A file that is missing, unreadable, not JSON, or whose top level is not an objec
 Each of these keys of the preferences [2] is kept only when its value is a true or a false; anything else is dropped. Absent means the default given here:
 
 - `notifyBrowser`: notify in the browser; absent means on.
-- `notifyHumanIntervention`: the "needs you" category, an intervention [4]; absent means on, the baseline The Framework leans on.
+- `notifyHumanIntervention`: the "needs you" category, an intervention [4]; absent means on, the baseline OpenAgent leans on.
 - `notifyNewActivity`: the activity category, an agent started or finished; absent means off. The two categories compose with `notifyBrowser`: a notification is delivered only when both its category and `notifyBrowser` are on.
 - `bridge`: switch the bridge [5] on; absent means off, because it opens the daemon's one route reachable from another origin.
 - `bridgeBrowser`: let the daemon run its own bridge browser; absent means off, because it downloads a browser and keeps a signed-in claude.ai session on disk. It only matters with `bridge` on.

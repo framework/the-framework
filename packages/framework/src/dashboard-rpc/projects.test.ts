@@ -6,14 +6,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { addProject, listProjects } from '../registry.js'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
-import { OPENAGENT_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../openagent-dir.js'
 import { projectErrorStore } from '../project-errors.js'
 import { provideTestContext } from './test-context.js'
 import { onCommands, onProjects, onRecordsReach, sendAddProject, sendRemoveProject, sendShareRecords } from './projects.js'
 
 // Against the real registry, pointed at a temp $XDG_CONFIG_HOME so the user's own is never touched.
 async function registered(): Promise<{ dir: string; restore: () => Promise<void> }> {
-  const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-projects-rpc-')))
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'openagent-projects-rpc-')))
   const previous = process.env.XDG_CONFIG_HOME
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
   await mkdir(process.env.XDG_CONFIG_HOME, { recursive: true })
@@ -106,7 +106,7 @@ test('onCommands names the two branches an agent can start from only when the st
 test('the records switch: kept on this machine until turned on, and a remote that refuses turns it back off', async () => {
   const { dir, restore } = await registered()
   const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@example.com' } })
-  const remote = await realpath(await mkdtemp(join(tmpdir(), 'framework-records-remote-')))
+  const remote = await realpath(await mkdtemp(join(tmpdir(), 'openagent-records-remote-')))
   const branchesOn = (bare: string) => git(bare, 'for-each-ref', '--format=%(refname)', 'refs/heads').trim()
   try {
     provideTestContext()

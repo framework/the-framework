@@ -72,4 +72,4 @@ A project's shared custom presets are read from, and written to, `.openagent/cus
 
 #### Business logic
 
-The call answers the installed subset of the editors The Framework knows how to open (the list and the probe are `dashboard/open-in-app.ts`'s), in display order. When detection fails it answers none.
+The call answers the installed subset of the editors OpenAgent knows how to open (the list and the probe are `dashboard/open-in-app.ts`'s), in display order. When detection fails it answers none.

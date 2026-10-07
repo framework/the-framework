@@ -20,9 +20,9 @@ import { defineConfig, type Plugin, type UserConfig } from 'vite'
 // The proxy middleware is registered synchronously so it lands ahead of Vite's own handling of the
 // path; it holds requests until the daemon is up. Left out by default so the plain dev server stays a
 // pure UI harness with no backend behind it.
-function frameworkDevDaemon(): Plugin {
+function openagentDevDaemon(): Plugin {
   return {
-    name: 'framework:dev-daemon',
+    name: 'openagent:dev-daemon',
     apply: 'serve',
     configureServer(server) {
       if (!process.env.OPENAGENT_DEV_DAEMON) return
@@ -36,7 +36,7 @@ function frameworkDevDaemon(): Plugin {
         const { runDaemon } = (await import(built)) as typeof import('../src/daemon.js')
         const cwd = process.env.OPENAGENT_DEV_DAEMON_CWD || process.cwd()
         // Ephemeral port: the dev server owns the address the browser talks to, and binding 4200
-        // would collide with a `framework` the developer is running in another terminal.
+        // would collide with an `openagent` the developer is running in another terminal.
         const url = await new Promise<string>((resolvePromise, rejectPromise) => {
           void runDaemon(cwd, { port: 0, onListening: state => resolvePromise(state.url) }).then(
             () => rejectPromise(new Error('the dev daemon exited before it bound')),
@@ -45,10 +45,10 @@ function frameworkDevDaemon(): Plugin {
         })
         const bound = new URL(url)
         target = { hostname: bound.hostname, port: bound.port || '4200' }
-        server.config.logger.info(`\n[framework] dev daemon started at ${url} — starting runs is enabled\n`)
+        server.config.logger.info(`\n[openagent] dev daemon started at ${url} — starting runs is enabled\n`)
       })().catch((err: unknown) => {
         server.config.logger.error(
-          `[framework] dev daemon did not start (${err instanceof Error ? err.message : String(err)}); ` +
+          `[openagent] dev daemon did not start (${err instanceof Error ? err.message : String(err)}); ` +
             `reads still work, but starting a run stays disabled`,
         )
       })
@@ -72,7 +72,7 @@ function frameworkDevDaemon(): Plugin {
           proxyReq.on('error', () => {
             if (!res.headersSent) {
               res.statusCode = 502
-              res.end('framework dev daemon proxy error')
+              res.end('openagent dev daemon proxy error')
             }
           })
           req.pipe(proxyReq)
@@ -101,14 +101,14 @@ const HOST_MODULES: Record<string, string> = {
   'react-dom': 'react-dom',
   'react-dom/client': 'react-dom-client',
 }
-const HOST_PREFIX = 'virtual:framework-host:'
+const HOST_PREFIX = 'virtual:openagent-host:'
 const MODULE_API = fileURLToPath(new URL('./module/index.ts', import.meta.url))
 
-function frameworkHostModules(): Plugin {
+function openagentHostModules(): Plugin {
   const require = createRequire(import.meta.url)
   let serving = false
   return {
-    name: 'framework:host-modules',
+    name: 'openagent:host-modules',
     configResolved(config) {
       serving = config.command === 'serve'
     },
@@ -138,7 +138,7 @@ export default defineConfig({
   // (A7), so `root` is pinned to this file's directory instead of inherited from the cwd — the
   // scripts that run it live one level up.
   root: fileURLToPath(new URL('.', import.meta.url)),
-  plugins: [frameworkDevDaemon(), frameworkHostModules(), react(), tailwindcss()],
+  plugins: [openagentDevDaemon(), openagentHostModules(), react(), tailwindcss()],
   build: {
     // Straight into the package's own dist, where the daemon serves it from. There used to be a
     // copy step between the two — a whole turbo task — because the bundle was built in a

@@ -1,4 +1,4 @@
-import type { FrameworkEvent } from '../../src/index.js'
+import type { OpenAgentEvent } from '../../src/index.js'
 import { isAgentActive, agentOutcome } from './live-state.js'
 
 /**
@@ -14,7 +14,7 @@ export type AgentStatusPill = { dot: string; label: string; tone: string; detail
  * it (#948): failed, stopped, or waiting for an answer. With no ending the agent builds while it
  * is live, and has finished otherwise.
  */
-export function agentStatusPill(events: FrameworkEvent[]): AgentStatusPill | null {
+export function agentStatusPill(events: OpenAgentEvent[]): AgentStatusPill | null {
   if (events.length === 0) return null
   const outcome = agentOutcome(events)
   const failed = outcome !== undefined && !outcome.ok && !outcome.stopped && !outcome.waiting

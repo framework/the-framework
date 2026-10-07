@@ -244,9 +244,9 @@ async function repoWithCloudHeads(): Promise<{
   strandedAnchor: string
   cleanup: () => Promise<void>
 }> {
-  const origin = await mkdtemp(join(tmpdir(), 'framework-cloud-work-origin-'))
-  const project = await mkdtemp(join(tmpdir(), 'framework-cloud-work-'))
-  const session = await mkdtemp(join(tmpdir(), 'framework-cloud-work-session-'))
+  const origin = await mkdtemp(join(tmpdir(), 'openagent-cloud-work-origin-'))
+  const project = await mkdtemp(join(tmpdir(), 'openagent-cloud-work-'))
+  const session = await mkdtemp(join(tmpdir(), 'openagent-cloud-work-session-'))
   const identify = async (cwd: string) => {
     for (const cfg of [
       ['user.email', 'test@example.com'],

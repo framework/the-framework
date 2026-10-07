@@ -6,7 +6,7 @@ Drives Codex as a driver [1]: each turn [2] is one `codex app-server` process in
 - The user picks Codex as the driver [1] and starts an agent [7]; the agent view shows what Codex says, word by word as it writes, and what work it does, turn [2] by turn.
 - The user picks a model for the agent; the dashboard shows what the agent spent in tokens, and no price.
 
-**Business logic story**: Codex runs on the user's own ChatGPT login, a subscription in the normal case. The Framework holds no model key and passes none: Codex authenticates itself, keeps its own loop and its own tools, and The Framework only prompts it and reads what comes back. Running the process, deciding success on its exit code and on what its output said, stopping it and reaping its process tree are the rules of `agent-driver`'s `cli-session.ts`, shared with the Claude Code driver. A turn has no time limit of its own.
+**Business logic story**: Codex runs on the user's own ChatGPT login, a subscription in the normal case. OpenAgent holds no model key and passes none: Codex authenticates itself, keeps its own loop and its own tools, and OpenAgent only prompts it and reads what comes back. Running the process, deciding success on its exit code and on what its output said, stopping it and reaping its process tree are the rules of `agent-driver`'s `cli-session.ts`, shared with the Claude Code driver. A turn has no time limit of its own.
 
 ## Glossary
 
@@ -51,7 +51,7 @@ See `## Context`.
 
 #### Business logic
 
-Every turn [2] spawns the `codex` command, found on `PATH` unless the driver [1] was configured with another command, as its app server (`codex app-server`): a process that speaks JSON-RPC, one JSON message per line, over its standard input and output. The process's working directory is the driver session's [3] directory, the agent's [7] checkout [8]. It runs with the environment of The Framework's own process unless the driver was configured with another; when the driver session keeps a log, that environment also carries `AGENT_DIARY`, the diary's path (the rule of `agent-driver`'s `session-log.ts`). Extra command-line arguments the driver was configured with are appended verbatim, last.
+Every turn [2] spawns the `codex` command, found on `PATH` unless the driver [1] was configured with another command, as its app server (`codex app-server`): a process that speaks JSON-RPC, one JSON message per line, over its standard input and output. The process's working directory is the driver session's [3] directory, the agent's [7] checkout [8]. It runs with the environment of OpenAgent's own process unless the driver was configured with another; when the driver session keeps a log, that environment also carries `AGENT_DIARY`, the diary's path (the rule of `agent-driver`'s `session-log.ts`). Extra command-line arguments the driver was configured with are appended verbatim, last.
 
 The exchange, all of it written by the driver as the app server answers:
 
@@ -158,7 +158,7 @@ The Codex driver [1] offers no quota [6] reading at all. A caller that finds non
 
 **User story**: the user picks the model for the next agent [7] from the models their own Codex offers, by the names Codex shows.
 
-**Problem**: the models a ChatGPT login may use change with Codex's releases and the person's plan, so no list written into The Framework stays right.
+**Problem**: the models a ChatGPT login may use change with Codex's releases and the person's plan, so no list written into OpenAgent stays right.
 
 #### Business logic
 

@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { OPENAGENT_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './openagent-dir.js'
 import { sanitizeCustomPresets, type CustomPreset } from './registry.js'
 import { nodeStoreFs, type StoreFs } from './store/index.js'
 

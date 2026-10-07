@@ -55,7 +55,7 @@ The browser is the newest Chrome for Testing already under the directory's `chro
 
 #### Context
 
-**User story**: a user who runs The Framework through npx, not from a git checkout, switches the bridge browser on, and it works. A maintainer who edits the extension in a checkout sees the edit reach the running bridge browser without a rebuild.
+**User story**: a user who runs OpenAgent through npx, not from a git checkout, switches the bridge browser on, and it works. A maintainer who edits the extension in a checkout sees the edit reach the running bridge browser without a rebuild.
 
 **Problem**: Chrome derives an unpacked extension's identity from the folder it was installed from, and npx puts every version of the package in a different folder. Installing from there would leave the profile with one dead copy of the extension per version the user ever ran, each shown with an error on Chrome's extensions page.
 
@@ -72,7 +72,7 @@ When neither folder holds the extension, the launch fails at once with "the exte
 
 #### Context
 
-**Problem**: a daemon that died without closing its browser leaves that browser running on the profile, and a second Chrome started on the same profile hands its command line to the first and exits at once. The profile is The Framework's own, so whatever holds it is The Framework's own leftover; nothing the user runs shares it.
+**Problem**: a daemon that died without closing its browser leaves that browser running on the profile, and a second Chrome started on the same profile hands its command line to the first and exits at once. The profile is OpenAgent's own, so whatever holds it is OpenAgent's own leftover; nothing the user runs shares it.
 
 #### Business logic
 

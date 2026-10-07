@@ -50,7 +50,7 @@ The editor also exposes three operations to the surface that contains it: clear 
 
 **User story**: the user types `/` and picks "/work-queue" to run the project's command of that name, or picks a prompt they saved last week.
 
-**Problem**: The Framework ships no prompt text. The `/` list is the open project's own commands, plus what people saved. A skill that teaches the agent how to use the tickets, the queue or the logs is not listed: typed alone, it would start an agent with nothing to do.
+**Problem**: OpenAgent ships no prompt text. The `/` list is the open project's own commands, plus what people saved. A skill that teaches the agent how to use the tickets, the queue or the logs is not listed: typed alone, it would start an agent with nothing to do.
 
 #### Business logic
 

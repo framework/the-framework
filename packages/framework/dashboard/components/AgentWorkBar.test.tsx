@@ -6,10 +6,10 @@ afterEach(cleanup)
 
 describe('AgentWorkBar', () => {
   test('it says the project, the branch, what the branch holds and the next step, in one row', () => {
-    render(<AgentWorkBar projectName="gemstack" checkout={{ branch: 'the-framework/fix-header' }} summary={<span>2 commits</span>} actions={<button type="button">Open PR</button>} show />)
+    render(<AgentWorkBar projectName="gemstack" checkout={{ branch: 'agent-fix-header' }} summary={<span>2 commits</span>} actions={<button type="button">Open PR</button>} show />)
     const bar = screen.getByRole('group', { name: "This agent's work" })
-    // The prefix every agent branch shares is not said.
-    expect(bar.textContent).toBe('gemstackfix-header2 commitsOpen PR')
+    // The branch as it is named.
+    expect(bar.textContent).toBe('gemstackagent-fix-header2 commitsOpen PR')
     expect(screen.getByRole('button', { name: 'Open PR' })).toBeTruthy()
   })
 

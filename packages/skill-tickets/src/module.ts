@@ -30,7 +30,7 @@ export function planPath(file: string): string {
   return `${TICKETS_DIR}/${ticketPlanName(file)}`
 }
 
-/** A run as the dashboard names it to the module: the framework's `ModuleAgent`, by structure. */
+/** A run as the dashboard names it to the module: OpenAgent's `ModuleAgent`, by structure. */
 export interface AgentLike {
   id: string
   name?: string
@@ -77,7 +77,7 @@ export function routeOf(path: readonly string[]): ModuleRoute {
   return plan === 'plan' ? { view: 'plan', projectId, file } : { view: 'unknown' }
 }
 
-/** A link as the module hands it to the dashboard's link actions: the framework's `ModuleLink`, by structure. */
+/** A link as the module hands it to the dashboard's link actions: OpenAgent's `ModuleLink`, by structure. */
 export interface TicketAsLink {
   text: string
   href?: string
@@ -110,7 +110,7 @@ export function planLink(ticket: LinkableTicket): TicketAsLink {
   return { text: planTicketPrompt(ticket.file), priority: queuePriorityForTicket(ticket.priority) }
 }
 
-/** What running one command in a project answers: the framework's `ModuleCommandResult`, by structure. */
+/** What running one command in a project answers: OpenAgent's `ModuleCommandResult`, by structure. */
 export type CommandResult = { ok: true; output: unknown } | { ok: false; error: string }
 
 /** The rows `list` printed, or why there are none: a command that could not run, or printed no list. */

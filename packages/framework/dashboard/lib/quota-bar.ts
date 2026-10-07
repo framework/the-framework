@@ -1,6 +1,6 @@
 // The usage bar's own arithmetic (#960), kept out of the component so it can be tested without a
 // DOM and read without React. Everything here is about *drawing* the week; where the boundary sits
-// and what it gates is the framework's (`quota-boundary.ts`), and this never re-derives it.
+// and what it gates is OpenAgent's (`quota-boundary.ts`), and this never re-derives it.
 
 /** One quota-day's stretch of the bar, 0-100, and the label that names it, if any. */
 export interface DaySegment {

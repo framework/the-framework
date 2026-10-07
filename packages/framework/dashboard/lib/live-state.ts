@@ -1,4 +1,4 @@
-import type { AgentMeta, FrameworkEvent, ChoiceRequest } from '../../src/index.js'
+import type { AgentMeta, OpenAgentEvent, ChoiceRequest } from '../../src/index.js'
 
 // Live-run state derived from the event stream — kept pure so it can be driven and
 // tested on its own, away from React. The dashboard is a projection of the diary the
@@ -12,7 +12,7 @@ export { pendingChoices } from '../../src/client.js'
  * minus its discriminant, derived so a field added to the event carries through here on
  * its own — the same way {@link ChoiceEvent} tracks the `choice` event.
  */
-type ViewEvent = Extract<FrameworkEvent, { kind: 'view' }>
+type ViewEvent = Extract<OpenAgentEvent, { kind: 'view' }>
 export type AgentView = Omit<ViewEvent, 'kind'>
 
 /**
@@ -20,7 +20,7 @@ export type AgentView = Omit<ViewEvent, 'kind'>
  * event with an id already seen updates it in place (the agent re-showed the same title),
  * so the rail keeps one entry per view rather than stacking duplicates.
  */
-export function agentViews(events: readonly FrameworkEvent[]): AgentView[] {
+export function agentViews(events: readonly OpenAgentEvent[]): AgentView[] {
   const byId = new Map<string, AgentView>()
   for (const event of events) {
     // Strip the discriminant and keep the rest, like pendingChoices — a new field on the
@@ -37,7 +37,7 @@ export function agentViews(events: readonly FrameworkEvent[]): AgentView[] {
  * Whether the agent is still going, i.e. worth showing a Stop button. An agent ends with a
  * single `end` event; until one arrives (and once anything has streamed) it is live.
  */
-export function isAgentActive(events: readonly FrameworkEvent[]): boolean {
+export function isAgentActive(events: readonly OpenAgentEvent[]): boolean {
   // Asked of the CURRENT segment, not the whole feed: a resumed session (#762) appends a second
   // `session` boundary after its `end` to the same journal, and "was there ever an end" read a
   // resumed-live run as inactive — hiding Stop and settling the pill while the agent worked.
@@ -59,7 +59,7 @@ export interface AgentOutcome {
  * about a finished agent used to live only in one small `✗ failed` feed line — the overview
  * pill said "finished" for a crash and a clean pass alike.
  */
-export function agentOutcome(events: readonly FrameworkEvent[]): AgentOutcome | undefined {
+export function agentOutcome(events: readonly OpenAgentEvent[]): AgentOutcome | undefined {
   // The ending of the CURRENT segment: a resumed session (#762) carries its stopped segment's
   // `end` in the same journal, and the first-end-wins read kept a resumed agent "stopped" for
   // ever — while it was live again, and even after it later finished clean. Mid-resume there is
@@ -86,7 +86,7 @@ export function cardOutcome(status: AgentMeta['status']): AgentOutcome | undefin
  * match wins, so a multi-turn session points at its most recent agent. Absent until the driver has
  * found the agent (and for any non-Actions target).
  */
-export function actionsRunUrl(events: readonly FrameworkEvent[]): string | undefined {
+export function actionsRunUrl(events: readonly OpenAgentEvent[]): string | undefined {
   let url: string | undefined
   for (const event of events) {
     if (event.kind !== 'driver' || event.event.type !== 'action') continue
@@ -103,7 +103,7 @@ export function actionsRunUrl(events: readonly FrameworkEvent[]): string | undef
  * are what a tab opened mid-run replays. The last match wins, so a session that handed off more
  * than once points at its most recent cloud session. Absent until the hand-off has landed.
  */
-export function cloudSession(events: readonly FrameworkEvent[]): { url: string; id: string } | undefined {
+export function cloudSession(events: readonly OpenAgentEvent[]): { url: string; id: string } | undefined {
   let found: { url: string; id: string } | undefined
   for (const event of events) {
     if (event.kind !== 'driver' || event.event.type !== 'action') continue
@@ -122,7 +122,7 @@ export function cloudSession(events: readonly FrameworkEvent[]): { url: string; 
  * end" must not answer with a leg the run has since left behind (#762). A feed with no boundary
  * is returned whole.
  */
-export function currentAgentEvents(events: readonly FrameworkEvent[]): FrameworkEvent[] {
+export function currentAgentEvents(events: readonly OpenAgentEvent[]): OpenAgentEvent[] {
   let start = 0
   let wentOn = false
   for (let i = events.length - 1; i >= 0; i--) {

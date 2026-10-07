@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { DATA_BRANCH, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
-import { OPENAGENT_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './openagent-dir.js'
 import { prsForBranch, type LinkedPr } from './dashboard/pull-requests.js'
 import { listAgents, type AgentMeta } from './store/index.js'
 import { nodeFs } from './node-fs.js'
@@ -347,10 +347,10 @@ export function startCloudScratchSweep(opts: CloudScratchSweepOptions): ProjectP
   return startProjectPass(opts.projects, async cwd => {
     const { deleted, failed } = await sweep(cwd).catch((): ScratchSweepResult => ({ deleted: [], kept: [], failed: [] }))
     for (const ref of deleted) {
-      opts.log(`[framework] deleted the leftover cloud hand-off ref ${ref} on origin: its session settled long ago and nothing consumes it (#1547).`)
+      opts.log(`[openagent] deleted the leftover cloud hand-off ref ${ref} on origin: its session settled long ago and nothing consumes it (#1547).`)
     }
     for (const item of failed) {
-      opts.log(`[framework] could not delete the leftover ref ${item.ref} on origin: ${item.error}`)
+      opts.log(`[openagent] could not delete the leftover ref ${item.ref} on origin: ${item.error}`)
     }
   })
 }

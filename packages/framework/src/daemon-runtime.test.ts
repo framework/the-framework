@@ -6,7 +6,7 @@ import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createProjectRuntime } from './daemon-runtime.js'
 import { PROJECT_HOOKS_FILE } from './project-hooks.js'
-import { OPENAGENT_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './openagent-dir.js'
 import { addProject, listProjects } from './registry.js'
 import { DATA_BRANCH, excludeFromGit, readSharing, withFileBranch } from '@openagt/agent-data'
 
@@ -14,7 +14,7 @@ import { DATA_BRANCH, excludeFromGit, readSharing, withFileBranch } from '@opena
 // relay half of onStart has its own loopback test (dashboard/remote-run.integration.test.ts).
 
 async function project(hooks?: string): Promise<string> {
-  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-runtime-')))
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'openagent-runtime-')))
   await mkdir(join(cwd, OPENAGENT_DIR), { recursive: true })
   if (hooks !== undefined) await writeFile(join(cwd, PROJECT_HOOKS_FILE), hooks)
   return cwd
@@ -109,8 +109,8 @@ test('a Start hands the line the branch to start from, and refuses a word that i
 })
 
 test('adding a project writes the runner\'s start, resume and check lines, an empty folder included, and keeps a line already there', async () => {
-  const folder = await realpath(await mkdtemp(join(tmpdir(), 'framework-add-')))
-  const cfg = await realpath(await mkdtemp(join(tmpdir(), 'framework-add-cfg-')))
+  const folder = await realpath(await mkdtemp(join(tmpdir(), 'openagent-add-')))
+  const cfg = await realpath(await mkdtemp(join(tmpdir(), 'openagent-add-cfg-')))
   // The add registers through the process's own environment, and a new folder's first commit needs an author.
   const env = { XDG_CONFIG_HOME: cfg, GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' }
   const before = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]))
@@ -147,8 +147,8 @@ test('adding a project writes the runner\'s start, resume and check lines, an em
 })
 
 test('removing a project runs its close hooks and takes it off the list, and deletes nothing in its folder; an id not on the list is refused', async () => {
-  const folder = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-')))
-  const cfg = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-cfg-')))
+  const folder = await realpath(await mkdtemp(join(tmpdir(), 'openagent-remove-')))
+  const cfg = await realpath(await mkdtemp(join(tmpdir(), 'openagent-remove-cfg-')))
   const env = { XDG_CONFIG_HOME: cfg, GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' }
   const before = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]))
   Object.assign(process.env, env)
@@ -187,8 +187,8 @@ test('removing a project runs its close hooks and takes it off the list, and del
 })
 
 test('a project with an agent at work is not removed, a card left "running" by a dead process does not count, and a project whose folder is gone is removed', async () => {
-  const folder = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-busy-')))
-  const cfg = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-busy-cfg-')))
+  const folder = await realpath(await mkdtemp(join(tmpdir(), 'openagent-remove-busy-')))
+  const cfg = await realpath(await mkdtemp(join(tmpdir(), 'openagent-remove-busy-cfg-')))
   const env = { XDG_CONFIG_HOME: cfg, GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' }
   const before = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]))
   Object.assign(process.env, env)
@@ -247,7 +247,7 @@ async function usedProject(runtime: ReturnType<typeof createProjectRuntime>, fol
 }
 
 test('removing a project with its files: OpenAgent\'s own go, each named; the person\'s files, commits, a branch with work and the remote stay', async () => {
-  const base = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-files-')))
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'openagent-remove-files-')))
   const folder = join(base, 'project')
   const cfg = join(base, 'cfg')
   await mkdir(folder)
@@ -299,7 +299,7 @@ test('removing a project with its files: OpenAgent\'s own go, each named; the pe
 })
 
 test('removing a project with its files keeps what is not OpenAgent\'s to delete: a tracked file, uncommitted work, the person\'s settings, and records another listed project uses', async () => {
-  const base = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-kept-')))
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'openagent-remove-kept-')))
   const folder = join(base, 'project')
   const second = join(base, 'second')
   const cfg = join(base, 'cfg')
@@ -352,7 +352,7 @@ test('removing a project with its files keeps what is not OpenAgent\'s to delete
 })
 
 test('removing a project with its files while a run of this machine is still alive: the runner refuses, and the records and the dashboard\'s directory stay', async () => {
-  const base = await realpath(await mkdtemp(join(tmpdir(), 'framework-remove-live-')))
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'openagent-remove-live-')))
   const folder = join(base, 'project')
   const cfg = join(base, 'cfg')
   await mkdir(folder)

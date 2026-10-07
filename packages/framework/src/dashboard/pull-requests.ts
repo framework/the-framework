@@ -5,10 +5,10 @@ import { cachedRead, invalidate, type Cached } from './cache.js'
  * The pull requests the dashboard reads (#1820), in one place, all through the project's git host
  * provider (`../store/git-host.ts`): a branch's request, a branch's whole request history, and the
  * project's open requests. Reads only: opening and landing are `agent-handoff.ts`'s, through the
- * same provider. The framework runs no git host tool; a project with no git host package has no pull
+ * same provider. OpenAgent runs no git host tool; a project with no git host package has no pull
  * requests, and every read here answers "none" for it.
  *
- * The shapes are the framework's own ({@link LinkedPr}, {@link OpenPr}), copied out of what the
+ * The shapes are OpenAgent's own ({@link LinkedPr}, {@link OpenPr}), copied out of what the
  * provider answers rather than passed through, so a field a provider adds cannot leak into what
  * callers store.
  */
@@ -39,7 +39,7 @@ export interface OpenPr {
   /**
    * Draft PRs are generally left off the queue: a draft is not asking for review.
    *
-   * The exception is a draft the framework opened for itself (#1102), which {@link headRefName}
+   * The exception is a draft OpenAgent opened for itself (#1102), which {@link headRefName}
    * is what tells apart.
    */
   isDraft: boolean
@@ -64,7 +64,7 @@ export type BranchPrLookup = (cwd: string, branch: string) => Promise<LinkedPr |
 /** Lists a checkout's open PRs; rejects when the git host could not answer. */
 export type PrLister = (cwd: string) => Promise<OpenPr[]>
 
-/** A provider's request as the framework keeps it: the state upper-cased, the head as the request's commit. */
+/** A provider's request as OpenAgent keeps it: the state upper-cased, the head as the request's commit. */
 export function linkedPrOf(request: GitHostRequest): LinkedPr {
   return {
     number: request.number,
@@ -93,7 +93,7 @@ export function openPrOf(request: GitHostRequest): OpenPr {
  * Every PR a branch name has ever had, newest first (#1251).
  *
  * The newest request for a head *in any state* is what a single view would answer, so a session
- * whose prompt pins its branch name (`the-framework/triage-quick`) inherits a predecessor's
+ * whose prompt pins its branch name (`openagent/triage-quick`) inherits a predecessor's
  * merged PR as its own. The list form keeps the whole history so {@link pickAgentPr} can decide
  * which entry, if any, belongs to the agent asking. Resolves `[]` when the project has no git host or
  * the git host could not answer — indistinguishable from "no PRs", which is what every caller would do

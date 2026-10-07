@@ -19,8 +19,8 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 [9] agent id: an agent's stable id, derived from the moment it started; it names the agent's checkout directory, its branch until the agent names it, and its run.
 [10] hands-off: said of an agent whose work leaves this machine, so its first prompt is the whole agent: an agent whose location is `web`.
 [12] run: only the `logs` skill's record of one agent on the `agent-data` branch: a card (what was asked, the branch, the pull request, how it ended, what it cost) and a diary (what the agent said).
-[14] branches provider: the package of the project that declares it provides the checkouts and branches; The Framework reads a branch's state and pushes branches through the command that package declares (`../store/branches.ts`). Git only.
-[19] git host provider: the package of the project that declares it provides the git host (`"openagent": { "git-host": "<command>" }`); The Framework opens and lands pull requests through the command that package declares (`../store/git-host.ts`). A project with none has no git host: no pull request is opened or landed for it.
+[14] branches provider: the package of the project that declares it provides the checkouts and branches; OpenAgent reads a branch's state and pushes branches through the command that package declares (`../store/branches.ts`). Git only.
+[19] git host provider: the package of the project that declares it provides the git host (`"openagent": { "git-host": "<command>" }`); OpenAgent opens and lands pull requests through the command that package declares (`../store/git-host.ts`). A project with none has no git host: no pull request is opened or landed for it.
 [18] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [20] subagent: an agent another agent, its main agent, started for one task: its record names the main agent as its `parent`, and its branch started from the main agent's. It opens no pull request. Its main agent lands its work: merges it into the main agent's own branch, deletes the subagent's branch, and writes the subagent's last commit on the subagent's record as `landed` (`skill-orchestration`). An agent whose record carries `landed` is landed.
 [21] the commit an agent's own work begins at: `baseCommit` on the agent's record, written by the tool that started it for every agent that made its own branch: the commit that branch was made at. The branches provider measures the agent's commits and files from it when the agent started from a branch other than the default one, and once the default branch already contains the agent's work; otherwise from the default branch. Absent on an agent given a branch that already existed.
@@ -42,7 +42,7 @@ Decides what becomes of an agent's [1] work once the agent has ended, its handof
 - **"Merge into main"** - for a project with no remote: the branches provider merges the agent's recorded branch into the default branch on this machine and deletes it, and the agent's run then records the branch's last commit and where its work began; a refusal is the provider's own line.
 - **A pull request for a branch only the remote has** - a cloud session's own branch is published as a draft, through the same two providers.
 - **The "Merge" button on a finished agent** - refused when the agent has no pull request or it is no longer open, or the project has no git host; otherwise the git host provider lands the pull request.
-- **The pull request's title** - the name the branches provider answers for its branch, else the branch, else "Session <agent id>"; never the prompt, and never a branch with its prefix cut off by the framework.
+- **The pull request's title** - the name the branches provider answers for its branch, else the branch, else "Session <agent id>"; never the prompt, and never a branch with its prefix cut off by OpenAgent.
 - **The pull request's body** - what the agent said about the work, else what was asked for, then which agent did it.
 - **What a handoff reports** - a button answers with success (and the pull request's URL and number) or one error line, and the number rides along so it gets recorded on the agent.
 
@@ -124,7 +124,7 @@ A branch is empty when it has no commit the base does not already have, or when 
 
 #### Context
 
-**Problem**: the agent [1] is told to commit its work, but an agent that ends without doing so holds its whole output in an uncommitted tree in its checkout [3]. What gets published is what the agent committed; The Framework commits nothing on its behalf, so that work stays in the checkout and has to be named on the agent's page, or the page offers an "Open PR" that GitHub can only refuse for a branch with no diff.
+**Problem**: the agent [1] is told to commit its work, but an agent that ends without doing so holds its whole output in an uncommitted tree in its checkout [3]. What gets published is what the agent committed; OpenAgent commits nothing on its behalf, so that work stays in the checkout and has to be named on the agent's page, or the page offers an "Open PR" that GitHub can only refuse for a branch with no diff.
 
 #### Business logic
 
@@ -198,7 +198,7 @@ An agent [1] that recorded no branch is refused with "this session recorded no b
 
 #### Business logic
 
-The branch is published by the rule above, always as a draft — a pull request The Framework opens by itself must not request anyone's review, and the intervention [8] feed keeps listing it — with the title and body rules below. The branches provider [14] finds nothing to push for a branch only the remote has and answers it as it is; the git host provider [19] opens the pull request against its own default base.
+The branch is published by the rule above, always as a draft — a pull request OpenAgent opens by itself must not request anyone's review, and the intervention [8] feed keeps listing it — with the title and body rules below. The branches provider [14] finds nothing to push for a branch only the remote has and answers it as it is; the git host provider [19] opens the pull request against its own default base.
 
 ### The "Merge" button on a finished agent
 
@@ -228,7 +228,7 @@ See `## Context`.
 
 #### Business logic
 
-What the agent [1] was asked for at the start, which is all The Framework knows on its own. Then, after a blank line, "Opened from OpenAgent session `<agent id [9]>`." Nothing else.
+What the agent [1] was asked for at the start, which is all OpenAgent knows on its own. Then, after a blank line, "Opened from OpenAgent session `<agent id [9]>`." Nothing else.
 
 ### What a handoff reports
 

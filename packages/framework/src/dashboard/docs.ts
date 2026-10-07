@@ -7,7 +7,7 @@ import { join } from 'node:path'
  *
  * These are written per session as `PLAN_<SESSION>.agent.md` (the plan for now) and
  * `TODO_<SESSION>.agent.md` (the backlog), where SESSION is a git-branch slug — by
- * The Framework's own system prompt back when it ran the agent (#323/#326), and by
+ * OpenAgent's own system prompt back when it ran the agent (#323/#326), and by
  * whatever a project's own skills tell an agent to write now. The flat fallback is `PLAN.md`
  * at the root; the `TODO` category has no flat file: the agent queue is not a document of the
  * checkout but a project package's data, and the dashboard shows it on that package's own page

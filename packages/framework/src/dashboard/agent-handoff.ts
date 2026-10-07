@@ -18,7 +18,7 @@ import { projectRuns, type RunsFor } from '../store/runs.js'
 // not its checkout still exists.
 //
 // The branch's git facts and its push are the project's branches provider's (#1774), and every
-// pull request, opened or landed, is the project's git host provider's (#1820): the framework asks the
+// pull request, opened or landed, is the project's git host provider's (#1820): OpenAgent asks the
 // packages the project picked, through the commands they declare (`store/branches.ts`,
 // `store/git-host.ts`), and never runs git or a git host tool itself. Opening a pull request is the two
 // composed: the push, then the open. What stays here is what is about the *run*: which of the
@@ -69,7 +69,7 @@ export interface AgentHandoff {
   deletions: number
   /**
    * The session produced nothing to hand off: the branch exists but carries no commit the base
-   * does not already have — or nothing beyond the framework's own bookkeeping (#1291), which is
+   * does not already have — or nothing beyond OpenAgent's own bookkeeping (#1291), which is
    * committed for provenance, never as publishable work. Said out loud, rather than shown as an
    * empty branch.
    */
@@ -227,7 +227,7 @@ export async function mergeAgentPr(
 
 /**
  * Read what a finished session left behind, for `branch`: the branch's git facts from the
- * project's branches provider, and the run's own pull request from the framework's lookup.
+ * project's branches provider, and the run's own pull request from OpenAgent's lookup.
  *
  * Returns undefined only when the project has no branches provider, or the provider did not
  * answer for the branch. A branch that no longer exists still returns a handoff (with
@@ -362,8 +362,8 @@ export async function mergeAgentBranch(cwd: string, agent: Pick<AgentMeta, 'id' 
 /**
  * Open a draft PR for a branch that exists only on the remote (#1601): a cloud session's own
  * `claude/*` branch was pushed from a VM this machine never sees, so there is nothing to push
- * here — the provider publishes the branch as the remote has it. Draft because a PR the
- * framework opens by itself must not put a review request in anyone's inbox, and the
+ * here — the provider publishes the branch as the remote has it. Draft because a PR
+ * OpenAgent opens by itself must not put a review request in anyone's inbox, and the
  * interventions queue keeps listing a session's draft.
  */
 export async function openRemoteBranchPullRequest(
@@ -442,13 +442,13 @@ export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'intent'> & Partial
  * as commit subjects, which describe neither what changed nor even a whole thought (#1618).
  */
 function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'branch'>, name?: string): string {
-  // The name the branches provider answers for the branch comes before the branch itself: the
-  // framework draws the name it is given and never cuts the package's prefix off a branch.
+  // The name the branches provider answers for the branch comes before the branch itself:
+  // OpenAgent draws the name it is given and never cuts the package's prefix off a branch.
   return name ?? agent.branch ?? `Session ${agent.id}`
 }
 
 /**
- * The PR body: what was asked for, which is all the framework knows on its own, and which session
+ * The PR body: what was asked for, which is all OpenAgent knows on its own, and which session
  * did it.
  */
 function agentPrBody(agent: HandoffAgent): string {

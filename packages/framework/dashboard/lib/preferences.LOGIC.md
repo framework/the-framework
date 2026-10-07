@@ -132,5 +132,5 @@ Notifications are two independent axes: whether a notification reaches the user 
 Unset means:
 
 - Browser delivery: on. The browser's own notification permission is still the real gate, which is handled in `notification-permission.ts`.
-- The "Human Queue" category, an intervention [5]: on. It is the baseline The Framework leans on, so it fires until the user turns it off.
+- The "Human Queue" category, an intervention [5]: on. It is the baseline OpenAgent leans on, so it fires until the user turns it off.
 - The "New activity" category: off. It is loosely informative, so it is opt in.

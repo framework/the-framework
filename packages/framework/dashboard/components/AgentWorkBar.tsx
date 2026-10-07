@@ -38,7 +38,7 @@ export function AgentWorkBar({
         <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
           <GitBranch className="h-3.5 w-3.5 shrink-0" />
           <Tooltip>
-            <TooltipTrigger render={<span className="truncate" />}>{branch.replace(/^the-framework\//, '')}</TooltipTrigger>
+            <TooltipTrigger render={<span className="truncate" />}>{branch}</TooltipTrigger>
             <TooltipContent className="whitespace-pre-line">{[branch, checkout?.checkout?.path].filter(Boolean).join('\n')}</TooltipContent>
           </Tooltip>
         </span>

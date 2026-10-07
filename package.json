@@ -1,9 +1,9 @@
 {
-  "name": "the-framework",
+  "name": "openagent",
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "The Framework: autonomous AI programming — coding agents work your repos unattended and hand the result off as pull requests.",
+  "description": "OpenAgent: autonomous AI programming — coding agents work your repos unattended and hand the result off as pull requests.",
   "packageManager": "pnpm@11.5.3",
   "scripts": {
     "build": "pnpm -r --filter '!__private__website' run build",

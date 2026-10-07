@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 
 const here = dirname(fileURLToPath(import.meta.url))
-// jsdom belongs to the-framework (the dashboard's dev dependency, merged in with it); this
+// jsdom belongs to the dashboard (its dev dependency); this
 // directory deliberately has no package.json of its own, so resolve through the package that
 // actually depends on it.
 const require_ = createRequire(import.meta.url)
@@ -339,7 +339,7 @@ async function deliver(body, prepare) {
 
 function newSessionPage({
   branches = ['main', 'cloud-1-abcd'],
-  remembered = 'the-framework',
+  remembered = 'openagent',
   repoPicker = true,
   glyphs = false,
   models = ['Fable 5', 'Opus 5', 'Sonnet 5', 'Haiku 4.5'],
@@ -415,7 +415,7 @@ function newSessionPage({
     chip.onclick = () => openList('Search branches…', branches, b => { chip.textContent = b })
   }
   const wireRepo = chip => {
-    chip.onclick = () => openList('Search repos…', ['brillout/docpress', 'framework/the-framework'], picked => {
+    chip.onclick = () => openList('Search repos…', ['brillout/docpress', 'openagt/openagent'], picked => {
       chip.textContent = picked.split('/').pop()
       chip.setAttribute('role', 'combobox')
       chip.id = 'repo'
@@ -435,7 +435,7 @@ function newSessionPage({
   return { dom, w, d, seen }
 }
 
-const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt: 'Add the thing' }
+const START = { repo: 'openagt/openagent', branch: 'cloud-1-abcd', prompt: 'Add the thing' }
 
 {
   // The page remembered our repo: nothing to pick but the branch.
@@ -443,7 +443,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
   const result = await w.__oaBridgeCreateSession(START)
   const branch = d.getElementById('branch')?.textContent
   const text = d.querySelector('[contenteditable="true"]').textContent
-  const ok = result.ok && result.sessionId === 'session_01NEW' && /repo already the-framework/.test(result.note) && branch === 'cloud-1-abcd' && text === 'Add the thing' && seen.sent && seen.modelOpened === 0
+  const ok = result.ok && result.sessionId === 'session_01NEW' && /repo already openagent/.test(result.note) && branch === 'cloud-1-abcd' && text === 'Add the thing' && seen.sent && seen.modelOpened === 0
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  create with the repo remembered picks the branch, types the prompt and sends, and leaves the model picker alone  (branch=${branch}, searched=${JSON.stringify(seen.searched)}, modelOpened=${seen.modelOpened}, result=${JSON.stringify(result)})`)
   dom.window.close()
@@ -509,7 +509,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
   const result = await w.__oaBridgeCreateSession(START)
   const repo = d.getElementById('repo')?.textContent.replace(/[\uE000-\uF8FF]/g, '')
   const branch = d.getElementById('branch')?.textContent.replace(/[\uE000-\uF8FF]/g, '')
-  const ok = result.ok && repo === 'the-framework' && branch === 'cloud-1-abcd' && seen.sent
+  const ok = result.ok && repo === 'openagent' && branch === 'cloud-1-abcd' && seen.sent
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  create reads labels through the page's icon glyphs  (repo=${repo}, branch=${branch}, result=${JSON.stringify(result)})`)
   dom.window.close()
@@ -521,7 +521,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
   const result = await w.__oaBridgeCreateSession(START)
   const repo = d.getElementById('repo')?.textContent
   const branch = d.getElementById('branch')?.textContent
-  const ok = result.ok && repo === 'the-framework' && branch === 'cloud-1-abcd' && seen.sent && /repo: clicked "framework\/the-framework"/.test(result.note)
+  const ok = result.ok && repo === 'openagent' && branch === 'cloud-1-abcd' && seen.sent && /repo: clicked "openagt\/openagent"/.test(result.note)
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  create with another repo remembered re-picks it through its chip  (repo=${repo}, branch=${branch}, result=${JSON.stringify(result)})`)
   dom.window.close()
@@ -532,7 +532,7 @@ const START = { repo: 'framework/the-framework', branch: 'cloud-1-abcd', prompt:
   const { dom, w, d, seen } = newSessionPage({ remembered: '' })
   const result = await w.__oaBridgeCreateSession(START)
   const repo = d.getElementById('repo')?.textContent
-  const ok = result.ok && repo === 'the-framework' && seen.sent
+  const ok = result.ok && repo === 'openagent' && seen.sent
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  create with no repo remembered uses the select-repo trigger  (repo=${repo}, result=${JSON.stringify(result)})`)
   dom.window.close()
@@ -585,7 +585,7 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   const composer = `<div contenteditable="true"></div><button aria-label="Send message" id="send"></button>`
   // The new-session page's chips as the live one renders them with a repository remembered, so a
   // creation asked of the Driver can succeed here without a picker.
-  const chips = `<button role="combobox" id="repo">the-framework</button><button role="combobox" id="branch">main</button>`
+  const chips = `<button role="combobox" id="repo">openagent</button><button role="combobox" id="branch">main</button>`
   // The middle panel's own "Show N more" sits deep in its card — on the live page, twenty-eight
   // levels from the sidebar's rows — and must never be taken for the list's.
   const panel = `<section><div><div><div><div>Sessions</div><button id="decoy">Show 2 more</button></div></div></div></section>`
@@ -760,7 +760,7 @@ function appPage({ sessions = SESSIONS, firstPage = 6, sendAppendsRow = true } =
   const { dom, w, seen } = appPage()
   const result = await w.__oaBridgeDrive({
     visits: [{ id: 'session_01UNREAD', status: 'unread', answer: { id: 'ans-4', text: 'Work on the next TODO' } }],
-    start: { repo: 'framework/the-framework', branch: 'main', prompt: 'Add the thing' },
+    start: { repo: 'openagt/openagent', branch: 'main', prompt: 'Add the thing' },
   })
   const ok =
     result.started?.ok === true &&

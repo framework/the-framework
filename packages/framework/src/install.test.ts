@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { FIRST_COMMIT_MESSAGE, installProject } from './install.js'
-import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
+import { openagentGitignore, gitignorePath } from './openagent-gitignore.js'
 import type { GitRunner } from '@openagt/agent-data'
 import type { StoreFs } from './store/index.js'
 
@@ -60,7 +60,7 @@ test('installProject on a repo with commits seeds the ignore file and commits no
   const { git, calls } = fakeGit(inRepoWithCommits)
 
   assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true })
-  assert.equal(fs.files.get(gitignorePath(CWD)), frameworkGitignore())
+  assert.equal(fs.files.get(gitignorePath(CWD)), openagentGitignore())
 
   assert.deepEqual(
     calls.map(args => args[0]),
@@ -113,7 +113,7 @@ test('against real git: adding a project leaves the person’s repository as it 
 
     assert.deepEqual(await installProject(repo), { ok: true })
 
-    assert.equal(await readFile(gitignorePath(repo), 'utf8'), frameworkGitignore(), 'the ignore file is written')
+    assert.equal(await readFile(gitignorePath(repo), 'utf8'), openagentGitignore(), 'the ignore file is written')
     assert.equal(git('log', '--format=%H %s'), before.log, 'no commit on the person’s branch')
     assert.equal(git('status', '--porcelain', '-uall'), before.status, 'git shows no new file, and their changes are as they left them')
     assert.deepEqual(await installProject(repo), { ok: true, alreadyActivated: true })
@@ -139,7 +139,7 @@ test('against real git: a repository with no commit gets an empty first one, and
 })
 
 test('installProject on an already-activated repo is a no-op that never calls git', async () => {
-  const fs = memFs({ [gitignorePath(CWD)]: frameworkGitignore() })
+  const fs = memFs({ [gitignorePath(CWD)]: openagentGitignore() })
   const { git, calls } = fakeGit(() => '')
 
   assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true, alreadyActivated: true })

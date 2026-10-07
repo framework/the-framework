@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { parseQueueEntries, providedQueue } from './queue.js'
 
 // The queue contract (#1774): a project's package declares `"openagent": { "queue": "<command>" }`
-// and the framework reads the queue by running `<command> --local`. Real processes: a tiny
+// and OpenAgent reads the queue by running `<command> --local`. Real processes: a tiny
 // provider script that logs each call it answers, in a throwaway project.
 
 /** A provider command: prints the entries of a JSON file, logging every call. */
@@ -19,7 +19,7 @@ process.stdout.write(readFileSync(join(__dirname, 'queue.json'), 'utf8'))
 
 /** A project whose package.json lists `deps`, each installed under node_modules with its own package.json. */
 async function project(deps: Record<string, Record<string, unknown>>, queue = '["- one", "two"]'): Promise<string> {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-queue-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-queue-')))
   await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: Object.fromEntries(Object.keys(deps).map(name => [name, '*'])) }))
   for (const [name, manifest] of Object.entries(deps)) {
     const dir = join(root, 'node_modules', name)

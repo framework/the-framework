@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { crawlRepoFiles, isActivated, type ProjectFs } from './project.js'
 import type { GitRunner } from '@openagt/agent-data'
-import { gitignorePath } from './framework-gitignore.js'
+import { gitignorePath } from './openagent-gitignore.js'
 
 const CWD = '/proj'
 

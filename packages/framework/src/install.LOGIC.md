@@ -44,7 +44,7 @@ When the folder is not inside a git working tree (a git that cannot answer the q
 
 #### Context
 
-**Business logic story**: the ignore file's rules are in `framework-gitignore.ts`. OpenAgent ships no prompt text, so activation writes no prompt files.
+**Business logic story**: the ignore file's rules are in `openagent-gitignore.ts`. OpenAgent ships no prompt text, so activation writes no prompt files.
 
 #### Business logic
 

@@ -1,4 +1,4 @@
-Runs the framework package's compiled test suite, the `dist-test/` output of the test build, with Node's built-in test runner against a throwaway configuration home, so that no test can ever read the machine's real registry [1] or the daemon's state file. A fresh temporary directory is created and set as the configuration home (`XDG_CONFIG_HOME`) for the whole suite, and removed again when the suite ends, whatever the outcome.
+Runs the OpenAgent package's compiled test suite, the `dist-test/` output of the test build, with Node's built-in test runner against a throwaway configuration home, so that no test can ever read the machine's real registry [1] or the daemon's state file. A fresh temporary directory is created and set as the configuration home (`XDG_CONFIG_HOME`) for the whole suite, and removed again when the suite ends, whatever the outcome.
 
 ## Glossary
 

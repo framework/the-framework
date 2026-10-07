@@ -7,7 +7,7 @@ import { readProvidedCommand } from '@openagt/agent-data'
 import { parseRunCard, providedRuns } from './runs.js'
 
 // The finished-runs contract (#1774): a project's package declares `"openagent": { "runs": "<command>" }`
-// and the framework reads finished runs by running that command. These tests use real processes:
+// and OpenAgent reads finished runs by running that command. These tests use real processes:
 // a tiny provider script that logs each call it answers, in a throwaway project.
 
 /** A provider command: answers the contract's command line from a JSON file of runs, logging every call. */
@@ -37,7 +37,7 @@ if (args[0] === 'show') {
 
 /** A project whose package.json lists `deps`, each installed under node_modules with its own package.json. */
 async function project(deps: Record<string, Record<string, unknown>>): Promise<string> {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-runs-')))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-runs-')))
   await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: Object.fromEntries(Object.keys(deps).map(name => [name, '*'])) }))
   for (const [name, manifest] of Object.entries(deps)) {
     const dir = join(root, 'node_modules', name)

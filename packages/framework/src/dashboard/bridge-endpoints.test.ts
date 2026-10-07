@@ -344,7 +344,7 @@ test('the start-queue is served to the extension and its report travels back (#1
   const reports: { id: string; ok: boolean; sessionId?: string; note?: string }[] = []
   let pending: { id: string; repo: string; branch: string; prompt: string; model?: string } | undefined = {
     id: 'req-1',
-    repo: 'framework/the-framework',
+    repo: 'openagt/openagent',
     branch: 'cloud-1-abcd1234',
     prompt: 'Spike and plan the queue ticket',
     model: 'sonnet',
@@ -364,7 +364,7 @@ test('the start-queue is served to the extension and its report travels back (#1
     const first = await fetch(`${s.url}${BRIDGE_PREFIX}/start`, { headers: { authorization: `Bearer ${TOKEN}` } })
     assert.equal(first.status, 200)
     assert.deepEqual(await first.json(), {
-      start: { id: 'req-1', repo: 'framework/the-framework', branch: 'cloud-1-abcd1234', prompt: 'Spike and plan the queue ticket', model: 'sonnet' },
+      start: { id: 'req-1', repo: 'openagt/openagent', branch: 'cloud-1-abcd1234', prompt: 'Spike and plan the queue ticket', model: 'sonnet' },
     })
 
     const second = await fetch(`${s.url}${BRIDGE_PREFIX}/start`, { headers: { authorization: `Bearer ${TOKEN}` } })

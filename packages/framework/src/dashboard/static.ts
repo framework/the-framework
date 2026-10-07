@@ -8,7 +8,7 @@ import { requestPathname } from '../request-path.js'
 // `index.html` plus `assets/**` — so the daemon serves it as
 // plain files with an SPA fallback (any non-asset path yields `index.html`, which boots
 // the client router). Assets are copied into the
-// framework package at build time (see scripts/bundle-dashboard.mjs).
+// OpenAgent package at build time (see scripts/bundle-dashboard.mjs).
 
 /** Whether a real, readable file exists at `path`. */
 async function isFile(path: string): Promise<boolean> {

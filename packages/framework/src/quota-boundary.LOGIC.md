@@ -1,10 +1,10 @@
-Computes the quota boundary [1]: the share of the account's quota [2] week that may have been spent by now, derived from nothing but the week's reset time as the coding agent [3] phrases it. The boundary is the elapsed share of the seven-day week and rises continuously with the clock. The Framework only places and draws it: no line that work stops at is computed here.
+Computes the quota boundary [1]: the share of the account's quota [2] week that may have been spent by now, derived from nothing but the week's reset time as the coding agent [3] phrases it. The boundary is the elapsed share of the seven-day week and rises continuously with the clock. OpenAgent only places and draws it: no line that work stops at is computed here.
 
 ## Context
 
-**User story**: the account's week is meant to be spent evenly: a quiet week still gets spent instead of expiring unused. In the dashboard's usage panel the user sees where the boundary sits against what is used. The Framework starts no unattended [4] work itself: a package that does, such as the scheduler, keeps its own copy of this rule, decides how far past the boundary its work may start, and may put that stop line on the usage bar through its own module (`dashboard/module/index.ts`).
+**User story**: the account's week is meant to be spent evenly: a quiet week still gets spent instead of expiring unused. In the dashboard's usage panel the user sees where the boundary sits against what is used. OpenAgent starts no unattended [4] work itself: a package that does, such as the scheduler, keeps its own copy of this rule, decides how far past the boundary its work may start, and may put that stop line on the usage bar through its own module (`dashboard/module/index.ts`).
 
-**Problem**: The Framework never calls a model itself, so it knows the account's allowance only as the coding agent reports it: windows with a percentage used and a reset time written as prose, without a year. There is nothing to configure. A fixed limit would either strand allowance in a quiet week or run dry early in a busy one, while a boundary derived from the week itself reaches the full allowance exactly as the week resets, so nothing is left on the floor.
+**Problem**: OpenAgent never calls a model itself, so it knows the account's allowance only as the coding agent reports it: windows with a percentage used and a reset time written as prose, without a year. There is nothing to configure. A fixed limit would either strand allowance in a quiet week or run dry early in a busy one, while a boundary derived from the week itself reaches the full allowance exactly as the week resets, so nothing is left on the floor.
 
 ## Glossary
 

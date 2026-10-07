@@ -2,19 +2,19 @@ import { runPackageCommand, type ProvidedCommand } from '@openagt/agent-data'
 import { providedCommand } from '../built-in.js'
 
 /**
- * The agent queue, as the framework reads it (#1774). The framework keeps no queue and imports no
+ * The agent queue, as OpenAgent reads it (#1774). OpenAgent keeps no queue and imports no
  * queue package: a project's queue comes from whichever of its packages declares that it provides
- * it — `"openagent": { "queue": "<command>" }` in the package's own package.json — and the
- * framework reads it by running that command. Swap the package for another that answers the same
+ * it — `"openagent": { "queue": "<command>" }` in the package's own package.json — and
+ * OpenAgent reads it by running that command. Swap the package for another that answers the same
  * command line and prints the same shape, and nothing here changes. No package declares it: the
  * project has no queue, and the dashboard shows it none.
  *
  * The command line a provider answers, printing one JSON document and exiting 0:
  *   `<command> --local`   the open entries, in order of work, as an array of strings
- * `--local` reads the copy on this machine, no network: the framework polls.
+ * `--local` reads the copy on this machine, no network: OpenAgent polls.
  *
- * That is the whole contract. Writing the queue is not the framework's: a module the queue package
- * brings acts on it through its own command (`@openagt/dashboard/module`'s link actions), and the framework
+ * That is the whole contract. Writing the queue is not OpenAgent's: a module the queue package
+ * brings acts on it through its own command (`@openagt/dashboard/module`'s link actions), and OpenAgent
  * only re-reads.
  *
  * The shape, owned here: an entry is one string, the task a future agent is started with, as the
@@ -22,7 +22,7 @@ import { providedCommand } from '../built-in.js'
  * how a dashboard reads that is the queue package's module's.
  */
 
-/** A project's queue: what a provider answers, read by the framework. */
+/** A project's queue: what a provider answers, read by OpenAgent. */
 export interface QueueSource {
   /** The open entries, in order of work; `[]` when none can be read. */
   list(): Promise<string[]>
@@ -89,7 +89,7 @@ export function providedQueue(now: () => number = Date.now): QueueReader {
   return Object.assign(reader, { changed: (root: string) => sources.get(root)?.source?.drop() })
 }
 
-/** The framework's one reader of the queue, shared by every caller so they share its cache. */
+/** OpenAgent's one reader of the queue, shared by every caller so they share its cache. */
 export const projectQueue: QueueReader = providedQueue()
 
 /** A {@link QueueFor} for a project with no provider: no queue. */

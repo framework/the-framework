@@ -2,7 +2,7 @@ The world the backend end-to-end stories run in: one daemon runtime per story, i
 
 ## Glossary
 
-[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [2] start hook / resume hook: the one shell line under `start`, and the one under `resume`, in a project's `.openagent/hooks.yml`; each answers the agent's id as JSON on stdout.
 [3] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [4] registry: `~/.openagent.json`, the file that lists the projects and keeps the user's preferences.

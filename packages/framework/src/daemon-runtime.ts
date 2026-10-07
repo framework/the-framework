@@ -2,7 +2,7 @@ import { resolve } from 'node:path'
 import { hostname } from 'node:os'
 import { stat } from 'node:fs/promises'
 import { fromDiaryLine, isPidAlive, projectBranches, readLiveMetas, resolveAgentDiary, type AgentMeta, type AnyDiaryLine } from './store/index.js'
-import type { FrameworkEvent } from './events.js'
+import type { OpenAgentEvent } from './events.js'
 import type { StartAgentOptions, StartAgentResult, AddProjectResult, RemoveProjectResult } from './dashboard/index.js'
 import type { EventsSource, RemoteAgents } from './dashboard/rpc-serve.js'
 import { RelayedAgents, startRemoteAgent } from './dashboard/remote-run.js'
@@ -45,7 +45,7 @@ export interface ProjectRuntime {
   remoteEventsSource: EventsSource
   /** Tail a relay-started agent's on-disk events (#1067): the daemon's `/_relay/events` endpoint uses
    *  it to stream one agent back to whichever daemon relayed it here. */
-  tailRelayEvents: (agentId: string, onEvent: (event: FrameworkEvent) => void) => () => void
+  tailRelayEvents: (agentId: string, onEvent: (event: OpenAgentEvent) => void) => () => void
   /** The relayed-agent lookup the dashboard's read RPCs consult (#1067 slice 2): which device a remote
    *  run runs on, so a run-scoped RPC forwards there instead of resolving a local checkout. */
   remoteAgents: RemoteAgents
@@ -154,7 +154,7 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
     // Each package that writes hook lines writes its own (the built-in runner's start, resume and
     // check among them), so the new project starts an agent with nothing typed by hand. A writer
     // keeps every line already there, so adding a project again only fills what is missing.
-    for (const failed of await writeHookLines(abs)) console.log(`[framework] hook lines (${abs}): ${failed}`)
+    for (const failed of await writeHookLines(abs)) console.log(`[openagent] hook lines (${abs}): ${failed}`)
     await addProject(abs, new Date().toISOString()).catch(() => {})
     // The project's open hooks (#1774): a project added while the daemon runs is a project the
     // boot never saw, so its open lines run now, the way they would have at boot.
@@ -205,7 +205,7 @@ export function createProjectRuntime({ cwd, env }: ProjectRuntimeOptions): Proje
   // Tail a relay-started run's own log (#1067) for the `/_relay/events` endpoint: the diary the
   // run's tool keeps, its lines turned into events. The relocating tail, for the same reason as
   // the dashboard's onEvents: the diary becomes the finished run's when the run ends.
-  const tailRelayEvents = (agentId: string, onEvent: (event: FrameworkEvent) => void): (() => void) =>
+  const tailRelayEvents = (agentId: string, onEvent: (event: OpenAgentEvent) => void): (() => void) =>
     tailAgentEvents<AnyDiaryLine>(() => resolveAgentDiary(cwd, agentId), line => {
       const event = fromDiaryLine(line)
       if (event) onEvent(event)

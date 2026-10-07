@@ -1,6 +1,6 @@
 # @openagt/dashboard
 
-**The Framework** — autonomous AI programming: humans make the important decisions
+**OpenAgent** — autonomous AI programming: humans make the important decisions
 while coding agents run unattended.
 
 You register your repos. From then on, agents work on them: each agent gets a throwaway
@@ -36,7 +36,7 @@ the command cannot start one at all.
 
 ## How it works
 
-The Framework runs no coding agent and makes no model call. Starting an agent is running
+OpenAgent runs no coding agent and makes no model call. Starting an agent is running
 **one shell line the project itself names** — its `start` hook, in the project's own
 `.openagent/hooks.yml`:
 
@@ -104,8 +104,8 @@ needs only its lines carried home.
 - **An agent is one task being worked**, in its own checkout on its own branch. You can watch
   it, answer its questions, and say more to it — or not be there at all.
 - **What you can ask for is your project's own commands**: its skills, read from
-  `.claude/skills/` and `.agents/skills/`, plus free text and the prompts you save. The
-  Framework ships no prompt text.
+  `.claude/skills/` and `.agents/skills/`, plus free text and the prompts you save.
+  OpenAgent ships no prompt text.
 - **Work leaves as a pull request**, opened by the agent itself. An agent that committed
   nothing publishes nothing.
 

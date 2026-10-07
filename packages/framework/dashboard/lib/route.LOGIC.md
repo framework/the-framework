@@ -42,7 +42,7 @@ The path is split on `/` and read segment by segment:
 - `/settings` is Settings [6], which belongs to no project.
 - `/<word>`, where the word is a lowercase letter followed by lowercase letters and digits, is the page a module [8] adds under that word, with no project and no agent selected; the segments after it are the page's own, decoded. Which module, if any, claims the word is not the address's business: the shell decides, and says "No such page" when none does.
 - `/<project id>` is the project's home [4].
-- `/<project id>/<agent id>` is the agent view [5] of one agent. The second segment is the agent id [2] — never the id of the agent's driver session [7], because only the agent id is The Framework's own, stable, and already the name of the agent's checkout directory.
+- `/<project id>/<agent id>` is the agent view [5] of one agent. The second segment is the agent id [2] — never the id of the agent's driver session [7], because only the agent id is OpenAgent's own, stable, and already the name of the agent's checkout directory.
 
 ### Reserved words never collide with ids
 

@@ -68,7 +68,7 @@ Queuing an answer [3] for a session:
 - must name only labels of the parked question's options, each at most once, else "every label must be one of the question options";
 - must name exactly one label unless the question is multi-select, else "pick exactly one option"; a multi-select takes any subset, including none.
 
-The answer's text is worded as a local agent's answer is (`agent-driver`'s continuation prompt): `You paused to ask: "<title>". The user chose: <labels, comma-separated>. Continue with that decision.`, with "(none)" for an empty multi-select. When any picked option is marked as stopping the session, the text is instead `You paused to ask: "<title>". The user chose: <labels>. Stop here: the user is taking over and will come back with fresh instructions.` — nothing of The Framework's can end a session on claude.ai, so the session is told the user is taking over. Every queued answer gets its own id and the time it was queued, and it replaces whatever answer the session had, a failed one included.
+The answer's text is worded as a local agent's answer is (`agent-driver`'s continuation prompt): `You paused to ask: "<title>". The user chose: <labels, comma-separated>. Continue with that decision.`, with "(none)" for an empty multi-select. When any picked option is marked as stopping the session, the text is instead `You paused to ask: "<title>". The user chose: <labels>. Stop here: the user is taking over and will come back with fresh instructions.` — nothing of OpenAgent's can end a session on claude.ai, so the session is told the user is taking over. Every queued answer gets its own id and the time it was queued, and it replaces whatever answer the session had, a failed one included.
 
 ### Withdrawal until collected
 

@@ -1,4 +1,4 @@
-// The Framework's mark (#757): the hexknot from https://brillout.github.io/brand-the-framework/.
+// OpenAgent's mark (#757): the hexknot from https://brillout.github.io/brand-the-framework/.
 //
 // Six strands, each a flat fill in a neutral ramp. The fills are CSS variables rather than the
 // literal hex values so the mark survives a dark background: the shipped ramp runs neutral-950 ->

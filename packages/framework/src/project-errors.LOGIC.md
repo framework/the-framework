@@ -66,7 +66,7 @@ A project's errors are listed oldest first. The dashboard reads them from the pr
 
 #### Business logic
 
-When that sync fails, the `data-sync` error is recorded with the sync's own error text, and the same text goes to the daemon's log as "[framework] data sync: <error>". A branch that stays on this machine (no remote, or records the person keeps here) is a sync that succeeds. When the sync succeeds, the error is cleared unconditionally, so it lives exactly as long as the condition: the next tick [4] after the user fixes the remote, it is gone. Its headline in the dashboard is "Not syncing with the remote".
+When that sync fails, the `data-sync` error is recorded with the sync's own error text, and the same text goes to the daemon's log as "[openagent] data sync: <error>". A branch that stays on this machine (no remote, or records the person keeps here) is a sync that succeeds. When the sync succeeds, the error is cleared unconditionally, so it lives exactly as long as the condition: the next tick [4] after the user fixes the remote, it is gone. Its headline in the dashboard is "Not syncing with the remote".
 
 ### The local only note
 
@@ -82,8 +82,8 @@ Every sync hands over how far the branch reaches: a successful one as its pull a
 
 #### Context
 
-**Business logic story**: a project installs both a GitHub package and a GitLab package, each declaring it provides the git host. Nothing in The Framework picks one by dependency order; the project must say.
+**Business logic story**: a project installs both a GitHub package and a GitLab package, each declaring it provides the git host. Nothing in OpenAgent picks one by dependency order; the project must say.
 
 #### Business logic
 
-On the data sync's clock, for every kind of data The Framework reads through a provider, the daemon asks the shared library whether the provider is unsettled. When any kind is, the `provider` error is recorded with one line per such kind, as the library words it: "<n> packages provide <kind>: <names>; name one under \"framework\" in package.json", or "package.json names <name> for <kind>, which does not provide it; the providers are <names>". When every kind is settled the error is cleared. Its headline in the dashboard is "Unsettled: which package provides the data".
+On the data sync's clock, for every kind of data OpenAgent reads through a provider, the daemon asks the shared library whether the provider is unsettled. When any kind is, the `provider` error is recorded with one line per such kind, as the library words it: "<n> packages provide <kind>: <names>; name one under \"openagent\" in package.json", or "package.json names <name> for <kind>, which does not provide it; the providers are <names>". When every kind is settled the error is cleared. Its headline in the dashboard is "Unsettled: which package provides the data".

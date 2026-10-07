@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { AgentMeta, FrameworkEvent } from '../../src/index.js'
+import type { AgentMeta, OpenAgentEvent } from '../../src/index.js'
 import { TriangleAlert } from 'lucide-react'
 import { EventList } from './EventList.js'
 import type { SessionSetup } from './SessionLine.js'
@@ -28,7 +28,7 @@ export function AgentFeed({
   onOpenAgent,
   onOpenChange,
 }: {
-  events: FrameworkEvent[]
+  events: OpenAgentEvent[]
   /** The feed's own project: with it, an answered question is its ✓ card and an open one is no
    *  row, since the agent's page asks it above the message box. Required, so no caller shows an
    *  open question as log text by leaving it out. */

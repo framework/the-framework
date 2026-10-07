@@ -9,7 +9,7 @@ Lists every open question [1] across all projects in one place, longest waiting 
 ## Glossary
 
 [1] open question: a question nobody has answered yet, as the dashboard lists them across projects.
-[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. The Framework starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
+[2] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch. OpenAgent starts none itself: the tool the project's start hook names runs it, and the dashboard shows it from the files that tool keeps.
 [3] question: what an agent's turn ended on, asking the user to choose between options; the agent ends `waiting`, its checkout kept, and the answer resumes it. A cloud session's question is the one the bridge reports.
 [5] cloud session: a Claude Code cloud session on claude.ai, the far end of a `web` agent.
 [6] the Claude web bridge (the bridge): the daemon's bridge endpoints plus the Chrome extension: carries the question a cloud session is parked on into the dashboard, and types the user's answer back into the session.

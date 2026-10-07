@@ -19,7 +19,7 @@ export const CLOUD_SESSION_WINDOW_MS = 12 * 60 * 60 * 1000
  * What the cloud side of a web run is doing.
  *
  * - `waiting`: the browser bridge holds a question the session is parked on
- * - `merged`: the session's work was adopted (#1601) and its pull request merged by the framework
+ * - `merged`: the session's work was adopted (#1601) and its pull request merged by OpenAgent
  * - `in-cloud`: no pull request yet and the run is inside the session window, so it may still be working
  * - `done`: its pull request exists — the work landed, and the PR badge carries its live state — or the
  *   window passed with nothing adopted: the session finished or never pushed

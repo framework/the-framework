@@ -33,6 +33,6 @@ test('dispatchRelayRpc runs a whitelisted rpc against the home id and returns it
   // No project is registered under this id, so onGitStatus resolves no checkout and returns null - proof
   // the call reached the whitelisted impl with the home id (the caller's arg[0] project id is dropped).
   provideTestContext()
-  const result = await dispatchRelayRpc('the-framework:no-such-home', 'onGitStatus', ['remote-project-id', 'run-1'])
+  const result = await dispatchRelayRpc('openagent:no-such-home', 'onGitStatus', ['remote-project-id', 'run-1'])
   assert.equal(result, null)
 })

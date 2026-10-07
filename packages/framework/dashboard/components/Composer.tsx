@@ -36,7 +36,7 @@ import { cn } from '../lib/utils.js'
 // the trigger says so rather than naming the first model as if it had been chosen.
 // The drivers and their models are the list Settings offers too (`lib/models.ts` driverOptions):
 // what each coding agent answered when the daemon asked, so the menu offers what the agent's own
-// picker offers, by the agent's own names. Only the icons are this component's own, and the Record<DriverName, ...> shape means a new agent framework-side is
+// picker offers, by the agent's own names. Only the icons are this component's own, and the Record<DriverName, ...> shape means a new agent on OpenAgent's side is
 // a compile error here rather than a silently missing menu entry.
 const DRIVER_UI: Record<DriverName, { icon: DriverOption['icon'] }> = {
   'claude-code': { icon: <ClaudeLogo className="h-4 w-4" /> },

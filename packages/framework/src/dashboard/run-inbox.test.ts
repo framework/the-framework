@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { addWorktree, agentBranchName, worktreePath } from '@openagt/skill-branches'
 import { nodeGitRunner } from '@openagt/agent-data'
 import { linkBranchesProvider } from '../store/test-branches.js'
-import { OPENAGENT_DIR } from '../framework-dir.js'
+import { OPENAGENT_DIR } from '../openagent-dir.js'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { RUN_INBOX_FILE, sayToRun } from './run-inbox.js'
 
@@ -15,7 +15,7 @@ import { RUN_INBOX_FILE, sayToRun } from './run-inbox.js'
 const RUN = '2026-07-19T10-00-00-000Z'
 
 test('a line written to a run that ended meanwhile is taken back out of the inbox and resumes the run instead (#1774)', async () => {
-  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-run-inbox-')))
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'openagent-run-inbox-')))
   const checkout = worktreePath(cwd, RUN)
   const inbox = join(checkout, OPENAGENT_DIR, RUN_INBOX_FILE)
   try {

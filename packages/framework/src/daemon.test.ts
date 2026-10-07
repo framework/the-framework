@@ -33,9 +33,9 @@ async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done:
   )
   return { done, state: await listening }
 }
-import { OPENAGENT_DIR } from './framework-dir.js'
+import { OPENAGENT_DIR } from './openagent-dir.js'
 import { projectId, listProjects, addProject } from './registry.js'
-import { gitignorePath, frameworkGitignore } from './framework-gitignore.js'
+import { gitignorePath, openagentGitignore } from './openagent-gitignore.js'
 
 // The dashboard steers + starts over the daemon's in-process RPC mount (#405/#426), not the
 // retired per-read HTTP routes. Post to `/_rpc/<name>` (same-origin) and return the unwrapped `ret`.
@@ -60,11 +60,11 @@ const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(r
 /** Fake an activated workspace: the install-written ignore file is the activation marker (#1600). */
 async function activate(cwd: string): Promise<void> {
   await mkdir(join(cwd, OPENAGENT_DIR), { recursive: true })
-  await writeFile(gitignorePath(cwd), frameworkGitignore())
+  await writeFile(gitignorePath(cwd), openagentGitignore())
 }
 
 async function tmpWorkspace(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-daemon-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'openagent-daemon-'))
   await activate(cwd)
   return cwd
 }
@@ -107,7 +107,7 @@ test('runDaemon serves the dashboard, and shuts down when the signal aborts', as
 })
 
 test('runDaemon comes up on a fresh workspace with no .openagent yet', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-daemon-')) // deliberately no mkdir
+  const cwd = await mkdtemp(join(tmpdir(), 'openagent-daemon-')) // deliberately no mkdir
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
@@ -149,11 +149,11 @@ test("a project's open hooks run once the dashboard listens, its close hooks at 
     assert.equal(await readFile(join(cwd, 'hooks.log'), 'utf8'), `open-1\n${cwd}\nopen-2\nclose\n`)
     const hookLines = logged.filter(l => l.includes(' hook ('))
     assert.deepEqual(hookLines, [
-      `[framework] open hook (${basename(cwd)}): echo open-1 >> hooks.log: exit 0`,
-      `[framework] open hook (${basename(cwd)}): pwd -P >> hooks.log: exit 0`,
-      `[framework] open hook (${basename(cwd)}): exit 3: exit 3`,
-      `[framework] open hook (${basename(cwd)}): echo open-2 >> hooks.log: exit 0`,
-      `[framework] close hook (${basename(cwd)}): echo close >> hooks.log: exit 0`,
+      `[openagent] open hook (${basename(cwd)}): echo open-1 >> hooks.log: exit 0`,
+      `[openagent] open hook (${basename(cwd)}): pwd -P >> hooks.log: exit 0`,
+      `[openagent] open hook (${basename(cwd)}): exit 3: exit 3`,
+      `[openagent] open hook (${basename(cwd)}): echo open-2 >> hooks.log: exit 0`,
+      `[openagent] close hook (${basename(cwd)}): echo close >> hooks.log: exit 0`,
     ])
   } finally {
     console.log = original

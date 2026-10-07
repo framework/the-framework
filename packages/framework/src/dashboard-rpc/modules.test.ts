@@ -42,7 +42,7 @@ else console.log(JSON.stringify(read()))`,
 }
 
 test('the dashboard\'s modules are every registered project\'s, one per package, and a module runs only its own package\'s commands', async () => {
-  const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-modules-rpc-')))
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'openagent-modules-rpc-')))
   const previous = process.env.XDG_CONFIG_HOME
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
   try {
@@ -74,8 +74,8 @@ test('the dashboard\'s modules are every registered project\'s, one per package,
   }
 })
 
-test('a module\'s command may write what the framework reads through a provider: the next read sees it, not a cached copy (#1774)', async () => {
-  const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-modules-rpc-')))
+test('a module\'s command may write what OpenAgent reads through a provider: the next read sees it, not a cached copy (#1774)', async () => {
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'openagent-modules-rpc-')))
   const previous = process.env.XDG_CONFIG_HOME
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
   try {
@@ -86,7 +86,7 @@ test('a module\'s command may write what the framework reads through a provider:
     const queue = (await projectQueue(a))!
     assert.deepEqual(await queue.list(), [], 'read once: cached for the window')
     assert.deepEqual(await runModuleCommand(projectId(a), 'queue', ['add', 'ship it']), { ok: true, output: { ok: true } })
-    assert.deepEqual(await queue.list(), ['ship it'], 'the module wrote through its command, and the framework forgot its read')
+    assert.deepEqual(await queue.list(), ['ship it'], 'the module wrote through its command, and OpenAgent forgot its read')
   } finally {
     if (previous === undefined) delete process.env.XDG_CONFIG_HOME
     else process.env.XDG_CONFIG_HOME = previous
@@ -95,7 +95,7 @@ test('a module\'s command may write what the framework reads through a provider:
 })
 
 test('a module reads through its own server part, in its own project; nothing else is read', async () => {
-  const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-modules-read-')))
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'openagent-modules-read-')))
   const previous = process.env.XDG_CONFIG_HOME
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
   try {

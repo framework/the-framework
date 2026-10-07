@@ -6,7 +6,7 @@ The browser's typed stubs for what the dashboard asks the daemon about projects:
 [2] start hook: the one shell line under `start:` in the project's `.openagent/hooks.yml`, which starts an agent.
 [3] launcher: the Start form on a project's own page (the project home).
 [5] sweep: a background job the daemon runs on its clock: the data sync, the cloud scratch sweep, cloud work adoption.
-[7] git host provider: the package of the project that declares it provides the git host; The Framework opens and lands pull requests through the command that package declares. A project with none has no git host: no pull request can be opened for it.
+[7] git host provider: the package of the project that declares it provides the git host; OpenAgent opens and lands pull requests through the command that package declares. A project with none has no git host: no pull request can be opened for it.
 
 ## Business logic — TL;DR
 

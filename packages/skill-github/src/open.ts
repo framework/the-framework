@@ -4,8 +4,8 @@ import { armMerge, type MergeArming, type WatchStarter } from './merge.js'
 import { openRequestOf } from './requests.js'
 
 /**
- * Opening a pull request (#1820): the agent's own step after its branch is pushed, and the
- * framework's on a person's Open PR. The words are the caller's; a branch that already has an
+ * Opening a pull request (#1820): the agent's own step after its branch is pushed, and
+ * OpenAgent's on a person's Open PR. The words are the caller's; a branch that already has an
  * open request gets no second one, and only the merge arming happens. Pushing is not here: the
  * branches package pushes, this package asks GitHub.
  */

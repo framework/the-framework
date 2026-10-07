@@ -2,7 +2,7 @@ Runs one turn [1] of a coding agent [2] as one operating-system process, whichev
 
 ## Context
 
-**User story**: the user starts an agent [6] and follows it in the agent view as it works; when the user stops it, or closes The Framework with Ctrl-C, nothing of the coding agent [2] keeps running on the machine.
+**User story**: the user starts an agent [6] and follows it in the agent view as it works; when the user stops it, or closes OpenAgent with Ctrl-C, nothing of the coding agent [2] keeps running on the machine.
 
 **Problem**: a coding agent spawns a deep subtree of its own: worker processes, search tools, the shell commands it runs, MCP servers. Signaling only the top process orphans that subtree, which keeps burning CPU after the agent is gone, so a stop must reach the whole tree at once. And a coding agent that crashes mid-build has usually streamed text first, so streamed text alone must never count as a completed turn [1].
 
@@ -25,8 +25,8 @@ Runs one turn [1] of a coding agent [2] as one operating-system process, whichev
 - **A stop request kills the whole process tree** - a stop request [7] sends the whole process group a termination signal, then a forced kill 5 seconds later, and fails the turn as stopped; a stop request already raised before the turn starts fails it without spawning anything.
 - **Nothing is reported twice** - once a turn has been settled by a stop request or a spawn failure, the process's later exit produces no further progress event.
 - **A process that cannot start fails the turn** - a coding agent that cannot be started at all, because it is not installed, fails the turn with that error.
-- **A closed input pipe never crashes The Framework** - a coding agent that exits before reading its prompt breaks the input pipe; that error is swallowed, because the exit code already reports the failed turn.
-- **Every live process group is registered** - the group is registered with the registry in `child-registry.ts` while it runs, so a hard exit of The Framework still reaps it, and removed once it is gone.
+- **A closed input pipe never crashes OpenAgent** - a coding agent that exits before reading its prompt breaks the input pipe; that error is swallowed, because the exit code already reports the failed turn.
+- **Every live process group is registered** - the group is registered with the registry in `child-registry.ts` while it runs, so a hard exit of OpenAgent still reaps it, and removed once it is gone.
 
 ## Business logic
 
@@ -66,7 +66,7 @@ When the process exits with code zero and the driver's parser read no failure, t
 
 #### Context
 
-**User story**: the user presses Stop, or closes The Framework with Ctrl-C, and every process the coding agent [2] started is gone.
+**User story**: the user presses Stop, or closes OpenAgent with Ctrl-C, and every process the coding agent [2] started is gone.
 
 #### Business logic
 
@@ -92,11 +92,11 @@ A turn [1] settles exactly once. Once a stop request [7] or a spawn failure has 
 
 When the operating system cannot start the process at all, because the command is missing from `PATH` or cannot be executed, the turn [1] fails with the operating system's error. No `error` progress event [5] is reported for it; the failure itself carries the reason.
 
-### A closed input pipe never crashes The Framework
+### A closed input pipe never crashes OpenAgent
 
 #### Context
 
-**Problem**: a coding agent [2] that exits before reading its prompt, on a bad flag or an instant crash, breaks the pipe the prompt is being written to. Left unhandled, that broken pipe is an uncaught error in The Framework's own process, which would take the daemon and every running agent [6] down with it.
+**Problem**: a coding agent [2] that exits before reading its prompt, on a bad flag or an instant crash, breaks the pipe the prompt is being written to. Left unhandled, that broken pipe is an uncaught error in OpenAgent's own process, which would take the daemon and every running agent [6] down with it.
 
 #### Business logic
 
@@ -110,4 +110,4 @@ See `## Context`.
 
 #### Business logic
 
-As soon as the process has an id, its process group is registered with the registry in `child-registry.ts`, and it is removed from the registry once the process has exited, failed to start, or been killed. Between the two, a hard exit of The Framework's process force-kills the group on the way out.
+As soon as the process has an id, its process group is registered with the registry in `child-registry.ts`, and it is removed from the registry once the process has exited, failed to start, or been killed. Between the two, a hard exit of OpenAgent's process force-kills the group on the way out.

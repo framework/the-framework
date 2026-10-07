@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { readFile } from 'node:fs/promises'
-import { frameworkVersion, parseArgs, printStartupFooter, runCli, type CliIO } from './cli.js'
+import { openagentVersion, parseArgs, printStartupFooter, runCli, type CliIO } from './cli.js'
 
 function capture(): { io: CliIO; out: string[]; err: string[] } {
   const out: string[] = []
@@ -23,13 +23,13 @@ test('parseArgs keeps four options and no verbs (D4)', () => {
   assert.match(parseArgs(['--port', 'x']).error!, /--port/)
 })
 
-test('frameworkVersion reports the real package version, not the failed-read placeholder (#312)', async () => {
+test('openagentVersion reports the real package version, not the failed-read placeholder (#312)', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }
-  assert.equal(frameworkVersion(), pkg.version)
+  assert.equal(openagentVersion(), pkg.version)
   // The guard this test exists for: a failed read must not look like a plausible version. The
   // sentinel is `unknown` rather than `0.0.0` because the packages are unreleased and genuinely
   // versioned `0.0.0`, so a numeric fallback would be indistinguishable from a correct read.
-  assert.notEqual(frameworkVersion(), 'unknown')
+  assert.notEqual(openagentVersion(), 'unknown')
 })
 
 test('runCli --version prints the real version (#312)', async () => {
@@ -79,18 +79,18 @@ test('runCli rejects the retired flags and verbs as usage errors (D4/D4b)', asyn
 
 test('the startup footer prints the commands and the version (#312)', async () => {
   const { io, out } = capture()
-  await printStartupFooter(io, { fetchLatest: async () => frameworkVersion() })
+  await printStartupFooter(io, { fetchLatest: async () => openagentVersion() })
   assert.ok(out.includes('Type a prompt on the dashboard to start an agent, or use:'))
   assert.ok(out.includes('  openagent --help              All options'))
-  assert.ok(out.includes(`OpenAgent v${frameworkVersion()}`))
-  assert.ok(out.includes(`✅ Up to date (v${frameworkVersion()})`))
+  assert.ok(out.includes(`OpenAgent v${openagentVersion()}`))
+  assert.ok(out.includes(`✅ Up to date (v${openagentVersion()})`))
 })
 
 test('the footer offers no `openagent stop`: Ctrl-C is how the foreground dashboard ends (#312)', async () => {
   const { io, out } = capture()
   await printStartupFooter(io, { fetchLatest: async () => undefined })
   assert.ok(!out.some(l => l.includes('openagent stop')))
-  assert.ok(out.includes(`OpenAgent v${frameworkVersion()}`))
+  assert.ok(out.includes(`OpenAgent v${openagentVersion()}`))
 })
 
 test('the footer offers no positional build command: D4 removed it, and following it exited 2', async () => {
@@ -105,7 +105,7 @@ test('the version prints before npm answers, and a newer release is announced af
   const pending = printStartupFooter(io, { fetchLatest: () => new Promise<string>(resolve => (release = resolve)) })
   // The static half is out while the registry call is still in flight — bare `openagent` blocks on
   // the server forever, so anything held back until after the await would never be printed there.
-  assert.ok(out.includes(`OpenAgent v${frameworkVersion()}`))
+  assert.ok(out.includes(`OpenAgent v${openagentVersion()}`))
   assert.ok(!out.some(l => l.includes('Update available')))
   release('999.0.0')
   await pending
@@ -115,7 +115,7 @@ test('the version prints before npm answers, and a newer release is announced af
 test('an unreachable npm registry costs the footer nothing (#312)', async () => {
   const { io, out } = capture()
   await printStartupFooter(io, { fetchLatest: () => Promise.reject(new Error('offline')) })
-  assert.ok(out.includes(`OpenAgent v${frameworkVersion()}`))
+  assert.ok(out.includes(`OpenAgent v${openagentVersion()}`))
   assert.ok(!out.some(l => l.includes('Up to date') || l.includes('Update available')))
 })
 

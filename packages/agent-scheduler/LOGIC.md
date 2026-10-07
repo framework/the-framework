@@ -29,8 +29,8 @@ The `@openagt/agent-scheduler` package: a standalone tool, like `@openagt/agent-
 
 ## Business logic — TL;DR
 
-- **The executable** (`bin/`) - `agent-scheduler`, the one command line: `tick`, `init`, `start`, `stop [--unless-keep-alive]`, `status`, `model`, `offset`, `switch`, `publish`; JSON on stdout, one line for a person on stderr, exit 0, 1 or 2. Running, continuing and checking one run are `agent-runner`'s command line.
-- **The rules and the processes** (`src/`) - the schedule's lines and the due rule, the state, the spend boundary, a command's runs counted across machines off the run records, the tick's decisions, the scheduler's process, the dashboard's `open` and `close` hooks written by `init`, and the command line; told in `src/LOGIC.md`.
+- **The executable** (`bin/`) - `agent-scheduler`, the one command line: `tick`, `init`, `start`, `stop [--unless-keep-alive]`, `status`, `model`, `offset`, `switch`, `publish`, `cleanup`; JSON on stdout, one line for a person on stderr, exit 0, 1 or 2. Running, continuing and checking one run are `agent-runner`'s command line.
+- **The rules and the processes** (`src/`) - the schedule's lines and the due rule, the state, the spend boundary, a command's runs counted across machines off the run records, the tick's decisions, the scheduler's process, the dashboard's `open` and `close` hooks written by `init`, what the tool left in a project removed by `cleanup` (the state file and the scheduler's log, then `.agent-scheduler/` once it is empty, then the rule hiding it from git), and the command line; told in `src/LOGIC.md`.
 - **The dashboard part** (`dashboard/`) - the package's module [18]: the Settings page's Scheduler section (the spend cushion, and a switch and a publish menu per scheduled command), the Overview's Scheduler card (each project's scheduler and its last tick), and the usage bar's stop line (the spend cushion as a handle); told in `dashboard/LOGIC.md`.
 
 ## Business logic

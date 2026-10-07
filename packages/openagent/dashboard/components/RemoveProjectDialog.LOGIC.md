@@ -8,7 +8,7 @@ The dialog behind "Remove project…" in the project's "⋮" menu (`AgentActions
 
 ## Glossary
 
-[1] OpenAgent's files: what the product and its tools left in a project's folder: the directories `.openagent`, `.branches` and `.agent-runner`, and the local branch `agent-data` with the agents' records.
+[1] OpenAgent's files: what the product and its tools left in a project's folder: the directories `.openagent`, `.branches` and `.agent-runner`, the local branch `agent-data` with the agents' records, and what a tool the project has installed keeps there (the scheduler's `.agent-scheduler`, the subagent settings in `.orchestration`).
 [2] report: the daemon's answer to a removal with files, three lists in words for a person: what was removed, what was kept with the reason, and what could not be done (`src/remove-files.ts`).
 
 ## Business logic — TL;DR
@@ -45,9 +45,9 @@ Ticked, the body no longer says that nothing is deleted. It reads "It leaves the
 
 A panel appears under the box with three paragraphs:
 
-- "This deletes, on this machine: the agents' checkouts in .branches, the folders .openagent (with hooks.yml, the project's start lines) and .agent-runner, and the local branch agent-data."
+- "This deletes, on this machine: the agents' checkouts in .branches, the folders .openagent (with hooks.yml, the project's start lines) and .agent-runner, and the local branch agent-data. A tool the project has installed removes its own files too: the scheduler's state, the subagent settings."
 - "The agents' conversations go with that branch. If you never shared the records, this is their only copy. If you did, what has not reached the remote yet is lost. An agent that waits for your answer cannot be continued after this." The first sentence is in the stronger text color.
-- "It never touches the remote, your files, your commits, a branch with work on it, or a file git tracks. A checkout with uncommitted work stays, and so does .agent-runner/config.yml if you wrote one. A scheduler you set to keep running makes these files again. You see the list of what went and what stayed right after."
+- "It never touches the remote, your files, your commits, a branch with work on it, or a file git tracks. A checkout with uncommitted work stays, and so does .agent-runner/config.yml if you wrote one. A scheduler you set to keep running is not stopped: its files, the records and .openagent then stay. Stop it, add the folder again and remove it once more to delete them. You see the list of what went and what stayed right after."
 
 The confirm button then reads "Remove and delete" in place of "Remove". Unticking the box hides the panel and restores the first body and "Remove".
 

@@ -16,6 +16,9 @@
     "dist",
     "bin/agent-scheduler"
   ],
+  "openagent": {
+    "cleanup": "agent-scheduler"
+  },
   "bin": {
     "agent-scheduler": "bin/agent-scheduler"
   },

@@ -12,6 +12,7 @@ import type { CleanupReport } from './dashboard/types.js'
  *
  * - every tool that declares a `cleanup` command: asked to run it, and its answer passed on. One
  *   that refuses or fails ends the pass there: the records and the dashboard's directory stay.
+ *   The runner refuses while a run is alive, the scheduler while one set to keep running is.
  * - the agents' records: the `agent-data` checkout and local branch, and the person's answer to
  *   "share the records". Left alone when another project on the list is a checkout of the same
  *   repository, since the branch is the repository's and that project still reads it.

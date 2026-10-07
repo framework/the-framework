@@ -106,7 +106,8 @@ export function RemoveProjectDialog({
                   <p>
                     This deletes, on this machine: the agents&rsquo; checkouts in <span className={name}>.branches</span>, the folders{' '}
                     <span className={name}>.openagent</span> (with <span className={name}>hooks.yml</span>, the project&rsquo;s start lines) and{' '}
-                    <span className={name}>.agent-runner</span>, and the local branch <span className={name}>agent-data</span>.
+                    <span className={name}>.agent-runner</span>, and the local branch <span className={name}>agent-data</span>. A tool the
+                    project has installed removes its own files too: the scheduler&rsquo;s state, the subagent settings.
                   </p>
                   <p className="mt-2">
                     <span className={name}>The agents&rsquo; conversations go with that branch.</span> If you never shared the records, this is
@@ -116,7 +117,8 @@ export function RemoveProjectDialog({
                   <p className="mt-2">
                     It never touches the remote, your files, your commits, a branch with work on it, or a file git tracks. A checkout with
                     uncommitted work stays, and so does <span className={name}>.agent-runner/config.yml</span> if you wrote one. A scheduler
-                    you set to keep running makes these files again. You see the list of what went and what stayed right after.
+                    you set to keep running is not stopped: its files, the records and <span className={name}>.openagent</span> then stay.
+                    Stop it, add the folder again and remove it once more to delete them. You see the list of what went and what stayed right after.
                   </p>
                 </div>
               )}

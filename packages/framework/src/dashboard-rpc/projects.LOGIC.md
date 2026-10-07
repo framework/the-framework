@@ -21,7 +21,7 @@ Everything the dashboard asks the daemon about projects [1]: the list of registe
 
 - **The projects list carries what is wrong with each project** - every registered project [1] comes back with its identity and, when there is one, the fault the daemon's background work recorded against it.
 - **Adding a project** - a path is registered only after it has been installed as a project; an empty path is refused outright; the add carries the person's answer on sharing the agents' records, and anything but a plain yes is a no.
-- **Removing a project** - the project is named by its id and the removal is the daemon's; an empty id is refused outright; the daemon's answer, a refusal included, is the answer.
+- **Removing a project** - the project is named by its id and the removal is the daemon's; an empty id is refused outright; the removal says whether OpenAgent's files in the folder go too, and anything but a plain yes is a no; the daemon's answer, a refusal included, is the answer.
 - **Where a project's records go, and the switch** - a read answers whether the project's `agent-data` branch [5] reaches the remote, has no remote, or is kept on this machine; turning sharing on sends what is there at once, and a remote that refuses turns it back off and is told in its words; a project with no remote is refused; turning it off just stops.
 - **The folder dialog is the daemon's** - the machine's own choose-a-folder dialog is opened by the daemon, because a browser cannot learn an absolute path; dismissing it is an ordinary answer, not a failure.
 - **The onboarding's first suggestion** - the directory the daemon was started in is offered as the first project, together with whether it is already registered.
@@ -62,13 +62,13 @@ A host that has no ability to add projects at all fails this call outright rathe
 
 #### Context
 
-**User story**: in a project's menu the user picks "Remove project…" and confirms (`../../dashboard/components/AgentActionsMenu.tsx`); the project [1] leaves the list and nothing in its folder is deleted.
+**User story**: in a project's menu the user picks "Remove project…" and confirms (`../../dashboard/components/AgentActionsMenu.tsx`); the project [1] leaves the list and nothing in its folder is deleted. When they ticked "Also delete OpenAgent's files in this folder" in that dialog (`../../dashboard/components/RemoveProjectDialog.tsx`), what the product and its tools left in the folder is deleted too, and the dialog lists what went and what stayed.
 
 **Problem**: removing is the daemon's to do, like adding: it runs the project's `close` hooks and writes the registry. And a project whose folder was deleted must still be removable, so a removal cannot name the project by its folder.
 
 #### Business logic
 
-Removing takes the project's id, not its path. An empty id is refused with "a project id is required" before the daemon is asked. Otherwise the daemon removes the project (`../daemon-runtime.ts`) and its answer is the answer: removed, or the reason it was not, for instance "An agent is working in this project. Stop it, then remove the project."
+Removing takes the project's id, not its path, and whether OpenAgent's files in its folder go too. An empty id is refused with "a project id is required" before the daemon is asked. The files are asked for only when the call says exactly yes; anything else is a no, so a call that is unclear deletes nothing. Otherwise the daemon removes the project (`../daemon-runtime.ts`) and its answer is the answer: removed, or the reason it was not, for instance "An agent is working in this project. Stop it, then remove the project." A removal with the files answers, with the success, what was removed, what was kept with the reason, and what could not be done (`../remove-files.ts`).
 
 A host that has no ability to remove projects at all fails this call outright, as for adding.
 

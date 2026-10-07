@@ -39,7 +39,7 @@ export interface DashboardOptions {
    */
   onAddProject: (path: string, share: boolean) => Promise<AddProjectResult> | AddProjectResult
   /** Called when the browser removes a project: the `sendRemoveProject` RPC reaches this through the wired dashboard context. */
-  onRemoveProject: (projectId: string) => Promise<RemoveProjectResult> | RemoveProjectResult
+  onRemoveProject: (projectId: string, files: boolean) => Promise<RemoveProjectResult> | RemoveProjectResult
   /**
    * The user-preferences store (#410): the `onPreferences` / `savePreferences` RPCs read and
    * write it through the wired dashboard context.

@@ -3,7 +3,7 @@ import type { GitHostHome, FrameworkEvent, RepositoryOffer, RecordsReach } from 
 import { sessionInfo } from '../../src/client.js'
 import { MoreVertical, ChevronDown, FolderOpen, Code, Check, ExternalLink, Square, FolderX, Trash2, Copy, CloudUpload, CloudOff, Info } from 'lucide-react'
 import { onGitHostHome, onRepositoryOffer } from '../rpc/reads.js'
-import { onRecordsReach, sendRemoveProject, sendShareRecords } from '../rpc/projects.js'
+import { onRecordsReach, sendShareRecords } from '../rpc/projects.js'
 import {
   sendOpenInApp,
   sendStop,
@@ -19,6 +19,7 @@ import { buildResumeCommand } from '../lib/resume-command.js'
 import { buttonVariants } from './ui/button.js'
 import { PreferredEditorItems } from './PreferredEditorItems.js'
 import { ConfirmDialog } from './ui/confirm-dialog.js'
+import { RemoveProjectDialog } from './RemoveProjectDialog.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
   DropdownMenu,
@@ -346,26 +347,7 @@ export function AgentActionsMenu({
         />
       )}
       {onProjectRemoved && !agentId && (
-        <ConfirmDialog
-          open={confirmRemove}
-          onOpenChange={setConfirmRemove}
-          title="Remove this project?"
-          body={
-            <>
-              It leaves the dashboard&rsquo;s list, and its scheduler stops unless you set it to keep running. Nothing in the folder is deleted:
-              your files and your commits stay, and so do OpenAgent&rsquo;s own files there (
-              <span className="font-medium text-foreground">.openagent</span>, <span className="font-medium text-foreground">.branches</span>,{' '}
-              <span className="font-medium text-foreground">.agent-runner</span> and the branch{' '}
-              <span className="font-medium text-foreground">agent-data</span> with the agents&rsquo; records). Add the folder again to bring
-              the project back.
-            </>
-          }
-          confirmLabel="Remove"
-          confirmBusyLabel="Removing…"
-          fallbackError="Could not remove the project."
-          onConfirm={() => sendRemoveProject(projectId)}
-          onSuccess={onProjectRemoved}
-        />
+        <RemoveProjectDialog projectId={projectId} open={confirmRemove} onOpenChange={setConfirmRemove} onRemoved={onProjectRemoved} />
       )}
       {onDeleted && agentId && (
         <ConfirmDialog

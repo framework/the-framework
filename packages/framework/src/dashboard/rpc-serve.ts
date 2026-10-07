@@ -22,8 +22,8 @@ export type StartAgentHandler = (
 /** Wired by the daemon so `sendAddProject` can install + register a repo (#433). */
 export type AddProjectHandler = (path: string, share: boolean) => AddProjectResult | Promise<AddProjectResult>
 
-/** Wired by the daemon so `sendRemoveProject` can take a project off the list, by its id. */
-export type RemoveProjectHandler = (projectId: string) => RemoveProjectResult | Promise<RemoveProjectResult>
+/** Wired by the daemon so `sendRemoveProject` can take a project off the list, by its id, and with `files` remove what OpenAgent left in its folder. */
+export type RemoveProjectHandler = (projectId: string, files: boolean) => RemoveProjectResult | Promise<RemoveProjectResult>
 
 /** Resolve an agent to its live event stream: the relay feeds `onEvents` from its own in-memory stream
  * rather than a file on disk (#426), and the daemon feeds an agent it is relaying from a device (#1067).

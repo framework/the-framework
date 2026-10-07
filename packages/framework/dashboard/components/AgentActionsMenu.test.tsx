@@ -12,7 +12,7 @@ const sendRemoveWorktree = vi.fn(async () => ({ ok: true as const }))
 const sendDeleteAgent = vi.fn(async () => ({ ok: true as const }))
 const onRecordsReach = vi.fn(async () => null as 'origin' | 'no-remote' | 'kept' | null)
 const sendShareRecords = vi.fn(async () => ({ ok: true }) as unknown)
-const sendRemoveProject = vi.fn(async (_projectId: string) => ({ ok: true }) as unknown)
+const sendRemoveProject = vi.fn(async (_projectId: string, _files: boolean) => ({ ok: true }) as unknown)
 vi.mock('../rpc/reads.js', () => ({ onGitHostHome, onRepositoryOffer }))
 vi.mock('../rpc/projects.js', () => ({ onRecordsReach, sendShareRecords, sendRemoveProject }))
 vi.mock('../rpc/control.js', () => ({
@@ -394,10 +394,73 @@ describe('Remove project, in the project’s menu', () => {
     expect(dialog.textContent).toMatch(/Nothing in the folder is deleted/)
     for (const kept of ['.openagent', '.branches', '.agent-runner', 'agent-data']) expect(dialog.textContent).toContain(kept)
     expect(dialog.textContent).toMatch(/Add the folder again to bring\s+the project back/)
+    // The box is there, not ticked, and what it would delete is not said until it is.
+    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false')
+    expect(dialog.textContent).toContain('Also delete OpenAgent’s files in this folder')
+    expect(dialog.textContent).not.toMatch(/This deletes/)
     expect(sendRemoveProject).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
-    await waitFor(() => expect(sendRemoveProject).toHaveBeenCalledWith('p1'))
+    await waitFor(() => expect(sendRemoveProject).toHaveBeenCalledWith('p1', false))
     await waitFor(() => expect(onProjectRemoved).toHaveBeenCalledTimes(1))
+  })
+
+  test('with the box ticked it says what goes and what never does, removes with the files, and shows what went and what stayed before the page is told', async () => {
+    onRecordsReach.mockResolvedValue(null)
+    sendRemoveProject.mockClear()
+    sendRemoveProject.mockResolvedValue({
+      ok: true,
+      cleanup: {
+        removed: ['.branches/agent-data', 'branch agent-data', '.openagent'],
+        kept: [{ path: '.branches/agent-1', reason: 'agent-1 has uncommitted work; the checkout was kept' }],
+        failed: ['my-tool: took too long'],
+      },
+    })
+    const onProjectRemoved = vi.fn()
+    render(<AgentActionsMenu projectId="p1" events={[]} onProjectRemoved={onProjectRemoved} />)
+    openProjectMenu()
+    fireEvent.click(await screen.findByText('Remove project…'))
+    fireEvent.click(await screen.findByRole('checkbox'))
+    const dialog = screen.getByRole('alertdialog')
+    await waitFor(() => expect(dialog.textContent).toMatch(/This deletes, on this machine/))
+    expect(dialog.textContent).not.toMatch(/Nothing in the folder is deleted/)
+    expect(dialog.textContent).toMatch(/Your files and your commits stay\./)
+    expect(dialog.textContent).toMatch(/hooks\.yml, the project’s start lines/)
+    expect(dialog.textContent).toMatch(/An agent that waits for your answer cannot be\s+continued after this/)
+    expect(dialog.textContent).toMatch(/A scheduler\s+you set to keep running makes these files again/)
+    expect(dialog.textContent).toMatch(/The agents’ conversations go with that branch/)
+    expect(dialog.textContent).toMatch(/this is\s+their only copy/)
+    expect(dialog.textContent).toMatch(/It never touches the remote, your files, your commits, a branch with work on it, or a file git tracks/)
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove and delete' }))
+    await waitFor(() => expect(sendRemoveProject).toHaveBeenCalledWith('p1', true))
+
+    await waitFor(() => expect(screen.getByText('Project removed')).toBeTruthy())
+    const report = screen.getByRole('alertdialog').textContent ?? ''
+    for (const line of ['Deleted', '.branches/agent-data', 'branch agent-data', '.openagent', 'Kept', '.branches/agent-1: agent-1 has uncommitted work; the checkout was kept', 'Could not be cleaned', 'my-tool: took too long']) {
+      expect(report).toContain(line)
+    }
+    // The page moves on only once the person has read it.
+    expect(onProjectRemoved).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(onProjectRemoved).toHaveBeenCalledTimes(1))
+  })
+
+  test('a box ticked and then cancelled is unticked the next time the dialog opens', async () => {
+    onRecordsReach.mockResolvedValue(null)
+    sendRemoveProject.mockClear()
+    render(<AgentActionsMenu projectId="p1" events={[]} onProjectRemoved={vi.fn()} />)
+    openProjectMenu()
+    fireEvent.click(await screen.findByText('Remove project…'))
+    fireEvent.click(await screen.findByRole('checkbox'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Remove and delete' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    openProjectMenu()
+    fireEvent.click(await screen.findByText('Remove project…'))
+    expect((await screen.findByRole('checkbox')).getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeTruthy()
+    expect(sendRemoveProject).not.toHaveBeenCalled()
+    cleanup()
   })
 
   test('a refusal is said in the dialog and the page is not told; with nobody to tell, or in a session’s menu, it is not offered', async () => {

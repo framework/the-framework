@@ -20,8 +20,19 @@ export type AddProjectResult =
   | { ok: true; alreadyActivated: boolean; noRemote?: true }
   | { ok: false; error: string }
 
-/** The outcome of removing a project from the list: gone from it, or why not. */
-export type RemoveProjectResult = { ok: true } | { ok: false; error: string }
+/**
+ * What removing OpenAgent's files from a project's folder did: what went, what stayed with the
+ * reason, and what could not be done, each line in words for a person. Paths are from the
+ * project's root.
+ */
+export interface CleanupReport {
+  removed: string[]
+  kept: { path: string; reason: string }[]
+  failed: string[]
+}
+
+/** The outcome of removing a project from the list: gone from it, with what the clean-up did when one was asked for, or why not. */
+export type RemoveProjectResult = { ok: true; cleanup?: CleanupReport } | { ok: false; error: string }
 
 /**
  * What the Onboarding checklist (#958) needs and no other read carries: the server's own

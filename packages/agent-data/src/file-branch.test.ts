@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { spawn } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
@@ -11,6 +11,8 @@ import {
   fileBranchRepo,
   isGitLocked,
   branchReach,
+  clearSharing,
+  removeFileBranch,
   listBranchDir,
   openBranchReader,
   pullFileBranch,
@@ -671,5 +673,78 @@ test('a one-shot reader in a clone that keeps its records and never made the bra
   } finally {
     await cleanup()
     await rm(parent, RETRIED_RM)
+  }
+})
+
+const there = (path: string): Promise<boolean> => stat(path).then(() => true, () => false)
+const localBranches = async (repo: string): Promise<string[]> => (await git(['for-each-ref', '--format=%(refname:short)', 'refs/heads'], repo)).trim().split('\n')
+
+test('the branch taken off this machine: its checkout and the local branch go, origin keeps its copy, and what never reached origin goes with it', async () => {
+  const { repo, cleanup } = await initSyncedRepos()
+  try {
+    assert.deepEqual(await withFileBranch(repo, BRANCH, 'shared', async dir => writeFile(join(dir, 'a.md'), 'a\n')), { ok: true, changed: true, pushed: true })
+    const onOrigin = await git(['ls-remote', 'origin'], repo)
+    // Kept on this machine from here on: a commit origin never gets.
+    await writeSharing(repo, false)
+    assert.deepEqual(await withFileBranch(repo, BRANCH, 'local only', async dir => writeFile(join(dir, 'b.md'), 'b\n')), { ok: true, changed: true, pushed: false })
+
+    assert.match(await readFile(join(repo, '.git', 'info', 'exclude'), 'utf8'), /^\/\.branches$/m)
+    assert.deepEqual(await removeFileBranch(repo, BRANCH), { ok: true, removed: [`.branches/${BRANCH}`, `branch ${BRANCH}`, '.branches'], kept: [] })
+    assert.equal(await there(join(repo, '.branches')), false, 'the directory it made goes with its last checkout, the lock let go')
+    assert.doesNotMatch(await readFile(join(repo, '.git', 'info', 'exclude'), 'utf8'), /^\/\.branches$/m, 'and the rule that hid it')
+    assert.deepEqual(await localBranches(repo), ['main'])
+    assert.equal(await git(['ls-remote', 'origin'], repo), onOrigin, 'origin is as it was')
+    assert.equal((await git(['status', '--porcelain'], repo)).trim(), '')
+
+    // The person's answer is forgotten on its own call: sharing reads as off, set or not.
+    assert.equal(await clearSharing(repo), true)
+    assert.equal(await clearSharing(repo), false)
+    assert.equal(await readSharing(repo), false)
+  } finally {
+    await cleanup()
+  }
+})
+
+test('nothing to take off: a repository with neither the checkout nor the branch is not touched; a folder git does not know as the checkout stays', async () => {
+  const repo = await initRepo('file-branch-remove-none-')
+  try {
+    assert.deepEqual(await removeFileBranch(repo, BRANCH), { ok: true, removed: [], kept: [] })
+    assert.equal(await there(join(repo, '.branches')), false, 'not even the checkouts directory is made')
+
+    await mkdir(join(repo, '.branches', BRANCH), { recursive: true })
+    await writeFile(join(repo, '.branches', BRANCH, 'mine.md'), 'mine\n')
+    assert.deepEqual(await removeFileBranch(repo, BRANCH), { ok: true, removed: [], kept: [{ path: `.branches/${BRANCH}`, reason: 'not a checkout git knows' }] })
+    assert.equal(await readFile(join(repo, '.branches', BRANCH, 'mine.md'), 'utf8'), 'mine\n')
+  } finally {
+    await rm(repo, RETRIED_RM)
+  }
+})
+
+test('from a second checkout of the repository the branch is the repository\'s, and stays', async () => {
+  const repo = await initRepo('file-branch-remove-second-')
+  const second = join(await realpath(await mkdtemp(join(tmpdir(), 'file-branch-remove-wt-'))), 'wt')
+  try {
+    assert.equal((await withFileBranch(repo, BRANCH, 'a record', async dir => writeFile(join(dir, 'a.md'), 'a\n'))).ok, true)
+    await git(['worktree', 'add', '-b', 'other', second], repo)
+    assert.deepEqual(await removeFileBranch(second, BRANCH), { ok: true, removed: [], kept: [{ path: `branch ${BRANCH}`, reason: `it belongs to the repository at ${repo}` }] })
+    assert.equal(await readFile(join(repo, '.branches', BRANCH, 'a.md'), 'utf8'), 'a\n')
+    assert.ok((await localBranches(repo)).includes(BRANCH))
+  } finally {
+    await rm(dirname(second), RETRIED_RM)
+    await rm(repo, RETRIED_RM)
+  }
+})
+
+test('the checkouts directory stays, with its rule, while anything else is in it', async () => {
+  const repo = await initRepo('file-branch-remove-shared-dir-')
+  try {
+    assert.equal((await withFileBranch(repo, BRANCH, 'a record', async dir => writeFile(join(dir, 'a.md'), 'a\n'))).ok, true)
+    await git(['worktree', 'add', '-b', 'agent-1', join(repo, '.branches', 'agent-1')], repo)
+    assert.deepEqual(await removeFileBranch(repo, BRANCH), { ok: true, removed: [`.branches/${BRANCH}`, `branch ${BRANCH}`], kept: [] })
+    assert.equal(await there(join(repo, '.branches', 'agent-1')), true)
+    assert.match(await readFile(join(repo, '.git', 'info', 'exclude'), 'utf8'), /^\/\.branches$/m)
+    assert.equal((await git(['status', '--porcelain'], repo)).trim(), '')
+  } finally {
+    await rm(repo, RETRIED_RM)
   }
 })

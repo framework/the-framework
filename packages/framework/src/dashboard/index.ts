@@ -1,5 +1,5 @@
 export { startDashboard, type Dashboard, type DashboardOptions } from './server.js'
-export type { StartAgentOptions, StartAgentResult, AddProjectResult, RemoveProjectResult, OnboardingSuggestion, AgentWorktree } from './types.js'
+export type { StartAgentOptions, StartAgentResult, AddProjectResult, RemoveProjectResult, CleanupReport, OnboardingSuggestion, AgentWorktree } from './types.js'
 export {
   summarizeProject,
   defaultProjectsProvider,

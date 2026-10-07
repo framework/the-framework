@@ -2,7 +2,7 @@ What the daemon does for a project: starting an agent [1] through the project's 
 
 ## Context
 
-**User story**: the user presses Start on a project's launcher and an agent [1] appears in the agent list within moments, working in its own checkout on its own branch; two Starts on the same project run side by side. A Start that cannot work says why. The user picks a saved device [4] as the target and the agent runs there, shown here like a local one. The user adds a repository from the dashboard and it appears in the project list. The user removes a project from its menu and it leaves the project list, with nothing in its folder deleted.
+**User story**: the user presses Start on a project's launcher and an agent [1] appears in the agent list within moments, working in its own checkout on its own branch; two Starts on the same project run side by side. A Start that cannot work says why. The user picks a saved device [4] as the target and the agent runs there, shown here like a local one. The user adds a repository from the dashboard and it appears in the project list. The user removes a project from its menu and it leaves the project list, with nothing in its folder deleted, unless they ticked the box that also deletes OpenAgent's files [10] there.
 
 **Business logic story**: the daemon names no tool. What starts an agent is one shell line the project's own `.openagent/hooks.yml` names; the agent it begins is that tool's process, keeps its own record (card and diary [5]) in its own checkout, and outlives the daemon. So there is no map of live agents here, no cap, nothing to stop at shutdown and nothing to recover at boot.
 
@@ -17,6 +17,7 @@ What the daemon does for a project: starting an agent [1] through the project's 
 [7] home project: the directory the daemon was started in; a request that names no project, or names its id, addresses it without a registry lookup.
 [8] publish level: how far an agent publishes its work when it finishes: `commit` (commit the work and push nothing), `branch` (commit it, push the branch and open no pull request), `pr` (commit it, push the branch and open its pull request) or `merge` (commit it, push the branch and open its pull request, set to merge on its own once its checks pass). An agent given none commits and publishes only what its prompt asks.
 [9] git host provider: the package of the project that declares it provides the git host; The Framework opens and lands pull requests through the command that package declares. A project with none has no git host: no pull request can be opened for it.
+[10] OpenAgent's files: what the product and its tools left in a project's folder: the directories `.openagent`, `.branches` and `.agent-runner`, and the local branch `agent-data` with the agents' records.
 
 ## Business logic — TL;DR
 
@@ -24,7 +25,7 @@ What the daemon does for a project: starting an agent [1] through the project's 
 - **Starting an agent** - the project's start hook [2] is run with the prompt, the user's picks and the follow-up when there is one, at the publish level [8] of the option in force: the user's saved option, held to `branch` in a project with no git host provider [9] and to `commit` in a project whose repository has no remote, and, when none is saved, the furthest the project goes with no pull request; a Start that names the branch to start from hands it over, and is refused when the word is no branch name; the id it answers is the Start's answer; a refusal is its words; the project's checkouts are read again on the next look, so the new agent's checkout is found at once.
 - **Starting an agent on a device** - the start is forwarded to the device, which runs its own project's hook; a memory-only row stands for the agent here.
 - **Adding a project** - the directory is checked and installed, the person's answer on whether the agents' records may go to the repository's remote is written to the repository (a yes only when it has a remote), every package that writes hook lines writes its own into its hooks file where missing (the built-in runner's `start`, `resume` and `check` among them), it is registered, and its `open` hooks [6] run.
-- **Removing a project** - the project is found in the registry by its id; while an agent [1] is working in it the removal is refused; otherwise its `close` hooks [6] run, it is taken off the registry, and nothing in its folder is deleted.
+- **Removing a project** - the project is found in the registry by its id; while an agent [1] is working in it the removal is refused; otherwise its `close` hooks [6] run and it is taken off the registry; nothing in its folder is deleted, unless the removal asks for the files too: then OpenAgent's files [10] are removed once the project is off the registry, the tools' own first and nothing more when one of them refuses, the agents' records kept while another registered project is a checkout of the same repository, and the answer says what went and what stayed.
 - **Relaying a device's agent** - the events of an agent relayed from a device stream from memory; an agent a device relayed here is tailed off its diary [5]; one whitelisted read or write is run against the home project for the relaying daemon.
 
 ## Business logic
@@ -75,19 +76,21 @@ An add carries the path and the person's answer on the agents' records, yes or n
 
 #### Context
 
-**User story**: the user picks "Remove project…" in a project's menu and confirms. The project leaves the dashboard's list and its scheduler stops. Their folder is as it was, and adding the folder again brings the project back.
+**User story**: the user picks "Remove project…" in a project's menu and confirms. The project leaves the dashboard's list and its scheduler stops. Their folder is as it was, and adding the folder again brings the project back. A user who ticked "Also delete OpenAgent's files in this folder" in that dialog (`../dashboard/components/RemoveProjectDialog.tsx`) also has OpenAgent's files [10] deleted, and reads what was deleted and what was kept.
 
 **Problem**: what a project's `open` hooks [6] started, a scheduler for instance, is stopped by its `close` hooks at shutdown; once the project is off the registry no shutdown names it, so that scheduler would run on. And an agent [1] at work would go on working in a project the dashboard no longer shows.
 
 #### Business logic
 
-A removal names the project by its id. The project is looked up in the registry by that id and not through its folder, so a project whose folder was deleted can still be removed. An id no registered project has is refused with "no project with that id is on the list".
+A removal names the project by its id, and says whether OpenAgent's files [10] go too; a removal that does not say removes no file. The project is looked up in the registry by that id and not through its folder, so a project whose folder was deleted can still be removed. An id no registered project has is refused with "no project with that id is on the list".
 
 When the project's folder exists, two things happen before the removal. First, the project's checkouts are read fresh, so an agent started a moment ago is seen, and the removal is refused with "An agent is working in this project. Stop it, then remove the project." when an agent is working there. An agent counts as working when its card [5] says running and its process is alive on this machine; a card left running by a process that died does not count, and neither does a card that names another machine. A refused removal changes nothing. Second, the project's `close` hooks run, the ones a shutdown would have run for it, their outcome logged. When the folder is gone both steps are skipped.
 
-Then the project is taken off the registry (`registry.ts`), and what the daemon kept of what the project's providers answered (its branches, git host, queue, runs and tickets) is forgotten. The answer is success.
+Then the project is taken off the registry (`registry.ts`), and what the daemon kept of what the project's providers answered (its branches, git host, queue, runs and tickets) is forgotten.
 
-Nothing in the folder is deleted: the user's files and commits stay, and so do the product's own things there (`.openagent`, `.branches`, `.agent-runner`, and the `agent-data` branch with the agents' records). The user's preferences stay too. Adding the folder again registers the same project, with the same id.
+A removal that does not ask for the files, and any removal of a project whose folder is gone, ends here and answers success. Nothing in the folder is deleted: the user's files and commits stay, and so do the product's own things there (`.openagent`, `.branches`, `.agent-runner`, and the `agent-data` branch with the agents' records). The user's preferences stay too. Adding the folder again registers the same project, with the same id.
+
+A removal that asks for the files then removes OpenAgent's files [10] from the folder (`remove-files.ts`): what each tool's clean-up removes, then the agents' records, then the dashboard's own `.openagent/`. A tool that refuses ends it there, with the records and `.openagent/` kept: the runner refuses while a run of this machine is alive, a run still booting included, which the check above does not see. This comes after the project is off the registry, so no background job of the daemon starts on the folder again in between (`daemon-services.ts`). The agents' records belong to the repository, not to one folder: when another registered project is a checkout of the same repository, the records are kept and the answer names that project's folder. What the daemon kept of the providers' answers is forgotten once more. The answer is success with the report: what was removed, what was kept with the reason, and what could not be done. A step that failed is a line of that report, never a refused removal: the project is already off the registry. The user's preferences stay, and adding the folder again registers the same project.
 
 ### Relaying a device's agent
 

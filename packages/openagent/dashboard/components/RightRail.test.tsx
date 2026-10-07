@@ -46,7 +46,7 @@ function render(ui: ReactElement, panels: MountedPanel[] = [FILES]) {
 beforeEach(() => {
   // Open, as the person left it, on the agent's page and on the "New agent" page: the tests below
   // are about what an open rail shows.
-  localStorage.setItem('fw.side-panel', JSON.stringify(['p1/r1', 'new']))
+  localStorage.setItem('oa.side-panel', JSON.stringify(['p1/r1', 'new']))
   forgetRemembered()
   onDocs.mockReset().mockResolvedValue([{ name: 'PLAN.md', content: '# plan' }])
 })
@@ -239,7 +239,7 @@ describe('RightRail module tabs (#492)', () => {
 
 describe('RightRail open and closed', () => {
   test('it is closed until opened: one button, no tab and no panel; the button opens it and the browser remembers it for this agent', async () => {
-    localStorage.removeItem('fw.side-panel')
+    localStorage.removeItem('oa.side-panel')
     shown.mockClear()
     const { unmount } = render(<RightRail {...baseProps} />)
     const opener = screen.getByRole('button', { name: 'Open the side panel' })
@@ -251,7 +251,7 @@ describe('RightRail open and closed', () => {
     fireEvent.click(opener)
     expect(screen.getByRole('tab', { name: /Files/ })).toBeTruthy()
     expect(screen.getByText('files')).toBeTruthy()
-    expect(localStorage.getItem('fw.side-panel')).toBe('["p1/r1"]')
+    expect(localStorage.getItem('oa.side-panel')).toBe('["p1/r1"]')
     // The same agent's page, later: open from the first frame.
     unmount()
     render(<RightRail {...baseProps} />)
@@ -259,7 +259,7 @@ describe('RightRail open and closed', () => {
   })
 
   test('another agent starts closed, and coming back the first is as it was left', () => {
-    localStorage.removeItem('fw.side-panel')
+    localStorage.removeItem('oa.side-panel')
     const { rerender } = render(<RightRail {...baseProps} />)
     fireEvent.click(screen.getByRole('button', { name: 'Open the side panel' }))
     rerender(<RightRail {...baseProps} agentId="r2" />)
@@ -271,14 +271,14 @@ describe('RightRail open and closed', () => {
     rerender(<RightRail {...baseProps} agentId="r2" />)
     fireEvent.click(screen.getByRole('button', { name: 'Open the side panel' }))
     fireEvent.click(screen.getByRole('button', { name: 'Close the side panel' }))
-    expect(localStorage.getItem('fw.side-panel')).toBe('["p1/r1"]')
+    expect(localStorage.getItem('oa.side-panel')).toBe('["p1/r1"]')
   })
 
   test('the "New agent" page has its own, whatever the project', () => {
-    localStorage.removeItem('fw.side-panel')
+    localStorage.removeItem('oa.side-panel')
     const { rerender } = render(<RightRail {...baseProps} agentId={null} />)
     fireEvent.click(screen.getByRole('button', { name: 'Open the side panel' }))
-    expect(localStorage.getItem('fw.side-panel')).toBe('["new"]')
+    expect(localStorage.getItem('oa.side-panel')).toBe('["new"]')
     rerender(<RightRail {...baseProps} />)
     expect(screen.getByRole('button', { name: 'Open the side panel' })).toBeTruthy()
     rerender(<RightRail {...baseProps} agentId={null} />)
@@ -290,11 +290,11 @@ describe('RightRail open and closed', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close the side panel' }))
     expect(screen.queryByRole('tab')).toBeNull()
     expect(screen.getByRole('button', { name: 'Open the side panel' })).toBeTruthy()
-    expect(localStorage.getItem('fw.side-panel')).toBe('["new"]')
+    expect(localStorage.getItem('oa.side-panel')).toBe('["new"]')
   })
 
   test('with no tab to show there is no button either', async () => {
-    localStorage.removeItem('fw.side-panel')
+    localStorage.removeItem('oa.side-panel')
     onDocs.mockResolvedValue([])
     const { container } = render(<RightRail {...baseProps} />, [])
     await waitFor(() => expect(onDocs).toHaveBeenCalled())
@@ -317,7 +317,7 @@ describe('RightRail, a changed file asked for from the chat', () => {
   test('the ask opens a closed panel on the tab that lists changes and hands it the file; the other tabs are handed none', async () => {
     const { revealChange, forgetRevealedChanges } = await import('../lib/reveal-change.js')
     forgetRevealedChanges()
-    localStorage.removeItem('fw.side-panel')
+    localStorage.removeItem('oa.side-panel')
     render(<RightRail {...baseProps} />, [FILES, CHANGES])
     expect(screen.queryByRole('tablist')).toBeNull()
     act(() => revealChange('p1/r1', 'src/app.ts'))
@@ -353,7 +353,7 @@ describe('RightRail, a changed file asked for from the chat', () => {
   test('an ask moves the rail once: met again on coming back to its page, it does not undo a tab picked by hand', async () => {
     const { revealChange, forgetRevealedChanges } = await import('../lib/reveal-change.js')
     forgetRevealedChanges()
-    localStorage.setItem('fw.side-panel', JSON.stringify(['p1/r1', 'p1/r2']))
+    localStorage.setItem('oa.side-panel', JSON.stringify(['p1/r1', 'p1/r2']))
     const { rerender } = render(<RightRail {...baseProps} />, [FILES, CHANGES])
     act(() => revealChange('p1/r1', 'src/app.ts'))
     await waitFor(() => expect(screen.getByText('changes: src/app.ts')).toBeTruthy())

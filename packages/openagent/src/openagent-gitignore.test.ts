@@ -10,7 +10,7 @@ test('against real git: everything under .openagent is hidden from git, the igno
   const { tmpdir } = await import('node:os')
   const { execFileSync } = await import('node:child_process')
 
-  const repo = await mkdtemp(join(tmpdir(), 'fw-sessions-'))
+  const repo = await mkdtemp(join(tmpdir(), 'oa-sessions-'))
   const git = (...args: string[]): string => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
   try {
     git('init', '-q')

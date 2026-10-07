@@ -4,7 +4,7 @@
 // sits in the address bar, history, or a Referer header, and the launcher rehydrates from it once.
 
 /** sessionStorage key holding a draft carried from another device, until the launcher takes it. */
-const PENDING_DRAFT_KEY = 'fw.pending-draft'
+const PENDING_DRAFT_KEY = 'oa.pending-draft'
 
 /** sessionStorage, or undefined wherever this module is loaded without a browser behind it. */
 function session(): Storage | undefined {

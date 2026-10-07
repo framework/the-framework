@@ -11,7 +11,7 @@ Keeps, in this browser, on which pages the dashboard's side panel (the right rai
 ## Business logic — TL;DR
 
 - **One answer per page** - each agent's page has its own answer, named by its project and agent; the "New agent" page has one answer of its own, the same for every project.
-- **Closed unless remembered open** - the browser's local storage holds, under the key `fw.side-panel`, the list of the pages whose panel is open, and nothing when none is; a page not in the list is closed. The answer is read at once, from the first frame. Something else found under the key reads as no page open.
+- **Closed unless remembered open** - the browser's local storage holds, under the key `oa.side-panel`, the list of the pages whose panel is open, and nothing when none is; a page not in the list is closed. The answer is read at once, from the first frame. Something else found under the key reads as no page open.
 - **Opening and closing** - a change is written to the local storage and told to every part of the page that shows it, at once; it changes the answer of that one page only.
 - **At most 200 pages remembered** - opening a panel when 200 pages are already remembered open forgets the one opened longest ago, which is then closed.
 - **A browser that keeps nothing** - where the local storage cannot be read every panel is closed; where it cannot be written a panel still opens and closes, for as long as the page is loaded.

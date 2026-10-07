@@ -87,7 +87,7 @@ async function withRealRepo(body: (repo: string, git: (...args: string[]) => str
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const { execFileSync } = await import('node:child_process')
-  const repo = await mkdtemp(join(tmpdir(), 'fw-install-'))
+  const repo = await mkdtemp(join(tmpdir(), 'oa-install-'))
   const git = (...args: string[]): string => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
   try {
     git('init', '-q')

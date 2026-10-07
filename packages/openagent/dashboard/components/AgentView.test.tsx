@@ -464,13 +464,13 @@ describe('a changed file\'s row in the chat', () => {
   test('with a tab that lists changes, a click opens this agent\'s side panel and asks for the file by its path in the checkout', async () => {
     const { useRevealedChange, forgetRevealedChanges } = await import('../lib/reveal-change.js')
     forgetRevealedChanges()
-    localStorage.removeItem('fw.side-panel')
+    localStorage.removeItem('oa.side-panel')
     const Asked = () => <span data-testid="asked">{useRevealedChange('p1/run-1')?.path ?? ''}</span>
     onAgent.mockResolvedValue(events)
     render(withPanels(<>{view({ events, card: { status: 'done', workspace: WS } })}<Asked /></>, [panel({ changes: true as const })]))
     fireEvent.click(await screen.findByRole('button', { name: 'Show the change to A.md' }))
     expect(screen.getByTestId('asked').textContent).toBe('docs/A.md')
-    expect(JSON.parse(localStorage.getItem('fw.side-panel') ?? '[]')).toEqual(['p1/run-1'])
+    expect(JSON.parse(localStorage.getItem('oa.side-panel') ?? '[]')).toEqual(['p1/run-1'])
   })
 
   test('with no such tab, or one of another project, the row is there and is no button', async () => {

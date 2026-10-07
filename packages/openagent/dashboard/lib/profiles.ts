@@ -14,11 +14,11 @@ import { isLoopbackHost } from '../../src/client.js'
 export type ConnectionProfile = { id: string; label: string; url: string; token: string }
 
 /** localStorage key for the saved remote devices (an array of {@link ConnectionProfile}). */
-const DEVICES_KEY = 'fw.devices'
+const DEVICES_KEY = 'oa.devices'
 
 /** localStorage key remembering the loopback origin the dashboard was launched from (#1052), so
  * "Local" returns to the right port even from a remote box. */
-const LOCAL_ORIGIN_KEY = 'fw.local-origin'
+const LOCAL_ORIGIN_KEY = 'oa.local-origin'
 
 /** Fallback loopback origin when none was remembered — the default daemon port (daemon.ts). */
 const DEFAULT_LOCAL_ORIGIN = 'http://127.0.0.1:4200'

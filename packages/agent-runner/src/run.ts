@@ -122,6 +122,8 @@ export interface RunOptions {
   then?: string
   /** How far the agent publishes when it finishes; absent, only what the prompt itself asks. */
   publish?: Publish
+  /** A text handed to the agent with the prompt, after it: the record keeps it apart from the prompt, which stays the run's name. */
+  attached?: string
   /** The coding agent a follow-up run is on, given its id; this run's own when absent. */
   nextDriver?: (id: string) => Driver
   /** The run this one is started for: told when this one ends. */
@@ -211,6 +213,7 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
       checkout,
       card: { id, startedAt, status: 'running', intent: opts.prompt, driver: opts.driver.id, ...modelOf(opts.model), branch: checkout.branch, caller: { runner: mark, pid, host, ...forReaders(mark), kind: 'prompt', workspace: checkout.path } },
       prompt: opts.prompt,
+      ...(opts.attached !== undefined ? { attached: opts.attached } : {}),
       ...addedOf(opts.publish, opts.then),
       driver: opts.driver,
       ...modelOf(opts.model),
@@ -389,6 +392,8 @@ interface SessionRun {
   prompt: string
   /** The sentence said after the prompt and after every message that follows it in this session. */
   added?: string
+  /** The text handed over with the prompt, and with no message after it. */
+  attached?: string
   driver: Driver
   model?: string
   /** The pull request the run's branch had before this session: its end announces only a new one. */
@@ -459,6 +464,8 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
     // them was told the run has them, so this process sends them before it lets the run go.
     let prompts = [run.prompt]
     let resume = run.continued
+    // Handed over with the run's own prompt only: the first one this process sends.
+    let attached = run.attached
     while (driverSession) {
       status = 'done'
       detail = undefined
@@ -469,7 +476,9 @@ async function sessionToEnd(repo: string, run: SessionRun, dir: string, inbox: s
         for (const [i, prompt] of prompts.entries()) {
           // Only the last one drains the inbox: a line written meanwhile comes after these.
           const last = i === prompts.length - 1
-          const turn = await driverSession.prompt(prompt, { ...(last ? { inbox } : {}), ...(resume ? { resume: true } : {}), ...(run.added !== undefined ? { added: run.added } : {}) })
+          const handed = attached
+          attached = undefined
+          const turn = await driverSession.prompt(prompt, { ...(last ? { inbox } : {}), ...(resume ? { resume: true } : {}), ...(handed !== undefined ? { attached: handed } : {}), ...(run.added !== undefined ? { added: run.added } : {}) })
           lastText = turn.text
           lastWords = turn.text
           resume = true

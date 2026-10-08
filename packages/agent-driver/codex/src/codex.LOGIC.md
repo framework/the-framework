@@ -24,6 +24,7 @@ Drives Codex as a driver [1]: each turn [2] is one `codex app-server` process in
 [12] progress event: what a driver reports while a turn runs, for a caller to show and never to decide on: the prompt sent, the session id, streamed text, a tool used, the final result, a rate limit reading, an error, a notice, a question.
 [13] personal setup: the three parts of the person's own setup a coding agent loads when started by hand, by the names every adapter takes: `memory` (what the coding agent remembers across sessions on its own), `connectors` (the apps and accounts linked to the person's login), `skills` (the person's own instructions, skills and settings files).
 [14] Codex home: the folder Codex reads the person's login, instructions, skills, configuration and memories from, and saves its conversations in: `~/.codex` unless `CODEX_HOME` names another.
+[15] attached text: a text the caller hands the coding agent with one prompt, apart from the prompt: the coding agent reads it after the prompt, and no later prompt carries it.
 
 ## Business logic — TL;DR
 
@@ -57,7 +58,7 @@ The exchange, all of it written by the driver as the app server answers:
 
 1. `initialize`, naming the client `agent-driver`, then the `initialized` notice once it is answered.
 2. A conversation: `thread/start` for a fresh one, or `thread/resume` with the thread id for one that continues (see "Continuing the conversation"). Either names the directory, the sandbox (see "Sandboxed to the directory"), the approval policy `never`, and the model when the caller named one; a fresh one also carries the framing [10] (see "Framing as developer instructions").
-3. Once the conversation is answered: `turn/start` on its thread id, with the prompt, and after an empty line the sentence the caller added after it when there is one, as the one text input. The prompt never appears on the command line, so a long prompt never hits the command-line length limit.
+3. Once the conversation is answered: `turn/start` on its thread id, with the prompt, then its attached text [15], then the sentence the caller added after it, each after an empty line when there is one, as the one text input. The prompt never appears on the command line, so a long prompt never hits the command-line length limit.
 4. Once the app server says the turn completed, however it ended, standard input is closed, and the app server exits.
 
 Closing standard input ends the app server at once, turn or no turn (seen with codex-cli 0.144.4), so it stays open until the turn has completed, or until a request of the driver's is refused. A request the app server makes of its own, such as an approval or a question for the user, is answered with a refusal: nobody is there to answer it, and the turn goes on without. Spawning, streaming, the exit code, the stop request [9] and the reaping of the process tree follow `agent-driver`'s `cli-session.ts`: a non-zero exit fails the turn even when text streamed first, and so does a clean exit before the turn completed, or after a turn that failed.

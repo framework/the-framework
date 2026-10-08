@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
-import { DEFAULT_CAP, MAX_AGENTS, RUN_SKILLS_DIR, SKILL_FILE, isAgents } from './names.js'
+import { DEFAULT_CAP, FOUND_MAX, MAX_AGENTS, RUN_SKILLS_DIR, SKILL_FILE, isAgents } from './names.js'
 import { parseInterval, type Interval } from './pace.js'
 
 /**
@@ -181,6 +181,32 @@ export async function readSchedule(repo: string): Promise<Schedule> {
 export function commandPrompt(name: string): string {
   return `/${name}`
 }
+
+/**
+ * What a run is handed with its prompt when a check started it: {@link FOUND_OPENING}, then what
+ * the check printed, so an agent whose command asks for the new thing has it. The command's prompt
+ * stays the command alone: it is what the run is counted under.
+ *
+ * A NUL character is dropped: the text travels as a command-line argument, which can hold none.
+ * Output past {@link FOUND_MAX} characters is cut at the end of the last whole line that fits,
+ * mid-line when its first line alone is longer, and a last line says how much was printed.
+ */
+export function checkFound(stdout: string): string {
+  const printed = stdout.replaceAll('\0', '').trim()
+  if (printed.length <= FOUND_MAX) return `${FOUND_OPENING}\n${printed}`
+  const fits = printed.slice(0, FOUND_MAX)
+  // A line that ends exactly at the limit is whole: the line end is the next character.
+  const lineEnd = printed[FOUND_MAX] === '\n' ? FOUND_MAX : fits.lastIndexOf('\n')
+  const shown = lineEnd > 0 ? fits.slice(0, lineEnd) : fits
+  return `${FOUND_OPENING}\n${shown}\n(cut: the check printed ${printed.length} characters, these are the first ${shown.length})`
+}
+
+/**
+ * What is said before a check's output. The agent has never seen the check, and a check may print
+ * only a sign that there is work (one issue of five that changed): so the words say what the
+ * output is, and that the command, not the output, says what the work is.
+ */
+export const FOUND_OPENING = 'The scheduler starts this command when its check prints something, and this time the check printed what is below. It says why this run started; what the work is, the command says.'
 
 /**
  * The command a run's prompt is counted under, so a run a person started counts against that

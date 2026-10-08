@@ -50,8 +50,13 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   tool cannot read is skipped and named, never guessed.
 - A skill's check may name the commands of other skills (`npx queue`, `npx tickets`),
   though the words a command skill gives the agent name none. The scheduler runs the check;
-  the agent is never given it. Picked over keeping the checks in a file of the project,
-  away from the skill they belong to.
+  the agent is never given the shell line, only what it printed. Picked over keeping the
+  checks in a file of the project, away from the skill they belong to.
+- A run its check started is handed what the check printed, after its command and apart
+  from it on the run's record. The words before it say the output is why the run started
+  and that the command says what the work is, because a check may print only a sign that
+  there is work. Picked over the agent getting the command's name alone: the check had
+  already found the new thing, and the agent had to look for it again.
 - Every scheduled command starts switched off, on every machine, and runs only where a
   person switched it on. Picked over a command that runs unless a person switched it off: a
   skill that arrives in a project would start agents by itself.

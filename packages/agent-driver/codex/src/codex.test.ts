@@ -124,6 +124,16 @@ async function spawnedWith(opts: ConstructorParameters<typeof CodexDriver>[0], s
   return seen!
 }
 
+test('a text attached to a prompt and a sentence added after it reach Codex as one message, the attached text between the two; the start event names each apart', async () => {
+  const events: DriverEvent[] = []
+  let seen: Seen | undefined
+  const session = await new CodexDriver({ spawn: fakeAppServer({}, s => (seen = s)) }).start({ cwd: '/ws', onEvent: e => events.push(e) })
+  await session.prompt('/answer-comments', { attached: 'Found:\n[1]', added: 'Commit your work.' })
+  const turn = seen!.messages.find(m => m['method'] === 'turn/start')!['params'] as { input: { text: string }[] }
+  assert.equal(turn.input[0]!.text, '/answer-comments\n\nFound:\n[1]\n\nCommit your work.')
+  assert.deepEqual(events.find(e => e.type === 'start'), { type: 'start', prompt: '/answer-comments', attached: 'Found:\n[1]', added: 'Commit your work.' })
+})
+
 test('a Codex turn streams its messages word by word, what each tool call did, and its thoughts', async () => {
   const events: DriverEvent[] = []
   const session = await new CodexDriver({ spawn: fakeAppServer() }).start({ cwd: '/ws', onEvent: e => events.push(e) })

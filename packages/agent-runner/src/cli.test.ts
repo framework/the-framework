@@ -57,6 +57,12 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
     const relevelled = await run(repo, 'run', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--publish', 'pr')
     assert.equal(relevelled.code, 2)
     assert.match(relevelled.err, /--resume takes no --publish/)
+    const reattached = await run(repo, 'run', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--attach', 'Found: 1')
+    assert.equal(reattached.code, 2)
+    assert.match(reattached.err, /--resume takes no --attach/)
+    const emptyHanded = await run(repo, 'run', 'Read the docs', '--attach', '  ')
+    assert.equal(emptyHanded.code, 2)
+    assert.match(emptyHanded.err, /--attach needs a text/)
     // A run that continues keeps the parent and the branch its record names.
     const reparented = await run(repo, 'run', '--resume', '2026-09-17T20-00-00-000Z', 'go on', '--parent', 'p1')
     assert.equal(reparented.code, 2)

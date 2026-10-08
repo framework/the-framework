@@ -4,7 +4,7 @@ import type { DriverQuota } from '@openagt/agent-driver'
 import type { RunCard } from '@openagt/skill-logs'
 import { DEFAULT_STATE, type State } from './state.js'
 import { parseInterval, type Interval } from './pace.js'
-import type { ScheduledCommand } from './schedule.js'
+import { FOUND_OPENING, type ScheduledCommand } from './schedule.js'
 import { tick, type TickDeps } from './tick.js'
 
 // The tick's decisions with every reading injected: what it reads, in which order, and the one
@@ -34,7 +34,7 @@ function command(name: string, over: Partial<ScheduledCommand> = { when: 'npx qu
 interface Seen {
   markers: RunCard[]
   withdrawn: string[]
-  spawned: { id: string; prompt: string; model: string; publish?: string }[]
+  spawned: { id: string; prompt: string; model: string; publish?: string; attached?: string }[]
   checks: string[]
 }
 
@@ -152,7 +152,20 @@ test('a due command under its cap with quota to spare is marked on the branch, t
   assert.equal(marker.model, 'opus')
   // Nobody picked a publish level on this machine: the run commits its work.
   assert.deepEqual(marker.caller, { runner: { host: 'this-box', publish: 'commit' }, host: 'this-box' })
-  assert.deepEqual(seen.spawned, [{ id: marker.id, prompt: '/work-queue', model: 'opus', publish: 'commit' }])
+  // The run is handed what its check printed; its prompt stays the command alone, as the marker's does.
+  assert.deepEqual(seen.spawned, [{ id: marker.id, prompt: '/work-queue', model: 'opus', publish: 'commit', attached: `${FOUND_OPENING}\n["one entry"]` }])
+})
+
+test('a run is handed what its check printed, and only a run a check started: a command its pace alone starts is handed nothing', async () => {
+  const commands = [command('answer-comments', { when: 'gh api comments' }), command('plan-tickets', { every: every('6h') }), command('update-tickets', { when: 'npx tickets meta', every: every('15m') })]
+  const printed: Record<string, string> = { 'gh api comments': '\n[{"url":"https://example.test/1","by":"someone"}]\n', 'npx tickets meta': 'first import' }
+  const { deps: d, seen } = deps({ commands, check: async shell => ({ ok: true, stdout: printed[shell]!, stderr: '' }) })
+  await tick(d)
+  assert.deepEqual(seen.spawned.map(s => [s.prompt, s.attached]), [
+    ['/answer-comments', `${FOUND_OPENING}\n[{"url":"https://example.test/1","by":"someone"}]`],
+    ['/plan-tickets', undefined],
+    ['/update-tickets', `${FOUND_OPENING}\nfirst import`],
+  ])
 })
 
 test("this machine's publish pick goes on the marker and to the spawned run: commit where nobody picked, no level for nothing; the recorded schedule says what the skills say, with what each skill says it does", async () => {

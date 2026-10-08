@@ -77,11 +77,11 @@ export class FakeDriverSession implements DriverSession {
       return Promise.reject(new Error('fake prompt aborted'))
     }
     const i = this.index++
-    const sent = promptSent(text, opts.added)
+    const sent = promptSent(text, opts)
     this.prompts.push(sent)
     const turn = this.resolveTurn(sent, i)
 
-    this.emit(startEvent(text, opts.added))
+    this.emit(startEvent(text, opts))
     if (this.config.model !== undefined) this.emit({ type: 'model', model: this.config.model })
     for (const label of turn.actions ?? []) this.emit({ type: 'action', label })
     if (turn.text) this.emit({ type: 'text', text: turn.text })

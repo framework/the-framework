@@ -73,7 +73,9 @@ export interface RunCliSessionOptions {
   prompt: string
   /** The sentence the caller adds after the prompt; the `start` event names it apart. */
   added?: string
-  /** What goes to the CLI's stdin, for a CLI that reads the prompt wrapped. Default the prompt with the added sentence after it. Unused when the parser converses. */
+  /** The text the caller hands over with the prompt; the `start` event names it apart. */
+  attached?: string
+  /** What goes to the CLI's stdin, for a CLI that reads the prompt wrapped. Default the prompt with the attached text and the added sentence after it. Unused when the parser converses. */
   stdin?: string
   spawn: SpawnLike
   emit: (event: DriverEvent) => void
@@ -129,7 +131,7 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
       }
     }
 
-    opts.emit(startEvent(opts.prompt, opts.added))
+    opts.emit(startEvent(opts.prompt, opts))
     // `detached` makes the child its own process-group leader so we can kill the
     // whole agent subtree (claude + node workers + tool calls) at once, not just
     // the top process — otherwise an interrupt orphans the tree (the leak).
@@ -242,7 +244,7 @@ export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
           },
         })
       } else {
-        stdin.write(opts.stdin ?? promptSent(opts.prompt, opts.added))
+        stdin.write(opts.stdin ?? promptSent(opts.prompt, opts))
         stdin.end()
       }
     }

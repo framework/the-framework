@@ -4,7 +4,8 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseInterval } from './pace.js'
-import { commandPrompt, isDue, promptCommand, readSchedule, skillSchedule } from './schedule.js'
+import { checkFound, commandPrompt, FOUND_OPENING, isDue, promptCommand, readSchedule, skillSchedule } from './schedule.js'
+import { FOUND_MAX } from './names.js'
 
 const CLAUDE = '.claude/skills'
 const AGENTS = '.agents/skills'
@@ -161,4 +162,25 @@ test('due is a check whose JSON is not empty; a non-JSON answer is due by its te
 
 test("a command's prompt is its slash command", () => {
   assert.equal(commandPrompt('work-queue'), '/work-queue')
+})
+
+test('what a run is handed of its check: the opening words, then what the check printed without its outer blank lines and without NUL characters', () => {
+  assert.equal(checkFound('\n[{"number": 12}]\n'), `${FOUND_OPENING}\n[{"number": 12}]`)
+  assert.equal(FOUND_OPENING, 'The scheduler starts this command when its check prints something, and this time the check printed what is below. It says why this run started; what the work is, the command says.')
+  assert.equal(checkFound('a.md\0b.md\0'), `${FOUND_OPENING}\na.mdb.md`, 'a command-line argument can hold no NUL')
+})
+
+test('a long output is cut at the end of the last whole line that fits, mid-line when its first line alone is too long, and a last line says how much was printed', () => {
+  assert.equal(checkFound('y'.repeat(FOUND_MAX)), `${FOUND_OPENING}\n${'y'.repeat(FOUND_MAX)}`, 'exactly the limit is whole')
+  const oneLine = 'x'.repeat(FOUND_MAX + 500)
+  assert.equal(checkFound(oneLine), `${FOUND_OPENING}\n${'x'.repeat(FOUND_MAX)}\n(cut: the check printed ${FOUND_MAX + 500} characters, these are the first ${FOUND_MAX})`)
+  // Lines of eleven characters with their line end: the limit falls inside line 727, which is left out whole.
+  const lines = Array.from({ length: 1000 }, (_, i) => `"t-${String(i).padStart(5, '0')}",`).join('\n')
+  const handed = checkFound(lines).split('\n')
+  assert.equal(handed[0], FOUND_OPENING)
+  assert.equal(handed.at(-2), '"t-00726",', 'the last line shown is a whole one')
+  assert.equal(handed.at(-1), `(cut: the check printed ${lines.length} characters, these are the first 7996)`)
+  // A line that ends exactly at the limit is whole, and is kept.
+  const exact = `${'a'.repeat(3999)}\n${'b'.repeat(4000)}\n${'c'.repeat(50)}`
+  assert.equal(checkFound(exact), `${FOUND_OPENING}\n${'a'.repeat(3999)}\n${'b'.repeat(4000)}\n(cut: the check printed 8051 characters, these are the first ${FOUND_MAX})`)
 })

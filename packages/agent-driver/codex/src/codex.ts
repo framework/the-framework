@@ -258,11 +258,12 @@ export class CodexSession implements DriverSession {
       env: agentEnv(this.config.env ?? process.env, this.log),
       prompt: text,
       ...(opts.added !== undefined ? { added: opts.added } : {}),
+      ...(opts.attached !== undefined ? { attached: opts.attached } : {}),
       spawn: this.config.spawn ?? (nodeSpawn as unknown as SpawnLike),
       emit,
       signals: combineSignals(this.startOpts.signal, opts.signal),
       parser: new CodexAppServerParser({
-        text: promptSent(text, opts.added),
+        text: promptSent(text, opts),
         cwd: this.cwd,
         sandbox: this.config.sandbox ?? 'workspace-write',
         ...(framing ? { framing } : {}),

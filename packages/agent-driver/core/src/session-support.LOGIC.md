@@ -9,11 +9,12 @@ Gives every driver session [1] the pieces that are not specific to any coding ag
 [5] turn: one prompt sent to the driver; the coding agent's own loop runs to completion and answers with a final message.
 [6] framing: the standing instructions a caller gives a driver session, plus any extra instructions for one turn; the driver delivers them apart from the prompt when the coding agent takes such instructions (Claude Code's system prompt, Codex's developer instructions), or ahead of the prompt when it does not.
 [7] driver: a coding agent wrapped as a black box: start it in a directory, prompt it for one turn, stream what it does, resume it later.
+[8] attached text: a text the caller hands the coding agent with one prompt, apart from the prompt: the coding agent reads it after the prompt, and no later prompt carries it.
 
 ## Business logic — TL;DR
 
 - **A listener can never break the coding agent** - a progress event [3] goes to the caller's listener when there is one; a listener that throws is logged with the driver's [7] name and ignored, and the turn [5] continues. Without a listener, reporting is a no-op.
-- **A prompt and the sentence added after it** - what the coding agent is sent is the prompt and, when the caller added a sentence, that sentence after an empty line; the `start` progress event [3] carries the prompt as the caller gave it and names the sentence apart, so a reader can show who said what.
+- **A prompt, its attached text and the sentence added after it** - what the coding agent is sent is the prompt, then the attached text [8] when the caller handed one over, then the sentence the caller added when there is one, each after an empty line; the `start` progress event [3] carries the prompt as the caller gave it and names the attached text and the sentence apart, so a reader can show who said what.
 - **Two stop requests, one list** - the driver session's [1] stop request [4] and the turn's own are combined, absent ones dropped, so a turn ends when either is raised.
 - **Two framings, one block** - the driver session's framing [6] and the turn's extra framing are joined as separate paragraphs, with a blank line between them, empty ones dropped.
 - **A tool call's detail on one line** - the detail a driver puts on a tool call is flattened to one line (runs of whitespace become one space) and cut to 200 characters, the last one an ellipsis, so a long command or prompt never floods the diary.

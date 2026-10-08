@@ -79,8 +79,10 @@ export async function finishTurn(
   if (question) emit({ type: 'question', question })
   if (!opts.inbox) return turn
   let last = turn
+  // What was handed over with the prompt went with it alone: a line from the inbox carries none of it.
+  const { attached: _attached, ...further } = opts
   for (const line of await takeInbox(opts.inbox)) {
-    last = await session.prompt(promptOf(line), { ...opts, resume: true })
+    last = await session.prompt(promptOf(line), { ...further, resume: true })
   }
   return last
 }

@@ -149,6 +149,14 @@ test('ClaudeCodeDriver asks for thinking text, then sends the prompt, both as st
   await told.prompt('Fix the bug', { added: 'Commit your work.' })
   assert.deepEqual(JSON.parse(written.trim().split('\n')[1]!).message, { role: 'user', content: 'Fix the bug\n\nCommit your work.' })
   assert.deepEqual(events.find(e => e.type === 'start'), { type: 'start', prompt: 'Fix the bug', added: 'Commit your work.' })
+
+  // A text attached to the prompt goes between the two, and the start event names it apart too.
+  written = ''
+  const handed: DriverEvent[] = []
+  const given = await new ClaudeCodeDriver({ spawn }).start({ cwd: process.cwd(), onEvent: e => handed.push(e) })
+  await given.prompt('/answer-comments', { attached: 'Found:\n[1]', added: 'Commit your work.' })
+  assert.deepEqual(JSON.parse(written.trim().split('\n')[1]!).message, { role: 'user', content: '/answer-comments\n\nFound:\n[1]\n\nCommit your work.' })
+  assert.deepEqual(handed.find(e => e.type === 'start'), { type: 'start', prompt: '/answer-comments', attached: 'Found:\n[1]', added: 'Commit your work.' })
 })
 
 test('StreamJsonParser pulls token + cost usage off the result line (#322)', () => {

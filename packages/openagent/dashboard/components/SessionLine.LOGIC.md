@@ -11,6 +11,7 @@ Draws the line of an agent's [1] transcript that says what is set up for the age
 [1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [2] coding agent: the CLI doing the actual work: Claude Code or Codex.
 [3] card: the small file the tool that runs an agent keeps beside the agent's diary, saying how the agent stands: its status, its branch, the folder of its checkout, the coding agent and the model it runs.
+[4] attached text: a text the tool that runs an agent handed the coding agent with one prompt, apart from the prompt: the coding agent read it after the prompt. A run the scheduler started because a command's check found work carries what the check printed this way, with its first prompt.
 
 ## Business logic — TL;DR
 
@@ -67,7 +68,7 @@ The box holds up to five lines, in this order. Three are a step that was done: a
 - "Made the branch" and the branch's name, when the card says it;
 - "Started from the branch <name>, not from the main branch.", the name in the dark text color, the sentence cut with an ellipsis when it does not fit and the name whole in a tooltip, when the card names the branch the agent was told to start from (`base`). The tool that starts an agent writes it only for an agent told where to start: one started from the launcher's "My local branch" option, and a subagent, which starts from its main agent's branch. An agent started from the project's main branch has no such line;
 - "Started Claude Code": "Started" and the coding agent's [2] name ("Claude Code", "Codex"; a coding agent the dashboard has no name for reads as the card names it), followed by the model when the card says one. The model reads by the name its coding agent lists it under ("Opus 5.5"), and by its id while that list is not known or does not hold it (the naming rule in `lib/models.ts`);
-- "Auto adds after each message: “<sentence>”", the sentence in the dark text color, with no check, when the caller hands one over: what the tool that runs the agent added after the user's messages, the sentence of the pick under the launcher's "Auto" menu. The user's message in the transcript shows only their own words (`EventList.tsx`), so this row is where the rest of what the agent was told is read. An agent with nothing added has no such row.
+- "Auto adds after each message: “<sentence>”", the sentence in the dark text color, with no check, when the caller hands one over: what the tool that runs the agent added after the user's messages, the sentence of the pick under the launcher's "Auto" menu. The user's message in the transcript shows only their own words (`EventList.tsx`), so this row is where the sentence is read; an attached text [4] is read under the message it was sent with (`EventList.tsx`), not here. An agent with nothing added has no such row.
 
 ### Nothing known: plain words for an agent at work, else nothing
 

@@ -256,7 +256,9 @@ describe('the Automations page', () => {
     await screen.findByRole('region', { name: 'gemstack' })
     // The skill lets two run at once; a person's own number shows on the row too.
     expect(within(row('/post-merge-cleanup')).getByText('Up to 2 at once')).toBeTruthy()
+    expect(within(row('/post-merge-cleanup')).queryByText('your pick')).toBeNull()
     expect(within(row('/work-queue')).getByText('Up to 3 at once')).toBeTruthy()
+    expect(within(row('/work-queue')).getByText('your pick')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit /post-merge-cleanup' }))
     const editor = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
@@ -270,10 +272,10 @@ describe('the Automations page', () => {
     const count = within(many).getByLabelText('How many agents') as HTMLInputElement
     expect(count.value).toBe('2')
     const save = within(editor).getByRole('button', { name: 'Save' }) as HTMLButtonElement
-    for (const typed of ['', '0', '1.5']) {
+    for (const typed of ['', '0', '1.5', '100']) {
       fireEvent.change(count, { target: { value: typed } })
       expect(save.disabled, typed).toBe(true)
-      expect(within(editor).getByText('Type a whole number of agents, 1 or more.')).toBeTruthy()
+      expect(within(editor).getByText('Type a whole number of agents, from 1 to 99.')).toBeTruthy()
     }
     fireEvent.change(count, { target: { value: '1' } })
     expect(within(many).getByText('agent at once')).toBeTruthy()

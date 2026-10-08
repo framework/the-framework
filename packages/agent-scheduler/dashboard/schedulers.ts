@@ -1,6 +1,6 @@
 import type { ModuleHost, ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick, TickDecision } from '../src/state.js'
-import { DEFAULT_PUBLISH } from '../src/names.js'
+import { DEFAULT_PUBLISH, MAX_AGENTS } from '../src/names.js'
 import { MAX_COUNT, paceInForce, parseInterval, parseTimeOfDay, takesTimeOfDay, type PacePick, type PaceUnit } from '../src/pace.js'
 
 // What the module shows of each project's scheduler: the answer of `agent-scheduler status`, the
@@ -87,9 +87,9 @@ function isPace(value: unknown): boolean {
   return pick['work'] === true || (typeof pick['every'] === 'string' && parseInterval(pick['every']) !== undefined)
 }
 
-/** Whether a value is a number of agents at once: a whole number, 1 or more. The tool's own reading (`isAgents`). */
+/** Whether a value is a number of agents at once: a whole number from 1 to 99. The tool's own reading (`isAgents`). */
 function isCount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_AGENTS
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -301,7 +301,7 @@ export function agentsDraftOf(command: SchedulerCommand): AgentsDraft {
   return command.agents === undefined ? { kind: 'skill' } : { kind: 'own', count: String(command.agents) }
 }
 
-/** What a draft is on the command line, after `agents <command>`: `skill`, or the count. Nothing while the count is no whole number, 1 or more. */
+/** What a draft is on the command line, after `agents <command>`: `skill`, or the count. Nothing while the count is no whole number from 1 to 99. */
 export function agentsArgs(draft: AgentsDraft): string[] | undefined {
   if (draft.kind === 'skill') return ['skill']
   const typed = draft.count.trim()

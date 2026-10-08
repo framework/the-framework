@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Button, Checkbox, Tooltip, TooltipContent, TooltipTrigger, cn, formatAge, formatDateTime, useModuleHost, usePolled, type ModulePageProps, type ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick } from '../src/state.js'
+import { MAX_AGENTS } from '../src/names.js'
 import { MAX_COUNT, PACE_UNITS, parseInterval, takesTimeOfDay, type PaceUnit } from '../src/pace.js'
 import { PUBLISH_LABELS, UNIT_WORDS, agentsArgs, agentsDraftOf, atOnce, atOnceWords, decided, draftOf, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, schedulerStatus, withAgentsDraft, withDraft, type AgentsDraft, type PaceDraft, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
 
@@ -179,7 +180,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                             ))}
                           </select>
                           <p className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-sm">
-                            {paceProblem(open.pace) ?? (agentsArgs(open.agents) ? `${pace(withDraft(scheduled, open.pace))}. ${atOnce(withAgentsDraft(scheduled, open.agents)) > 1 ? `${atOnceWords(atOnce(withAgentsDraft(scheduled, open.agents)))}. ` : ''}${publishes({ ...scheduled, publish: open.publish })}.` : 'Type a whole number of agents, 1 or more.')}
+                            {paceProblem(open.pace) ?? (agentsArgs(open.agents) ? `${pace(withDraft(scheduled, open.pace))}. ${atOnce(withAgentsDraft(scheduled, open.agents)) > 1 ? `${atOnceWords(atOnce(withAgentsDraft(scheduled, open.agents)))}. ` : ''}${publishes({ ...scheduled, publish: open.publish })}.` : `Type a whole number of agents, from 1 to ${MAX_AGENTS}.`)}
                           </p>
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                             <p className="text-xs text-muted-foreground">Saved for you, in this project, on this machine. No tracked file changes.</p>
@@ -245,6 +246,7 @@ function AgentsFields({ scheduled, draft, disabled, onChange }: { scheduled: Sch
         <input
           type="number"
           min={1}
+          max={MAX_AGENTS}
           value={typed.count}
           disabled={draft.kind !== 'own'}
           onChange={e => onChange({ kind: 'own', count: e.target.value })}
@@ -344,6 +346,12 @@ function Summary({ host, project, scheduled }: { host: ReturnType<typeof useModu
         <>
           <span aria-hidden>·</span>
           <span>{atOnceWords(atOnce(scheduled))}</span>
+          {scheduled.agents !== undefined && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="text-info">your pick</span>
+            </>
+          )}
         </>
       )}
       <span aria-hidden>·</span>

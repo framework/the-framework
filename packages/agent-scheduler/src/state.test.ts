@@ -120,7 +120,7 @@ test("the cap in force is this machine's number of agents at once, else the skil
   // Another command still has its skill's.
   assert.equal(capInForce(mine, { name: 'plan-tickets', cap: 2 }), 2)
   // A state edited by hand: a value that is no whole number above 0 is no number set.
-  for (const odd of [0, -1, 1.5, '3', null, Number.NaN]) assert.equal(capInForce({ ...DEFAULT_STATE, agents: { 'work-queue': odd as never } }, skill), 1, String(odd))
+  for (const odd of [0, -1, 1.5, 100, '3', null, Number.NaN]) assert.equal(capInForce({ ...DEFAULT_STATE, agents: { 'work-queue': odd as never } }, skill), 1, String(odd))
   const back = withAgents(withAgents(mine, 'work-queue', undefined), 'triage quick', undefined)
   assert.equal('agents' in back, false)
   assert.deepEqual(withAgents(mine, 'plan-tickets', undefined), mine)

@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { PUBLISH_LEVELS, type Publish } from '@openagt/agent-runner'
-import { DEFAULT_MODEL, DEFAULT_PUBLISH, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE } from './names.js'
+import { DEFAULT_MODEL, DEFAULT_PUBLISH, DEFAULT_SPEND_OFFSET, MAX_AGENTS, STATE_DIR, STATE_FILE } from './names.js'
 import type { PacePick } from './pace.js'
 
 /**
@@ -165,9 +165,9 @@ export function withPace(state: State, command: string, pick: PacePick | undefin
   return Object.keys(paces).length ? { ...rest, paces } : rest
 }
 
-/** Whether a value is a number of agents at once: a whole number, 1 or more. */
+/** Whether a value is a number of agents at once: a whole number from 1 to 99. */
 export function isAgents(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_AGENTS
 }
 
 /**

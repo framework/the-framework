@@ -279,12 +279,12 @@ test("agents writes this machine's number of agents at once for a scheduled comm
     // A number left for a skill that is gone can always be taken back.
     assert.equal((await run(repo, 'agents', 'never-heard-of', 'skill')).code, 0)
 
-    for (const argv of [['agents', 'work-queue'], ['agents', 'work-queue', '0'], ['agents', 'work-queue', '1.5'], ['agents', 'work-queue', '-2'], ['agents', 'work-queue', 'many'], ['agents', 'work-queue', '2', 'extra']]) {
+    for (const argv of [['agents', 'work-queue'], ['agents', 'work-queue', '0'], ['agents', 'work-queue', '1.5'], ['agents', 'work-queue', '-2'], ['agents', 'work-queue', 'many'], ['agents', 'work-queue', '100'], ['agents', 'work-queue', '2', 'extra']]) {
       const bad = await run(repo, ...argv)
       assert.equal(bad.code, 2, argv.join(' '))
       assert.equal(bad.out, undefined)
     }
-    assert.match((await run(repo, 'agents', 'work-queue', 'many')).err, /^many is neither skill nor a whole number, 1 or more/)
+    assert.match((await run(repo, 'agents', 'work-queue', 'many')).err, /^many is neither skill nor a whole number from 1 to 99/)
     assert.equal((await readState(repo)).agents, undefined, 'a usage error writes nothing')
   } finally {
     await removeRepo(repo)

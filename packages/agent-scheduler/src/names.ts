@@ -33,6 +33,9 @@ export const DEFAULT_SPEND_OFFSET = 100 / 14
 /** Runs of one command in flight at once, across every machine, when its skill names no number. */
 export const DEFAULT_CAP = 1
 
+/** The most runs of one command a skill or a person may let be in flight at once. */
+export const MAX_AGENTS = 99
+
 /** How often a started scheduler ticks. */
 export const TICK_MS = 60_000
 

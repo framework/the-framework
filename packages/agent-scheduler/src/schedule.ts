@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
-import { DEFAULT_CAP, RUN_SKILLS_DIR, SKILL_FILE } from './names.js'
+import { DEFAULT_CAP, MAX_AGENTS, RUN_SKILLS_DIR, SKILL_FILE } from './names.js'
 import { parseInterval, type Interval } from './pace.js'
 
 /**
@@ -133,7 +133,7 @@ function parseRow(skill: string, row: unknown, dir: string): ScheduledCommand | 
   if (every !== undefined && !asEvery) return 'every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'
   if (when !== undefined && !(typeof when === 'string' && when.trim())) return 'when is a shell command line'
   if (waitsFor !== undefined && !(typeof waitsFor === 'string' && waitsFor.trim() && !waitsFor.trim().includes('\n'))) return 'waits-for is one line of text'
-  if (agents !== undefined && !(typeof agents === 'number' && Number.isInteger(agents) && agents >= 1)) return 'agents is a whole number, 1 or more'
+  if (agents !== undefined && !(typeof agents === 'number' && Number.isInteger(agents) && agents >= 1 && agents <= MAX_AGENTS)) return `agents is a whole number from 1 to ${MAX_AGENTS}`
   if (when === undefined && every === undefined) return 'neither every nor when says when'
   if (waitsFor !== undefined && when === undefined) return 'waits-for says what when waits for, and there is no when'
   return {

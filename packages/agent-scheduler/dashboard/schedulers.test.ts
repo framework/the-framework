@@ -195,7 +195,8 @@ describe('in words', () => {
     expect(agentsDraftOf({ ...base, agents: 3 })).toEqual({ kind: 'own', count: '3' })
     expect(agentsArgs({ kind: 'skill' })).toEqual(['skill'])
     expect(agentsArgs({ kind: 'own', count: ' 03 ' })).toEqual(['3'])
-    for (const count of ['', '0', '1.5', '-2', 'two', '1e2']) expect(agentsArgs({ kind: 'own', count }), count).toBeUndefined()
+    for (const count of ['', '0', '1.5', '-2', 'two', '1e2', '100']) expect(agentsArgs({ kind: 'own', count }), count).toBeUndefined()
+    expect(agentsArgs({ kind: 'own', count: '99' })).toEqual(['99'])
     expect(atOnce(withAgentsDraft({ ...base, skillAgents: 2 }, { kind: 'own', count: '5' }))).toBe(5)
     expect(atOnce(withAgentsDraft({ ...base, skillAgents: 2, agents: 5 }, { kind: 'skill' }))).toBe(2)
     const half = { ...base, agents: 5 }

@@ -138,6 +138,42 @@ describe('the Automations page', () => {
     expect(runCommand).not.toHaveBeenCalledWith('p1', ['switch', 'post-merge-cleanup', 'on'])
   })
 
+  test('with two projects a refused save names the project too; opening another row closes the open one, and a save that answers later closes only its own row', async () => {
+    let answerPublish: (result: ModuleCommandResult) => void = () => {}
+    const { host, runCommand } = hostAnswering((projectId, args) => {
+      if (args[0] === 'status') return { ok: true, output: STATUS }
+      if (args[0] === 'switch') return { ok: false, error: 'not inside a git repository' }
+      return new Promise<ModuleCommandResult>(resolve => (answerPublish = resolve)) as never
+    })
+    show(host, [GEMSTACK, OTHER])
+    const other = await screen.findByRole('region', { name: 'other' })
+    within(other).getByRole('checkbox', { name: 'Run /work-queue by itself' }).click()
+    expect((await screen.findByRole('alert')).textContent).toBe('The switch of /work-queue in other was not saved: not inside a git repository')
+
+    const gemstack = screen.getByRole('region', { name: 'gemstack' })
+    fireEvent.click(within(gemstack).getByRole('button', { name: 'Edit /post-merge-cleanup' }))
+    fireEvent.change(within(gemstack).getByLabelText('What its runs publish'), { target: { value: 'pr' } })
+    fireEvent.click(within(gemstack).getByRole('button', { name: 'Save' }))
+    // While that save is in flight the person opens another row: the first one closes, one row open at a time.
+    fireEvent.click(within(gemstack).getByRole('button', { name: 'Edit /work-queue' }))
+    expect(within(gemstack).queryByRole('group', { name: 'Editing /post-merge-cleanup' })).toBeNull()
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['publish', 'post-merge-cleanup', 'pr']))
+    expect(within(gemstack).getByRole('listitem', { name: '/post-merge-cleanup' }).className).toMatch(/opacity-60/)
+    answerPublish({ ok: true, output: { ok: true } })
+    await waitFor(() => expect(within(gemstack).getByRole('listitem', { name: '/post-merge-cleanup' }).className).not.toMatch(/opacity-60/))
+    expect(within(gemstack).getByRole('group', { name: 'Editing /work-queue' })).toBeTruthy()
+  })
+
+  test("a look that decided nothing says why beside its age; \"off\" is the status already", async () => {
+    const { host } = hostAnswering(projectId => ({ ok: true, output: { ...STATUS, ...(projectId === 'p1' ? { lastTick: { ...STATUS.lastTick, decisions: [], note: 'agent-data could not be pulled: origin is unreachable' } } : { on: false, lastTick: { ...STATUS.lastTick, decisions: [], note: 'off' } }) } }))
+    show(host, [GEMSTACK, OTHER])
+    const gemstack = await screen.findByRole('region', { name: 'gemstack' })
+    expect(within(gemstack).getByText(/: agent-data could not be pulled: origin is unreachable/)).toBeTruthy()
+    const other = screen.getByRole('region', { name: 'other' })
+    expect(within(other).getByText('Scheduler off')).toBeTruthy()
+    expect(within(other).queryByText(/: off/)).toBeNull()
+  })
+
   test("a skill whose schedule cannot be read is named with the reason; a command the coding agent cannot run says so on its row", async () => {
     const elsewhere = 'not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills'
     const { host } = hostAnswering(() => ({

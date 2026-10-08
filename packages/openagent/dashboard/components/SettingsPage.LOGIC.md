@@ -4,7 +4,7 @@ The Settings page: every preference [1] the user can set, on one page, each chan
 
 **User story**: the user opens Settings (the address `/settings`) to look up or change a setting without hunting through the header's menus, and follows the Overview's [2] hint that the onboarding can be resumed on the settings page. The heading is "Settings" and the line under it reads "Your defaults, everywhere."
 
-**Business logic story**: the same preferences feed the launcher on a project home [3], the notifications bell and the daemon's sweeps [4]. This page is the one surface that lists all of them, so what it shows must match what those surfaces act on. What belongs to a package (the scheduler's spend offset, switches and publish picks, the subagents' models) is not here: it is in that package's own section, after the page's own.
+**Business logic story**: the same preferences feed the launcher on a project home [3], the notifications bell and the daemon's sweeps [4]. This page is the one surface that lists all of them, so what it shows must match what those surfaces act on. What belongs to a package (the scheduler's spend offset, the subagents' models) is not here: it is in that package's own section, after the page's own.
 
 ## Glossary
 
@@ -135,7 +135,7 @@ The "Claude web" section ("A Claude web agent hands off and ends, so the questio
 
 #### Context
 
-**User story**: a project depends on the orchestration package and on the scheduler package; the user scrolls past "Claude web" and finds the first's Subagents section, where they pick the models a main agent's subagents run on, and the second's Scheduler section, where they switch a scheduled command on or off on this machine. A dashboard where no project has the package shows no such section.
+**User story**: a project depends on the orchestration package and on the scheduler package; the user scrolls past "Claude web" and finds the first's Subagents section, where they pick the models a main agent's subagents run on, and the second's Scheduler section, where they type how far past the quota boundary scheduled work may start. A dashboard where no project has the package shows no such section.
 
 **Problem**: a package's settings that this page drew itself would make the dashboard know each package's file and command, so every package's settings would be a change to the dashboard. The page names no package: what comes after its own sections is the installed modules' own.
 

@@ -10,7 +10,7 @@ import { PUBLISH_LABELS, decided, pace, publishChoices, publishes, readScheduler
 // what the scheduler last decided for it, and its switch. "Edit" opens the row in place to pick how
 // far its runs publish. All of it is this machine's, read with `agent-scheduler status` and saved
 // with `switch` and `publish`: no tracked file changes. A command is off until its switch is flipped
-// here, and commits its work until a level is picked here.
+// here, and commits its work until a level is picked here. One row is open at a time.
 
 const EMPTY: SchedulerRow[] = []
 
@@ -18,23 +18,26 @@ export function AutomationsPage({ projects }: ModulePageProps) {
   const host = useModuleHost()
   const key = projects.map(p => p.id).join(',')
   const { value: rows, loaded, reload } = usePolled(() => readSchedulers(host, projects), EMPTY, 10_000, [key])
-  const [busy, setBusy] = useState<string | undefined>()
+  /** The rows with a save waiting or in flight, each as often as it has one. */
+  const [busy, setBusy] = useState<readonly string[]>([])
   const [error, setError] = useState<string | undefined>()
   /** The row open for editing, and the publish pick made in it and not saved yet. */
   const [editing, setEditing] = useState<{ id: string; publish: PublishPick } | undefined>()
   // Saves go one at a time: each is a command that reads the state file, changes it and writes it back.
   const queue = useRef<Promise<unknown>>(Promise.resolve())
   const save = (what: string, id: string, project: ModuleProject, args: string[], then?: () => void): void => {
-    setBusy(id)
+    setBusy(current => [...current, id])
     setError(undefined)
     queue.current = queue.current.then(async () => {
       const answer = await host.runCommand(project.id, args)
-      setBusy(current => (current === id ? undefined : current))
+      setBusy(current => current.filter((other, index) => index !== current.indexOf(id)))
       if (answer.ok) then?.()
-      else setError(`The ${what} of /${args[1]} was not saved: ${answer.error}`)
+      else setError(`The ${what} of /${args[1]}${projects.length > 1 ? ` in ${project.name}` : ''} was not saved: ${answer.error}`)
       await reload()
     })
   }
+  /** Close the row, unless the person has opened another one since. */
+  const close = (id: string): void => setEditing(current => (current?.id === id ? undefined : current))
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-6">
@@ -61,6 +64,8 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                     <TooltipTrigger render={<span className="tabular-nums" />}>{formatAge(row.lastTick.at)}</TooltipTrigger>
                     <TooltipContent>{formatDateTime(row.lastTick.at)}</TooltipContent>
                   </Tooltip>
+                  {/* Why that look decided nothing, when it says: a pull that failed. "off" is the status beside the name already. */}
+                  {row.lastTick.note !== undefined && row.lastTick.note !== 'off' && `: ${row.lastTick.note}`}
                 </span>
               )}
             </div>
@@ -74,7 +79,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
             <ul className="divide-y divide-border">
               {row.commands.map(scheduled => {
                 const id = `${row.project.id}/${scheduled.command}`
-                const saving = busy === id
+                const saving = busy.includes(id)
                 const open = editing?.id === id ? editing : undefined
                 return (
                   <li key={id} aria-label={`/${scheduled.command}`} className={cn('py-3', saving && 'opacity-60')}>
@@ -126,7 +131,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                             <Button
                               size="sm"
                               disabled={saving}
-                              onClick={() => (open.publish === scheduled.publish ? setEditing(undefined) : save('publish pick', id, row.project, ['publish', scheduled.command, open.publish], () => setEditing(undefined)))}
+                              onClick={() => (open.publish === scheduled.publish ? close(id) : save('publish pick', id, row.project, ['publish', scheduled.command, open.publish], () => close(id)))}
                             >
                               Save
                             </Button>

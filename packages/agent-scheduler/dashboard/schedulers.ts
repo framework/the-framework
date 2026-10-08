@@ -175,9 +175,9 @@ const UNITS: Readonly<Record<string, string>> = { m: 'minute', h: 'hour', d: 'da
 
 /** An interval as a skill writes it, spelled out: `15m` is "15 minutes", `1h` is "1 hour". One the tool would not have read is shown as written. */
 export function spelled(every: string): string {
-  const unit = UNITS[every.slice(-1)]
-  const count = Number(every.slice(0, -1))
-  return unit && Number.isInteger(count) ? `${count} ${unit}${count === 1 ? '' : 's'}` : every
+  const read = /^(\d+)(m|h|d)$/.exec(every)
+  const count = Number(read?.[1])
+  return read && count >= 1 ? `${count} ${UNITS[read[2]!]}${count === 1 ? '' : 's'}` : every
 }
 
 const sentence = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)

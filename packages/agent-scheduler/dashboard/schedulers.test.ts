@@ -99,7 +99,7 @@ describe('in words', () => {
     expect(pace({ ...base, when: 'npx queue', waitsFor: 'when the queue holds a task' })).toBe('When the queue holds a task')
     expect(pace({ ...base, every: '6h', when: 'x' })).toBe('Every 6 hours at most, when its check finds work')
     expect(pace({ ...base, every: '15m', when: 'x', waitsFor: 'when a ticket has no plan' })).toBe('Every 15 minutes at most, when a ticket has no plan')
-    expect([spelled('1m'), spelled('1h'), spelled('7d'), spelled('2w'), spelled('soon')]).toEqual(['1 minute', '1 hour', '7 days', '2w', 'soon'])
+    expect([spelled('1m'), spelled('1h'), spelled('7d'), spelled('2w'), spelled('soon'), spelled('0d'), spelled('d'), spelled('-3h'), spelled('06h')]).toEqual(['1 minute', '1 hour', '7 days', '2w', 'soon', '0d', 'd', '-3h', '6 hours'])
   })
 
   test("how far a scheduled command publishes, by this machine's pick", () => {

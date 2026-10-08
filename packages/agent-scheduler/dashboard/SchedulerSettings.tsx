@@ -23,6 +23,8 @@ export function SchedulerSettings({ projects }: ModuleSettingsProps) {
   const [typed, setTyped] = useState<number | undefined>()
   const [text, setText] = useState<string | undefined>()
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // Saves go one at a time: each is a command per project that reads the state file, changes it and writes it back.
+  const queue = useRef<Promise<unknown>>(Promise.resolve())
   useEffect(() => {
     if (typed !== undefined && read === typed) setTyped(undefined)
   }, [read, typed])
@@ -31,14 +33,16 @@ export function SchedulerSettings({ projects }: ModuleSettingsProps) {
   const setOffset = (points: number): void => {
     setTyped(points)
     clearTimeout(timer.current)
-    timer.current = setTimeout(async () => {
+    timer.current = setTimeout(() => {
       setError(undefined)
-      const saved = await saveSpendOffset(host, projects, points)
-      if (!saved.ok) {
-        setTyped(undefined)
-        setError(`The spend offset was not saved: ${saved.error}`)
-      }
-      await reload()
+      queue.current = queue.current.then(async () => {
+        const saved = await saveSpendOffset(host, projects, points)
+        if (!saved.ok) {
+          setTyped(undefined)
+          setError(`The spend offset was not saved: ${saved.error}`)
+        }
+        await reload()
+      })
     }, OFFSET_SAVE_DELAY_MS)
   }
 

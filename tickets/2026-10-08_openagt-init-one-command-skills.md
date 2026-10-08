@@ -5,7 +5,7 @@ Issue: [#2023](https://github.com/openagt/openagent/issues/2023)
 
 ## TLDR
 
-A person who adds a project to OpenAgent gets almost no skills today. `npx @openagt/init` becomes the one front door: it sets up a project, shows the skills as a list with ticks, writes the ticked ones as tracked files, offers one commit (never a push), and ends by asking "Open the dashboard?". A skill's text calls its command by its full name and a version range (`npx @openagt/skill-tickets@^1 list`), so nothing is installed in the project.
+A person who adds a project to OpenAgent gets almost no skills today. `npx @openagt/init` becomes the one front door: it sets up a project, shows the skills as a list with ticks, writes the ticked ones as tracked files, offers one commit (never a push), and ends by asking "Open the dashboard?". A skill's text calls its command by its full name and a version range (`npx @openagt/skill-tickets@^1 list`), so nothing is installed in the project. Four basic skills (branches, logs, question, and github on a GitHub project) come with every run, with no commit.
 
 ## Why it matters
 
@@ -28,28 +28,26 @@ Only this repository works fully, because it was set up by hand: 24 skill texts 
    - Reviews and research (8): maintainability, maintenance, readability, security-audit, ux, research, market-research, suggest-new-features.
    - Subagents (1): orchestration. After a merge (1): post-merge-cleanup.
    - Needs its own setup (2), not ticked: browser, discord.
-   - The scheduler.
+   - The scheduler, ticked (see point 8).
 
-   Enter writes the ticked skills. Run again, the ticks show what the project has; a tick added writes a skill, a tick removed deletes it. `npx @openagt/init add <name>` and `remove <name>` do the same for scripts. A skill init does not know is left alone.
-4. **Four basic skills come with every run**: branches, logs and question, and github when the remote is on GitHub, linked into each agent checkout, hidden from git, as branches is today. A project's own tracked copy wins. "Add project" names these four in what it adds. This point was decided by the agent, not a person.
+   Enter writes the ticked skills. Run again, the ticks show what the project has; a tick added writes a skill, a tick removed deletes it. `npx @openagt/init add <name>` and `remove <name>` do the same for scripts. A skill init does not know is left alone. It ends by asking "Open the dashboard?"; on yes it starts the dashboard in the folder, which already offers the folder it was started in as a project.
+4. **Four basic skills come with every run**: branches, logs and question, and github when the remote is on GitHub, linked into each agent checkout, hidden from git, as branches is today. A project's own tracked copy wins. The reason is the checkout: a person who cannot change the default branch (a protected branch, a repository that is not theirs, a first try) would otherwise get agents that cannot ask a question. "Add project" names these four in what it adds.
 5. **"Add project" stays as it is.** The project shows one line ("This project has 4 of 25 skills") with an "Add skills" button opening the same list. The dashboard and the command run the same code.
 6. **A newer text**: the dashboard says so in one line ("3 skills have a newer text") with an "Update" button, and init says the same. Updating rewrites the files; the person reads `git diff` and commits or discards. A newer command arrives by itself inside the range.
 7. **The commit**: init asks "Commit these files now?" and makes one commit on the current branch holding only the skill files, never a push, then says what is left (push, or a pull request when the default branch is protected). "Add skills" offers the same commit. While a text is in the folder but not on the branch agents start from, the dashboard says so ("Tickets: waiting to reach main"), so the launcher never offers a command the agent lacks.
-8. **The scheduler is a tick**: it writes the two start and stop lines into `.openagent/hooks.yml`, by full name. That file is hidden from git, so this tick is per person and per machine, with no commit. It fits #2022.
+8. **The scheduler is a tick**, ticked by default: it writes the two start and stop lines into `.openagent/hooks.yml`, by full name. That file is hidden from git, so this tick is per person and per machine, with no commit. It fits #2022: every scheduled row starts switched off there, so the scheduler starts no agent until the person switches a row on.
 9. **A project not on GitHub**: init does not offer github and says in one line that agents push their branch and the person opens the request.
 
 ## Open questions
 
-1. Is point 4 right: four skills arrive without a commit while the others need one?
-2. Is the scheduler ticked by default? It does nothing with no scheduled row, and whether a row starts switched off is open in #2022.
-3. Newer than what? Init through `npx` carries the latest texts; the dashboard carries those of its installed version. The two can disagree.
-4. "Update" overwrites a text changed by hand. Is the diff enough, or should init say which files differ from any version it knows before writing?
-5. Eleven skill texts mention pull requests or issues: what each does with no git host skill is unchecked.
-6. Does a skill break when another is unticked (work-queue without queue, plan-tickets without tickets)? To check before the list lets a person untick one alone.
-7. What `npx` does for a full name with no network is unchecked. With `--offline` it runs from its cache in 0.3 seconds.
-8. Only the folders of Claude Code and Codex are written.
-9. A package of default skills, and picking by use case (`--use-cases`), are left for later.
-10. This reverses written decisions (a skill's command is a dependency of the project; a project's pages come from its `package.json`): those texts have to be rewritten by a person.
+1. Newer than what? Init through `npx` carries the latest texts; the dashboard carries those of its installed version. The two can disagree.
+2. "Update" overwrites a text changed by hand. Is the diff enough, or should init say which files differ from any version it knows before writing?
+3. Eleven skill texts mention pull requests or issues: what each does with no git host skill is unchecked.
+4. Does a skill break when another is unticked (work-queue without queue, plan-tickets without tickets)? To check before the list lets a person untick one alone.
+5. What `npx` does for a full name with no network is unchecked. With `--offline` it runs from its cache in 0.3 seconds.
+6. Only the folders of Claude Code and Codex are written.
+7. A package of default skills, and picking by use case (`--use-cases`), are left for later.
+8. This reverses written decisions (a skill's command is a dependency of the project; a project's pages come from its `package.json`): those texts have to be rewritten by a person.
 
 ## Not part of this
 

@@ -9,10 +9,12 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 ## Commands
 - Two kinds of skill: capability skills (`branches`, `tickets`, `queue`, `logs`), each a
   SKILL.md and a command, each saying how to do one thing; and command skills, each a
-  SKILL.md only, each a job that composes capabilities. A command assumes no capability
-  and names no skill; where the job is broken without a capability, it says so in
-  capability words and stops. Picked over a command naming the capabilities it uses,
-  which would tie the job to a package. A capability never names another skill.
+  SKILL.md only, each a job that composes capabilities. A command assumes no capability and
+  names no skill; where the job is broken without a capability, it says so in capability
+  words and stops. The check of its `schedule`, in the front matter, is the one place that
+  names commands: the scheduler runs it and the agent is never given it. Picked over a
+  command naming the capabilities it uses, which would tie the job to a package. A
+  capability never names another skill.
 - One package per command, `@openagt/skill-<command>`, the SKILL.md at the package root
   like the capability skills. Picked over one package holding every command, so a project
   installs the commands it wants and nothing else; the name follows Claude Code's own
@@ -20,10 +22,10 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - A command is marked `disable-model-invocation`: a person or a runner fires it, the
   agent never picks it on its own.
 - One triage command with a mode word, `/triage quick` and `/triage consensual`, and both
-  modes when the word is missing; the schedule paces and switches each mode on its own
-  line. Picked over two commands one sentence apart (the same job written twice), and
-  over one line running both modes (significant work would then be queued wherever quick
-  wins are, with no switch of its own).
+  modes when the word is missing; each mode is a scheduled command of its own, with its own
+  pace and its own switch. Picked over two commands one sentence apart (the same job
+  written twice), and over one scheduled command running both modes (significant work would
+  then be queued wherever quick wins are, with no switch of its own).
 - The command's words are the rules of the job, in numbers two runs agree on, read off the
   ticket listing: a quick win is a planned ticket with effort 2 or less and uncertainty 2
   or less; consensual work is a planned ticket with uncertainty 3 or less that is no quick

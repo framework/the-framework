@@ -28,38 +28,51 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   depends on OpenAgent, and OpenAgent never depends on it. Its dashboard part is
   the exception: it is drawn with the dashboard's module contract, and the tool itself runs
   without it.
-- The tool names no skill and no command. What runs comes from the schedule file, and a
-  command runs only when `.claude/skills/<command>` exists in the project; else the state
-  says "no such command in this project". Picked over the tool linking a command's skill
-  into the checkout from a package: a project tracks its skills, and the tool reads the
-  project.
-- One scheduler per project, since the schedule is a file in the project and the state sits
-  beside it. Picked over one per machine reading a registry of projects: nothing
-  machine-wide is left for it to hold.
+- The tool names no skill and no command. What runs comes from the project's skills: a
+  skill says in its own file that it can be scheduled, and a skill that is not in the
+  project has no scheduled command. Picked over the tool linking a command's skill into the
+  checkout from a package: a project tracks its skills, and the tool reads the project.
+- One scheduler per project, since the schedule comes from the project's skills and the
+  state sits in the project. Picked over one per machine reading a registry of projects:
+  nothing machine-wide is left for it to hold.
 
-## The two files
-- The schedule, `agent-schedule.md` at the repository root, tracked, written by a person:
-  one list line per command with its check and its cap. The check is a shell command run at
-  the repository root; due means it exits 0 and prints a JSON value that is not empty.
-  Picked over the tool reading the branch head (every commit was a start, most of them
-  empty), over the tool reading the queue (the tool would know a skill), and over a bare
-  clock (empty runs). A list line the parser cannot read is skipped and named, never
-  guessed.
-- A schedule line may say `publish <commit|branch|pr|merge>`; a line that says nothing
-  publishes nothing, as a run given no level does. The line is the team's default, in the
-  tracked schedule like the cap. A person may override it for one command on their machine,
-  in the state file like the on/off switch; the scheduler's own Settings section shows the
-  level in force and changes it.
-  Picked over the level being the file's alone, where changing it on one machine meant
-  editing a tracked file.
-- A schedule line paces a command two ways, alone or together: `when` says there is work
-  (the check's output), `every` says how often at most (the least time since the command's
-  last recorded start, read off the run records on the branch, so every machine agrees and
-  nothing new is stored). A routine whose run changes nothing cannot be paced by a check
-  alone: it would start every minute. Picked over a rotation of the routines in a fixed
-  order behind an empty queue (one line then depends on another, and idle it started an
-  agent every 30 minutes), and over a clock time (`at 09:00`: machine-local, and two
-  machines fire twice). Order is what the numbers say.
+## The schedule and the state
+- The schedule is the project's skills. A skill brings its scheduled command in the front
+  matter of its `SKILL.md`, under `schedule`: its check, its pace, how many agents may run
+  it at once, and one plain line saying what the check waits for. Picked over
+  `agent-schedule.md`, a tracked file at the repository root that a person wrote, one line
+  per command: a line could name a skill the project did not have, the check lived far from
+  the skill it belongs to, and a project with no such file had no scheduled command
+  whatever its skills. The check is a shell command run at the repository root; due means
+  it exits 0 and prints a JSON value that is not empty. Picked over the tool reading the
+  branch head (every commit was a start, most of them empty), over the tool reading the
+  queue (the tool would know a skill), and over a bare clock (empty runs). A `schedule` the
+  tool cannot read is skipped and named, never guessed.
+- A skill's check may name the commands of other skills (`npx queue`, `npx tickets`),
+  though the words a command skill gives the agent name none. The scheduler runs the check;
+  the agent is never given it. Picked over keeping the checks in a file of the project,
+  away from the skill they belong to.
+- Every scheduled command starts switched off, on every machine, and runs only where a
+  person switched it on. Picked over a command that runs unless a person switched it off: a
+  skill that arrives in a project would start agents by itself.
+- The schedule is read from both folders a coding agent reads skills from, `.claude/skills`
+  first. A command whose skill is only in `.agents/skills` is listed and never started, and
+  the tick says so: a scheduled run is on Claude Code, which reads `.claude/skills` only.
+  Picked over reading `.claude/skills` alone, where such a skill would have no row and
+  nothing would say why.
+- How far a scheduled command's runs publish is each person's pick on their own machine, in
+  the state file like the switch; the scheduler's own Settings section shows the pick and
+  changes it. Until a person picks, a run commits its work and pushes nothing. Picked over
+  a level written beside the command for the whole team, which a person could only
+  override: nothing leaves a machine before its own person said so.
+- A skill paces its scheduled command two ways, alone or together: `when` says there is
+  work (the check's output), `every` says how often at most (the least time since the
+  command's last recorded start, read off the run records on the branch, so every machine
+  agrees and nothing new is stored). A routine whose run changes nothing cannot be paced by
+  a check alone: it would start every minute. Picked over a rotation of the routines in a
+  fixed order behind an empty queue (one command then depends on another, and idle it
+  started an agent every 30 minutes), and over a clock time (`at 09:00`: machine-local, and
+  two machines fire twice). Order is what the numbers say.
 - The state, `.agent-scheduler/state.json`, untracked, per user, hidden through git's
   exclude file the way `.branches/` is: on or off, keep-alive, the model, the spend cushion,
   the scheduler's pid, the last tick and what it decided. Nothing the tool knows is only in
@@ -73,9 +86,10 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   model: a scheduled run is on Claude Code.
 
 ## The tick
-- The checks in the cheapest order: the command exists, the check says due, the cap, then
-  the quota. The quota is read only when everything else says start, because the reading
-  spawns the agent's CLI and its usage fetch is refused upstream when asked too often.
+- The checks in the cheapest order: the coding agent can run the command, it is switched
+  on, the check says due, the cap, then the quota. The quota is read only when everything
+  else says start, because the reading spawns the agent's CLI and its usage fetch is
+  refused upstream when asked too often.
 - The quota gate is OpenAgent's spend boundary, copied: a window in force may be used
   only as far as the week has elapsed, plus the user's cushion, half a day when unset.
   Picked over a plainer line (a window at 100% stands down): nothing would pace the week.
@@ -85,9 +99,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   A push that fails twice is another machine getting there first: withdrawn, no spawn.
 - A running record from another machine counts against its command's cap until that
   machine or a person ends it; a stuck command is fixed by hand.
-- A run counts for the schedule line its prompt names, and the scheduler decides that when
-  it counts the records; the run's record holds only the prompt. Picked over the runner
-  reading the schedule to name the command: the runner reads no scheduler file.
+- A run counts for the scheduled command its prompt names, and the scheduler decides that
+  when it counts the records; the run's record holds only the prompt. Picked over the
+  runner reading the schedule to name the command: the runner reads no scheduler file.
 - The daily heartbeat and the transport retry OpenAgent's daemon had are dropped: a
   failed run leaves its queue entry for the next tick.
 

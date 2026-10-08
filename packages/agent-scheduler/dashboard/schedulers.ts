@@ -1,6 +1,7 @@
 import type { ModuleHost, ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick, TickDecision } from '../src/state.js'
 import { DEFAULT_PUBLISH } from '../src/names.js'
+import { paceInForce, parseInterval, parseTimeOfDay, takesTimeOfDay, type PacePick, type PaceUnit } from '../src/pace.js'
 
 // What the module shows of each project's scheduler: the answer of `agent-scheduler status`, the
 // state file as it stands plus whether the scheduler's process is alive. Forgiving: a field that is
@@ -35,6 +36,8 @@ export interface SchedulerCommand {
   on: boolean
   /** How far a run of the command publishes on this machine: the pick made here, commit until one is made. */
   publish: PublishPick
+  /** This machine's pace for the command, where a person set one: it stands in for the skill's interval. */
+  pace?: PacePick
   /** What the command's skill does, in the skill's own words, when it says. */
   description?: string
   /** What the scheduler's last tick decided for the command, when it decided anything. */
@@ -73,6 +76,12 @@ function isPick(value: unknown): value is PublishPick {
   return (PUBLISH_PICKS as unknown[]).includes(value)
 }
 
+/** Whether a value of the state reads as a pace a person set: "whenever there is work", or an interval the tool reads. */
+function isPace(value: unknown): boolean {
+  const pick = record(value)
+  return pick['work'] === true || (typeof pick['every'] === 'string' && parseInterval(pick['every']) !== undefined)
+}
+
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }
@@ -86,6 +95,7 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
   const tick = record(state['lastTick'])
   const switches = record(state['switches'])
   const publishes = record(state['publishes'])
+  const paces = record(state['paces'])
   const decisions: TickDecision[] = []
   for (const item of Array.isArray(tick['decisions']) ? (tick['decisions'] as unknown[]) : []) {
     const d = record(item)
@@ -106,6 +116,7 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
       ...(typeof row['waitsFor'] === 'string' ? { waitsFor: row['waitsFor'] } : {}),
       on: switches[command] === true,
       publish: isPick(picked) ? picked : DEFAULT_PUBLISH,
+      ...(isPace(paces[command]) ? { pace: paces[command] as PacePick } : {}),
       ...(typeof row['description'] === 'string' ? { description: row['description'] } : {}),
       ...(decision ? { decision } : {}),
     })
@@ -171,23 +182,82 @@ export function publishChoices(gitHost: boolean, saved: PublishPick): readonly P
   return offered.includes(saved) ? offered : [...offered, saved]
 }
 
-const UNITS: Readonly<Record<string, string>> = { m: 'minute', h: 'hour', d: 'day' }
+/** A unit's word on the page, in the order the menu lists them. */
+export const UNIT_WORDS: Readonly<Record<PaceUnit, string>> = { m: 'minute', h: 'hour', d: 'day', w: 'week', mo: 'month' }
 
-/** An interval as a skill writes it, spelled out: `15m` is "15 minutes", `1h` is "1 hour". One the tool would not have read is shown as written. */
+/** An interval as written, spelled out: `15m` is "15 minutes", `1h` is "1 hour", `2w` is "2 weeks". One the tool would not have read is shown as written. */
 export function spelled(every: string): string {
-  const read = /^(\d+)(m|h|d)$/.exec(every)
-  const count = Number(read?.[1])
-  return read && count >= 1 ? `${count} ${UNITS[read[2]!]}${count === 1 ? '' : 's'}` : every
+  const read = parseInterval(every)
+  return read ? `${read.count} ${UNIT_WORDS[read.unit]}${read.count === 1 ? '' : 's'}` : every
 }
 
 const sentence = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
 
-/** How often a scheduled command runs, as a sentence: its interval, what its check waits for, or both. A check whose skill gives no plain line is "when its check finds work". */
+/**
+ * How often a scheduled command runs, as a sentence, by the pace in force: this machine's, else
+ * its skill's. An interval is "Every 6 hours", with "at most" before what its check waits for
+ * when it has a check; a time of day is "Every 2 days at 10:00"; a command its check alone paces
+ * says what the check waits for. A check whose skill gives no plain line is "when its check finds
+ * work".
+ */
 export function pace(command: SchedulerCommand): string {
   const waits = command.waitsFor ?? 'when its check finds work'
-  if (command.every && command.when) return `Every ${spelled(command.every)} at most, ${waits}`
-  if (command.every) return `Every ${spelled(command.every)}`
-  return sentence(waits)
+  const skills = command.every === undefined ? undefined : parseInterval(command.every)
+  const inForce = paceInForce(command.pace, { ...(skills ? { every: skills } : {}), ...(command.when !== undefined ? { when: command.when } : {}) })
+  // An interval of the skill's the tool would not have read is shown as written.
+  const every = inForce ? spelled(inForce.every.text) : command.pace === undefined && command.every !== undefined ? command.every : undefined
+  if (every === undefined) return sentence(waits)
+  const when = inForce?.at ? `Every ${every} at ${inForce.at.text}` : `Every ${every}`
+  if (command.when === undefined) return when
+  return inForce?.at ? `${when}, ${waits}` : `${when} at most, ${waits}`
+}
+
+/** Whether the pace a command runs at is one a person set on this machine, not its skill's. */
+export function ownPace(command: SchedulerCommand): boolean {
+  return draftOf(command).kind !== 'skill'
+}
+
+/**
+ * A pace as the Edit box holds it while a person picks: the skill's own, whenever there is work,
+ * or an interval typed as a count and a unit with an optional time of day. The count and the time
+ * are text, as typed, so a half-typed one is no pace yet.
+ */
+export type PaceDraft = { kind: 'skill' } | { kind: 'work' } | { kind: 'every'; count: string; unit: PaceUnit; at: string }
+
+/** The draft a command's Edit box opens with: its pace on this machine, the skill's own where nobody set one or the one set cannot be followed. */
+export function draftOf(command: SchedulerCommand): PaceDraft {
+  const pick = command.pace
+  if (pick === undefined) return { kind: 'skill' }
+  // "Whenever there is work" is what a skill with a check and no interval says already.
+  if ('work' in pick) return command.when !== undefined && command.every !== undefined ? { kind: 'work' } : { kind: 'skill' }
+  const every = parseInterval(pick.every)
+  if (!every) return { kind: 'skill' }
+  const at = takesTimeOfDay(every) && pick.at !== undefined ? parseTimeOfDay(pick.at) : undefined
+  return { kind: 'every', count: String(every.count), unit: every.unit, at: at?.text ?? '' }
+}
+
+/**
+ * What a draft is on the command line, after `pace <command>`: `skill`, `work`, or an interval
+ * with its time of day when it has one. Nothing while the draft is no pace yet: a count that is
+ * no whole number above 0, a time that is none. A time typed beside minutes or hours is left out,
+ * since the page hides the field then.
+ */
+export function paceArgs(draft: PaceDraft): string[] | undefined {
+  if (draft.kind !== 'every') return [draft.kind]
+  const every = /^\d+$/.test(draft.count.trim()) ? parseInterval(`${draft.count.trim()}${draft.unit}`) : undefined
+  if (!every) return undefined
+  if (!takesTimeOfDay(every) || draft.at.trim() === '') return [every.text]
+  const at = parseTimeOfDay(draft.at.trim())
+  return at ? [every.text, at.text] : undefined
+}
+
+/** A command as it would read with a draft saved: what the Edit box's sentence describes. The command as it is while the draft is no pace yet. */
+export function withDraft(command: SchedulerCommand, draft: PaceDraft): SchedulerCommand {
+  const args = paceArgs(draft)
+  if (!args) return command
+  const { pace: _pace, ...rest } = command
+  if (args[0] === 'skill') return rest
+  return { ...rest, pace: args[0] === 'work' ? { work: true } : { every: args[0]!, ...(args[1] !== undefined ? { at: args[1] } : {}), since: '' } }
 }
 
 /** How far a scheduled command's runs publish on this machine, as a sentence. */
@@ -205,9 +275,10 @@ export function publishes(command: SchedulerCommand): string {
  * for a command switched off here, and nothing for one switched on that no tick has decided yet.
  * A decision is said in plain words where the tool's own are a rule's shorthand ("No work", "One
  * is already running"), and in the tool's words with a capital where they carry a reason only the
- * tool knows (`Quota: …`, `Check failed: …`).
+ * tool knows (`Quota: …`, `Check failed: …`). A command waiting for its time of day says when it
+ * is next due: "Next: Saturday 10:00".
  */
-export function decided(command: SchedulerCommand): string | undefined {
+export function decided(command: SchedulerCommand, now: Date = new Date()): string | undefined {
   const outcome = command.decision?.outcome
   const elsewhere = /^not a command of the coding agent: its skill is only under (\S+),/.exec(outcome ?? '')
   if (elsewhere) return `Cannot start: its skill is only in ${elsewhere[1]}, which Claude Code does not read`
@@ -217,9 +288,25 @@ export function decided(command: SchedulerCommand): string | undefined {
   if (outcome.startsWith('started ')) return 'Started a run'
   const paced = /^not due \(last start (.+) ago, /.exec(outcome)
   if (paced) return `Started ${paced[1]} ago, not due yet`
+  const next = /^not due \(next start from (\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d),/.exec(outcome)
+  if (next) return `Next: ${nextWords(new Date(Number(next[1]), Number(next[2]) - 1, Number(next[3]), Number(next[4]), Number(next[5])), now)}`
   const capped = /^cap reached \((\d+) in flight/.exec(outcome)
   if (capped) return capped[1] === '1' ? 'One is already running' : `${capped[1]} are already running`
   return sentence(outcome)
+}
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** A coming local time, for a person: "today 10:00", "tomorrow 10:00", the weekday within a week ("Saturday 10:00"), else the date ("24 Oct 10:00"). */
+export function nextWords(when: Date, now: Date): string {
+  const two = (n: number): string => String(n).padStart(2, '0')
+  const time = `${two(when.getHours())}:${two(when.getMinutes())}`
+  const days = Math.round((new Date(when.getFullYear(), when.getMonth(), when.getDate()).getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86_400_000)
+  if (days === 0) return `today ${time}`
+  if (days === 1) return `tomorrow ${time}`
+  if (days > 1 && days < 7) return `${WEEKDAYS[when.getDay()]} ${time}`
+  return `${when.getDate()} ${MONTHS[when.getMonth()]} ${time}`
 }
 
 /** The one word a scheduler's row leads with, and its colour. */

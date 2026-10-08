@@ -8,7 +8,6 @@
 
 
 ## Priority 5
-- Create tickets/2026-10-08_automations-skills-bring-scheduled-rows.plan.md
 
 
 ## Priority 4

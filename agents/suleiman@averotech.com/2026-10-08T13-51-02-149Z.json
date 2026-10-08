@@ -6,7 +6,6 @@
   "intent": "/update-tickets",
   "driver": "claude-code",
   "model": "claude-opus-5-5",
-  "branch": "agent-2026-10-08T13-51-02-149Z",
   "cost": 0.33520639999999996,
   "caller": {
     "runner": {

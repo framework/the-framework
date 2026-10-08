@@ -357,6 +357,19 @@ test("this machine's number of agents at once stands in for the skill's, against
   await tick(raced.deps)
   assert.deepEqual(raced.seen.withdrawn, [])
   assert.equal(raced.seen.spawned.length, 1)
+
+  // The other way: the skill allows two, this machine's person says one, and another machine's marker lands first: this machine's is withdrawn.
+  const fewerCards: RunCard[] = []
+  const lost = deps({ commands: [command('work-queue', { when: 'npx queue', cap: 2 })], inFlightCards: fewerCards, stateOver: { switches: { 'work-queue': true }, agents: { 'work-queue': 1 } } })
+  const writeLost = lost.deps.writeMarker
+  lost.deps.writeMarker = async card => {
+    fewerCards.push(running('2026-09-16T14-00-59-000Z', 'work-queue'))
+    return writeLost(card)
+  }
+  const record = await tick(lost.deps)
+  assert.deepEqual(lost.seen.withdrawn, ['2026-09-16T14-01-00-000Z'])
+  assert.deepEqual(lost.seen.spawned, [])
+  assert.match(record.decisions[0]!.outcome, /^cap reached \(1 in flight/)
 })
 
 test('a marker whose push failed twice is withdrawn and nothing is spawned', async () => {

@@ -270,6 +270,8 @@ test("agents writes this machine's number of agents at once for a scheduled comm
     assert.deepEqual((three.out as { agents: unknown }).agents, { 'work-queue': 3 })
     await run(repo, 'agents', 'work-queue', '1')
     assert.deepEqual((await readState(repo)).agents, { 'work-queue': 1 }, 'one is a pick too, kept')
+    await run(repo, 'agents', 'work-queue', '099')
+    assert.deepEqual((await readState(repo)).agents, { 'work-queue': 99 }, 'the top, a leading zero dropped')
     await run(repo, 'agents', 'work-queue', 'skill')
     assert.equal((await readState(repo)).agents, undefined)
 
@@ -278,6 +280,11 @@ test("agents writes this machine's number of agents at once for a scheduled comm
     assert.deepEqual(unknown.out, { ok: false, reason: 'not-scheduled', command: 'triage' })
     // A number left for a skill that is gone can always be taken back.
     assert.equal((await run(repo, 'agents', 'never-heard-of', 'skill')).code, 0)
+    // A skill whose schedule cannot be read: the refusal says why.
+    await writeSkill(repo, 'triage', 'schedule:\n  evry: 6h\n')
+    const typo = await run(repo, 'agents', 'triage', '2')
+    assert.equal(typo.code, 1)
+    assert.equal(typo.err, 'the schedule of triage cannot be read: unknown key evry')
 
     for (const argv of [['agents', 'work-queue'], ['agents', 'work-queue', '0'], ['agents', 'work-queue', '1.5'], ['agents', 'work-queue', '-2'], ['agents', 'work-queue', 'many'], ['agents', 'work-queue', '100'], ['agents', 'work-queue', '2', 'extra']]) {
       const bad = await run(repo, ...argv)

@@ -115,6 +115,8 @@ test("the cap in force is this machine's number of agents at once, else the skil
   const mine = withAgents(withAgents(DEFAULT_STATE, 'work-queue', 3), 'triage quick', 1)
   assert.deepEqual(mine.agents, { 'work-queue': 3, 'triage quick': 1 })
   assert.equal(capInForce(mine, skill), 3)
+  // 99 is the top, and a pick.
+  assert.equal(capInForce({ ...DEFAULT_STATE, agents: { 'work-queue': 99 } }, skill), 99)
   // A number below the skill's is a pick too.
   assert.equal(capInForce(mine, { name: 'triage quick', cap: 4 }), 1)
   // Another command still has its skill's.

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { STATUS, hostAnswering } from './fixtures.js'
-import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, decided, draftOf, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withAgentsDraft, withDraft } from './schedulers.js'
+import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, saysAtOnce, decided, draftOf, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withAgentsDraft, withDraft } from './schedulers.js'
 
 const GEMSTACK = { id: 'p1', name: 'gemstack', gitHost: true }
 const OTHER = { id: 'p2', name: 'other', gitHost: false }
@@ -190,6 +190,8 @@ describe('in words', () => {
     expect(atOnce({ ...base, skillAgents: 2, agents: 1 })).toBe(1)
     expect(atOnce({ ...base, agents: 3 })).toBe(3)
     expect([atOnceWords(1), atOnceWords(2), atOnceWords(10)]).toEqual(['One at a time', 'Up to 2 at once', 'Up to 10 at once'])
+    // Worth saying when it is more than one, or a person set it, even to one.
+    expect([saysAtOnce(base), saysAtOnce({ ...base, skillAgents: 2 }), saysAtOnce({ ...base, agents: 1 }), saysAtOnce({ ...base, skillAgents: 2, agents: 1 })]).toEqual([false, true, true, true])
 
     expect(agentsDraftOf(base)).toEqual({ kind: 'skill' })
     expect(agentsDraftOf({ ...base, agents: 3 })).toEqual({ kind: 'own', count: '3' })

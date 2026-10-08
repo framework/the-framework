@@ -265,7 +265,7 @@ describe('the Automations page', () => {
     const many = within(editor).getByRole('group', { name: 'How many at once' })
     expect((within(many).getByRole('radio', { name: /As the skill says/ }) as HTMLInputElement).checked).toBe(true)
     expect(within(many).getByText('up to 2 at once')).toBeTruthy()
-    expect(within(many).getByText('Counted with the agents of every machine that shares this repository.')).toBeTruthy()
+    expect(within(many).getByText('A new one starts only when the row is due, and only while fewer than this are working on any machine that shares this repository.')).toBeTruthy()
     expect(within(editor).getByText('Every 1 day. Up to 2 at once. Commits its work.')).toBeTruthy()
     // Picking a number starts from the skill's.
     fireEvent.click(within(many).getByRole('radio', { name: 'Up to' }))
@@ -277,9 +277,10 @@ describe('the Automations page', () => {
       expect(save.disabled, typed).toBe(true)
       expect(within(editor).getByText('Type a whole number of agents, from 1 to 99.')).toBeTruthy()
     }
+    // Lowered to one where the skill lets two: the sentence says so, it does not go quiet.
     fireEvent.change(count, { target: { value: '1' } })
     expect(within(many).getByText('agent at once')).toBeTruthy()
-    expect(within(editor).getByText('Every 1 day. Commits its work.')).toBeTruthy()
+    expect(within(editor).getByText('Every 1 day. One at a time. Commits its work.')).toBeTruthy()
     fireEvent.change(count, { target: { value: '4' } })
     expect(within(editor).getByText('Every 1 day. Up to 4 at once. Commits its work.')).toBeTruthy()
     fireEvent.click(within(within(editor).getByRole('group', { name: 'When it runs' })).getByRole('radio', { name: 'Every' }))
@@ -302,6 +303,40 @@ describe('the Automations page', () => {
     fireEvent.click(within(second).getByRole('radio', { name: /As the skill says/ }))
     fireEvent.click(within(screen.getByRole('group', { name: 'Editing /work-queue' })).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['agents', 'work-queue', 'skill']))
+  })
+
+  test("a person's own number of one is said on the row; a number of agents that is not taken stops there: the publish pick is not sent and the row stays open; a pace that is no pace yet is the hint that shows first", async () => {
+    const { host, runCommand } = hostAnswering((projectId, args) => {
+      if (args[0] === 'status') return { ok: true, output: { ...STATUS, agents: { 'work-queue': 1 } } }
+      return args[0] === 'agents' ? { ok: false, error: 'no skill of this project schedules post-merge-cleanup' } : { ok: true, output: { ok: true } }
+    })
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    // The skill says nothing, so one at a time, and so does this person: said because it is their pick.
+    expect(within(row('/work-queue')).getByText('One at a time')).toBeTruthy()
+    expect(within(row('/work-queue')).getByText('your pick')).toBeTruthy()
+    expect(within(row('/post-merge-cleanup')).queryByText('One at a time')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit /post-merge-cleanup' }))
+    const editor = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
+    const many = within(editor).getByRole('group', { name: 'How many at once' })
+    fireEvent.click(within(many).getByRole('radio', { name: 'Up to' }))
+    // Both half typed: the pace's hint shows first, then the number's.
+    fireEvent.change(within(many).getByLabelText('How many agents'), { target: { value: '' } })
+    fireEvent.click(within(within(editor).getByRole('group', { name: 'When it runs' })).getByRole('radio', { name: 'Every' }))
+    fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: '' } })
+    expect(within(editor).getByText('Type a whole number, from 1 to 9999.')).toBeTruthy()
+    fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: '2' } })
+    expect(within(editor).getByText('Type a whole number of agents, from 1 to 99.')).toBeTruthy()
+    fireEvent.change(within(many).getByLabelText('How many agents'), { target: { value: '99' } })
+    fireEvent.change(within(editor).getByLabelText('What its runs publish'), { target: { value: 'pr' } })
+    fireEvent.click(within(editor).getByRole('button', { name: 'Save' }))
+    expect((await within(row('/post-merge-cleanup')).findByRole('alert')).textContent).toBe('The number of agents was not saved: no skill of this project schedules post-merge-cleanup')
+    expect(screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })).toBeTruthy()
+    expect(runCommand.mock.calls.filter(([, args]) => args[0] !== 'status').map(([, args]) => args)).toEqual([
+      ['pace', 'post-merge-cleanup', '2d'],
+      ['agents', 'post-merge-cleanup', '99'],
+    ])
   })
 
   test('a project with no git host package is offered Nothing, Commit and Publish branch only', async () => {

@@ -1,6 +1,6 @@
 import type { ModuleHost, ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick, TickDecision } from '../src/state.js'
-import { DEFAULT_PUBLISH, MAX_AGENTS } from '../src/names.js'
+import { DEFAULT_PUBLISH, isAgents } from '../src/names.js'
 import { MAX_COUNT, paceInForce, parseInterval, parseTimeOfDay, takesTimeOfDay, type PacePick, type PaceUnit } from '../src/pace.js'
 
 // What the module shows of each project's scheduler: the answer of `agent-scheduler status`, the
@@ -87,11 +87,6 @@ function isPace(value: unknown): boolean {
   return pick['work'] === true || (typeof pick['every'] === 'string' && parseInterval(pick['every']) !== undefined)
 }
 
-/** Whether a value is a number of agents at once: a whole number from 1 to 99. The tool's own reading (`isAgents`). */
-function isCount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_AGENTS
-}
-
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }
@@ -128,8 +123,8 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
       on: switches[command] === true,
       publish: isPick(picked) ? picked : DEFAULT_PUBLISH,
       ...(isPace(paces[command]) ? { pace: paces[command] as PacePick } : {}),
-      ...(isCount(row['agents']) && row['agents'] > 1 ? { skillAgents: row['agents'] } : {}),
-      ...(isCount(agents[command]) ? { agents: agents[command] } : {}),
+      ...(isAgents(row['agents']) && row['agents'] > 1 ? { skillAgents: row['agents'] } : {}),
+      ...(isAgents(agents[command]) ? { agents: agents[command] } : {}),
       ...(typeof row['description'] === 'string' ? { description: row['description'] } : {}),
       ...(decision ? { decision } : {}),
     })
@@ -288,6 +283,11 @@ export function atOnce(command: SchedulerCommand): number {
   return command.agents ?? command.skillAgents ?? 1
 }
 
+/** Whether a command's number of agents at once is worth saying: when it is more than one, or a person set it, even to one. */
+export function saysAtOnce(command: SchedulerCommand): boolean {
+  return atOnce(command) > 1 || command.agents !== undefined
+}
+
 /** A number of agents at once, as a sentence: "One at a time", "Up to 3 at once". */
 export function atOnceWords(count: number): string {
   return count === 1 ? 'One at a time' : `Up to ${count} at once`
@@ -305,7 +305,7 @@ export function agentsDraftOf(command: SchedulerCommand): AgentsDraft {
 export function agentsArgs(draft: AgentsDraft): string[] | undefined {
   if (draft.kind === 'skill') return ['skill']
   const typed = draft.count.trim()
-  return /^\d+$/.test(typed) && isCount(Number(typed)) ? [String(Number(typed))] : undefined
+  return /^\d+$/.test(typed) && isAgents(Number(typed)) ? [String(Number(typed))] : undefined
 }
 
 /** A command as it would read with a number of agents draft saved; the command as it is while the draft is no number yet. */

@@ -87,6 +87,7 @@ test('a schedule the reader cannot read gives no command and says why, the row n
   assert.deepEqual(why('schedule:\n  every: 1h\n  agents: 0\n'), refused('agents is a whole number from 1 to 99'))
   assert.deepEqual(why('schedule:\n  every: 1h\n  agents: many\n'), refused('agents is a whole number from 1 to 99'))
   assert.deepEqual(why('schedule:\n  every: 1h\n  agents: 100\n'), refused('agents is a whole number from 1 to 99'))
+  assert.equal(read('a', skill('a', 'schedule:\n  every: 1h\n  agents: 99\n')).commands[0]!.cap, 99)
   assert.deepEqual(why('schedule:\n  every: 1h\n  word: Quick Wins\n'), refused('word is one word of lower-case letters, digits and dashes'))
   assert.deepEqual(why('schedule: daily\n'), refused('a row is a list of keys'))
   assert.deepEqual(why('schedule: []\n'), refused('the schedule lists no row'))

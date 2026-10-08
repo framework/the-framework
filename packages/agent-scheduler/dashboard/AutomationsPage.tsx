@@ -3,7 +3,7 @@ import { Button, Checkbox, Tooltip, TooltipContent, TooltipTrigger, cn, formatAg
 import type { PublishPick } from '../src/state.js'
 import { MAX_AGENTS } from '../src/names.js'
 import { MAX_COUNT, PACE_UNITS, parseInterval, takesTimeOfDay, type PaceUnit } from '../src/pace.js'
-import { PUBLISH_LABELS, UNIT_WORDS, agentsArgs, agentsDraftOf, atOnce, atOnceWords, decided, draftOf, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, schedulerStatus, withAgentsDraft, withDraft, type AgentsDraft, type PaceDraft, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
+import { PUBLISH_LABELS, UNIT_WORDS, agentsArgs, agentsDraftOf, atOnce, atOnceWords, decided, saysAtOnce, draftOf, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, schedulerStatus, withAgentsDraft, withDraft, type AgentsDraft, type PaceDraft, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
 
 // The Automations page: what starts by itself while nobody is at the keyboard. One group per
 // project the page is given (every project that has this package, or the one picked in the
@@ -32,7 +32,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
   const [busy, setBusy] = useState<readonly string[]>([])
   /** The last save that was not taken, on the row it was for. */
   const [failed, setFailed] = useState<{ id: string; text: string } | undefined>()
-  /** The row open for editing, and the pace and the publish pick made in it and not saved yet. */
+  /** The row open for editing, and the pace, the number of agents and the publish pick made in it and not saved yet. */
   const [editing, setEditing] = useState<Editing | undefined>()
   /** Which row is open, as of now: a save answers long after the click that started it. */
   const openId = useRef<string | undefined>(undefined)
@@ -180,7 +180,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                             ))}
                           </select>
                           <p className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-sm">
-                            {paceProblem(open.pace) ?? (agentsArgs(open.agents) ? `${pace(withDraft(scheduled, open.pace))}. ${atOnce(withAgentsDraft(scheduled, open.agents)) > 1 ? `${atOnceWords(atOnce(withAgentsDraft(scheduled, open.agents)))}. ` : ''}${publishes({ ...scheduled, publish: open.publish })}.` : `Type a whole number of agents, from 1 to ${MAX_AGENTS}.`)}
+                            {paceProblem(open.pace) ?? (agentsArgs(open.agents) ? `${pace(withDraft(scheduled, open.pace))}. ${saysAtOnce(withAgentsDraft(scheduled, open.agents)) ? `${atOnceWords(atOnce(withAgentsDraft(scheduled, open.agents)))}. ` : ''}${publishes({ ...scheduled, publish: open.publish })}.` : `Type a whole number of agents, from 1 to ${MAX_AGENTS}.`)}
                           </p>
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                             <p className="text-xs text-muted-foreground">Saved for you, in this project, on this machine. No tracked file changes.</p>
@@ -224,7 +224,8 @@ interface Editing {
 
 /**
  * "How many at once", in an open row: as the skill says, or up to a number the person types. The
- * number is held against the agents of every machine that shares the repository.
+ * number is held against the agents of every machine that shares the repository, and a new agent
+ * still starts only when the row is due by its pace and its check.
  */
 function AgentsFields({ scheduled, draft, disabled, onChange }: { scheduled: SchedulerCommand; draft: AgentsDraft; disabled: boolean; onChange: (next: AgentsDraft) => void }) {
   const skills = scheduled.skillAgents ?? 1
@@ -255,7 +256,7 @@ function AgentsFields({ scheduled, draft, disabled, onChange }: { scheduled: Sch
         />
         <span>{Number(typed.count) === 1 ? 'agent' : 'agents'} at once</span>
       </div>
-      <p className="text-xs text-muted-foreground">Counted with the agents of every machine that shares this repository.</p>
+      <p className="text-xs text-muted-foreground">A new one starts only when the row is due, and only while fewer than this are working on any machine that shares this repository.</p>
     </fieldset>
   )
 }
@@ -329,7 +330,7 @@ function PaceFields({ scheduled, draft, disabled, onChange }: { scheduled: Sched
   )
 }
 
-/** A row's one line: when the command runs, how far its runs publish, and what the scheduler last decided for it; a decision that started a run opens that agent. */
+/** A row's one line: when the command runs, how many agents at once when that is worth saying, how far its runs publish, and what the scheduler last decided for it; a decision that started a run opens that agent. */
 function Summary({ host, project, scheduled }: { host: ReturnType<typeof useModuleHost>; project: ModuleProject; scheduled: SchedulerCommand }) {
   const last = decided(scheduled)
   const run = scheduled.decision?.run
@@ -342,7 +343,7 @@ function Summary({ host, project, scheduled }: { host: ReturnType<typeof useModu
           <span className="text-info">your pick</span>
         </>
       )}
-      {(atOnce(scheduled) > 1 || scheduled.agents !== undefined) && (
+      {saysAtOnce(scheduled) && (
         <>
           <span aria-hidden>·</span>
           <span>{atOnceWords(atOnce(scheduled))}</span>

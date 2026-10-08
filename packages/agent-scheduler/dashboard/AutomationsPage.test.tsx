@@ -102,6 +102,150 @@ describe('the Automations page', () => {
     expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'publish')).toEqual([['p1', ['publish', 'post-merge-cleanup', 'pr']]])
   })
 
+  test('Edit offers when the row runs: as the skill says, or every so many of a unit with a time of day for days or more; Save runs `pace`, and the sentence follows the pick', async () => {
+    const { host, runCommand } = scheduler()
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit /post-merge-cleanup' }))
+    const editor = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
+    const skills = within(editor).getByRole('radio', { name: /As the skill says/ }) as HTMLInputElement
+    expect(skills.checked).toBe(true)
+    expect(within(editor).getByText('every 1 day')).toBeTruthy()
+    // Its skill gives no check: nothing could say when there is work.
+    expect(within(editor).queryByRole('radio', { name: 'Whenever there is work' })).toBeNull()
+    expect(within(editor).getByText('Every 1 day. Commits its work.')).toBeTruthy()
+
+    // Picking "Every" starts from the skill's own interval.
+    fireEvent.click(within(editor).getByRole('radio', { name: 'Every' }))
+    const count = within(editor).getByLabelText('How many') as HTMLInputElement
+    const unit = within(editor).getByLabelText('Unit') as HTMLSelectElement
+    expect([count.value, unit.value]).toEqual(['1', 'd'])
+    expect(options(unit)).toEqual(['minute', 'hour', 'day', 'week', 'month'])
+    fireEvent.change(count, { target: { value: '2' } })
+    expect(options(unit)).toEqual(['minutes', 'hours', 'days', 'weeks', 'months'])
+    expect(within(editor).getByText('Counted from its last start, on any machine that shares this repository.')).toBeTruthy()
+    fireEvent.change(within(editor).getByLabelText('Time of day'), { target: { value: '10:00' } })
+    expect(within(editor).getByText("optional, this machine's time")).toBeTruthy()
+    expect(within(editor).getByText('Every 2 days at 10:00. Commits its work.')).toBeTruthy()
+    expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'pace')).toHaveLength(0)
+    fireEvent.click(within(editor).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['pace', 'post-merge-cleanup', '2d', '10:00']))
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Editing /post-merge-cleanup' })).toBeNull())
+    // The publish pick did not change: one command ran.
+    expect(runCommand.mock.calls.filter(([, args]) => args[0] !== 'status')).toEqual([['p1', ['pace', 'post-merge-cleanup', '2d', '10:00']]])
+  })
+
+  test('minutes and hours take no time of day; a count that is no whole number above 0 is no pace yet, and Save waits', async () => {
+    const { host, runCommand } = scheduler()
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit /post-merge-cleanup' }))
+    const editor = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
+    fireEvent.click(within(editor).getByRole('radio', { name: 'Every' }))
+    fireEvent.change(within(editor).getByLabelText('Time of day'), { target: { value: '10:00' } })
+    fireEvent.change(within(editor).getByLabelText('Unit'), { target: { value: 'h' } })
+    expect(within(editor).queryByLabelText('Time of day')).toBeNull()
+    expect(within(editor).getByText('Every 1 hour. Commits its work.')).toBeTruthy()
+    const save = within(editor).getByRole('button', { name: 'Save' }) as HTMLButtonElement
+    for (const typed of ['', '0', '1.5']) {
+      fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: typed } })
+      expect(save.disabled, typed).toBe(true)
+      expect(within(editor).getByText('Type a whole number, from 1 to 9999.')).toBeTruthy()
+    }
+    // A time left half typed: the field has no text, the browser says the entry is bad, and Save waits.
+    fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: '2' } })
+    fireEvent.change(within(editor).getByLabelText('Unit'), { target: { value: 'd' } })
+    const time = within(editor).getByLabelText('Time of day') as HTMLInputElement
+    Object.defineProperty(time, 'validity', { configurable: true, value: { badInput: true } })
+    fireEvent.change(time, { target: { value: '' } })
+    expect(save.disabled).toBe(true)
+    expect(within(editor).getByText('Finish the time, like 10:00, or clear it.')).toBeTruthy()
+    Object.defineProperty(time, 'validity', { configurable: true, value: { badInput: false } })
+    fireEvent.change(time, { target: { value: '09:30' } })
+    expect(save.disabled).toBe(false)
+    expect(within(editor).getByText('Every 2 days at 09:30. Commits its work.')).toBeTruthy()
+    fireEvent.change(time, { target: { value: '' } })
+    expect(within(editor).getByText("optional, this machine's time")).toBeTruthy()
+    fireEvent.change(within(editor).getByLabelText('Unit'), { target: { value: 'mo' } })
+    expect(within(editor).getByText("optional, this machine's time; a month counts as 30 days")).toBeTruthy()
+    fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: '30' } })
+    fireEvent.change(within(editor).getByLabelText('Unit'), { target: { value: 'm' } })
+    expect(save.disabled).toBe(false)
+    fireEvent.click(save)
+    // The time typed beside days is not sent beside minutes.
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['pace', 'post-merge-cleanup', '30m']))
+  })
+
+  test("a row with a pace of its own says so and opens on it; \"As the skill says\" takes it back; a row whose skill has an interval and a check is offered \"Whenever there is work\"; a pace and a publish pick changed together are two saves, the pace first", async () => {
+    const since = '2026-10-08T07:00:00.000Z'
+    const { host, runCommand } = hostAnswering((projectId, args) =>
+      args[0] !== 'status'
+        ? { ok: true, output: { ok: true } }
+        : {
+            ok: true,
+            output: {
+              ...STATUS,
+              switches: { 'post-merge-cleanup': true, 'update-tickets': true },
+              paces: { 'post-merge-cleanup': { every: '2d', at: '10:00', since } },
+              lastTick: {
+                ...STATUS.lastTick,
+                decisions: [{ command: 'post-merge-cleanup', outcome: 'not due (next start from 2099-01-03 10:00, every 2d at 10:00)' }],
+                schedule: [...STATUS.lastTick.schedule, { command: 'update-tickets', every: '15m', when: 'gh issue list', waitsFor: 'when an issue changed' }],
+              },
+            },
+          },
+    )
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    const mine = row('/post-merge-cleanup')
+    expect(within(mine).getByText('Every 2 days at 10:00')).toBeTruthy()
+    expect(within(mine).getByText('your pick')).toBeTruthy()
+    expect(within(mine).getByText('Next: 3 Jan 10:00')).toBeTruthy()
+    expect(within(row('/update-tickets')).queryByText('your pick')).toBeNull()
+    expect(within(row('/update-tickets')).getByText('Every 15 minutes at most, when an issue changed')).toBeTruthy()
+
+    fireEvent.click(within(mine).getByRole('button', { name: 'Edit /post-merge-cleanup' }))
+    const editor = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
+    expect((within(editor).getByRole('radio', { name: 'Every' }) as HTMLInputElement).checked).toBe(true)
+    expect([(within(editor).getByLabelText('How many') as HTMLInputElement).value, (within(editor).getByLabelText('Unit') as HTMLSelectElement).value, (within(editor).getByLabelText('Time of day') as HTMLInputElement).value]).toEqual(['2', 'd', '10:00'])
+    fireEvent.click(within(editor).getByRole('radio', { name: /As the skill says/ }))
+    expect(within(editor).getByText('Every 1 day. Commits its work.')).toBeTruthy()
+    fireEvent.click(within(editor).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['pace', 'post-merge-cleanup', 'skill']))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit /update-tickets' }))
+    const second = screen.getByRole('group', { name: 'Editing /update-tickets' })
+    expect(within(second).getByText('every 15 minutes at most, when an issue changed')).toBeTruthy()
+    fireEvent.click(within(second).getByRole('radio', { name: 'Whenever there is work' }))
+    expect(within(second).getByText('When an issue changed. Commits its work.')).toBeTruthy()
+    fireEvent.change(within(second).getByLabelText('What its runs publish'), { target: { value: 'pr' } })
+    fireEvent.click(within(second).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['publish', 'update-tickets', 'pr']))
+    expect(runCommand.mock.calls.filter(([, args]) => args[0] !== 'status').map(([, args]) => args)).toEqual([
+      ['pace', 'post-merge-cleanup', 'skill'],
+      ['pace', 'update-tickets', 'work'],
+      ['publish', 'update-tickets', 'pr'],
+    ])
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Editing /update-tickets' })).toBeNull())
+  })
+
+  test('a pace that is not taken stops there: the publish pick is not sent, the row stays open with both picks, and its line says why', async () => {
+    const { host, runCommand } = scheduler((projectId, args) => (args[0] === 'pace' ? { ok: false, error: 'post-merge-cleanup has no check, so nothing would say when there is work' } : { ok: true, output: { ok: true } }))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit /post-merge-cleanup' }))
+    const editor = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
+    fireEvent.click(within(editor).getByRole('radio', { name: 'Every' }))
+    fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: '3' } })
+    fireEvent.change(within(editor).getByLabelText('What its runs publish'), { target: { value: 'pr' } })
+    fireEvent.click(within(editor).getByRole('button', { name: 'Save' }))
+    expect((await within(row('/post-merge-cleanup')).findByRole('alert')).textContent).toBe('The pace was not saved: post-merge-cleanup has no check, so nothing would say when there is work')
+    const still = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
+    expect((within(still).getByLabelText('How many') as HTMLInputElement).value).toBe('3')
+    expect((within(still).getByLabelText('What its runs publish') as HTMLSelectElement).value).toBe('pr')
+    expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'publish')).toHaveLength(0)
+  })
+
   test('a project with no git host package is offered Nothing, Commit and Publish branch only', async () => {
     const { host } = scheduler()
     show(host, [OTHER])
@@ -191,16 +335,16 @@ describe('the Automations page', () => {
     // The row opened meanwhile stays open, and keeps the keyboard.
     const second = within(gemstack).getByRole('group', { name: 'Editing /work-queue' })
     await new Promise(resolve => setTimeout(resolve, 20))
-    expect(document.activeElement).toBe(within(second).getByLabelText('What its runs publish'))
+    expect(document.activeElement).toBe(within(second).getByRole('radio', { name: /As the skill says/ }))
   })
 
-  test('the keyboard follows the row: opening it lands on the menu, Escape closes it and hands the keyboard back to its Edit button', async () => {
+  test('the keyboard follows the row: opening it lands on the pace in force, Escape closes it and hands the keyboard back to its Edit button', async () => {
     const { host, runCommand } = scheduler()
     show(host)
     await screen.findByRole('region', { name: 'gemstack' })
     fireEvent.click(screen.getByRole('button', { name: 'Edit /work-queue' }))
     const menu = screen.getByLabelText('What its runs publish')
-    expect(document.activeElement).toBe(menu)
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: /As the skill says/ }))
     fireEvent.change(menu, { target: { value: 'merge' } })
     fireEvent.keyDown(menu, { key: 'Escape' })
     expect(screen.queryByRole('group', { name: 'Editing /work-queue' })).toBeNull()

@@ -1,7 +1,7 @@
 // The scheduler's module for the dashboard: the package's `./dashboard` export. It adds the
 // Automations page, the Scheduler section of the Settings page, the Scheduler card of the Overview,
 // and the stop line on the usage bar. Its data is the `agent-scheduler` command's own, run in each
-// project by the dashboard: `status` to read, `offset`, `switch` and `publish` to save.
+// project by the dashboard: `status` to read, `offset`, `switch`, `pace` and `publish` to save.
 import { CalendarClock } from 'lucide-react'
 import { defineModule } from '@openagt/dashboard/module'
 import { AutomationsPage } from './AutomationsPage.js'

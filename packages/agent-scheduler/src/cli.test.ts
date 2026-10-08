@@ -179,6 +179,88 @@ test('publish writes this machine\'s publish pick for a scheduled command; a com
   }
 })
 
+test("pace writes this machine's pace for a scheduled command: an interval, a time of day with days or more, whenever there is work, and `skill` takes it back", async () => {
+  const repo = await testRepo()
+  try {
+    await writeSkill(repo, 'work-queue', 'schedule:\n  when: npx queue\n')
+    await writeSkill(repo, 'triage', 'schedule:\n  word: quick\n  every: 6h\n')
+    const slower = await run(repo, 'pace', 'triage quick', '2d')
+    assert.equal(slower.code, 0)
+    const picked = (slower.out as { paces: Record<string, { every: string; at?: string; since: string }> }).paces['triage quick']!
+    assert.equal(picked.every, '2d')
+    assert.equal('at' in picked, false)
+    assert.equal(new Date(picked.since).toISOString(), picked.since, 'when it was picked is recorded')
+    await run(repo, 'pace', 'triage quick', '2w', '9:05')
+    const timed = (await readState(repo)).paces!['triage quick'] as { every: string; at: string; since: string }
+    assert.deepEqual({ ...timed, since: '' }, { every: '2w', at: '09:05', since: '' })
+    // The same pace picked again keeps when it was first made, so a time that was missed is still due; another one is a new pick.
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await run(repo, 'pace', 'triage quick', '2w', '09:05')
+    assert.equal(((await readState(repo)).paces!['triage quick'] as { since: string }).since, timed.since)
+    await run(repo, 'pace', 'triage quick', '2w', '10:00')
+    assert.notEqual(((await readState(repo)).paces!['triage quick'] as { since: string }).since, timed.since)
+    await run(repo, 'pace', 'work-queue', 'work')
+    assert.deepEqual((await readState(repo)).paces!['work-queue'], { work: true })
+    // The skill's own pace again: nothing kept.
+    await run(repo, 'pace', 'triage quick', 'skill')
+    await run(repo, 'pace', 'work-queue', 'skill')
+    assert.equal((await readState(repo)).paces, undefined)
+
+    // A state edited by hand: a pace that is no pick at all is simply replaced.
+    await writeState(repo, { ...(await readState(repo)), paces: { 'triage quick': null as never, 'work-queue': 'daily' as never } })
+    assert.equal((await run(repo, 'pace', 'triage quick', '2d')).code, 0)
+    assert.equal((await run(repo, 'pace', 'work-queue', '1h')).code, 0)
+    await run(repo, 'pace', 'triage quick', 'skill')
+    await run(repo, 'pace', 'work-queue', 'skill')
+
+    // Switching a command on counts its time of day from then, so a row ticked after its time waits for the next one.
+    await run(repo, 'pace', 'triage quick', '1d', '10:00')
+    const pickedAt = ((await readState(repo)).paces!['triage quick'] as { since: string }).since
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await run(repo, 'switch', 'triage quick', 'on')
+    const switched = (await readState(repo)).paces!['triage quick'] as { every: string; at: string; since: string }
+    assert.deepEqual({ ...switched, since: '' }, { every: '1d', at: '10:00', since: '' })
+    assert.ok(switched.since > pickedAt, 'counted from the switch')
+    // Switched on again while already on: nothing moves, so a missed time is not put off.
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await run(repo, 'switch', 'triage quick', 'on')
+    assert.equal(((await readState(repo)).paces!['triage quick'] as { since: string }).since, switched.since)
+    await run(repo, 'switch', 'triage quick', 'off')
+    assert.equal(((await readState(repo)).paces!['triage quick'] as { since: string }).since, switched.since, 'off changes nothing of the pace')
+    await run(repo, 'pace', 'triage quick', 'skill')
+    // A command with no time of day is switched on with nothing else written.
+    await run(repo, 'switch', 'work-queue', 'on')
+    assert.equal((await readState(repo)).paces, undefined)
+    await run(repo, 'switch', 'work-queue', 'off')
+
+    // "Whenever there is work" needs a check to ask.
+    const noCheck = await run(repo, 'pace', 'triage quick', 'work')
+    assert.equal(noCheck.code, 1)
+    assert.deepEqual(noCheck.out, { ok: false, reason: 'no-check', command: 'triage quick' })
+    assert.equal(noCheck.err, 'triage quick has no check, so nothing would say when there is work')
+    const unknown = await run(repo, 'pace', 'triage', '1h')
+    assert.equal(unknown.code, 1)
+    assert.deepEqual(unknown.out, { ok: false, reason: 'not-scheduled', command: 'triage' })
+    assert.equal((await readState(repo)).paces, undefined, 'a refusal writes nothing')
+    // A pace left for a skill that is gone, or cannot be read any more, can always be taken back.
+    await run(repo, 'pace', 'triage quick', '2d')
+    await writeSkill(repo, 'triage', 'schedule:\n  word: quick\n  evry: 6h\n')
+    assert.equal((await run(repo, 'pace', 'triage quick', '3d')).err, 'the schedule of triage cannot be read: unknown key evry')
+    assert.equal((await run(repo, 'pace', 'triage quick', 'skill')).code, 0)
+    assert.equal((await readState(repo)).paces, undefined)
+    assert.equal((await run(repo, 'pace', 'never-heard-of', 'skill')).code, 0)
+
+    for (const argv of [['pace', 'work-queue'], ['pace', 'work-queue', 'often'], ['pace', 'work-queue', '0h'], ['pace', 'work-queue', '10000d'], ['pace', 'work-queue', '2d', '25:00'], ['pace', 'work-queue', '6h', '10:00'], ['pace', 'work-queue', 'work', '10:00'], ['pace', 'work-queue', '2d', '10:00', 'extra']]) {
+      const bad = await run(repo, ...argv)
+      assert.equal(bad.code, 2, argv.join(' '))
+      assert.equal(bad.out, undefined)
+    }
+    assert.match((await run(repo, 'pace', 'work-queue', '6h', '10:00')).err, /^a time of day goes with days, weeks or months/)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
 test('tick on a project with the scheduler off: the branch is pulled, nothing is decided, the state remembers the tick', async () => {
   const repo = await testRepo()
   try {

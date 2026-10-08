@@ -1,17 +1,20 @@
 import { useRef, useState } from 'react'
 import { Button, Checkbox, Tooltip, TooltipContent, TooltipTrigger, cn, formatAge, formatDateTime, useModuleHost, usePolled, type ModulePageProps, type ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick } from '../src/state.js'
-import { PUBLISH_LABELS, decided, pace, publishChoices, publishes, readSchedulers, schedulerStatus, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
+import { MAX_COUNT, PACE_UNITS, parseInterval, takesTimeOfDay, type PaceUnit } from '../src/pace.js'
+import { PUBLISH_LABELS, UNIT_WORDS, decided, draftOf, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, schedulerStatus, withDraft, type PaceDraft, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
 
 // The Automations page: what starts by itself while nobody is at the keyboard. One group per
 // project the page is given (every project that has this package, or the one picked in the
 // dashboard), under its name and its scheduler's status; one row per command the project's skills
 // schedule, as the project's scheduler last read them. A row holds the command, what its skill says
 // it does, when it runs in the skill's plain words, how far its runs publish, what the scheduler
-// last decided for it, and its switch. "Edit" opens the row in place to pick how far its runs
-// publish; one row is open at a time. All of it is this machine's, read with
-// `agent-scheduler status` and saved with `switch` and `publish`: no tracked file changes. A
-// command is off until its switch is flipped here, and commits its work until a level is picked here.
+// last decided for it, and its switch. "Edit" opens the row in place to pick when it runs (as its
+// skill says, whenever there is work, or every so many minutes, hours, days, weeks or months, with
+// a time of day for days or more) and how far its runs publish; one row is open at a time. All of
+// it is this machine's, read with `agent-scheduler status` and saved with `switch`, `pace` and
+// `publish`: no tracked file changes. A command is off until its switch is flipped here, runs at
+// its skill's pace until another is picked here, and commits its work until a level is picked here.
 
 const EMPTY: SchedulerRow[] = []
 
@@ -26,11 +29,11 @@ export function AutomationsPage({ projects }: ModulePageProps) {
   const [busy, setBusy] = useState<readonly string[]>([])
   /** The last save that was not taken, on the row it was for. */
   const [failed, setFailed] = useState<{ id: string; text: string } | undefined>()
-  /** The row open for editing, and the publish pick made in it and not saved yet. */
-  const [editing, setEditing] = useState<{ id: string; publish: PublishPick } | undefined>()
+  /** The row open for editing, and the pace and the publish pick made in it and not saved yet. */
+  const [editing, setEditing] = useState<Editing | undefined>()
   /** Which row is open, as of now: a save answers long after the click that started it. */
   const openId = useRef<string | undefined>(undefined)
-  const edit = (next: { id: string; publish: PublishPick } | undefined): void => {
+  const edit = (next: Editing | undefined): void => {
     openId.current = next?.id
     setEditing(next)
   }
@@ -56,6 +59,21 @@ export function AutomationsPage({ projects }: ModulePageProps) {
       if (answer.ok) then?.()
       else setFailed({ id, text: `The ${what} was not saved: ${answer.error}` })
     })
+  }
+
+  /** Save what the open row changed, the pace then the publish pick, each a command of its own and the second only once the first is taken; the row closes once the last one is taken, and at once when nothing changed. A save not taken leaves the row open with what was picked. */
+  const saveRow = (id: string, project: ModuleProject, scheduled: SchedulerCommand, open: Editing): void => {
+    const paced = paceArgs(open.pace)
+    if (!paced) return
+    const saves: [what: string, args: string[]][] = []
+    if (paced.join(' ') !== paceArgs(draftOf(scheduled))!.join(' ')) saves.push(['pace', ['pace', scheduled.command, ...paced]])
+    if (open.publish !== scheduled.publish) saves.push(['publish pick', ['publish', scheduled.command, open.publish]])
+    const step = (index: number): void => {
+      const next = saves[index]
+      if (!next) return close(id)
+      save(next[0], id, project, next[1], () => step(index + 1))
+    }
+    step(0)
   }
 
   return (
@@ -116,7 +134,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                                 else editButtons.current.delete(id)
                               }}
                               disabled={saving}
-                              onClick={() => edit({ id, publish: scheduled.publish })}
+                              onClick={() => edit({ id, publish: scheduled.publish, pace: draftOf(scheduled) })}
                               aria-label={`Edit /${scheduled.command}`}
                               className="text-xs underline disabled:opacity-50"
                             >
@@ -140,13 +158,12 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                           }}
                           className="mt-3 rounded-md border border-border bg-muted/40 p-4"
                         >
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What its runs publish</p>
+                          <PaceFields scheduled={scheduled} draft={open.pace} disabled={saving} onChange={next => edit({ ...open, pace: next })} />
+                          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">What its runs publish</p>
                           <select
-                            // The keyboard lands where the row opened.
-                            autoFocus
                             value={open.publish}
                             disabled={saving}
-                            onChange={e => edit({ id, publish: e.target.value as PublishPick })}
+                            onChange={e => edit({ ...open, publish: e.target.value as PublishPick })}
                             aria-label="What its runs publish"
                             className="mt-2 rounded-md border border-border bg-background px-2 py-1 text-sm"
                           >
@@ -156,14 +173,16 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                               </option>
                             ))}
                           </select>
-                          <p className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-sm">{`${pace(scheduled)}. ${publishes({ ...scheduled, publish: open.publish })}.`}</p>
+                          <p className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-sm">
+                            {paceProblem(open.pace) ?? `${pace(withDraft(scheduled, open.pace))}. ${publishes({ ...scheduled, publish: open.publish })}.`}
+                          </p>
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                             <p className="text-xs text-muted-foreground">Saved for you, in this project, on this machine. No tracked file changes.</p>
                             <div className="flex gap-2">
                               <Button variant="outline" size="sm" disabled={saving} onClick={() => close(id)}>
                                 Cancel
                               </Button>
-                              <Button size="sm" disabled={saving} onClick={() => (open.publish === scheduled.publish ? close(id) : save('publish pick', id, row.project, ['publish', scheduled.command, open.publish], () => close(id)))}>
+                              <Button size="sm" disabled={saving || !paceArgs(open.pace)} onClick={() => saveRow(id, row.project, scheduled, open)}>
                                 Save
                               </Button>
                             </div>
@@ -187,6 +206,84 @@ export function AutomationsPage({ projects }: ModulePageProps) {
   )
 }
 
+const lower = (text: string): string => text.charAt(0).toLowerCase() + text.slice(1)
+
+/** A row open for editing: which one, and what the person picked in it and has not saved yet. */
+interface Editing {
+  id: string
+  publish: PublishPick
+  pace: PaceDraft
+}
+
+/**
+ * "When it runs", in an open row: as the skill says, whenever there is work (only for a command
+ * with a check), or every so many of a unit, with a time of day beside days, weeks or months.
+ * Picking the third without a count yet starts from the skill's own interval, else one day.
+ */
+function PaceFields({ scheduled, draft, disabled, onChange }: { scheduled: SchedulerCommand; draft: PaceDraft; disabled: boolean; onChange: (next: PaceDraft) => void }) {
+  const skills = scheduled.every === undefined ? undefined : parseInterval(scheduled.every)
+  const typed = draft.kind === 'every' ? draft : { kind: 'every' as const, count: String(skills?.count ?? 1), unit: skills?.unit ?? ('d' as PaceUnit), at: '' }
+  const timed = takesTimeOfDay({ count: 1, unit: typed.unit, ms: 0, text: '' })
+  const name = `when /${scheduled.command} runs`
+  const field = 'rounded-md border border-border bg-background px-2 py-1 text-sm disabled:opacity-50'
+  return (
+    <fieldset disabled={disabled} className="space-y-2">
+      <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">When it runs</legend>
+      <label className="flex items-center gap-2 text-sm">
+        {/* The keyboard lands where the row opened. */}
+        <input type="radio" name={name} autoFocus={draft.kind === 'skill'} checked={draft.kind === 'skill'} onChange={() => onChange({ kind: 'skill' })} />
+        As the skill says
+        <span className="text-xs text-muted-foreground">{lower(pace(withDraft(scheduled, { kind: 'skill' })))}</span>
+      </label>
+      {scheduled.when !== undefined && scheduled.every !== undefined && (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="radio" name={name} autoFocus={draft.kind === 'work'} checked={draft.kind === 'work'} onChange={() => onChange({ kind: 'work' })} />
+          Whenever there is work
+        </label>
+      )}
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <label className="flex items-center gap-2">
+          <input type="radio" name={name} autoFocus={draft.kind === 'every'} checked={draft.kind === 'every'} onChange={() => onChange(typed)} />
+          Every
+        </label>
+        <input
+          type="number"
+          min={1}
+          max={MAX_COUNT}
+          value={typed.count}
+          disabled={draft.kind !== 'every'}
+          onChange={e => onChange({ ...typed, count: e.target.value })}
+          aria-label="How many"
+          className={cn(field, 'w-20')}
+        />
+        <select value={typed.unit} disabled={draft.kind !== 'every'} onChange={e => onChange({ ...typed, unit: e.target.value as PaceUnit })} aria-label="Unit" className={field}>
+          {PACE_UNITS.map(unit => (
+            <option key={unit} value={unit}>
+              {Number(typed.count) === 1 ? UNIT_WORDS[unit] : `${UNIT_WORDS[unit]}s`}
+            </option>
+          ))}
+        </select>
+        {timed && (
+          <>
+            <span>at</span>
+            <input
+              type="time"
+              value={typed.at}
+              disabled={draft.kind !== 'every'}
+              // A time left half typed has no text; the browser says so on the field itself.
+              onChange={e => onChange({ kind: 'every', count: typed.count, unit: typed.unit, at: e.target.value, ...(e.target.validity.badInput ? { atHalfTyped: true as const } : {}) })}
+              aria-label="Time of day"
+              className={field}
+            />
+            <span className="text-xs text-muted-foreground">optional, this machine's time{typed.unit === 'mo' ? '; a month counts as 30 days' : ''}</span>
+          </>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">Counted from its last start, on any machine that shares this repository.</p>
+    </fieldset>
+  )
+}
+
 /** A row's one line: when the command runs, how far its runs publish, and what the scheduler last decided for it; a decision that started a run opens that agent. */
 function Summary({ host, project, scheduled }: { host: ReturnType<typeof useModuleHost>; project: ModuleProject; scheduled: SchedulerCommand }) {
   const last = decided(scheduled)
@@ -194,6 +291,12 @@ function Summary({ host, project, scheduled }: { host: ReturnType<typeof useModu
   return (
     <p className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
       <span>{pace(scheduled)}</span>
+      {ownPace(scheduled) && (
+        <>
+          <span aria-hidden>·</span>
+          <span className="text-info">your pick</span>
+        </>
+      )}
       <span aria-hidden>·</span>
       <span>{publishes(scheduled)}</span>
       {last !== undefined && (

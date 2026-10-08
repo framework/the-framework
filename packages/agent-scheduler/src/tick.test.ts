@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import type { DriverQuota } from '@openagt/agent-driver'
 import type { RunCard } from '@openagt/skill-logs'
 import { DEFAULT_STATE, type State } from './state.js'
+import { parseInterval, type Interval } from './pace.js'
 import type { ScheduledCommand } from './schedule.js'
 import { tick, type TickDeps } from './tick.js'
 
@@ -23,9 +24,7 @@ function running(id: string, command: string, host = 'other-box'): RunCard {
 }
 
 /** An interval as a skill writes it: `6h`. */
-function every(text: string): { ms: number; text: string } {
-  return { ms: Number(text.slice(0, -1)) * { m: 60_000, h: 3_600_000, d: 86_400_000 }[text.slice(-1) as 'm' | 'h' | 'd'], text }
-}
+const every = (text: string): Interval => parseInterval(text)!
 
 /** A scheduled command with a check and a cap of one, its skill in Claude Code's folder, unless said otherwise. */
 function command(name: string, over: Partial<ScheduledCommand> = { when: 'npx queue' }): ScheduledCommand {
@@ -99,6 +98,46 @@ test('an interval: never started is due; a start inside the interval is not due,
   const third = await tick(old.deps)
   assert.deepEqual(third.decisions.map(d => d.outcome.replace(/ 2026.*$/, '')), ['started', 'started'])
   assert.deepEqual(old.seen.checks, ['gh issue list'])
+})
+
+test("this machine's pace stands in for the skill's: its own interval, or whenever there is work; a pace too large to be one leaves the skill's; the recorded schedule still says the skill's", async () => {
+  const commands = [command('update-tickets', { every: every('15m'), when: 'gh issue list' }), command('plan-tickets', { every: every('6h'), when: 'npx tickets list' }), command('triage quick', { every: every('6h') })]
+  // All three last started 20 minutes ago.
+  const lastStart = async (): Promise<string> => new Date(NOW.getTime() - 20 * 60_000).toISOString()
+  const skills = deps({ commands, lastStart })
+  assert.deepEqual((await tick(skills.deps)).decisions.map(d => d.outcome.replace(/ 2026.*$/, '')), ['started', 'not due (last start 20m ago, every 6h)', 'not due (last start 20m ago, every 6h)'])
+
+  const since = '2026-09-01T00:00:00.000Z'
+  const mine = deps({ commands, lastStart, stateOver: { switches: { 'update-tickets': true, 'plan-tickets': true, 'triage quick': true }, paces: { 'update-tickets': { every: '1h', since }, 'plan-tickets': { work: true }, 'triage quick': { every: '10m', since } } } })
+  const record = await tick(mine.deps)
+  assert.deepEqual(record.decisions.map(d => d.outcome.replace(/ 2026.*$/, '')), ['not due (last start 20m ago, every 1h)', 'started', 'started'])
+  // Slowed down, its check never ran; "whenever there is work" asked the check alone.
+  assert.deepEqual(mine.seen.checks, ['npx tickets list'])
+  assert.deepEqual(record.schedule.map(row => [row.command, row.every]), [['update-tickets', '15m'], ['plan-tickets', '6h'], ['triage quick', '6h']])
+
+  // A count no date can hold must never read as "due on every tick": it is no pace, and the skill's stands.
+  const huge = deps({ commands, lastStart, stateOver: { switches: { 'plan-tickets': true }, paces: { 'plan-tickets': { every: '100000000d', at: '10:00', since } } } })
+  assert.deepEqual((await tick(huge.deps)).decisions.filter(d => d.command === 'plan-tickets'), [{ command: 'plan-tickets', outcome: 'not due (last start 20m ago, every 6h)' }])
+})
+
+test('a pace with a time of day: not due before that time, with the time it is due from; due from then on, and a missed time starts once', async () => {
+  const commands = [command('post-merge-cleanup', { every: every('1h'), when: 'gh pr list' })]
+  // The machine's own local time: the 16th at 09:00, last started on the 14th at 10:02.
+  const local = (day: number, hour: number, minute = 0): Date => new Date(2026, 8, day, hour, minute)
+  const paces = { 'post-merge-cleanup': { every: '2d', at: '10:00', since: local(1, 8).toISOString() } }
+  const early = deps({ commands, now: () => local(16, 9), lastStart: async () => local(14, 10, 2).toISOString(), stateOver: { switches: { 'post-merge-cleanup': true }, paces } })
+  assert.deepEqual((await tick(early.deps)).decisions, [{ command: 'post-merge-cleanup', outcome: 'not due (next start from 2026-09-16 10:00, every 2d at 10:00)' }])
+  assert.deepEqual(early.seen.checks, [], 'no check runs before the time')
+
+  const onTime = deps({ commands, now: () => local(16, 10), lastStart: async () => local(14, 10, 2).toISOString(), stateOver: { switches: { 'post-merge-cleanup': true }, paces } })
+  assert.match((await tick(onTime.deps)).decisions[0]!.outcome, /^started /)
+  assert.deepEqual(onTime.seen.checks, ['gh pr list'], 'from the time on, the check decides')
+
+  // The scheduler was not running on the 16th at 10:00: on the 17th at 08:00 the missed time is due, once.
+  const late = deps({ commands, now: () => local(17, 8), lastStart: async () => local(14, 10, 2).toISOString(), stateOver: { switches: { 'post-merge-cleanup': true }, paces } })
+  assert.match((await tick(late.deps)).decisions[0]!.outcome, /^started /)
+  const after = deps({ commands, now: () => local(17, 10, 5), lastStart: async () => local(17, 8).toISOString(), stateOver: { switches: { 'post-merge-cleanup': true }, paces } })
+  assert.deepEqual((await tick(after.deps)).decisions, [{ command: 'post-merge-cleanup', outcome: 'not due (next start from 2026-09-19 10:00, every 2d at 10:00)' }])
 })
 
 test('a due command under its cap with quota to spare is marked on the branch, then spawned, and the state says so', async () => {

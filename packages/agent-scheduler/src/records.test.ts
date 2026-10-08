@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { markerCard, recordRun, writeMarker } from '@openagt/agent-runner'
 import { listRuns } from '@openagt/skill-logs'
 import { commandOf, inFlight, lastStart } from './records.js'
+import { parseInterval } from './pace.js'
 import type { Schedule } from './schedule.js'
 import { removeRepo, testRepo } from './test-repo.js'
 
@@ -41,7 +42,7 @@ test('in flight counts the running cards of one command, whatever the machine; a
 })
 
 test('a run counts for the scheduled command its prompt names, else for its prompt\'s first word; a run agent-runner did not start counts for none', () => {
-  const schedule: Schedule = { commands: [{ name: 'triage quick', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1, dir: '.claude/skills' }, { name: 'work-queue', when: 'npx queue', cap: 1, dir: '.claude/skills' }], unreadable: [] }
+  const schedule: Schedule = { commands: [{ name: 'triage quick', every: parseInterval('6h')!, cap: 1, dir: '.claude/skills' }, { name: 'work-queue', when: 'npx queue', cap: 1, dir: '.claude/skills' }], unreadable: [] }
   const card = (intent: string) => markerCard({ id: 'x', startedAt: '2026-09-16T14:01:00.000Z', prompt: intent, driver: 'claude-code', mark })
   assert.equal(commandOf(card('/triage quick'), schedule), 'triage quick')
   assert.equal(commandOf(card('/triage'), schedule), 'triage')

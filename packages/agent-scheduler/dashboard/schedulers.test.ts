@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { STATUS, hostAnswering } from './fixtures.js'
-import { decided, loosestSpendOffset, offsetsThatDiffer, pace, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset } from './schedulers.js'
+import { decided, draftOf, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withDraft } from './schedulers.js'
 
 const GEMSTACK = { id: 'p1', name: 'gemstack', gitHost: true }
 const OTHER = { id: 'p2', name: 'other', gitHost: false }
@@ -16,6 +16,12 @@ describe('a scheduler row, from what status printed', () => {
       { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', on: false, publish: 'nothing', description: 'Work one queued task.', decision: STATUS.lastTick.decisions[1] },
     ])
     expect(row.lastTick).toEqual({ at: '2026-10-03T10:00:00.000Z', decisions: STATUS.lastTick.decisions })
+  })
+
+  test("a scheduled command carries the pace a person set for it on this machine", () => {
+    const since = '2026-10-08T07:00:00.000Z'
+    const row = schedulerRow(GEMSTACK, { ...STATUS, paces: { 'post-merge-cleanup': { every: '2d', at: '10:00', since }, 'work-queue': { work: true }, gone: { every: '1h', since } } })
+    expect(row.commands.map(c => [c.command, c.pace])).toEqual([['post-merge-cleanup', { every: '2d', at: '10:00', since }], ['work-queue', { work: true }]])
   })
 
   test("a skill whose schedule the tick could not read is named with the reason, and is no command's decision", () => {
@@ -35,6 +41,7 @@ describe('a scheduler row, from what status printed', () => {
       model: 3,
       switches: { a: 'yes' },
       publishes: { a: 'push' },
+      paces: { a: { every: 'often' } },
       lastTick: { at: '2026-10-03T10:00:00.000Z', note: 'off', decisions: [{ command: 'a' }, 'x'], schedule: [{ command: 'a', every: 6, waitsFor: ['x'], description: 7 }, { every: '1d' }, null] },
     })
     expect(odd).toEqual({ project: GEMSTACK, on: false, keepAlive: false, running: false, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], note: 'off' }, commands: [{ command: 'a', on: false, publish: 'commit' }], unreadable: [] })
@@ -99,7 +106,81 @@ describe('in words', () => {
     expect(pace({ ...base, when: 'npx queue', waitsFor: 'when the queue holds a task' })).toBe('When the queue holds a task')
     expect(pace({ ...base, every: '6h', when: 'x' })).toBe('Every 6 hours at most, when its check finds work')
     expect(pace({ ...base, every: '15m', when: 'x', waitsFor: 'when a ticket has no plan' })).toBe('Every 15 minutes at most, when a ticket has no plan')
-    expect([spelled('1m'), spelled('1h'), spelled('7d'), spelled('2w'), spelled('soon'), spelled('0d'), spelled('d'), spelled('-3h'), spelled('06h')]).toEqual(['1 minute', '1 hour', '7 days', '2w', 'soon', '0d', 'd', '-3h', '6 hours'])
+    expect([spelled('1m'), spelled('1h'), spelled('7d'), spelled('2w'), spelled('1mo'), spelled('soon'), spelled('0d'), spelled('d'), spelled('-3h'), spelled('06h')]).toEqual(['1 minute', '1 hour', '7 days', '2 weeks', '1 month', 'soon', '0d', 'd', '-3h', '6 hours'])
+    // An interval of the skill's the tool would not have read is shown as written.
+    expect(pace({ ...base, every: '2y' })).toBe('Every 2y')
+  })
+
+  test("the pace in force is this machine's where a person set one: its interval, a time of day, or whenever there is work; a pick that cannot be followed leaves the skill's", () => {
+    const skill = { command: 'a', on: true, publish: 'commit' as const, every: '6h', when: 'x', waitsFor: 'when a ticket has no plan' }
+    const since = '2026-10-08T07:00:00.000Z'
+    expect(pace({ ...skill, pace: { every: '30m', since } })).toBe('Every 30 minutes at most, when a ticket has no plan')
+    // Beside a check a time of day is "from": the command starts once the check finds work, which may be later that day.
+    expect(pace({ ...skill, pace: { every: '2d', at: '10:00', since } })).toBe('Every 2 days from 10:00, when a ticket has no plan')
+    expect(pace({ ...skill, pace: { every: '2w', since } })).toBe('Every 2 weeks at most, when a ticket has no plan')
+    expect(pace({ ...skill, pace: { work: true } })).toBe('When a ticket has no plan')
+    expect(pace({ command: 'a', on: true, publish: 'commit', every: '1d', pace: { every: '1mo', at: '9:05', since } })).toBe('Every 1 month at 09:05')
+    // No check to ask: "whenever there is work" cannot be followed, the skill's interval stands.
+    expect(pace({ command: 'a', on: true, publish: 'commit', every: '1d', pace: { work: true } })).toBe('Every 1 day')
+    expect(ownPace({ ...skill, pace: { every: '30m', since } })).toBe(true)
+    expect(ownPace({ ...skill, pace: { work: true } })).toBe(true)
+    expect(ownPace(skill)).toBe(false)
+    expect(ownPace({ command: 'a', on: true, publish: 'commit', every: '1d', pace: { work: true } })).toBe(false)
+  })
+
+  test('the Edit box\'s draft: it opens with the pace in force, and reads as the words of the `pace` command; a half-typed one is no pace yet', () => {
+    const skill = { command: 'a', on: true, publish: 'commit' as const, every: '6h', when: 'x' }
+    const since = '2026-10-08T07:00:00.000Z'
+    expect(draftOf(skill)).toEqual({ kind: 'skill' })
+    expect(draftOf({ ...skill, pace: { work: true } })).toEqual({ kind: 'work' })
+    expect(draftOf({ ...skill, pace: { every: '2d', at: '10:00', since } })).toEqual({ kind: 'every', count: '2', unit: 'd', at: '10:00' })
+    expect(draftOf({ ...skill, pace: { every: '30m', since } })).toEqual({ kind: 'every', count: '30', unit: 'm', at: '' })
+    // A skill with a check and no interval already runs whenever there is work.
+    expect(draftOf({ command: 'a', on: true, publish: 'commit', when: 'x', pace: { work: true } })).toEqual({ kind: 'skill' })
+
+    expect(paceArgs({ kind: 'skill' })).toEqual(['skill'])
+    expect(paceArgs({ kind: 'work' })).toEqual(['work'])
+    expect(paceArgs({ kind: 'every', count: '2', unit: 'd', at: '10:00' })).toEqual(['2d', '10:00'])
+    expect(paceArgs({ kind: 'every', count: ' 15 ', unit: 'm', at: '' })).toEqual(['15m'])
+    expect(paceArgs({ kind: 'every', count: '1', unit: 'mo', at: '' })).toEqual(['1mo'])
+    // A time left in the field beside minutes or hours is not sent: the page hides the field then.
+    expect(paceArgs({ kind: 'every', count: '6', unit: 'h', at: '10:00' })).toEqual(['6h'])
+    for (const count of ['', '0', '1.5', '-2', 'two', '10000', '1e2']) {
+      expect(paceArgs({ kind: 'every', count, unit: 'd', at: '' }), count).toBeUndefined()
+      expect(paceProblem({ kind: 'every', count, unit: 'd', at: '' }), count).toBe('Type a whole number, from 1 to 9999.')
+    }
+    expect(paceArgs({ kind: 'every', count: '2', unit: 'd', at: '25:00' })).toBeUndefined()
+    // A time field left half typed has no text: the draft says so, and it is no pace until finished or cleared.
+    expect(paceArgs({ kind: 'every', count: '2', unit: 'd', at: '', atHalfTyped: true })).toBeUndefined()
+    expect(paceProblem({ kind: 'every', count: '2', unit: 'd', at: '', atHalfTyped: true })).toBe('Finish the time, like 10:00, or clear it.')
+    // Beside minutes or hours there is no time field, so a half-typed time left behind does not count.
+    expect(paceArgs({ kind: 'every', count: '2', unit: 'h', at: '', atHalfTyped: true })).toEqual(['2h'])
+    expect(paceProblem({ kind: 'every', count: '2', unit: 'd', at: '10:00' })).toBeUndefined()
+    expect(paceProblem({ kind: 'skill' })).toBeUndefined()
+    // A state edited by hand: only `work: true` is "whenever there is work".
+    expect(draftOf({ ...skill, pace: { work: false, every: '2d', since } as never })).toEqual({ kind: 'every', count: '2', unit: 'd', at: '' })
+
+    // What the row would read as, saved.
+    expect(pace(withDraft(skill, { kind: 'every', count: '2', unit: 'd', at: '10:00' }))).toBe('Every 2 days from 10:00, when its check finds work')
+    expect(pace(withDraft({ ...skill, pace: { every: '30m', since } }, { kind: 'skill' }))).toBe('Every 6 hours at most, when its check finds work')
+    expect(pace(withDraft(skill, { kind: 'work' }))).toBe('When its check finds work')
+    expect(withDraft(skill, { kind: 'every', count: '', unit: 'd', at: '' })).toBe(skill)
+  })
+
+  test('a coming time, for a person: today, tomorrow, the weekday within a week, else the date', () => {
+    const now = new Date(2026, 9, 8, 21, 30)
+    expect(nextWords(new Date(2026, 9, 8, 23, 0), now)).toBe('today 23:00')
+    expect(nextWords(new Date(2026, 9, 9, 10, 0), now)).toBe('tomorrow 10:00')
+    expect(nextWords(new Date(2026, 9, 10, 9, 5), now)).toBe('Saturday 09:05')
+    expect(nextWords(new Date(2026, 9, 14, 10, 0), now)).toBe('Wednesday 10:00')
+    expect(nextWords(new Date(2026, 9, 15, 10, 0), now)).toBe('15 Oct 10:00')
+    expect(nextWords(new Date(2026, 10, 7, 10, 0), now)).toBe('7 Nov 10:00')
+    // Read off an old tick: the time has passed, and the scheduler has not looked since.
+    expect(nextWords(new Date(2026, 9, 8, 10, 0), now)).toBe('as soon as the scheduler looks')
+    expect(nextWords(new Date(2026, 9, 3, 10, 0), now)).toBe('as soon as the scheduler looks')
+    const waiting = { command: 'a', on: true, publish: 'commit' as const, decision: { command: 'a', outcome: 'not due (next start from 2026-10-10 10:00, every 2d at 10:00)' } }
+    expect(decided(waiting, now)).toBe('Next: Saturday 10:00')
+    expect(decided({ ...waiting, on: false }, now)).toBe('Off')
   })
 
   test("how far a scheduled command publishes, by this machine's pick", () => {

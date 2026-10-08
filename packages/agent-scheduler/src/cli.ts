@@ -4,8 +4,9 @@ import { projectRoot } from '@openagt/skill-branches'
 import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
 import { cleanup } from './cleanup.js'
-import { PUBLISH_PICKS, updateState, withPublish, withSwitch, type PublishPick } from './state.js'
-import { readSchedule } from './schedule.js'
+import { PUBLISH_PICKS, isSwitchedOn, updateState, withPace, withPublish, withSwitch, type PublishPick } from './state.js'
+import { parseInterval, parseTimeOfDay, sinceNow, takesTimeOfDay } from './pace.js'
+import { readSchedule, type ScheduledCommand } from './schedule.js'
 
 /**
  * The command line: JSON on stdout, one line for a person on stderr, and the exit code says how
@@ -25,6 +26,9 @@ export const USAGE = `usage: agent-scheduler <command>
   switch <command> <on|off>     whether a scheduled command runs on this machine, the command as status names it (quoted when it has a word after it); every one starts off, and off is taken for any name
   publish <command> <nothing|commit|branch|pr|merge>
                                 how far this machine's runs of a scheduled command publish; commit until picked
+  pace <command> <skill|work|N<m|h|d|w|mo>> [HH:MM]
+                                how often at most a scheduled command starts on this machine: an interval (15m, 6h, 2d, 2w, 1mo; 1 to 9999), with a time of day
+                                for days, weeks or months (2d 10:00, this machine's time); work for whenever its check finds work; skill for the skill's own pace again, taken for any name
   cleanup                       remove what this tool left in the project: the state file and the scheduler's log, then .agent-scheduler/ and the rule hiding it from git once it is empty;
                                 refused while the state names a scheduler that is alive; the command a dashboard asks for when a project is removed with its files
 
@@ -139,7 +143,9 @@ const COMMANDS: Record<string, Command> = {
     const repo = await project(io.cwd, git)
     // Off needs no scheduled command: a switch left on for a skill that is gone can always be taken back.
     if (to === 'on') await scheduled(repo, name)
-    return { ok: true, ...(await updateState(repo, s => withSwitch(s, name, to === 'on'), git)) }
+    // Switched on, a time of day counts from now: a row ticked after its time waits for the next one, as when the time was picked.
+    // A command already on is left as it is, so asking twice does not put a missed time off.
+    return { ok: true, ...(await updateState(repo, s => (to === 'off' ? withSwitch(s, name, false) : isSwitchedOn(s, name) ? s : withPace(withSwitch(s, name, true), name, sinceNow(s.paces?.[name], new Date()))), git)) }
   },
 
   async publish(args, io, git) {
@@ -151,6 +157,36 @@ const COMMANDS: Record<string, Command> = {
     return { ok: true, ...(await updateState(repo, s => withPublish(s, name, to as PublishPick), git)) }
   },
 
+  async pace(args, io, git) {
+    const { positionals } = parse(args, {}, 2, 3)
+    const [name, to, at] = positionals as [string, string, string | undefined]
+    const interval = parseInterval(to)
+    if (to !== 'skill' && to !== 'work' && !interval) throw new Usage(`${to} is none of skill, work, or an interval like 15m, 6h, 2d, 2w, 1mo`)
+    const time = at === undefined ? undefined : parseTimeOfDay(at)
+    if (at !== undefined && !time) throw new Usage(`${at} is no time of day like 10:00`)
+    if (time && !(interval && takesTimeOfDay(interval))) throw new Usage('a time of day goes with days, weeks or months')
+    const repo = await project(io.cwd, git)
+    // Taking a pace back needs no scheduled command: one left for a skill that is gone can always be taken back.
+    if (to === 'skill') return { ok: true, ...(await updateState(repo, s => withPace(s, name, undefined), git)) }
+    const command = await scheduled(repo, name)
+    if (to === 'work' && command.when === undefined) throw new Refused({ ok: false, reason: 'no-check', command: name }, `${name} has no check, so nothing would say when there is work`)
+    const every = interval?.text
+    return {
+      ok: true,
+      ...(await updateState(
+        repo,
+        s => {
+          if (every === undefined) return withPace(s, name, { work: true })
+          // The same pace picked again is the same pick: when it was made stays, so a time that was missed is still due.
+          const before = s.paces?.[name]
+          const same = typeof before === 'object' && before !== null && 'every' in before && before.every === every && before.at === time?.text && typeof before.since === 'string'
+          return withPace(s, name, { every, ...(time ? { at: time.text } : {}), since: same ? before.since : new Date().toISOString() })
+        },
+        git,
+      )),
+    }
+  },
+
   async cleanup(args, io, git) {
     parse(args, {}, 0)
     const outcome = await cleanup(await project(io.cwd, git), { git })
@@ -159,10 +195,11 @@ const COMMANDS: Record<string, Command> = {
   },
 }
 
-/** Refused where no skill of the project schedules the command, with why when its skill's schedule cannot be read. */
-async function scheduled(repo: string, name: string): Promise<void> {
+/** The scheduled command of that name; refused where no skill of the project schedules it, with why when its skill's schedule cannot be read. */
+async function scheduled(repo: string, name: string): Promise<ScheduledCommand> {
   const schedule = await readSchedule(repo)
-  if (schedule.commands.some(c => c.name === name)) return
+  const command = schedule.commands.find(c => c.name === name)
+  if (command) return command
   const skill = name.split(' ')[0]!
   const unreadable = schedule.unreadable.find(u => u.skill === skill)
   if (unreadable) throw new Refused({ ok: false, reason: 'unreadable-schedule', skill, detail: unreadable.reason }, `the schedule of ${skill} cannot be read: ${unreadable.reason}`)

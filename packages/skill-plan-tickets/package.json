@@ -1,6 +1,6 @@
 {
   "name": "@openagt/skill-plan-tickets",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "The plan-tickets command for coding agents: queue a plan for the open tickets that have none or an outdated one, unattended. A skill file only, no code.",
   "license": "MIT",
   "repository": {

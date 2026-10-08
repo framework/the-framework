@@ -109,6 +109,12 @@ export interface RunOptions {
   prompt: string
   /** The run's id; minted from the start time when absent. */
   id?: string
+  /**
+   * When the run was asked for, ISO: the start its record holds. A scheduler asks, then marks and
+   * spawns, and the seconds between belong to the run: its marker and its record name one start.
+   * This process's clock when absent.
+   */
+  startedAt?: string
   /** Whether the run's marker is already on the branch: a scheduler's tick writes it before it spawns. A person's run marks itself. */
   marked?: boolean
   /** The model the session starts on; the tool's own default when absent. */
@@ -168,7 +174,7 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
   const clock = () => now().toISOString()
   const host = opts.host ?? hostname()
   const pid = opts.pid ?? process.pid
-  const startedAt = clock()
+  const startedAt = opts.startedAt ?? clock()
   const id = opts.id ?? runIdFrom(startedAt)
   let mark: RunnerMark = { host, pid, ...lasting(opts) }
   const log = opts.log ?? (() => {})

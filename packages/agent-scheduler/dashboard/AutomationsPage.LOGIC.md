@@ -112,7 +112,7 @@ See `## Context`.
 
 #### Business logic
 
-The checkbox, labelled "Run /<command> by itself" for a screen reader, is checked when the command runs on this machine: only once its schedule switch [2] was switched on here. Flipping it runs `agent-scheduler switch <command> on` or `… off` in that project, at once, with no Save. Checking it also counts the time of day of the command's pace pick [9], when it has one, from now (`../src/cli.ts`): a command set to "every day at 10:00" and switched on at 11:00 waits for tomorrow's 10:00. Unchecking it changes nothing of the pace pick.
+The checkbox, labelled "Run /<command> by itself" for a screen reader, is checked when the command runs on this machine: only once its schedule switch [2] was switched on here. Flipping it runs `agent-scheduler switch <command> on` or `… off` in that project, at once, with no Save. Checking it also counts the time of day of the command's pace pick [9], when it has one, from now (`../src/cli.ts`): a command set to "every day at 10:00" and switched on at 11:00 waits for tomorrow's 10:00. Checking it also writes the time the command was switched on (`../src/cli.ts`), which the command's check is given as `$LAST_RUN` until the command starts after it (`../src/tick.ts`): a check that asks what is new asks from when the box was checked, not from before. Unchecking it changes nothing of the pace pick.
 
 ### Edit
 

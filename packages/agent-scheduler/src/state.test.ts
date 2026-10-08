@@ -4,7 +4,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@openagt/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, switchedOnAt, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
@@ -56,17 +56,24 @@ test('a state file that does not parse reads as the default rather than stopping
 
 test('every command starts switched off; only a command switched on is kept, so switching it off leaves no trace', () => {
   assert.equal(isSwitchedOn(DEFAULT_STATE, 'work-queue'), false)
-  const on = withSwitch(DEFAULT_STATE, 'post-merge-cleanup', true)
-  assert.deepEqual(on.switches, { 'post-merge-cleanup': true })
+  const MORNING = '2026-10-09T07:00:00.000Z'
+  const NOON = '2026-10-09T12:00:00.000Z'
+  const on = withSwitch(DEFAULT_STATE, 'post-merge-cleanup', MORNING)
+  assert.deepEqual(on.switches, { 'post-merge-cleanup': MORNING }, 'the switch holds when it was switched on')
   assert.equal(isSwitchedOn(on, 'post-merge-cleanup'), true)
+  assert.equal(switchedOnAt(on, 'post-merge-cleanup'), MORNING)
   assert.equal(isSwitchedOn(on, 'work-queue'), false)
+  assert.equal(switchedOnAt(on, 'work-queue'), undefined)
   // Switching off a command nobody switched on keeps nothing of it.
-  const both = withSwitch(withSwitch(on, 'triage quick', true), 'work-queue', false)
-  assert.deepEqual(both.switches, { 'post-merge-cleanup': true, 'triage quick': true })
-  const back = withSwitch(withSwitch(both, 'triage quick', false), 'post-merge-cleanup', false)
+  const both = withSwitch(withSwitch(on, 'triage quick', NOON), 'work-queue', undefined)
+  assert.deepEqual(both.switches, { 'post-merge-cleanup': MORNING, 'triage quick': NOON })
+  const back = withSwitch(withSwitch(both, 'triage quick', undefined), 'post-merge-cleanup', undefined)
   assert.equal('switches' in back, false)
-  // A state edited by hand: anything but true is off.
-  assert.equal(isSwitchedOn({ ...DEFAULT_STATE, switches: { 'work-queue': 'on' as never } }, 'work-queue'), false)
+  // A state edited by hand: anything but a time is off.
+  assert.equal(isSwitchedOn({ ...DEFAULT_STATE, switches: { 'work-queue': 'on' } }, 'work-queue'), false)
+  assert.equal(isSwitchedOn({ ...DEFAULT_STATE, switches: { 'work-queue': true as never } }, 'work-queue'), false)
+  // Text a date would read loosely is no time either: `1` reads as the year 2001.
+  for (const loose of ['1', '2026', 'October 9']) assert.equal(isSwitchedOn({ ...DEFAULT_STATE, switches: { 'work-queue': loose } }, 'work-queue'), false, loose)
 })
 
 test('a scheduler ending clears its own pid only: a pid another scheduler wrote meanwhile stays', async () => {

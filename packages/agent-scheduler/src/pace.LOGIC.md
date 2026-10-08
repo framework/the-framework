@@ -11,7 +11,7 @@ The pace [1] of a scheduled command [5]: how an interval [2] and a time of day [
 ## Glossary
 
 [1] pace: how often at most a scheduled command starts, the one in force on a machine: an interval [2], with a time of day [3] when it has one. A command its check [6] alone paces has no pace.
-[2] interval: a count and a unit: minutes (`m`), hours (`h`), days (`d`), weeks (`w`, 7 days) or months (`mo`, 30 days), written together (`15m`, `2w`). It is the least time since the command's last recorded start, on any machine, before it may start again.
+[2] interval: a count and a unit: minutes (`m`), hours (`h`), days (`d`), weeks (`w`, 7 days) or months (`mo`, 30 days), written together (`15m`, `2w`). It is the least time since the command's last start, on any machine, before it may start again.
 [3] time of day: an hour and a minute on a 24-hour clock (`10:00`), in the machine's own local time. It goes only with an interval in days, weeks or months.
 [4] pace pick: a person's choice, on one machine, of a pace for one scheduled command there: "whenever there is work", or an interval with an optional time of day; kept in the state, not in the skill. A command with no pace pick runs at its skill's pace.
 [5] scheduled command: one command a skill of the project schedules with the `schedule` key in the front matter of its `SKILL.md`.

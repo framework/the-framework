@@ -120,6 +120,7 @@ test('a spawned run is told its tool, and its model only when it has one', () =>
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', then: '/post-merge-cleanup' }), ['run', '/work-queue', '--id', 'r1', '--then', '/post-merge-cleanup'])
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', publish: 'merge' }), ['run', '/work-queue', '--id', 'r1', '--publish', 'merge'])
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', mark: true }), ['run', '/work-queue', '--id', 'r1', '--mark'])
+  assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', startedAt: '2026-10-09T10:00:00.000Z' }), ['run', '/work-queue', '--id', 'r1', '--started', '2026-10-09T10:00:00.000Z'])
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', publish: 'commit', attached: 'Found:\n["one entry"]' }), ['run', '/work-queue', '--id', 'r1', '--publish', 'commit', '--attach=Found:\n["one entry"]'])
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', attached: '- one entry' }), ['run', '/work-queue', '--id', 'r1', '--attach=- one entry'], 'a text that opens with a dash stays the flag\'s own text')
   assert.deepEqual(runArgs({ id: 'r1', prompt: 'Do task one', parent: 'p1', base: 'agent-p1' }), ['run', 'Do task one', '--id', 'r1', '--parent', 'p1', '--base', 'agent-p1'])

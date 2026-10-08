@@ -185,7 +185,7 @@ describe('the Automations page', () => {
             ok: true,
             output: {
               ...STATUS,
-              switches: { 'post-merge-cleanup': true, 'update-tickets': true },
+              switches: { 'post-merge-cleanup': '2026-10-03T08:00:00.000Z', 'update-tickets': '2026-10-03T08:00:00.000Z' },
               paces: { 'post-merge-cleanup': { every: '2d', at: '10:00', since } },
               lastTick: {
                 ...STATUS.lastTick,

@@ -504,6 +504,20 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
   }
 })
 
+test('a run given its start keeps it as its record\'s start, whatever its own clock says: a scheduler asks, then marks and spawns, and the record names the moment it asked', async () => {
+  const repo = await testRepo()
+  try {
+    const asked = '2026-09-16T14:00:40.000Z'
+    const given = await runCommand(repo, { prompt: '/answer-comments', id: 'given-1', startedAt: asked, driver: new FakeDriver({ turns: [{ text: 'Done.' }] }), now: () => NOW, gitHost: noGitHost })
+    assert.equal(given.status, 'done')
+    assert.equal((await findRun(repo, 'given-1'))?.startedAt, asked)
+    const own = await runCommand(repo, { prompt: '/answer-comments', id: 'own-1', driver: new FakeDriver({ turns: [{ text: 'Done.' }] }), now: () => NOW, gitHost: noGitHost })
+    assert.equal((await findRun(repo, own.id))?.startedAt, NOW.toISOString(), 'no start given: this process\'s clock')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
 test('the sentence a run adds after its prompts: none with no publish level, that of its level with one, the hold sentence whenever a follow-up is coming', () => {
   assert.equal(addedLine(undefined, undefined), undefined, 'no level: the prompt as written')
   assert.equal(addedLine('commit', undefined), 'When you finish, if you changed any file, commit your work.')

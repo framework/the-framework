@@ -28,7 +28,7 @@ One run [1]: a checkout [2] from the `branches` package, a session from `@openag
 
 ## Business logic — TL;DR
 
-- **The id and the mark** - the id is given by the process that spawned the run (a detached start, a scheduler's tick) or minted from the start time; the mark names this host and this process, and the follow-up [11], the publish level [16], the parent [14] and the base when the run names them; it names no command: the card's intent is the prompt, and a scheduler reads off it which of its commands the run counts for.
+- **The id and the mark** - the id is given by the process that spawned the run (a detached start, a scheduler's tick) or minted from the start time; the start is the one the spawning process gave the run (a scheduler's tick), else the clock's now; the mark names this host and this process, and the follow-up [11], the publish level [16], the parent [14] and the base when the run names them; it names no command: the card's intent is the prompt, and a scheduler reads off it which of its commands the run counts for.
 - **The run's lock** - taken for the run's id with this process's pid before the marker, waited for while another live process holds it (a spawned run finds it already handed to it), let go once the record is written and the checkout reclaimed or kept, whatever happened.
 - **The marker** - a person's run writes its own marker; a run given its id was marked before it was spawned and does not mark itself again.
 - **The checkout** - made through the `branches` package for the run's id, on the birth branch `agent-<id>`, started from the base when the run names one and from origin's default branch otherwise, or attached to an existing branch when one is given (a follow-up's); without one there is no run: the record is written `failed` with `could not create a checkout: …` over the marker, the parent [14] told, and the outcome says `no checkout`.
@@ -56,7 +56,7 @@ See `## Context`.
 
 #### Business logic
 
-The run starts at the clock's now. Its id is the one handed over by the process that spawned it, or else the start time as an id. Its mark [6] is this machine's host name, this process's pid, and, each when the run names one, the follow-up's [11] prompt, the publish level [16], the parent's [14] id and the base. The run reads no schedule and its mark names no command: which command of a schedule the run counts for is the scheduler's to read off the prompt, the card's intent, when it counts.
+The run starts at the clock's now, unless the process that spawned it gave it its start (`run --started <time>`, beside `--id`): the run then keeps that time as its start, on its marker when it writes one, on its live card and on its record, whatever its own clock says. A scheduler gives its runs their start: it asks about a command, then marks and spawns, and the seconds in between belong to the run, so the marker the scheduler wrote and the record the run writes name one start, the moment the scheduler asked (`agent-scheduler`'s `tick.ts`). Its id is the one handed over by the process that spawned it, or else the start time as an id. Its mark [6] is this machine's host name, this process's pid, and, each when the run names one, the follow-up's [11] prompt, the publish level [16], the parent's [14] id and the base. The run reads no schedule and its mark names no command: which command of a schedule the run counts for is the scheduler's to read off the prompt, the card's intent, when it counts.
 
 ### The run's lock
 

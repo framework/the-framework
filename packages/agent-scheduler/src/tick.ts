@@ -2,11 +2,11 @@ import type { DriverQuota, DriverReadiness } from '@openagt/agent-driver'
 import { markerCard, runnerMark, type Publish, type RunnerMark } from '@openagt/agent-runner'
 import type { FileBranchWrite } from '@openagt/agent-data'
 import type { RunCard } from '@openagt/skill-logs'
-import { RUN_SKILLS_DIR } from './names.js'
+import { LAST_RUN_ENV, RUN_SKILLS_DIR } from './names.js'
 import { dueFrom, localStamp, paceInForce, paceText } from './pace.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
-import { checkFound, commandPrompt, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
-import { capInForce, isSwitchedOn, publishInForce, type ListedCommand, type State, type TickDecision, type TickRecord } from './state.js'
+import { checkFound, commandPrompt, isDue, lastRunValue, type Schedule, type ScheduledCommand } from './schedule.js'
+import { capInForce, publishInForce, switchedOnAt, type ListedCommand, type State, type TickDecision, type TickRecord } from './state.js'
 
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
@@ -37,7 +37,8 @@ export interface TickDeps {
   now: () => Date
   pull: () => Promise<{ ok: true } | { ok: false; error: string }>
   sweep: () => Promise<unknown>
-  check: (shell: string) => Promise<CheckResult>
+  /** Run a check, which reads `lastRun` as `$LAST_RUN`. */
+  check: (shell: string, lastRun: string) => Promise<CheckResult>
   /** When the command last started on any machine, ISO; nothing when it never did. */
   lastStart: (command: string) => Promise<string | undefined>
   inFlight: (command: string) => Promise<RunCard[]>
@@ -47,8 +48,8 @@ export interface TickDeps {
   mint: () => string
   writeMarker: (card: RunCard) => Promise<FileBranchWrite>
   withdrawMarker: (id: string) => Promise<unknown>
-  /** Start the run's process, detached; resolves once it is spawned. `attached` is handed to the agent with the prompt. */
-  spawn: (run: { id: string; prompt: string; model: string; publish?: Publish; attached?: string }) => Promise<void>
+  /** Start the run's process, detached; resolves once it is spawned. `startedAt` is the start its record keeps, `attached` what the agent is handed with the prompt. */
+  spawn: (run: { id: string; prompt: string; startedAt: string; model: string; publish?: Publish; attached?: string }) => Promise<void>
   /** The driver's id, for the marker's card. */
   driver: string
   /** Whether the scheduler was told to stop while this tick runs: then nothing more is started. */
@@ -77,16 +78,20 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       decide(`not a command of the coding agent: its skill is only under ${command.dir}, not ${RUN_SKILLS_DIR}`)
       continue
     }
-    if (!isSwitchedOn(deps.state, command.name)) {
+    const switchedOn = switchedOnAt(deps.state, command.name)
+    if (switchedOn === undefined) {
       decide('switched off on this machine')
       continue
     }
+    // When the command is asked about: the start of a run started now. The next check's "since the
+    // last start" then begins before this check ran, not the seconds later the run's process began,
+    // and nothing that came in between is missed.
+    const now = deps.now()
     // The pace in force: this machine's pick, else the skill's; none for a command its check alone paces.
     const pace = paceInForce(deps.state.paces?.[command.name], command)
+    const last = pace || command.when !== undefined ? await deps.lastStart(command.name) : undefined
     if (pace) {
       // The pace before the check: the records are on disk already, the check spawns a shell.
-      const last = await deps.lastStart(command.name)
-      const now = deps.now()
       const from = dueFrom(pace, last === undefined ? undefined : new Date(last), now)
       if (now.getTime() < from.getTime()) {
         decide(pace.at ? `not due (next start from ${localStamp(from)}, every ${paceText(pace)})` : `not due (last start ${age(now.getTime() - Date.parse(last!))} ago, every ${paceText(pace)})`)
@@ -96,7 +101,9 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     // What the check printed, handed to the run it starts: a command its pace alone starts has none.
     let found: string | undefined
     if (command.when !== undefined) {
-      const checked = await deps.check(command.when).catch((err): CheckResult => ({ ok: false, stdout: '', stderr: String(err) }))
+      // What is new for the check: since its command last started, or since it was switched on here when that is later.
+      const since = lastRunValue(last !== undefined && Date.parse(last) > Date.parse(switchedOn) ? last : switchedOn)
+      const checked = await deps.check(command.when, since).catch((err): CheckResult => ({ ok: false, stdout: '', stderr: String(err) }))
       if (!checked.ok) {
         decide(`check failed: ${checked.stderr.trim().split('\n').at(-1) ?? ''}`)
         continue
@@ -105,7 +112,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
         decide('not due')
         continue
       }
-      found = checkFound(checked.stdout)
+      found = checkFound(checked.stdout, since)
     }
     // The cap in force: this machine's number for the command, else the skill's, held against every machine's runs.
     const cap = capInForce(deps.state, command)
@@ -136,7 +143,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     const level = publishInForce(deps.state, command.name)
     const publish = level !== undefined ? { publish: level } : {}
     const mark: RunnerMark = { host: deps.host, ...publish }
-    const marked = await deps.writeMarker(markerCard({ id, startedAt: deps.now().toISOString(), prompt, driver: deps.driver, model: deps.state.model, mark }))
+    const marked = await deps.writeMarker(markerCard({ id, startedAt: now.toISOString(), prompt, driver: deps.driver, model: deps.state.model, mark }))
     if (!marked.ok) {
       // The commit stayed local and would ride a later push: taken back, so no record says running for a run that never was.
       await deps.withdrawMarker(id)
@@ -154,7 +161,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       continue
     }
     try {
-      await deps.spawn({ id, prompt, model: deps.state.model, ...publish, ...(found !== undefined ? { attached: found } : {}) })
+      await deps.spawn({ id, prompt, startedAt: now.toISOString(), model: deps.state.model, ...publish, ...(found !== undefined ? { attached: found } : {}) })
       decide(`started ${id}`, id)
     } catch (err) {
       decide(`could not start: ${err instanceof Error ? err.message : String(err)}`)
@@ -189,11 +196,11 @@ async function boundary(deps: TickDeps) {
   return quotaBoundaryStatus({ windows: reading.windows, now: deps.now().getTime(), model: deps.state.model, limitOffset: deps.state.spendOffset })
 }
 
-/** Run a check at the repository root through the shell, within its budget. */
-export async function runCheck(repo: string, shell: string, timeoutMs: number): Promise<CheckResult> {
+/** Run a check at the repository root through the shell, within its budget; the check reads `lastRun` as `$LAST_RUN`. */
+export async function runCheck(repo: string, shell: string, timeoutMs: number, lastRun: string): Promise<CheckResult> {
   const { execFile } = await import('node:child_process')
   return new Promise<CheckResult>(resolve => {
-    execFile('sh', ['-c', shell], { cwd: repo, timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile('sh', ['-c', shell], { cwd: repo, timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, [LAST_RUN_ENV]: lastRun } }, (err, stdout, stderr) => {
       resolve({ ok: !err, stdout: String(stdout), stderr: err && !String(stderr).trim() ? err.message : String(stderr) })
     })
   })

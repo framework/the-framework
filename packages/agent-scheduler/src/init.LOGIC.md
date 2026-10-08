@@ -1,4 +1,4 @@
-Writes this tool's lines into a dashboard's hooks file, `.openagent/hooks.yml` in the project, so the dashboard's opening starts the scheduler and its closing stops it. What `agent-scheduler init` runs. The spend cushion, the schedule switches, the pace picks and the publish picks are no hook lines: the package's own dashboard part (`../dashboard/`) saves them through this tool's command line. The lines that check, start and continue a run are `agent-runner`'s, written by `agent-runner init`; the writer is `agent-runner`'s too, and this tool hands it its own lines.
+Writes this tool's lines into a dashboard's hooks file, `.openagent/hooks.yml` in the project, so the dashboard's opening starts the scheduler and its closing stops it. What `agent-scheduler init` runs. The spend cushion, the schedule switches, the pace picks, the agents picks and the publish picks are no hook lines: the package's own dashboard part (`../dashboard/`) saves them through this tool's command line. The lines that check, start and continue a run are `agent-runner`'s, written by `agent-runner init`; the writer is `agent-runner`'s too, and this tool hands it its own lines.
 
 ## Context
 

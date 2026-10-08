@@ -1,6 +1,6 @@
 import type { ModuleHost, ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick, TickDecision } from '../src/state.js'
-import { DEFAULT_PUBLISH } from '../src/names.js'
+import { DEFAULT_PUBLISH, isAgents } from '../src/names.js'
 import { MAX_COUNT, paceInForce, parseInterval, parseTimeOfDay, takesTimeOfDay, type PacePick, type PaceUnit } from '../src/pace.js'
 
 // What the module shows of each project's scheduler: the answer of `agent-scheduler status`, the
@@ -38,6 +38,10 @@ export interface SchedulerCommand {
   publish: PublishPick
   /** This machine's pace for the command, where a person set one: it stands in for the skill's interval. */
   pace?: PacePick
+  /** How many runs of the command its skill lets be in flight at once, when it is more than one. */
+  skillAgents?: number
+  /** This machine's number of runs of the command in flight at once, where a person set one: it stands in for the skill's. */
+  agents?: number
   /** What the command's skill does, in the skill's own words, when it says. */
   description?: string
   /** What the scheduler's last tick decided for the command, when it decided anything. */
@@ -97,6 +101,7 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
   const switches = record(state['switches'])
   const publishes = record(state['publishes'])
   const paces = record(state['paces'])
+  const agents = record(state['agents'])
   const decisions: TickDecision[] = []
   for (const item of Array.isArray(tick['decisions']) ? (tick['decisions'] as unknown[]) : []) {
     const d = record(item)
@@ -118,6 +123,8 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
       on: switches[command] === true,
       publish: isPick(picked) ? picked : DEFAULT_PUBLISH,
       ...(isPace(paces[command]) ? { pace: paces[command] as PacePick } : {}),
+      ...(isAgents(row['agents']) && row['agents'] > 1 ? { skillAgents: row['agents'] } : {}),
+      ...(isAgents(agents[command]) ? { agents: agents[command] } : {}),
       ...(typeof row['description'] === 'string' ? { description: row['description'] } : {}),
       ...(decision ? { decision } : {}),
     })
@@ -269,6 +276,44 @@ export function withDraft(command: SchedulerCommand, draft: PaceDraft): Schedule
   const { pace: _pace, ...rest } = command
   if (args[0] === 'skill') return rest
   return { ...rest, pace: args[0] === 'work' ? { work: true } : { every: args[0]!, ...(args[1] !== undefined ? { at: args[1] } : {}), since: '' } }
+}
+
+/** How many runs of a scheduled command may be in flight at once, as this machine counts: the number set here, else the skill's, one when it says none. */
+export function atOnce(command: SchedulerCommand): number {
+  return command.agents ?? command.skillAgents ?? 1
+}
+
+/** Whether a command's number of agents at once is worth saying: when it is more than one, or a person set it, even to one. */
+export function saysAtOnce(command: SchedulerCommand): boolean {
+  return atOnce(command) > 1 || command.agents !== undefined
+}
+
+/** A number of agents at once, as a sentence: "One at a time", "Up to 3 at once". */
+export function atOnceWords(count: number): string {
+  return count === 1 ? 'One at a time' : `Up to ${count} at once`
+}
+
+/** A number of agents at once as the Edit box holds it while a person picks: the skill's own, or a count as typed. */
+export type AgentsDraft = { kind: 'skill' } | { kind: 'own'; count: string }
+
+/** The draft a command's Edit box opens with: its number on this machine, the skill's own where nobody set one. */
+export function agentsDraftOf(command: SchedulerCommand): AgentsDraft {
+  return command.agents === undefined ? { kind: 'skill' } : { kind: 'own', count: String(command.agents) }
+}
+
+/** What a draft is on the command line, after `agents <command>`: `skill`, or the count. Nothing while the count is no whole number from 1 to 99. */
+export function agentsArgs(draft: AgentsDraft): string[] | undefined {
+  if (draft.kind === 'skill') return ['skill']
+  const typed = draft.count.trim()
+  return /^\d+$/.test(typed) && isAgents(Number(typed)) ? [String(Number(typed))] : undefined
+}
+
+/** A command as it would read with a number of agents draft saved; the command as it is while the draft is no number yet. */
+export function withAgentsDraft(command: SchedulerCommand, draft: AgentsDraft): SchedulerCommand {
+  const args = agentsArgs(draft)
+  if (!args) return command
+  const { agents: _agents, ...rest } = command
+  return args[0] === 'skill' ? rest : { ...rest, agents: Number(args[0]) }
 }
 
 /** How far a scheduled command's runs publish on this machine, as a sentence. */

@@ -30,8 +30,16 @@ export const DEFAULT_MODEL = 'opus'
  */
 export const DEFAULT_SPEND_OFFSET = 100 / 14
 
-/** Runs of one command in flight at once, across every machine, when its skill names no number. */
+/** Runs of one command in flight at once, where neither its skill nor a person names a number. */
 export const DEFAULT_CAP = 1
+
+/** The most runs of one command a skill or a person may let be in flight at once. */
+export const MAX_AGENTS = 99
+
+/** Whether a value is a number of agents at once: a whole number from 1 to 99. */
+export function isAgents(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_AGENTS
+}
 
 /** How often a started scheduler ticks. */
 export const TICK_MS = 60_000

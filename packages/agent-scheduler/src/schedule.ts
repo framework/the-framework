@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
-import { DEFAULT_CAP, RUN_SKILLS_DIR, SKILL_FILE } from './names.js'
+import { DEFAULT_CAP, MAX_AGENTS, RUN_SKILLS_DIR, SKILL_FILE, isAgents } from './names.js'
 import { parseInterval, type Interval } from './pace.js'
 
 /**
@@ -38,10 +38,11 @@ import { parseInterval, type Interval } from './pace.js'
  * or both; with both, the command starts only when both hold. `waits-for` is one plain line
  * saying what the check waits for, for a person: a check is a shell line nothing can turn into a
  * sentence. `agents` is how many runs of the command may be in flight at once, across every
- * machine that shares the repository.
+ * machine that shares the repository, from 1 to 99.
  *
  * Whether a command runs, and how far its runs publish, is not the skill's to say: each person
- * sets both on their own machine, in the tool's state.
+ * sets both on their own machine, in the tool's state. The pace and the number of agents are
+ * where the skill starts: each person may set their own there too.
  *
  * A `schedule` the reader cannot read is skipped and named, so a typo stands down one skill's
  * commands and says so rather than silently doing nothing.
@@ -61,7 +62,7 @@ export interface ScheduledCommand {
   every?: Interval
   /** What the check waits for, in one plain line for a person. */
   waitsFor?: string
-  /** Runs in flight at once, across every machine. */
+  /** Runs in flight at once, across every machine, where no person set another number. */
   cap: number
   /** The skills folder the skill was read from (`.claude/skills`). */
   dir: string
@@ -133,7 +134,7 @@ function parseRow(skill: string, row: unknown, dir: string): ScheduledCommand | 
   if (every !== undefined && !asEvery) return 'every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'
   if (when !== undefined && !(typeof when === 'string' && when.trim())) return 'when is a shell command line'
   if (waitsFor !== undefined && !(typeof waitsFor === 'string' && waitsFor.trim() && !waitsFor.trim().includes('\n'))) return 'waits-for is one line of text'
-  if (agents !== undefined && !(typeof agents === 'number' && Number.isInteger(agents) && agents >= 1)) return 'agents is a whole number, 1 or more'
+  if (agents !== undefined && !isAgents(agents)) return `agents is a whole number from 1 to ${MAX_AGENTS}`
   if (when === undefined && every === undefined) return 'neither every nor when says when'
   if (waitsFor !== undefined && when === undefined) return 'waits-for says what when waits for, and there is no when'
   return {
@@ -141,7 +142,7 @@ function parseRow(skill: string, row: unknown, dir: string): ScheduledCommand | 
     ...(typeof when === 'string' ? { when: when.trim() } : {}),
     ...(asEvery ? { every: asEvery } : {}),
     ...(typeof waitsFor === 'string' ? { waitsFor: waitsFor.trim() } : {}),
-    cap: typeof agents === 'number' ? agents : DEFAULT_CAP,
+    cap: isAgents(agents) ? agents : DEFAULT_CAP,
     dir,
   }
 }

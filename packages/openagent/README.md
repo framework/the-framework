@@ -77,11 +77,11 @@ out: said in red) and `warnings` (said in amber), each line naming its own fix. 
 with no `check` line shows nothing there.
 
 A package's own settings are no hook. The scheduler's are the scheduler package's own part of
-the dashboard: its Automations page holds a switch, a pace and a publish pick per scheduled
-command, its Settings section holds how far past the quota boundary it may start unattended
-work, and the handle on the usage bar is its stop line. That part reads them with
-`agent-scheduler status` and saves them with `agent-scheduler offset`, `switch`, `pace` and
-`publish`.
+the dashboard: its Automations page holds a switch, a pace, a number of agents at once and a
+publish pick per scheduled command, its Settings section holds how far past the quota boundary
+it may start unattended work, and the handle on the usage bar is its stop line. That part reads
+them with `agent-scheduler status` and saves them with `agent-scheduler offset`, `switch`,
+`pace`, `agents` and `publish`.
 
 The dashboard is a **projection of the agent's own files**. The agent's tool keeps the
 agent's card (`<id>.json`) and diary (`<id>.jsonl`) under `.openagent/` in the agent's

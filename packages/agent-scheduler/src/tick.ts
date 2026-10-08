@@ -6,7 +6,7 @@ import { RUN_SKILLS_DIR } from './names.js'
 import { dueFrom, localStamp, paceInForce, paceText } from './pace.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
 import { commandPrompt, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
-import { isSwitchedOn, publishInForce, type ListedCommand, type State, type TickDecision, type TickRecord } from './state.js'
+import { capInForce, isSwitchedOn, publishInForce, type ListedCommand, type State, type TickDecision, type TickRecord } from './state.js'
 
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
@@ -103,8 +103,10 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
         continue
       }
     }
+    // The cap in force: this machine's number for the command, else the skill's, held against every machine's runs.
+    const cap = capInForce(deps.state, command)
     const running = await deps.inFlight(command.name)
-    if (running.length >= command.cap) {
+    if (running.length >= cap) {
       decide(`cap reached (${running.length} in flight: ${running.map(describe).join(', ')})`)
       continue
     }
@@ -141,7 +143,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     // a marker ranked past it is withdrawn by the machine that wrote it.
     const after = await deps.inFlight(command.name)
     const rank = after.map(card => card.id).sort().indexOf(id)
-    if (rank >= command.cap) {
+    if (rank >= cap) {
       await deps.withdrawMarker(id)
       const others = after.filter(c => c.id !== id)
       decide(`cap reached (${others.length} in flight: ${others.map(describe).join(', ')})`)
@@ -159,7 +161,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
 
 /** A command as a dashboard lists it: what its skill says, not this machine's switch or publish pick, which the state carries. */
 function listed(command: ScheduledCommand): ListedCommand {
-  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}) }
+  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}), ...(command.cap > 1 ? { agents: command.cap } : {}) }
 }
 
 /** An age for a decision line: `less than a minute`, `12m`, `3h`, `2d`, floored. */

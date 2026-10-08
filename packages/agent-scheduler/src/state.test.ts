@@ -4,7 +4,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@openagt/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, withSwitch, publishInForce, withPace, withPublish } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
@@ -106,4 +106,24 @@ test("a pace is kept only where a person set one: taking it back leaves no trace
   assert.equal('paces' in back, false)
   // Taking back a pace nobody set changes nothing.
   assert.deepEqual(withPace(one, 'triage quick', undefined), one)
+})
+
+test("the cap in force is this machine's number of agents at once, else the skill's; it is kept only where a person set one", () => {
+  const skill = { name: 'work-queue', cap: 1 }
+  assert.equal(capInForce(DEFAULT_STATE, skill), 1)
+  assert.equal(capInForce(DEFAULT_STATE, { name: 'plan-tickets', cap: 2 }), 2)
+  const mine = withAgents(withAgents(DEFAULT_STATE, 'work-queue', 3), 'triage quick', 1)
+  assert.deepEqual(mine.agents, { 'work-queue': 3, 'triage quick': 1 })
+  assert.equal(capInForce(mine, skill), 3)
+  // 99 is the top, and a pick.
+  assert.equal(capInForce({ ...DEFAULT_STATE, agents: { 'work-queue': 99 } }, skill), 99)
+  // A number below the skill's is a pick too.
+  assert.equal(capInForce(mine, { name: 'triage quick', cap: 4 }), 1)
+  // Another command still has its skill's.
+  assert.equal(capInForce(mine, { name: 'plan-tickets', cap: 2 }), 2)
+  // A state edited by hand: a value that is no whole number above 0 is no number set.
+  for (const odd of [0, -1, 1.5, 100, '3', null, Number.NaN]) assert.equal(capInForce({ ...DEFAULT_STATE, agents: { 'work-queue': odd as never } }, skill), 1, String(odd))
+  const back = withAgents(withAgents(mine, 'work-queue', undefined), 'triage quick', undefined)
+  assert.equal('agents' in back, false)
+  assert.deepEqual(withAgents(mine, 'plan-tickets', undefined), mine)
 })

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { STATUS, hostAnswering } from './fixtures.js'
-import { decided, draftOf, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withDraft } from './schedulers.js'
+import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, saysAtOnce, decided, draftOf, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withAgentsDraft, withDraft } from './schedulers.js'
 
 const GEMSTACK = { id: 'p1', name: 'gemstack', gitHost: true }
 const OTHER = { id: 'p2', name: 'other', gitHost: false }
@@ -181,6 +181,37 @@ describe('in words', () => {
     const waiting = { command: 'a', on: true, publish: 'commit' as const, decision: { command: 'a', outcome: 'not due (next start from 2026-10-10 10:00, every 2d at 10:00)' } }
     expect(decided(waiting, now)).toBe('Next: Saturday 10:00')
     expect(decided({ ...waiting, on: false }, now)).toBe('Off')
+  })
+
+  test("how many agents at once: this machine's number, else the skill's, one when it says none; the Edit box's draft reads as the words of the `agents` command", () => {
+    const base = { command: 'a', on: true, publish: 'commit' as const }
+    expect(atOnce(base)).toBe(1)
+    expect(atOnce({ ...base, skillAgents: 2 })).toBe(2)
+    expect(atOnce({ ...base, skillAgents: 2, agents: 1 })).toBe(1)
+    expect(atOnce({ ...base, agents: 3 })).toBe(3)
+    expect([atOnceWords(1), atOnceWords(2), atOnceWords(10)]).toEqual(['One at a time', 'Up to 2 at once', 'Up to 10 at once'])
+    // Worth saying when it is more than one, or a person set it, even to one.
+    expect([saysAtOnce(base), saysAtOnce({ ...base, skillAgents: 2 }), saysAtOnce({ ...base, agents: 1 }), saysAtOnce({ ...base, skillAgents: 2, agents: 1 })]).toEqual([false, true, true, true])
+
+    expect(agentsDraftOf(base)).toEqual({ kind: 'skill' })
+    expect(agentsDraftOf({ ...base, agents: 3 })).toEqual({ kind: 'own', count: '3' })
+    expect(agentsArgs({ kind: 'skill' })).toEqual(['skill'])
+    expect(agentsArgs({ kind: 'own', count: ' 03 ' })).toEqual(['3'])
+    for (const count of ['', '0', '1.5', '-2', 'two', '1e2', '100']) expect(agentsArgs({ kind: 'own', count }), count).toBeUndefined()
+    expect(agentsArgs({ kind: 'own', count: '99' })).toEqual(['99'])
+    expect(atOnce(withAgentsDraft({ ...base, skillAgents: 2 }, { kind: 'own', count: '5' }))).toBe(5)
+    expect(atOnce(withAgentsDraft({ ...base, skillAgents: 2, agents: 5 }, { kind: 'skill' }))).toBe(2)
+    const half = { ...base, agents: 5 }
+    expect(withAgentsDraft(half, { kind: 'own', count: '' })).toBe(half)
+  })
+
+  test("a scheduled command carries its skill's number of agents at once when it is more than one, and the number a person set on this machine", () => {
+    const row = schedulerRow(GEMSTACK, {
+      ...STATUS,
+      agents: { 'post-merge-cleanup': 3, 'work-queue': 0, gone: 2 },
+      lastTick: { ...STATUS.lastTick, schedule: [{ command: 'post-merge-cleanup', every: '1d', agents: 2 }, { command: 'work-queue', when: 'npx queue', agents: 1 }] },
+    })
+    expect(row.commands.map(c => [c.command, c.skillAgents, c.agents])).toEqual([['post-merge-cleanup', 2, 3], ['work-queue', undefined, undefined]])
   })
 
   test("how far a scheduled command publishes, by this machine's pick", () => {

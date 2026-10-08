@@ -11,13 +11,14 @@ The schedule [1]: how a skill's `schedule` [9], in the front matter of its `SKIL
 [1] the schedule: all the scheduled commands of a project, each brought by a skill of the project. A skill with no `schedule` key [9] brings none.
 [2] command: a scheduled command, one command a skill schedules, named as a person types the command without its slash: the skill's folder name, then at most one word the skill takes as its argument (`triage quick`); the coding agent's harness expands the slash command `/<name>` from the skill's folder and hands the skill the word. Each name is its own command: its own prompt, switch, interval, cap and run records.
 [3] check: the shell command a row [8] gives as `when`, run at the repository root on every tick; its output says whether the command is due.
-[4] cap: how many runs of one command may be in flight at once, across every machine that shares the repository; the number a row [8] gives as `agents`, 1 when it gives none.
+[4] cap: how many runs of one scheduled command a machine lets be in flight at once: the machine starts another run of the command only while fewer than its number are in flight on any machine that shares the repository. Its number is the agents pick [11] made on it, a person's own number for the command there, else the number the command's skill gives, 1 when the skill gives none. The skill gives its number as `agents` in a row [8].
 [5] interval: the `every` key of a row [8]: the least time since the command's last recorded start before it may start again, on a machine where no person set another pace.
 [6] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the tool's state (`.agent-scheduler/state.json`), not in the skill. Every scheduled command is off on a machine until a person switches it on there.
 [7] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: `nothing`, `commit`, `branch`, `pr` or `merge`; kept in the state, not in the skill. It is `commit` until the person picks.
 [8] row: one entry of a skill's `schedule` [9]: a YAML map of keys that makes one scheduled command.
 [9] the skill's `schedule`, also the `schedule` key: the key `schedule` in the front matter of a skill's `SKILL.md`, where the skill says which commands it schedules. Its value is one row [8], or a list of rows.
 [10] pace pick: a person's choice, on one machine, of a pace for one scheduled command there: "whenever there is work", or an interval with an optional time of day; kept in the state, not in the skill. A command with no pace pick runs at its skill's pace.
+[11] agents pick: a person's choice, on one machine, of that machine's number for one scheduled command: the machine starts another run of the command only while fewer than that number are in flight on any machine that shares the repository. A whole number from 1 to 99; kept in the state, not in the skill. A command with no agents pick has its skill's number.
 
 ## Business logic — TL;DR
 
@@ -44,7 +45,7 @@ A row is a YAML map of these keys, in any order:
 - `every` is the interval [5]: a whole number from 1 to 9999 and a unit of `m` (minutes), `h` (hours), `d` (days), `w` (weeks of 7 days) or `mo` (months of 30 days), written together (`15m`, `6h`, `7d`, `2w`, `1mo`). It is read by `pace.ts`'s rule, the same one a person's pace pick [10] is read by, and remembered as a duration and as written, without a leading zero, for the tick's line. A skill's `schedule` takes no time of day: only a pace pick does.
 - `when` is the check [3]: a shell command line, surrounding whitespace removed. It is YAML text, so a check that holds quotes, commas or colons, or that spans several lines, is written as a block (`when: |-` and the lines under it) and is read as written.
 - `waits-for` is one plain line for a person saying what the check waits for (`when the queue holds a task`), surrounding whitespace removed. A check is a shell line that nothing can turn into a sentence, so the skill says it. It says what `when` waits for, so a row has it only beside `when`. This file only carries the line; the package's dashboard part shows it.
-- `agents` is the cap [4]: a whole number, 1 or more. A row naming none has a cap of 1.
+- `agents` is the skill's number for the cap [4]: a whole number from 1 to 99 (`names.ts`). A row naming none has a cap of 1. A person may set another number for their own machine, their agents pick [11], with `agent-scheduler agents` or from a dashboard; the tick holds the runs in flight against the cap in force (`state.ts`, `tick.ts`).
 - `word` is the one word the skill gets as its argument: lowercase letters, digits and dashes, starting with a letter or a digit.
 
 A row needs at least one of `every` and `when`, else nothing says when its command runs. The command's name is the skill's folder name, and for a row with a `word` the folder name, one space and the word: the skill `triage` with the rows `word: quick` and `word: consensual` schedules two commands, `triage quick` and `triage consensual`, each with its own interval, cap, switch, pace pick and run records. A list may hold a row with a word beside a row without one (`triage` and `triage quick`). Each command also carries the skills folder its skill was read from (below).
@@ -81,7 +82,7 @@ A skill's `schedule` is read as a whole: when one row cannot be read, the skill 
 - `every` has an unknown unit (`2y`), no unit (`15`), a number of 0 or a number above 9999 (`100000000d`): `every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)`. An `every` of 0 is refused rather than read as "always", which is the key being absent.
 - `when` is not text, or is blank: `when is a shell command line`.
 - `waits-for` is not text, is blank, or spans several lines: `waits-for is one line of text`.
-- `agents` is not a whole number of 1 or more (`0`, `many`): `agents is a whole number, 1 or more`.
+- `agents` is not a whole number from 1 to 99 (`0`, `many`, `100`): `agents is a whole number from 1 to 99`.
 - A row has neither `every` nor `when`: `neither every nor when says when`.
 - A row has `waits-for` and no `when`: `waits-for says what when waits for, and there is no when`.
 - Two rows give the same command name: `two rows are named <name>`.

@@ -1,5 +1,6 @@
 Effort: 6
 Uncertainty: 5
+Outdated: yes
 
 # [Plan] Automations: skills bring the scheduled rows, each person sets when they run
 
@@ -59,3 +60,4 @@ How to move the scheduled rows from `agent-schedule.md` into the command skills'
 
 - Rewrite or approve the `DECISIONS.md` bullets (Problem 1).
 - Confirm every row starts off and publishes nothing until picked (Solutions 3 and 5), since it stops this repository's four running rows.
+

@@ -19,7 +19,8 @@ import { ScrollArea } from './ui/scroll-area.js'
 // package's Scheduler). OpenAgent's own cards are projections of the same .openagent files
 // over the `onDashboard` RPC, polled so they stay live; selecting a row jumps into its project or
 // straight into a session. With one project picked in the sidebar's project select (#1513), every
-// part but the usage bar shows that project's only.
+// part but the usage bar shows that project's only, and the cards of packages it does not have are
+// not drawn.
 //
 // It replaced the denser board this started as (#471) — KPI tiles, a two-week activity chart, agent
 // outcomes, and a projects table — cut here as redundant (#1139). The chart and the outcomes dial
@@ -43,7 +44,7 @@ export function DashboardPage({
   interventions: Intervention[]
   /** Every registered project. The usage bar is given all of them: usage is the account's, not a project's. */
   projects: ProjectSummary[]
-  /** The one project the page shows (#1513), or null for all: the agents at work and the packages' cards show only its. */
+  /** The one project the page shows (#1513), or null for all: the agents at work and the packages' cards show only its, and a card of a package it does not have is not drawn. */
   scope: string | null
 }) {
   const { value: data } = usePolled<DashboardData | null>(onDashboard, null, 5000, [])
@@ -72,7 +73,8 @@ export function DashboardPage({
           <div className="space-y-4">
             <Agents working={working} loading={loading} onSelectAgent={onSelectAgent} />
             {/* The cards the installed packages declare (#1818), under the agents at work: a package's own
-                summary of its data, only where a project has the package. */}
+                summary of its data, only when one of the projects shown (every registered one, or the picked
+                one alone) has the package. */}
             <ModuleCards projects={shownProjects} />
           </div>
         </div>

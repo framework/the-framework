@@ -18,11 +18,6 @@ function show(host: ModuleHost, projects: ModuleProject[] = [GEMSTACK, OTHER]) {
 afterEach(cleanup)
 
 describe('the Scheduler card', () => {
-  test('no project with the package, no card', () => {
-    const { host } = hostAnswering(() => ({ ok: true, output: STATUS }))
-    expect(show(host, []).container.textContent).toBe('')
-  })
-
   test("one row per project: its status, its model, the last tick's decisions; a decision that started a run opens that agent", async () => {
     const { host } = hostAnswering(projectId => ({ ok: true, output: projectId === 'p1' ? STATUS : { ok: true, on: false, keepAlive: true, running: false, model: 'opus', spendOffset: 7 } }))
     show(host)

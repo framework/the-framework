@@ -15,7 +15,6 @@ export function SchedulerCard({ projects }: ModuleCardProps) {
   const host = useModuleHost()
   const key = projects.map(p => p.id).join(',')
   const { value: rows, loaded } = usePolled(() => readSchedulers(host, projects), EMPTY, 10_000, [key])
-  if (projects.length === 0) return null
   return (
     <Card>
       <CardHeader>

@@ -35,7 +35,7 @@ export function ModuleSlot({ package: pkg, label, children }: { package: string;
   )
 }
 
-/** The registered projects a module's piece is given: the ones that have its package, by id and name, each with whether it has a git host package, leaving out any the dashboard does not list. */
+/** The projects a module's piece is given: of the projects handed in (every registered one, or the picked one alone), the ones that have its package, by id and name, each with whether it has a git host package. Empty when none has it: the Overview then draws no card. */
 export function projectsHaving(ids: readonly string[], projects: readonly ProjectSummary[]): ModuleProject[] {
   return ids.flatMap(id => {
     const project = projects.find(p => p.id === id)

@@ -340,6 +340,26 @@ describe('the project select (#1513)', () => {
     expect(await screen.findByText('tickets of app')).toBeTruthy()
   })
 
+  test('with a project picked the Overview draws only the cards of the packages that project has', async () => {
+    answerTwo()
+    function HotCard({ projects }: ModuleCardProps) {
+      return createElement('p', null, `hot tickets of ${projects.map(p => p.name).join(', ') || 'no project'}`)
+    }
+    const both = (answers.get('onModules')!() as unknown[])[0]
+    answers.set('onModules', () => [both, { package: '@acme/tickets', url: moduleModule('__hotCard', { cards: [{ id: 'hot', Card: HotCard }] }), projects: [PROJECT.id] }])
+    render(<App />)
+    expect(await screen.findByText('hot tickets of app')).toBeTruthy()
+    expect(screen.getByText('card for app, site')).toBeTruthy()
+
+    await pick('All projects', /site/)
+    expect(await screen.findByText('card for site')).toBeTruthy()
+    expect(screen.queryByText(/hot tickets of/)).toBeNull()
+
+    await pick('site', /app/)
+    expect(await screen.findByText('hot tickets of app')).toBeTruthy()
+    expect(screen.getByText('card for app')).toBeTruthy()
+  })
+
   test('adding a project reads the modules again at once', async () => {
     answerTwo()
     answers.set('sendPickProjectDirectory', () => ({ ok: true, path: '/work/new' }))

@@ -6,7 +6,7 @@ The project select: the menu at the top of the sidebar that picks the one projec
 
 ## Glossary
 
-[1] picked project: the one project the project select names. The sidebar then lists only the pages added by the packages that project has, and every page shows only that project's data. When the select says "All projects", no project is picked, the sidebar lists the pages added by every project's packages and every page shows every project's data.
+[1] picked project: the one project the project select names. The sidebar then lists only the pages, and the Overview draws only the cards, added by the packages that project has, and every page shows only that project's data. When the select says "All projects", no project is picked, the sidebar lists the pages added by every project's packages and every page shows every project's data.
 
 ## Business logic — TL;DR
 

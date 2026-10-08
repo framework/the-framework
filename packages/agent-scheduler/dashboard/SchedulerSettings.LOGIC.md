@@ -6,7 +6,7 @@ Settings → Scheduler: the section this package adds to the dashboard's Setting
 
 **Business logic story**: a person decides, per machine, how far past the quota boundary scheduled work may start. The number is one for every project, so it sits in Settings; what one project starts by itself is that project's own and sits on the Automations page. The dashboard gives the section the projects that have this package and runs this package's command for it; it knows nothing of what the section holds.
 
-**Problem**: a save is one process per project that reads the state [1], changes it and writes it back. Two saves at once could each write over the other's change, and the older number could land last.
+**Problem**: a save is one process per project that reads the state [1], changes it and writes it back. Two saves at once could each write over the other's change, and the older number could land last. And a save that fails must not stop the saves queued behind it.
 
 ## Glossary
 
@@ -20,7 +20,7 @@ Settings → Scheduler: the section this package adds to the dashboard's Setting
 
 - **Where it shows** - after the Settings page's own sections, at order 20, titled "Scheduler"; not at all while no registered project has the package.
 - **What it reads** - `agent-scheduler status` in every project that has the package, when shown and every 10 seconds, and again after every save.
-- **Spend offset** - the section's one Settings row [5]: the loosest spend cushion [3] any project holds, as a number from −50 to 50; a typed value is saved to every project once it has rested for half a second, one save at a time; projects holding another cushion are named with theirs; a refused save says which project and why.
+- **Spend offset** - the section's one Settings row [5]: the loosest spend cushion [3] any project holds, as a number from −50 to 50; a typed value is saved to every project once it has rested for half a second, one save at a time; projects holding another cushion are named with theirs; a save not taken says why, and the next one still saves.
 - **A project that cannot be read** - is named in the section with the reason.
 
 ## Business logic
@@ -33,7 +33,7 @@ See `## Context`.
 
 #### Business logic
 
-The dashboard draws the section after its own Settings sections, among the installed packages' sections by order, this one at 20. Its title is "Scheduler" and its line reads "How far scheduled work may spend, in every project, on this machine. What each project starts by itself is on the Automations page." Given no project (no registered project depends on the package), the section draws nothing at all. The section lists no scheduled command, and has no checkbox and no menu.
+The dashboard draws the section after its own Settings sections, among the installed packages' sections by order, this one at 20. Its title is "Scheduler" and its line reads "How far past the quota scheduled work may go, in every project, on this machine. What each project starts by itself is on the Automations page." Given no project (no registered project depends on the package), the section draws nothing at all. The section lists no scheduled command, and has no checkbox and no menu.
 
 ### What it reads
 
@@ -53,7 +53,7 @@ The section runs `agent-scheduler status` in every project it was given (`schedu
 
 #### Business logic
 
-The section's one Settings row [5] is "Spend offset" ("How far every project's scheduler may start work past the quota boundary, in percentage points (max 50). Negative holds it back; positive lets it borrow from the days ahead. One number, saved to every project; the handle on the usage bar moves the same number."): a number box bounded to −50 and 50. It shows the spend cushion [3] in force, the loosest any project holds, rounded to one decimal. When projects hold different cushions (one was set by hand from the command line), the description goes on: "Shown: the loosest. <project> is at <its cushion>, …; saving sets every project to the same number.", naming each project whose cushion is not the one shown. The Settings row is absent until a project has answered one. While the box has the focus it shows the text as typed, so a number can be typed through text that is no number yet (a minus sign alone); such text, and an empty box, change nothing. A typed number is rounded to whole points and held to −50..50, the reach of the usage bar's handle. Once the box loses the focus it shows that number, kept on the page until a read brings the same value back. It is saved once it has rested for half a second, since typing a number is several changes: the save runs `agent-scheduler offset -- <points>` in every project the section was given. Saves go one at a time: a save starts only when the one before it has answered, and the projects are read again after each. A save that fails shows, under the Settings row, the alert "The spend offset was not saved: <project>: <why>", the reason being what the command said, and the box goes back to the value the schedulers hold. The next save clears the alert.
+The section's one Settings row [5] is "Spend offset" ("How far every project's scheduler may start work past the quota boundary, in percentage points (max 50). Negative holds it back; positive lets it borrow from the days ahead. One number, saved to every project; the handle on the usage bar moves the same number."): a number box bounded to −50 and 50. It shows the spend cushion [3] in force, the loosest any project holds, rounded to one decimal. When projects hold different cushions (one was set by hand from the command line), the description goes on: "Shown: the loosest. <project> is at <its cushion>, …; saving sets every project to the same number.", naming each project whose cushion is not the one shown. The Settings row is absent until a project has answered one. While the box has the focus it shows the text as typed, so a number can be typed through text that is no number yet (a minus sign alone); such text, and an empty box, change nothing. A typed number is rounded to whole points and held to −50..50, the reach of the usage bar's handle. Once the box loses the focus it shows that number, kept on the page until a read brings the same value back. It is saved once it has rested for half a second, since typing a number is several changes: the save runs `agent-scheduler offset -- <points>` in every project the section was given. Saves go one at a time: a save runs its command in every project, then the projects are read again, and the next save starts only after both. A save is not taken when a project's command refused it, or when the command could not even be asked (the dashboard could not be reached). A save a command refused shows, under the Settings row, the alert "The spend offset was not saved: <project>: <why>", the reason being what the command said; one that could not be asked shows "The spend offset was not saved: <why>". Either way the box goes back to the value the schedulers hold, and the saves queued behind it still run. The next save clears the alert.
 
 ### A project that cannot be read
 

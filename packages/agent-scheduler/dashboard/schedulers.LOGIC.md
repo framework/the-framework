@@ -2,7 +2,7 @@ What the module knows of a project's scheduler and how it changes it: one projec
 
 ## Context
 
-**User story**: the user sees, per project, whether the scheduler is on and what its last tick [5] decided, and per scheduled command what it does, whether it runs on this machine, how far its runs publish here and what the scheduler last decided for it, each said in plain words ("Every 1 day", "Opens a pull request", "No work").
+**User story**: the user sees, per project, whether the scheduler is on and what its last tick [5] decided, and per scheduled command what it does, whether it runs on this machine, how far its runs publish here and what the scheduler last decided for it, each said in plain words ("Every 1 day", "Opens a pull request", "No work", "One is already running").
 
 **Problem**: the module reads another process's output. A project whose command fails, or a state [1] written by an older version, must not break the page, the section or the card for every other project.
 
@@ -79,6 +79,8 @@ A new cushion is saved by running `agent-scheduler offset -- <points>` in every 
 
 **Problem**: a tick's decision is at most a minute old, and a person may have flipped a command's schedule switch [2] since. The words for the last decision must follow the switch as it stands, not a line the last tick wrote before the flip.
 
+**Problem**: the tick's lines are written for the state file. Some are a rule's shorthand that a person has to decode (`cap reached (1 in flight: <id> on <host>)`, `not due (last start 2h ago, every 6h)`), and are said in plain words. Others carry a reason only the tool knows (`quota: …`, `check failed: …`), and are kept.
+
 #### Business logic
 
 - **The leading status of a project's row**: "not readable" (red) when the project's status could not be read; else "off" (muted) when the scheduler is off; else "on, not running" (amber) when it is on but its process is not alive; else "on" (green).
@@ -86,12 +88,14 @@ A new cushion is saved by running `agent-scheduler offset -- <points>` in every 
 - **A command's pace**, as a sentence with a capital: "Every <interval>" for a command with only an interval, the interval spelled out ("Every 1 day"). For a command with only a check, the plain line its skill gives for what the check waits for ("When the queue holds a task"), or "When its check finds work" when the skill gives none. For a command with both, "Every <interval> at most, " followed by those same words without the capital ("Every 15 minutes at most, when a ticket has no plan", "Every 6 hours at most, when its check finds work").
 - **How far a command publishes** on this machine, by its publish pick [4], as a sentence with a capital: "Commits its work" for `commit`, which is also the pick of a command nobody picked for, "Publishes its branch" for `branch`, "Opens a pull request" for `pr`, "Opens a pull request that merges on green" for `merge`, and "Publishes nothing" for a pick of nothing.
 - **What the scheduler last decided for a command**, for a person, by the first rule that holds:
-  1. The last tick's decision for the command starts with `not a command of the coding agent`: that line with a capital ("Not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills"), whether the command is switched on or off on this machine, since switching it on would start nothing.
+  1. The last tick's decision for the command is `not a command of the coding agent: its skill is only under <folder>, …`: "Cannot start: its skill is only in <folder>, which Claude Code does not read" ("Cannot start: its skill is only in .agents/skills, which Claude Code does not read"), whether the command is switched on or off on this machine, since switching it on would start nothing.
   2. The command is off on this machine: "Off", whatever the last tick said.
   3. The command is on and the last tick decided nothing for it, or still said `switched off on this machine` (it was switched on since): nothing is said.
   4. The decision is `not due`, the check found no work: "No work".
   5. The decision starts with `started `: "Started a run".
-  6. Any other decision: the tool's own line with a capital ("Not due (last start 2h ago, every 6h)", "Cap reached (1 in flight: …)", "Quota: …").
+  6. The decision is `not due (last start <age> ago, …)`, the command's interval has not passed: "Started <age> ago, not due yet", the age as the tick wrote it ("Started 2h ago, not due yet", "Started less than a minute ago, not due yet").
+  7. The decision is `cap reached (<N> in flight: …)`: "One is already running" when N is 1, else "<N> are already running" ("3 are already running").
+  8. Any other decision: the tool's own line with a capital ("Quota: …", "Check failed: …", "Not ready: …").
 - **The publish picks' labels**: "Nothing", "Commit", "Publish branch", "Open PR", "Merge on green", in that order.
-- **Which picks a project is offered**: all five where one of the project's packages provides a git host; "Nothing", "Commit" and "Publish branch" only where none does, since no pull request can be opened there. The command's pick in force, when the project is not offered it, is listed after them, so a menu always shows what is in force.
+- **Which picks a project is offered**: all five where one of the project's packages provides a git host; "Nothing", "Commit" and "Publish branch" only where none does, since no pull request can be opened there. The pick a menu shows, when the project is not offered it, is listed after them, so a menu always lists the entry it shows.
 - The bound of the spend cushion as the dashboard's controls set it, 50 points either side of the quota boundary, is the dashboard's own number, handed on from `@openagt/dashboard/module`.

@@ -188,7 +188,10 @@ describe('the Automations page', () => {
     expect(within(screen.getByRole('region', { name: 'other' })).getByRole('listitem', { name: '/post-merge-cleanup' }).className).not.toMatch(/opacity-60/)
     answerPublish({ ok: true, output: { ok: true } })
     await waitFor(() => expect(held.className).not.toMatch(/opacity-60/))
-    expect(within(gemstack).getByRole('group', { name: 'Editing /work-queue' })).toBeTruthy()
+    // The row opened meanwhile stays open, and keeps the keyboard.
+    const second = within(gemstack).getByRole('group', { name: 'Editing /work-queue' })
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(document.activeElement).toBe(within(second).getByLabelText('What its runs publish'))
   })
 
   test('the keyboard follows the row: opening it lands on the menu, Escape closes it and hands the keyboard back to its Edit button', async () => {

@@ -28,10 +28,17 @@ export function AutomationsPage({ projects }: ModulePageProps) {
   const [failed, setFailed] = useState<{ id: string; text: string } | undefined>()
   /** The row open for editing, and the publish pick made in it and not saved yet. */
   const [editing, setEditing] = useState<{ id: string; publish: PublishPick } | undefined>()
+  /** Which row is open, as of now: a save answers long after the click that started it. */
+  const openId = useRef<string | undefined>(undefined)
+  const edit = (next: { id: string; publish: PublishPick } | undefined): void => {
+    openId.current = next?.id
+    setEditing(next)
+  }
   const editButtons = useRef(new Map<string, HTMLButtonElement>())
-  /** Close the row, unless the person has opened another one since, and hand the keyboard back to its Edit button. */
+  /** Close the row and hand the keyboard back to its Edit button; nothing when the person has opened another row since. */
   const close = (id: string): void => {
-    setEditing(current => (current?.id === id ? undefined : current))
+    if (openId.current !== id) return
+    edit(undefined)
     setTimeout(() => editButtons.current.get(id)?.focus())
   }
   // Saves go one at a time: each is a command that reads the state file, changes it and writes it
@@ -109,7 +116,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                                 else editButtons.current.delete(id)
                               }}
                               disabled={saving}
-                              onClick={() => setEditing({ id, publish: scheduled.publish })}
+                              onClick={() => edit({ id, publish: scheduled.publish })}
                               aria-label={`Edit /${scheduled.command}`}
                               className="text-xs underline disabled:opacity-50"
                             >
@@ -129,7 +136,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                           role="group"
                           aria-label={`Editing /${scheduled.command}`}
                           onKeyDown={e => {
-                            if (e.key === 'Escape') close(id)
+                            if (e.key === 'Escape' && !saving) close(id)
                           }}
                           className="mt-3 rounded-md border border-border bg-muted/40 p-4"
                         >
@@ -139,7 +146,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                             autoFocus
                             value={open.publish}
                             disabled={saving}
-                            onChange={e => setEditing({ id, publish: e.target.value as PublishPick })}
+                            onChange={e => edit({ id, publish: e.target.value as PublishPick })}
                             aria-label="What its runs publish"
                             className="mt-2 rounded-md border border-border bg-background px-2 py-1 text-sm"
                           >

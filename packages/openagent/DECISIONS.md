@@ -92,11 +92,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   sections, where a project has its package. It reads and writes through the package's own
   command. Picked over OpenAgent's own sections knowing a package's file and a hook line
   per setting, which made every package's settings a change to OpenAgent.
-- The scheduler is a package's: its Settings section and its Overview card are the scheduler
-  package's own module, read and written through its command. OpenAgent reads no
-  scheduler file and has no hook line for a scheduler setting. Picked over OpenAgent's
-  own Automation section and scheduler card, which read the scheduler's state file by name
-  and needed a hook line per setting.
+- The scheduler is a package's: its Automations page, its Settings section and its Overview
+  card are the scheduler package's own module, read and written through its command.
+  OpenAgent reads no scheduler file and has no hook line for a scheduler setting. Picked
+  over OpenAgent's own Automation section and scheduler card, which read the scheduler's
+  state file by name and needed a hook line per setting.
 - A module may put a stop line on the usage bar: where its unattended work stops, as an
   offset from the quota boundary. The bar draws it and its handle, and the module reads and
   saves the offset through its own command. With no such module the bar shows the account

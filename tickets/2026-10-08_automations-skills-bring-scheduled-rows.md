@@ -71,4 +71,3 @@ The scheduler package: how it reads the rows, its state, its command line, its p
 ## References
 
 - The conversation behind the issue: https://gist.github.com/suleimansh/bb86e7791fd530ffdfec00f1f6a9ca64
-

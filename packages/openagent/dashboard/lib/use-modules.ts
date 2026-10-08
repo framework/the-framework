@@ -110,10 +110,11 @@ export function byMountOrder(a: { order?: number; package: string }, b: { order?
  * modules claim going to the first, the cards (#1818), sorted by their order then their package, the link actions, the side-rail tabs, the run slots, the Settings sections (sorted as the cards are) and the usage bar's stop line (the first module's that declares one),
  * every one of them, each carrying the package it came from and the projects that have it. `loaded` is false until the module list has
  * been read and every module in it imported, so the shell can tell "no such page" from "not
- * loaded yet".
+ * loaded yet". A change of `reloadKey` reads the list again at once; what is mounted stays until
+ * it answers.
  */
-export function useModules(): MountedModules {
-  const { value: modules, loaded: listed } = usePolled(onModules, NO_MODULES, 30_000, [])
+export function useModules(reloadKey = 0): MountedModules {
+  const { value: modules, loaded: listed } = usePolled(onModules, NO_MODULES, 30_000, [reloadKey])
   const [state, setState] = useState<MountedModules>(NOTHING_MOUNTED)
   useEffect(() => {
     if (!listed) return

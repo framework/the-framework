@@ -72,9 +72,6 @@ export function App() {
   const { view, projectId, agentId } = route
   // A module's page (#1774): the route names it by its segment, with no project selected.
   const pageSegment = route.page ?? null
-  const modules = useModules()
-  const { pages: modulePages, loaded: modulesLoaded } = modules
-  const modulePage = pageSegment ? modulePages.find(page => page.segment === pageSegment) : undefined
 
   // The registered projects, for the browser-tab title (#695/U3) — the selected project's name
   // plus the needs-you count drive `document.title` so a backgrounded tab tells you which project
@@ -84,11 +81,19 @@ export function App() {
   // follow it. Slow, and reloadable so adding a project from the sidebar's "New" reflects at once
   // (bump the key).
   const [projectsKey, setProjectsKey] = useState(0)
-  const { value: projects } = usePolled<ProjectSummary[]>(onProjects, EMPTY_PROJECTS, 30_000, [projectsKey])
+  const { value: projects, loaded: projectsLoaded } = usePolled<ProjectSummary[]>(onProjects, EMPTY_PROJECTS, 30_000, [projectsKey])
+  // Read again when a project is added from the sidebar or removed from its project home: which
+  // project has which module changes then.
+  const modules = useModules(projectsKey)
+  const { pages: modulePages, loaded: modulesLoaded } = modules
   // The one project every page shows (#1513), or null for all of them. A project that is not
   // registered (removed, or a link from another machine) picks nothing.
   const scope = route.scope && (projects.length === 0 || projects.some(p => p.id === route.scope)) ? route.scope : null
   const scopedProjects = useMemo(() => (scope ? projects.filter(p => p.id === scope) : projects), [projects, scope])
+  // The modules' pages the dashboard has: every one, or with a project picked only the pages of the
+  // packages that project has. The sidebar lists these, and a URL names a page only among these.
+  const shownPages = useMemo(() => (scope ? modulePages.filter(page => page.projects.includes(scope)) : modulePages), [modulePages, scope])
+  const modulePage = pageSegment ? shownPages.find(page => page.segment === pageSegment) : undefined
 
   // Every navigation keeps the picked project, and one into another project's page picks that
   // project: the pages never show a project the select does not name.
@@ -97,12 +102,15 @@ export function App() {
   // Pick the one project every page shows, or all of them. The page stays, with what it mirrored
   // into the query (a list's filters), unless it is another project's: its launcher becomes the
   // picked project's, and its agent's page the Overview. A module's page drops what follows its
-  // segment, which may name the project just left.
+  // segment, which may name the project just left, and one the picked project does not have
+  // becomes the Overview.
   const selectScope = (next: string | null) => {
     const { scope: _scope, ...here } = route
     if (next === null) return navigate(here, { keepQuery: true })
     if (here.projectId !== null && here.projectId !== next)
       return navigate(here.agentId === null ? { projectId: next, agentId: null, scope: next } : { projectId: null, agentId: null, scope: next })
+    const mounted = modulePages.find(page => page.segment === here.page)
+    if (mounted && !mounted.projects.includes(next)) return navigate({ projectId: null, agentId: null, scope: next })
     const { pagePath, ...page } = here
     navigate({ ...page, scope: next }, { keepQuery: !pagePath?.length })
   }
@@ -234,7 +242,7 @@ export function App() {
     go({ view: 'settings', projectId: null, agentId: null })
   }
 
-  // A module's page (#1774): its own segment, cross-project like the Overview.
+  // A module's page (#1774): its own segment, with no project selected, like the Overview.
   const showPage = (segment: string) => {
     go({ projectId: null, agentId: null, page: segment })
   }
@@ -319,12 +327,19 @@ export function App() {
     if (pageSegment) {
       if (modulePage)
         return <ModulePageView page={modulePage} projects={scopedProjects} path={route.pagePath ?? []} />
-      // Not loaded yet is not "no such page": the modules are imported after the first read.
-      if (!modulesLoaded) return null
+      // Not loaded yet is not "no such page": the modules are imported after the first read, and
+      // whether a picked project is a registered one is known once the projects are read.
+      if (!modulesLoaded || (scope !== null && !projectsLoaded)) return null
+      // A page another project's package adds is not the picked project's.
+      const elsewhere = scope !== null && modulePages.some(page => page.segment === pageSegment)
       return (
         <NotFound
           title="No such page"
-          detail={`No installed package adds a page at "/${pageSegment}".`}
+          detail={
+            elsewhere
+              ? `The project "${projects.find(p => p.id === scope)?.name ?? scope}" has no package that adds a page at "/${pageSegment}".`
+              : `No installed package adds a page at "/${pageSegment}".`
+          }
           actionLabel="Go to the Overview"
           onAction={showDashboard}
         />
@@ -467,7 +482,7 @@ export function App() {
           working={working}
           onDashboard={showDashboard}
           onSettings={showSettings}
-          pages={modulePages}
+          pages={shownPages}
           activePage={pageSegment}
           onPage={showPage}
           interventionCount={interventions.length}

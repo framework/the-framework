@@ -1,4 +1,4 @@
-The dashboard's left column, present on every page: the brand mark, the project select, which picks the one project every page shows, the "New agent" button, the "Overview" destination, one row per page the installed modules [15] add, the "Recent agents" list, and a footer with the connection indicator, the theme toggle, the notifications menu and "Settings". The list shows the picked project's [17] own agents [1], and every project's agents pooled newest-first when no project is picked, in both cases with a main agent's subagents [16] folded under it; each row says in one word what its agent is doing, when it started, where it runs and which coding agent [3] runs it, and a stand-in row says "starting…" for a just-started agent until its own row lands.
+The dashboard's left column, present on every page: the brand mark, the project select, which picks the one project every page shows, the "New agent" button, the "Overview" destination, one row per page the installed modules [15] add, only the pages of the packages the picked project [17] has when a project is picked, the "Recent agents" list, and a footer with the connection indicator, the theme toggle, the notifications menu and "Settings". The list shows the picked project's [17] own agents [1], and every project's agents pooled newest-first when no project is picked, in both cases with a main agent's subagents [16] folded under it; each row says in one word what its agent is doing, when it started, where it runs and which coding agent [3] runs it, and a stand-in row says "starting…" for a just-started agent until its own row lands.
 
 ## Context
 
@@ -20,14 +20,14 @@ The dashboard's left column, present on every page: the brand mark, the project 
 [14] driver: a coding agent wrapped as a black box. The user's driver choice is `claude-code` or `codex`; the driver implementations are `claude-code`, `codex`, `github-actions`, `claude-web` and `fake`.
 [15] module: a package that adds to the dashboard (pages, Overview cards, side-rail tabs, what an agent's page shows, actions on the links pages show, Settings sections): its browser part, named by the package's `exports["./dashboard"]`, reads its data through its own package's command, or through its own server part, named by `exports["./server"]`, which the daemon calls in its own process. A module comes from a project's dependencies, or is built into the dashboard and loaded for every project, as the Files module is.
 [16] subagent: an agent [1] started for another agent, its main agent, which split its task across subagents (the `orchestration` skill). The subagent's card names the main agent's id as its parent.
-[17] picked project: the one project the project select, the menu at the top of this column, names. Every page then shows only that project's data. When the select says "All projects", no project is picked and every page shows every project's data.
+[17] picked project: the one project the project select, the menu at the top of this column, names. This column then lists only the pages added by the packages that project has, and every page shows only that project's data. When the select says "All projects", no project is picked, this column lists the pages added by every project's packages and every page shows every project's data.
 [18] archive: the transient copy of a finished agent's events and status under a project's `.openagent/agents/`.
 
 ## Business logic — TL;DR
 
 - **One column on every page** - brand mark, the project select, the navigation group, the agents list and the footer controls, in a fixed-width column that never disappears, on the Overview and on an agent's page alike.
 - **"New agent"** - starts an agent where it can: in the picked project [17], in the only project, from a picker when there are several and none is picked, or, with no project at all, by offering to add one first.
-- **"Overview" and the modules' pages** - the cross-project destinations, "Overview" carrying the count of items in the "Human Queue", then one row per page a module [15] adds, labelled by the module (the tickets' page among them, when a package brings one); only the current view carries the active fill, never two.
+- **"Overview" and the modules' pages** - the destinations with no project selected: "Overview", carrying the count of items in the "Human Queue", then one row per module [15] page, labelled by its module (the tickets' page among them, when a package brings one), only the pages of the packages the picked project [17] has when a project is picked; only the current view carries the active fill, never two.
 - **The project select** - at the top, above a rule: the picked project [17] or "All projects", applying to everything under it.
 - **Which agents are listed** - the picked project's [17] own agents, or with none picked every project's recent agents pooled, each row naming its project; "No agents yet." when there is nothing.
 - **Subagents under their main agent** - the list is a tree one level deep: a subagent [16] whose main agent is in the list sits under it, in a list that is open by itself while a subagent is working, waiting or the one selected, and folded otherwise; the main agent's row carries the count of its subagents on its first line, and a click on the count opens or folds the list without opening the agent, the user's choice winning from then on. A main agent that is `done` reads "running" while one of its subagents in the list still holds its job.
@@ -48,7 +48,7 @@ See `## Context`.
 
 #### Business logic
 
-The column holds, top to bottom: the brand mark and word mark, which lead to the Overview [2], keeping the picked project [17], and animate while any agent [1] is working; the project select; a rule; the "New agent" button; the "Overview" row; one row per module page; the scrolling "Recent agents" list under a heading that stays pinned at the top of the scroll and is shown even when the list is empty, so "No agents yet." reads as the state of this list; and a footer with the connection indicator (which daemon this dashboard talks to), the theme toggle, the notifications menu (`NotificationsMenu.tsx`), and a gear button whose hover and accessible name read "Settings" and which opens the Settings page.
+The column holds, top to bottom: the brand mark and word mark, which lead to the Overview [2], keeping the picked project [17], and animate while any agent [1] is working; the project select; a rule; the "New agent" button; the "Overview" row; one row per module page the shell hands over; the scrolling "Recent agents" list under a heading that stays pinned at the top of the scroll and is shown even when the list is empty, so "No agents yet." reads as the state of this list; and a footer with the connection indicator (which daemon this dashboard talks to), the theme toggle, the notifications menu (`NotificationsMenu.tsx`), and a gear button whose hover and accessible name read "Settings" and which opens the Settings page.
 
 ### "New agent"
 
@@ -70,12 +70,12 @@ The button carries the active fill only when the project's launcher is the curre
 
 #### Context
 
-**User story**: the two cross-project destinations sit above the agents list, more prominent than a menu row, and the one open question count the user must never lose sight of rides on "Overview".
+**User story**: the destinations with no project selected, "Overview" and the modules' pages, sit above the agents list, more prominent than a menu row, and the one open question count the user must never lose sight of rides on "Overview".
 
 #### Business logic
 
 - "Overview" leads to the Overview [2]. When the count of interventions [6] is above zero, the row carries a filled badge with the count, whose hover reads "<N> item in your Human Queue" or "<N> items in your Human Queue". The row is the active one when no project is selected and no module's page is current.
-- Below "Overview", one row per page the installed modules [15] add, in the order the shell hands them, each with the module's own label and icon (a generic blocks icon when the module gives none); a row opens its page and is the active one while that page is current.
+- Below "Overview", one row per page the shell hands it, in the shell's order: every page the installed modules [15] add, or, with a project picked [17], only the pages of the packages that project has (the shell decides which, in `App.tsx`), each with the module's own label and icon (a generic blocks icon when the module gives none); a row opens its page and is the active one while that page is current.
 - All of these rows correspond to pages with no project selected, so "Overview" is the active one only when no module's page is current. The dashboard has no row of its own for tickets: the tickets' page is the tickets package's module's, listed here like any other module page.
 
 ### The project select

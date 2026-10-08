@@ -30,11 +30,14 @@ export interface Interval {
   text: string
 }
 
-/** An interval out of its text (`15m`, `6h`, `7d`, `2w`, `1mo`); nothing for text that is none, and for a count of 0, which would spell "always". */
+/** The largest count an interval takes: past it nobody means a pace, and far past it a date stops being one. */
+export const MAX_COUNT = 9999
+
+/** An interval out of its text (`15m`, `6h`, `7d`, `2w`, `1mo`); nothing for text that is none, for a count of 0, which would spell "always", and for one above 9999. */
 export function parseInterval(text: string): Interval | undefined {
   const read = /^(\d+)(mo|m|h|d|w)$/.exec(text)
   const count = Number(read?.[1])
-  if (!read || !Number.isSafeInteger(count) || count < 1) return undefined
+  if (!read || count < 1 || count > MAX_COUNT) return undefined
   const unit = read[2] as PaceUnit
   return { count, unit, ms: count * UNIT_MS[unit], text: `${count}${unit}` }
 }
@@ -53,10 +56,17 @@ export function parseTimeOfDay(text: string): { hour: number; minute: number; te
   return { hour, minute, text: `${String(hour).padStart(2, '0')}:${read[2]}` }
 }
 
+/** A pick with its time of day counted from now on: what switching the command on does, so a row ticked after its time waits for the next one. Any other pick is unchanged. */
+export function sinceNow(pick: PacePick | undefined, now: Date): PacePick | undefined {
+  if (typeof pick !== 'object' || pick === null || !('every' in pick) || typeof pick.at !== 'string') return pick
+  return { ...pick, since: now.toISOString() }
+}
+
 /**
  * A person's pick of a pace for one scheduled command, on their machine: `work` for "whenever
  * there is work", which takes the interval away and leaves the check alone to say when; else an
- * interval, with a time of day when it has one and when the pick was made.
+ * interval, with a time of day when it has one and when the pick was made, or the command last
+ * switched on with it.
  */
 export type PacePick = { work: true } | { every: string; at?: string; since: string }
 
@@ -75,11 +85,12 @@ export interface Pace {
 export function paceInForce(pick: PacePick | undefined, skill: { every?: Interval; when?: string }): Pace | undefined {
   const skills = skill.every ? { every: skill.every } : undefined
   if (pick === undefined || typeof pick !== 'object' || pick === null) return skills
-  if ('work' in pick) return pick.work === true && skill.when !== undefined ? undefined : skills
-  const every = typeof pick.every === 'string' ? parseInterval(pick.every) : undefined
+  if ('work' in pick && pick.work === true) return skill.when !== undefined ? undefined : skills
+  const every = 'every' in pick && typeof pick.every === 'string' ? parseInterval(pick.every) : undefined
   if (!every) return skills
-  const at = typeof pick.at === 'string' && takesTimeOfDay(every) ? parseTimeOfDay(pick.at) : undefined
-  return { every, ...(at ? { at, ...(typeof pick.since === 'string' ? { since: pick.since } : {}) } : {}) }
+  const timed = pick as { at?: unknown; since?: unknown }
+  const at = typeof timed.at === 'string' && takesTimeOfDay(every) ? parseTimeOfDay(timed.at) : undefined
+  return { every, ...(at ? { at, ...(typeof timed.since === 'string' ? { since: timed.since } : {}) } : {}) }
 }
 
 /**
@@ -90,8 +101,9 @@ export function paceInForce(pick: PacePick | undefined, skill: { every?: Interva
  * With a time of day: that time on the day the interval's days after the day it last started, so
  * a time that was missed (the scheduler not running then) is still due when the scheduler next
  * looks, once, since the start that follows moves the next day on. Never earlier than the first
- * such time after the pick was made: setting "every day at 10:00" at 11:00 starts nothing until
- * tomorrow's 10:00, like a calendar event. Days are the machine's own local days.
+ * such time after the pick was made, or after the command was last switched on with it: setting
+ * "every day at 10:00" at 11:00, or ticking its switch at 11:00, starts nothing until tomorrow's
+ * 10:00, like a calendar event. Days are the machine's own local days.
  */
 export function dueFrom(pace: Pace, lastStart: Date | undefined, now: Date): Date {
   if (!pace.at) return lastStart ? new Date(lastStart.getTime() + pace.every.ms) : new Date(0)
@@ -105,7 +117,7 @@ export function dueFrom(pace: Pace, lastStart: Date | undefined, now: Date): Dat
   return firstAfterPick && firstAfterPick.getTime() > afterLast.getTime() ? firstAfterPick : afterLast
 }
 
-/** A pace as a person writes it on the command line: `6h`, `2d at 10:00`. */
+/** A pace as a tick's decision says it: `6h`, `2d at 10:00`. */
 export function paceText(pace: Pace): string {
   return pace.at ? `${pace.every.text} at ${pace.at.text}` : pace.every.text
 }

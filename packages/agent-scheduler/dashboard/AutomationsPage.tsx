@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { Button, Checkbox, Tooltip, TooltipContent, TooltipTrigger, cn, formatAge, formatDateTime, useModuleHost, usePolled, type ModulePageProps, type ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick } from '../src/state.js'
-import { PACE_UNITS, parseInterval, takesTimeOfDay, type PaceUnit } from '../src/pace.js'
-import { PUBLISH_LABELS, UNIT_WORDS, decided, draftOf, ownPace, pace, paceArgs, publishChoices, publishes, readSchedulers, schedulerStatus, spelled, withDraft, type PaceDraft, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
+import { MAX_COUNT, PACE_UNITS, parseInterval, takesTimeOfDay, type PaceUnit } from '../src/pace.js'
+import { PUBLISH_LABELS, UNIT_WORDS, decided, draftOf, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, schedulerStatus, withDraft, type PaceDraft, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
 
 // The Automations page: what starts by itself while nobody is at the keyboard. One group per
 // project the page is given (every project that has this package, or the one picked in the
@@ -174,7 +174,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                             ))}
                           </select>
                           <p className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-sm">
-                            {paceArgs(open.pace) ? `${pace(withDraft(scheduled, open.pace))}. ${publishes({ ...scheduled, publish: open.publish })}.` : 'Type a whole number, 1 or more, and a time like 10:00 or none.'}
+                            {paceProblem(open.pace) ?? `${pace(withDraft(scheduled, open.pace))}. ${publishes({ ...scheduled, publish: open.publish })}.`}
                           </p>
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                             <p className="text-xs text-muted-foreground">Saved for you, in this project, on this machine. No tracked file changes.</p>
@@ -206,6 +206,8 @@ export function AutomationsPage({ projects }: ModulePageProps) {
   )
 }
 
+const lower = (text: string): string => text.charAt(0).toLowerCase() + text.slice(1)
+
 /** A row open for editing: which one, and what the person picked in it and has not saved yet. */
 interface Editing {
   id: string
@@ -231,7 +233,7 @@ function PaceFields({ scheduled, draft, disabled, onChange }: { scheduled: Sched
         {/* The keyboard lands where the row opened. */}
         <input type="radio" name={name} autoFocus={draft.kind === 'skill'} checked={draft.kind === 'skill'} onChange={() => onChange({ kind: 'skill' })} />
         As the skill says
-        <span className="text-xs text-muted-foreground">{scheduled.every !== undefined ? `every ${spelled(scheduled.every)}` : 'whenever there is work'}</span>
+        <span className="text-xs text-muted-foreground">{lower(pace(withDraft(scheduled, { kind: 'skill' })))}</span>
       </label>
       {scheduled.when !== undefined && scheduled.every !== undefined && (
         <label className="flex items-center gap-2 text-sm">
@@ -247,6 +249,7 @@ function PaceFields({ scheduled, draft, disabled, onChange }: { scheduled: Sched
         <input
           type="number"
           min={1}
+          max={MAX_COUNT}
           value={typed.count}
           disabled={draft.kind !== 'every'}
           onChange={e => onChange({ ...typed, count: e.target.value })}
@@ -256,18 +259,27 @@ function PaceFields({ scheduled, draft, disabled, onChange }: { scheduled: Sched
         <select value={typed.unit} disabled={draft.kind !== 'every'} onChange={e => onChange({ ...typed, unit: e.target.value as PaceUnit })} aria-label="Unit" className={field}>
           {PACE_UNITS.map(unit => (
             <option key={unit} value={unit}>
-              {UNIT_WORDS[unit]}s
+              {typed.count.trim() === '1' ? UNIT_WORDS[unit] : `${UNIT_WORDS[unit]}s`}
             </option>
           ))}
         </select>
         {timed && (
           <>
             <span>at</span>
-            <input type="time" value={typed.at} disabled={draft.kind !== 'every'} onChange={e => onChange({ ...typed, at: e.target.value })} aria-label="Time of day" className={field} />
-            <span className="text-xs text-muted-foreground">optional, this machine's time</span>
+            <input
+              type="time"
+              value={typed.at}
+              disabled={draft.kind !== 'every'}
+              // A time left half typed has no text; the browser says so on the field itself.
+              onChange={e => onChange({ kind: 'every', count: typed.count, unit: typed.unit, at: e.target.value, ...(e.target.validity.badInput ? { atHalfTyped: true as const } : {}) })}
+              aria-label="Time of day"
+              className={field}
+            />
+            <span className="text-xs text-muted-foreground">optional, this machine's time{typed.unit === 'mo' ? '; a month counts as 30 days' : ''}</span>
           </>
         )}
       </div>
+      <p className="text-xs text-muted-foreground">Counted from its last start, on any machine that shares this repository.</p>
     </fieldset>
   )
 }

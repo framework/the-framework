@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { STATUS, hostAnswering } from './fixtures.js'
-import { decided, draftOf, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withDraft } from './schedulers.js'
+import { decided, draftOf, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withDraft } from './schedulers.js'
 
 const GEMSTACK = { id: 'p1', name: 'gemstack', gitHost: true }
 const OTHER = { id: 'p2', name: 'other', gitHost: false }
@@ -115,7 +115,8 @@ describe('in words', () => {
     const skill = { command: 'a', on: true, publish: 'commit' as const, every: '6h', when: 'x', waitsFor: 'when a ticket has no plan' }
     const since = '2026-10-08T07:00:00.000Z'
     expect(pace({ ...skill, pace: { every: '30m', since } })).toBe('Every 30 minutes at most, when a ticket has no plan')
-    expect(pace({ ...skill, pace: { every: '2d', at: '10:00', since } })).toBe('Every 2 days at 10:00, when a ticket has no plan')
+    // Beside a check a time of day is "from": the command starts once the check finds work, which may be later that day.
+    expect(pace({ ...skill, pace: { every: '2d', at: '10:00', since } })).toBe('Every 2 days from 10:00, when a ticket has no plan')
     expect(pace({ ...skill, pace: { every: '2w', since } })).toBe('Every 2 weeks at most, when a ticket has no plan')
     expect(pace({ ...skill, pace: { work: true } })).toBe('When a ticket has no plan')
     expect(pace({ command: 'a', on: true, publish: 'commit', every: '1d', pace: { every: '1mo', at: '9:05', since } })).toBe('Every 1 month at 09:05')
@@ -144,11 +145,23 @@ describe('in words', () => {
     expect(paceArgs({ kind: 'every', count: '1', unit: 'mo', at: '' })).toEqual(['1mo'])
     // A time left in the field beside minutes or hours is not sent: the page hides the field then.
     expect(paceArgs({ kind: 'every', count: '6', unit: 'h', at: '10:00' })).toEqual(['6h'])
-    for (const count of ['', '0', '1.5', '-2', 'two']) expect(paceArgs({ kind: 'every', count, unit: 'd', at: '' }), count).toBeUndefined()
+    for (const count of ['', '0', '1.5', '-2', 'two', '10000', '1e2']) {
+      expect(paceArgs({ kind: 'every', count, unit: 'd', at: '' }), count).toBeUndefined()
+      expect(paceProblem({ kind: 'every', count, unit: 'd', at: '' }), count).toBe('Type a whole number, from 1 to 9999.')
+    }
     expect(paceArgs({ kind: 'every', count: '2', unit: 'd', at: '25:00' })).toBeUndefined()
+    // A time field left half typed has no text: the draft says so, and it is no pace until finished or cleared.
+    expect(paceArgs({ kind: 'every', count: '2', unit: 'd', at: '', atHalfTyped: true })).toBeUndefined()
+    expect(paceProblem({ kind: 'every', count: '2', unit: 'd', at: '', atHalfTyped: true })).toBe('Finish the time, like 10:00, or clear it.')
+    // Beside minutes or hours there is no time field, so a half-typed time left behind does not count.
+    expect(paceArgs({ kind: 'every', count: '2', unit: 'h', at: '', atHalfTyped: true })).toEqual(['2h'])
+    expect(paceProblem({ kind: 'every', count: '2', unit: 'd', at: '10:00' })).toBeUndefined()
+    expect(paceProblem({ kind: 'skill' })).toBeUndefined()
+    // A state edited by hand: only `work: true` is "whenever there is work".
+    expect(draftOf({ ...skill, pace: { work: false, every: '2d', since } as never })).toEqual({ kind: 'every', count: '2', unit: 'd', at: '' })
 
     // What the row would read as, saved.
-    expect(pace(withDraft(skill, { kind: 'every', count: '2', unit: 'd', at: '10:00' }))).toBe('Every 2 days at 10:00, when its check finds work')
+    expect(pace(withDraft(skill, { kind: 'every', count: '2', unit: 'd', at: '10:00' }))).toBe('Every 2 days from 10:00, when its check finds work')
     expect(pace(withDraft({ ...skill, pace: { every: '30m', since } }, { kind: 'skill' }))).toBe('Every 6 hours at most, when its check finds work')
     expect(pace(withDraft(skill, { kind: 'work' }))).toBe('When its check finds work')
     expect(withDraft(skill, { kind: 'every', count: '', unit: 'd', at: '' })).toBe(skill)

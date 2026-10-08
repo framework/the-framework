@@ -130,7 +130,7 @@ function parseRow(skill: string, row: unknown, dir: string): ScheduledCommand | 
   const waitsFor = row['waits-for']
   if (word !== undefined && !(typeof word === 'string' && WORD.test(word))) return 'word is one word of lower-case letters, digits and dashes'
   const asEvery = every === undefined ? undefined : parseInterval(String(every))
-  if (every !== undefined && !asEvery) return 'every is a number above 0 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'
+  if (every !== undefined && !asEvery) return 'every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'
   if (when !== undefined && !(typeof when === 'string' && when.trim())) return 'when is a shell command line'
   if (waitsFor !== undefined && !(typeof waitsFor === 'string' && waitsFor.trim() && !waitsFor.trim().includes('\n'))) return 'waits-for is one line of text'
   if (agents !== undefined && !(typeof agents === 'number' && Number.isInteger(agents) && agents >= 1)) return 'agents is a whole number, 1 or more'

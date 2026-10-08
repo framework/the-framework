@@ -1,7 +1,7 @@
 import type { ModuleHost, ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick, TickDecision } from '../src/state.js'
 import { DEFAULT_PUBLISH } from '../src/names.js'
-import { paceInForce, parseInterval, parseTimeOfDay, takesTimeOfDay, type PacePick, type PaceUnit } from '../src/pace.js'
+import { MAX_COUNT, paceInForce, parseInterval, parseTimeOfDay, takesTimeOfDay, type PacePick, type PaceUnit } from '../src/pace.js'
 
 // What the module shows of each project's scheduler: the answer of `agent-scheduler status`, the
 // state file as it stands plus whether the scheduler's process is alive. Forgiving: a field that is
@@ -80,6 +80,7 @@ function isPick(value: unknown): value is PublishPick {
 function isPace(value: unknown): boolean {
   const pick = record(value)
   return pick['work'] === true || (typeof pick['every'] === 'string' && parseInterval(pick['every']) !== undefined)
+  // The same two readings as the tool's own (`paceInForce`): anything else is no pace, and the row says its skill's.
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -198,7 +199,8 @@ const sentence = (text: string): string => text.charAt(0).toUpperCase() + text.s
  * its skill's. An interval is "Every 6 hours", with "at most" before what its check waits for
  * when it has a check; a time of day is "Every 2 days at 10:00"; a command its check alone paces
  * says what the check waits for. A check whose skill gives no plain line is "when its check finds
- * work".
+ * work". Beside a check a time of day is "from 10:00": the command starts once the check finds
+ * work, which may be later that day.
  */
 export function pace(command: SchedulerCommand): string {
   const waits = command.waitsFor ?? 'when its check finds work'
@@ -207,9 +209,8 @@ export function pace(command: SchedulerCommand): string {
   // An interval of the skill's the tool would not have read is shown as written.
   const every = inForce ? spelled(inForce.every.text) : command.pace === undefined && command.every !== undefined ? command.every : undefined
   if (every === undefined) return sentence(waits)
-  const when = inForce?.at ? `Every ${every} at ${inForce.at.text}` : `Every ${every}`
-  if (command.when === undefined) return when
-  return inForce?.at ? `${when}, ${waits}` : `${when} at most, ${waits}`
+  if (command.when === undefined) return inForce?.at ? `Every ${every} at ${inForce.at.text}` : `Every ${every}`
+  return inForce?.at ? `Every ${every} from ${inForce.at.text}, ${waits}` : `Every ${every} at most, ${waits}`
 }
 
 /** Whether the pace a command runs at is one a person set on this machine, not its skill's. */
@@ -220,18 +221,19 @@ export function ownPace(command: SchedulerCommand): boolean {
 /**
  * A pace as the Edit box holds it while a person picks: the skill's own, whenever there is work,
  * or an interval typed as a count and a unit with an optional time of day. The count and the time
- * are text, as typed, so a half-typed one is no pace yet.
+ * are text, as typed, so a half-typed one is no pace yet. A time field left half typed reports no
+ * text at all, so the draft holds that it is half typed beside it.
  */
-export type PaceDraft = { kind: 'skill' } | { kind: 'work' } | { kind: 'every'; count: string; unit: PaceUnit; at: string }
+export type PaceDraft = { kind: 'skill' } | { kind: 'work' } | { kind: 'every'; count: string; unit: PaceUnit; at: string; atHalfTyped?: true }
 
 /** The draft a command's Edit box opens with: its pace on this machine, the skill's own where nobody set one or the one set cannot be followed. */
 export function draftOf(command: SchedulerCommand): PaceDraft {
   const pick = command.pace
   if (pick === undefined) return { kind: 'skill' }
   // "Whenever there is work" is what a skill with a check and no interval says already.
-  if ('work' in pick) return command.when !== undefined && command.every !== undefined ? { kind: 'work' } : { kind: 'skill' }
-  const every = parseInterval(pick.every)
-  if (!every) return { kind: 'skill' }
+  if ('work' in pick && pick.work === true) return command.when !== undefined && command.every !== undefined ? { kind: 'work' } : { kind: 'skill' }
+  const every = 'every' in pick ? parseInterval(pick.every) : undefined
+  if (!every || !('every' in pick)) return { kind: 'skill' }
   const at = takesTimeOfDay(every) && pick.at !== undefined ? parseTimeOfDay(pick.at) : undefined
   return { kind: 'every', count: String(every.count), unit: every.unit, at: at?.text ?? '' }
 }
@@ -246,9 +248,18 @@ export function paceArgs(draft: PaceDraft): string[] | undefined {
   if (draft.kind !== 'every') return [draft.kind]
   const every = /^\d+$/.test(draft.count.trim()) ? parseInterval(`${draft.count.trim()}${draft.unit}`) : undefined
   if (!every) return undefined
-  if (!takesTimeOfDay(every) || draft.at.trim() === '') return [every.text]
+  if (!takesTimeOfDay(every)) return [every.text]
+  if (draft.atHalfTyped) return undefined
+  if (draft.at.trim() === '') return [every.text]
   const at = parseTimeOfDay(draft.at.trim())
   return at ? [every.text, at.text] : undefined
+}
+
+/** What keeps a draft from being a pace yet, for the person typing it; nothing when it is one. */
+export function paceProblem(draft: PaceDraft): string | undefined {
+  if (paceArgs(draft)) return undefined
+  if (draft.kind === 'every' && !(/^\d+$/.test(draft.count.trim()) && parseInterval(`${draft.count.trim()}${draft.unit}`))) return `Type a whole number, from 1 to ${MAX_COUNT}.`
+  return 'Finish the time, like 10:00, or clear it.'
 }
 
 /** A command as it would read with a draft saved: what the Edit box's sentence describes. The command as it is while the draft is no pace yet. */

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { dueFrom, localStamp, paceInForce, paceText, parseInterval, parseTimeOfDay, takesTimeOfDay, type Pace, type PacePick } from './pace.js'
+import { dueFrom, localStamp, paceInForce, paceText, parseInterval, parseTimeOfDay, sinceNow, takesTimeOfDay, type Pace, type PacePick } from './pace.js'
 
 // The pace's rules, pure. Every time here is the machine's own local time, made with the local
 // constructor, so the tests say the same thing in any time zone.
@@ -8,7 +8,7 @@ import { dueFrom, localStamp, paceInForce, paceText, parseInterval, parseTimeOfD
 const at = (day: number, hour: number, minute = 0): Date => new Date(2026, 9, day, hour, minute)
 const HOUR = 3_600_000
 
-test('an interval is a number above 0 and a unit: minutes, hours, days, weeks of 7 days, months of 30', () => {
+test('an interval is a number from 1 to 9999 and a unit: minutes, hours, days, weeks of 7 days, months of 30', () => {
   assert.deepEqual(parseInterval('15m'), { count: 15, unit: 'm', ms: 15 * 60_000, text: '15m' })
   assert.equal(parseInterval('6h')!.ms, 6 * HOUR)
   assert.equal(parseInterval('2d')!.ms, 48 * HOUR)
@@ -16,7 +16,9 @@ test('an interval is a number above 0 and a unit: minutes, hours, days, weeks of
   assert.deepEqual(parseInterval('1mo'), { count: 1, unit: 'mo', ms: 30 * 24 * HOUR, text: '1mo' })
   // A leading zero is dropped from the text; zero would spell "always".
   assert.equal(parseInterval('06h')!.text, '6h')
-  for (const text of ['0h', '0mo', 'h', '6', '6 h', '1y', '-2d', '1.5h', 'often', '']) assert.equal(parseInterval(text), undefined, text)
+  assert.equal(parseInterval('9999mo')!.count, 9999)
+  // Past 9999 nobody means a pace, and far past it a date stops being one: such a count must never read as "due".
+  for (const text of ['0h', '0mo', 'h', '6', '6 h', '1y', '-2d', '1.5h', 'often', '', '10000d', '100000000d', '99999999999999999999h']) assert.equal(parseInterval(text), undefined, text)
 })
 
 test('a time of day is hours and minutes on a 24-hour clock, and goes only with days, weeks or months', () => {
@@ -43,7 +45,9 @@ test("the pace in force is this machine's pick, else the skill's; a pick that ca
   assert.deepEqual(paceInForce({ work: true }, { every: skill.every }), { every: skill.every }, 'no check: the skill\'s pace stands')
 
   // A state edited by hand.
-  for (const odd of [{ every: 'often', since }, { every: 7 }, { work: 'yes' }, 'daily', null, []]) assert.deepEqual(paceInForce(odd as unknown as PacePick, skill), { every: skill.every }, JSON.stringify(odd))
+  for (const odd of [{ every: 'often', since }, { every: 7 }, { work: 'yes' }, { every: '100000000d', since }, 'daily', 7, null, []]) assert.deepEqual(paceInForce(odd as unknown as PacePick, skill), { every: skill.every }, JSON.stringify(odd))
+  // Only `work: true` is "whenever there is work": beside anything else the interval is read.
+  assert.deepEqual(paceInForce({ work: false, every: '2d', since } as unknown as PacePick, skill), { every: parseInterval('2d')! })
 })
 
 test('without a time of day a command is due the interval after its last start, and at once when it never started', () => {
@@ -59,9 +63,13 @@ test('with a time of day a command is due from that time on, on a day at least t
   // Started on the 8th, whatever the hour: due from the 10th at 10:00.
   assert.deepEqual(dueFrom(pace, at(8, 10, 2), at(9, 12)), at(10, 10))
   assert.deepEqual(dueFrom(pace, at(8, 23, 50), at(9, 12)), at(10, 10))
-  // Weeks are 7 days and months 30.
+  // Weeks are 7 days and months 30, across the end of a month and of a year.
   assert.deepEqual(dueFrom({ ...pace, every: parseInterval('1w')! }, at(8, 10), at(9, 12)), at(15, 10))
   assert.deepEqual(dueFrom({ ...pace, every: parseInterval('1mo')! }, at(1, 10), at(9, 12)), at(31, 10))
+  assert.deepEqual(dueFrom({ ...pace, every: parseInterval('1mo')! }, new Date(2027, 0, 31, 10), new Date(2027, 1, 1)), new Date(2027, 2, 2, 10))
+  assert.deepEqual(dueFrom({ ...pace, every: parseInterval('1d')! }, new Date(2026, 11, 31, 23, 50), new Date(2027, 0, 1)), new Date(2027, 0, 1, 10))
+  // A last start in the future (another machine's clock runs ahead): it waits, by the same rule.
+  assert.deepEqual(dueFrom(pace, at(9, 10), at(8, 12)), at(11, 10))
 })
 
 test('a time that was missed is due as soon as the scheduler looks, and once: the start that follows moves the next day on', () => {
@@ -79,12 +87,27 @@ test('a pick starts nothing before its first time of day: like a calendar event,
   const daily = { every: parseInterval('1d')!, at: parseTimeOfDay('10:00')! }
   // Picked at 11:00 on the 8th, never started.
   assert.deepEqual(dueFrom({ ...daily, since: at(8, 11).toISOString() }, undefined, at(8, 11, 1)), at(9, 10))
-  // Picked at 09:00: the same day's 10:00.
+  // Picked at 09:00, or at 10:00 sharp: the same day's 10:00. Half a minute past it: tomorrow's.
   assert.deepEqual(dueFrom({ ...daily, since: at(8, 9).toISOString() }, undefined, at(8, 9, 1)), at(8, 10))
+  assert.deepEqual(dueFrom({ ...daily, since: at(8, 10).toISOString() }, undefined, at(8, 10)), at(8, 10))
+  assert.deepEqual(dueFrom({ ...daily, since: new Date(2026, 9, 8, 10, 0, 30).toISOString() }, undefined, at(8, 10, 1)), at(9, 10))
+  // The time moved from 10:00 to 16:00 at 11:00, after today's start: tomorrow 16:00, no second start today.
+  assert.deepEqual(dueFrom({ ...daily, at: parseTimeOfDay('16:00')!, since: at(8, 11).toISOString() }, at(8, 10), at(8, 11, 1)), at(9, 16))
   // Last started long ago, picked at 11:00 today: still tomorrow's 10:00, not at once.
   assert.deepEqual(dueFrom({ ...daily, since: at(8, 11).toISOString() }, at(1, 10), at(8, 11, 1)), at(9, 10))
   // No record of when it was picked (a state edited by hand): today's time when it never started.
   assert.deepEqual(dueFrom(daily, undefined, at(8, 9)), at(8, 10))
+})
+
+test('switching a command on counts its time of day from then: ticked after the time, it waits for the next one; a pick with no time of day is unchanged', () => {
+  const picked = at(5, 11).toISOString()
+  const timed: PacePick = { every: '1d', at: '10:00', since: picked }
+  const on = sinceNow(timed, at(7, 15))
+  assert.deepEqual(on, { every: '1d', at: '10:00', since: at(7, 15).toISOString() })
+  // Without it the 6th's 10:00, long past, would start it at once at 15:00.
+  assert.deepEqual(dueFrom(paceInForce(on, {})!, undefined, at(7, 15, 1)), at(8, 10))
+  assert.deepEqual(dueFrom(paceInForce(timed, {})!, undefined, at(7, 15, 1)), at(6, 10))
+  for (const other of [{ every: '6h', since: picked }, { work: true }, undefined, null, 'daily'] as unknown as PacePick[]) assert.deepEqual(sinceNow(other, at(7, 15)), other)
 })
 
 test('a pace and a local time, as a decision writes them', () => {

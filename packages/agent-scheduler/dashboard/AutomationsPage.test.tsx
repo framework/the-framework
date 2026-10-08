@@ -120,8 +120,10 @@ describe('the Automations page', () => {
     const count = within(editor).getByLabelText('How many') as HTMLInputElement
     const unit = within(editor).getByLabelText('Unit') as HTMLSelectElement
     expect([count.value, unit.value]).toEqual(['1', 'd'])
-    expect(options(unit)).toEqual(['minutes', 'hours', 'days', 'weeks', 'months'])
+    expect(options(unit)).toEqual(['minute', 'hour', 'day', 'week', 'month'])
     fireEvent.change(count, { target: { value: '2' } })
+    expect(options(unit)).toEqual(['minutes', 'hours', 'days', 'weeks', 'months'])
+    expect(within(editor).getByText('Counted from its last start, on any machine that shares this repository.')).toBeTruthy()
     fireEvent.change(within(editor).getByLabelText('Time of day'), { target: { value: '10:00' } })
     expect(within(editor).getByText("optional, this machine's time")).toBeTruthy()
     expect(within(editor).getByText('Every 2 days at 10:00. Commits its work.')).toBeTruthy()
@@ -148,8 +150,24 @@ describe('the Automations page', () => {
     for (const typed of ['', '0', '1.5']) {
       fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: typed } })
       expect(save.disabled, typed).toBe(true)
-      expect(within(editor).getByText('Type a whole number, 1 or more, and a time like 10:00 or none.')).toBeTruthy()
+      expect(within(editor).getByText('Type a whole number, from 1 to 9999.')).toBeTruthy()
     }
+    // A time left half typed: the field has no text, the browser says the entry is bad, and Save waits.
+    fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: '2' } })
+    fireEvent.change(within(editor).getByLabelText('Unit'), { target: { value: 'd' } })
+    const time = within(editor).getByLabelText('Time of day') as HTMLInputElement
+    Object.defineProperty(time, 'validity', { configurable: true, value: { badInput: true } })
+    fireEvent.change(time, { target: { value: '' } })
+    expect(save.disabled).toBe(true)
+    expect(within(editor).getByText('Finish the time, like 10:00, or clear it.')).toBeTruthy()
+    Object.defineProperty(time, 'validity', { configurable: true, value: { badInput: false } })
+    fireEvent.change(time, { target: { value: '09:30' } })
+    expect(save.disabled).toBe(false)
+    expect(within(editor).getByText('Every 2 days at 09:30. Commits its work.')).toBeTruthy()
+    fireEvent.change(time, { target: { value: '' } })
+    expect(within(editor).getByText("optional, this machine's time")).toBeTruthy()
+    fireEvent.change(within(editor).getByLabelText('Unit'), { target: { value: 'mo' } })
+    expect(within(editor).getByText("optional, this machine's time; a month counts as 30 days")).toBeTruthy()
     fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: '30' } })
     fireEvent.change(within(editor).getByLabelText('Unit'), { target: { value: 'm' } })
     expect(save.disabled).toBe(false)
@@ -197,7 +215,7 @@ describe('the Automations page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit /update-tickets' }))
     const second = screen.getByRole('group', { name: 'Editing /update-tickets' })
-    expect(within(second).getByText('every 15 minutes')).toBeTruthy()
+    expect(within(second).getByText('every 15 minutes at most, when an issue changed')).toBeTruthy()
     fireEvent.click(within(second).getByRole('radio', { name: 'Whenever there is work' }))
     expect(within(second).getByText('When an issue changed. Commits its work.')).toBeTruthy()
     fireEvent.change(within(second).getByLabelText('What its runs publish'), { target: { value: 'pr' } })

@@ -5,7 +5,7 @@ import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './s
 import { initHooks } from './init.js'
 import { cleanup } from './cleanup.js'
 import { PUBLISH_PICKS, updateState, withPace, withPublish, withSwitch, type PublishPick } from './state.js'
-import { parseInterval, parseTimeOfDay, takesTimeOfDay } from './pace.js'
+import { parseInterval, parseTimeOfDay, sinceNow, takesTimeOfDay } from './pace.js'
 import { readSchedule, type ScheduledCommand } from './schedule.js'
 
 /**
@@ -27,7 +27,7 @@ export const USAGE = `usage: agent-scheduler <command>
   publish <command> <nothing|commit|branch|pr|merge>
                                 how far this machine's runs of a scheduled command publish; commit until picked
   pace <command> <skill|work|N<m|h|d|w|mo>> [HH:MM]
-                                how often at most a scheduled command starts on this machine: an interval (15m, 6h, 2d, 2w, 1mo), with a time of day
+                                how often at most a scheduled command starts on this machine: an interval (15m, 6h, 2d, 2w, 1mo; 1 to 9999), with a time of day
                                 for days, weeks or months (2d 10:00, this machine's time); work for whenever its check finds work; skill for the skill's own pace again, taken for any name
   cleanup                       remove what this tool left in the project: the state file and the scheduler's log, then .agent-scheduler/ and the rule hiding it from git once it is empty;
                                 refused while the state names a scheduler that is alive; the command a dashboard asks for when a project is removed with its files
@@ -143,7 +143,8 @@ const COMMANDS: Record<string, Command> = {
     const repo = await project(io.cwd, git)
     // Off needs no scheduled command: a switch left on for a skill that is gone can always be taken back.
     if (to === 'on') await scheduled(repo, name)
-    return { ok: true, ...(await updateState(repo, s => withSwitch(s, name, to === 'on'), git)) }
+    // Switched on, a time of day counts from now: a row ticked after its time waits for the next one, as when the time was picked.
+    return { ok: true, ...(await updateState(repo, s => (to === 'on' ? withPace(withSwitch(s, name, true), name, sinceNow(s.paces?.[name], new Date())) : withSwitch(s, name, false)), git)) }
   },
 
   async publish(args, io, git) {
@@ -177,7 +178,7 @@ const COMMANDS: Record<string, Command> = {
           if (every === undefined) return withPace(s, name, { work: true })
           // The same pace picked again is the same pick: when it was made stays, so a time that was missed is still due.
           const before = s.paces?.[name]
-          const same = before !== undefined && 'every' in before && before.every === every && before.at === time?.text
+          const same = typeof before === 'object' && before !== null && 'every' in before && before.every === every && before.at === time?.text && typeof before.since === 'string'
           return withPace(s, name, { every, ...(time ? { at: time.text } : {}), since: same ? before.since : new Date().toISOString() })
         },
         git,

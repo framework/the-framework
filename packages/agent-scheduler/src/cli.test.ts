@@ -206,6 +206,29 @@ test("pace writes this machine's pace for a scheduled command: an interval, a ti
     await run(repo, 'pace', 'work-queue', 'skill')
     assert.equal((await readState(repo)).paces, undefined)
 
+    // A state edited by hand: a pace that is no pick at all is simply replaced.
+    await writeState(repo, { ...(await readState(repo)), paces: { 'triage quick': null as never, 'work-queue': 'daily' as never } })
+    assert.equal((await run(repo, 'pace', 'triage quick', '2d')).code, 0)
+    assert.equal((await run(repo, 'pace', 'work-queue', '1h')).code, 0)
+    await run(repo, 'pace', 'triage quick', 'skill')
+    await run(repo, 'pace', 'work-queue', 'skill')
+
+    // Switching a command on counts its time of day from then, so a row ticked after its time waits for the next one.
+    await run(repo, 'pace', 'triage quick', '1d', '10:00')
+    const pickedAt = ((await readState(repo)).paces!['triage quick'] as { since: string }).since
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await run(repo, 'switch', 'triage quick', 'on')
+    const switched = (await readState(repo)).paces!['triage quick'] as { every: string; at: string; since: string }
+    assert.deepEqual({ ...switched, since: '' }, { every: '1d', at: '10:00', since: '' })
+    assert.ok(switched.since > pickedAt, 'counted from the switch')
+    await run(repo, 'switch', 'triage quick', 'off')
+    assert.equal(((await readState(repo)).paces!['triage quick'] as { since: string }).since, switched.since, 'off changes nothing of the pace')
+    await run(repo, 'pace', 'triage quick', 'skill')
+    // A command with no time of day is switched on with nothing else written.
+    await run(repo, 'switch', 'work-queue', 'on')
+    assert.equal((await readState(repo)).paces, undefined)
+    await run(repo, 'switch', 'work-queue', 'off')
+
     // "Whenever there is work" needs a check to ask.
     const noCheck = await run(repo, 'pace', 'triage quick', 'work')
     assert.equal(noCheck.code, 1)
@@ -223,7 +246,7 @@ test("pace writes this machine's pace for a scheduled command: an interval, a ti
     assert.equal((await readState(repo)).paces, undefined)
     assert.equal((await run(repo, 'pace', 'never-heard-of', 'skill')).code, 0)
 
-    for (const argv of [['pace', 'work-queue'], ['pace', 'work-queue', 'often'], ['pace', 'work-queue', '0h'], ['pace', 'work-queue', '2d', '25:00'], ['pace', 'work-queue', '6h', '10:00'], ['pace', 'work-queue', 'work', '10:00'], ['pace', 'work-queue', '2d', '10:00', 'extra']]) {
+    for (const argv of [['pace', 'work-queue'], ['pace', 'work-queue', 'often'], ['pace', 'work-queue', '0h'], ['pace', 'work-queue', '10000d'], ['pace', 'work-queue', '2d', '25:00'], ['pace', 'work-queue', '6h', '10:00'], ['pace', 'work-queue', 'work', '10:00'], ['pace', 'work-queue', '2d', '10:00', 'extra']]) {
       const bad = await run(repo, ...argv)
       assert.equal(bad.code, 2, argv.join(' '))
       assert.equal(bad.out, undefined)

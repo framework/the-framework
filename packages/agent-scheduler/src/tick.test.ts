@@ -100,7 +100,7 @@ test('an interval: never started is due; a start inside the interval is not due,
   assert.deepEqual(old.seen.checks, ['gh issue list'])
 })
 
-test("this machine's pace stands in for the skill's: its own interval, whenever there is work, or a time of day; the recorded schedule still says the skill's", async () => {
+test("this machine's pace stands in for the skill's: its own interval, or whenever there is work; a pace too large to be one leaves the skill's; the recorded schedule still says the skill's", async () => {
   const commands = [command('update-tickets', { every: every('15m'), when: 'gh issue list' }), command('plan-tickets', { every: every('6h'), when: 'npx tickets list' }), command('triage quick', { every: every('6h') })]
   // All three last started 20 minutes ago.
   const lastStart = async (): Promise<string> => new Date(NOW.getTime() - 20 * 60_000).toISOString()
@@ -114,6 +114,10 @@ test("this machine's pace stands in for the skill's: its own interval, whenever 
   // Slowed down, its check never ran; "whenever there is work" asked the check alone.
   assert.deepEqual(mine.seen.checks, ['npx tickets list'])
   assert.deepEqual(record.schedule.map(row => [row.command, row.every]), [['update-tickets', '15m'], ['plan-tickets', '6h'], ['triage quick', '6h']])
+
+  // A count no date can hold must never read as "due on every tick": it is no pace, and the skill's stands.
+  const huge = deps({ commands, lastStart, stateOver: { switches: { 'plan-tickets': true }, paces: { 'plan-tickets': { every: '100000000d', at: '10:00', since } } } })
+  assert.deepEqual((await tick(huge.deps)).decisions.filter(d => d.command === 'plan-tickets'), [{ command: 'plan-tickets', outcome: 'not due (last start 20m ago, every 6h)' }])
 })
 
 test('a pace with a time of day: not due before that time, with the time it is due from; due from then on, and a missed time starts once', async () => {

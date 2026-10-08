@@ -74,9 +74,10 @@ test('a skill with several modes lists one row per mode, each with the word the 
 test('a schedule the reader cannot read gives no command and says why, the row named when there are several', () => {
   const why = (frontMatter: string): unknown => read('a', skill('a', frontMatter))
   const refused = (reason: string): unknown => ({ commands: [], unreadable: [{ skill: 'a', reason }] })
-  assert.deepEqual(why('schedule:\n  every: 2y\n'), refused('every is a number above 0 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'))
-  assert.deepEqual(why('schedule:\n  every: 0h\n'), refused('every is a number above 0 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'))
-  assert.deepEqual(why('schedule:\n  every: 15\n'), refused('every is a number above 0 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'))
+  assert.deepEqual(why('schedule:\n  every: 2y\n'), refused('every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'))
+  assert.deepEqual(why('schedule:\n  every: 100000000d\n'), refused('every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'))
+  assert.deepEqual(why('schedule:\n  every: 0h\n'), refused('every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'))
+  assert.deepEqual(why('schedule:\n  every: 15\n'), refused('every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'))
   assert.deepEqual(why('schedule:\n  every: 1h\n  always: true\n'), refused('unknown key always'))
   assert.deepEqual(why('schedule:\n  waits-for: when there is work\n'), refused('neither every nor when says when'))
   assert.deepEqual(why('schedule:\n  every: 1d\n  waits-for: when there is work\n'), refused('waits-for says what when waits for, and there is no when'))
@@ -135,7 +136,7 @@ test("the schedule is read from both folders a coding agent reads skills from, e
         { name: 'update-tickets', every: parseInterval('1h')!, cap: 1, dir: CLAUDE },
         { name: 'work-queue', when: 'npx queue', cap: 1, dir: CLAUDE },
       ],
-      unreadable: [{ skill: 'broken', reason: 'every is a number above 0 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)' }],
+      unreadable: [{ skill: 'broken', reason: 'every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)' }],
     })
   } finally {
     await rm(repo, { recursive: true, force: true })

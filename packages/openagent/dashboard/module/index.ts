@@ -288,7 +288,7 @@ export interface ModuleHost {
   read(projectId: string, name: string, input?: Record<string, unknown>): Promise<ModuleReadResult>
   /** Open one agent's page in the dashboard: its live feed while it runs, its record after. */
   openAgent(projectId: string, agentId: string): void
-  /** Open a page a module adds (this one's or another's), at a sub-path: `openPage('tickets', [projectId, file])`. */
+  /** Open a page a module adds (this one's or another's), at a sub-path: `openPage('tickets', [projectId, file])`. With a project picked in the dashboard, a page that project's packages do not add shows "No such page". */
   openPage(segment: string, path?: string[]): void
   /**
    * Start a run in one project with this prompt, with the person's own picks (which tool, which

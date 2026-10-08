@@ -25,7 +25,8 @@ const SETTINGS_SEGMENT = 'settings'
  * Whether a first segment names a page a module adds (#1774) rather than a project: a lowercase
  * letter, then lowercase letters and digits. Never a project's id, which always carries a
  * `-<hash>` suffix, so the router reserves no module's word: whichever module claims the segment
- * gets it, and the shell says "no such page" when none does.
+ * gets it, and the shell says "no such page" when none does, or when the picked project
+ * has no package that adds it.
  */
 export function isPageSegment(segment: string): boolean {
   return /^[a-z][a-z0-9]*$/.test(segment)

@@ -2,7 +2,7 @@ The dashboard's three calls about modules [1]: which modules the registered proj
 
 ## Context
 
-**User story**: the sidebar shows one row per page the installed modules add, whatever projects are registered, like the Overview and Tickets rows; the Logs page lists the runs of every project that has the logs package, each read in its own project; "Add to queue" on a ticket runs the queue package's command, and the Overview's AI Queue card shows the new entry on its next poll, not five seconds later.
+**User story**: with no project picked, the sidebar shows one row per page the registered projects' modules add; with a project picked, only the rows of the packages that project has, which is why each module is listed with the projects that have it; the Logs page lists the runs of every project that has the logs package, each read in its own project; "Add to queue" on a ticket runs the queue package's command, and the Overview's AI Queue card shows the new entry on its next poll, not five seconds later.
 
 ## Glossary
 

@@ -20,8 +20,9 @@ export interface DashboardModule {
 }
 
 /**
- * Every module any registered project brings (#1774), one per package: the sidebar and the pages
- * are cross-project, like the Overview. A package several projects install is loaded once, from
+ * Every module any registered project brings (#1774), one per package, with the projects
+ * that have it: with no project picked the sidebar and the pages are every project's, and the
+ * dashboard narrows them itself to a picked project's. A package several projects install is loaded once, from
  * the first of them in the registry's order; its page then reads each project through that
  * project's own command. A project that cannot be read contributes nothing.
  */

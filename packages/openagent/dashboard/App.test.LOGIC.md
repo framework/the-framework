@@ -12,4 +12,8 @@ Covered:
 - With a project picked, "New agent" opens its launcher; picking another project there opens that project's launcher, and picking "All projects" keeps the page.
 - With no project picked the sidebar lists every project's agents on an agent's page too; picking another project on an agent's page goes to the Overview; on a module's page it drops the segments after the page's word, and keeps the page's own query parameters when there are no such segments, as "All projects" does.
 - A `?project=` naming no registered project picks nothing.
+- With one page every project has and one page only one project has: with no project picked the sidebar has a row for each; picking the project without the second page removes that row and keeps the first; picking the project that has it brings the row back, and picking "All projects" from there keeps both rows.
+- Picking a project on a module's page that project does not have goes to the Overview, keeping the pick. An address that names such a page with that project picked shows that the project has no package adding the page, and does not render the page; with the project that has it picked, the page renders.
+- Adding a project from the project select reads the list of modules again at once, and so does removing a project from its project home, which also goes to the Overview.
+- An address that names a module's page with a project picked shows nothing, and not "No such page", while the registered projects are still being read.
 - A jump from the all-projects list to another project's agent: the agent's page names the agent at once, from the row that was clicked, while that project's agents are still being read.

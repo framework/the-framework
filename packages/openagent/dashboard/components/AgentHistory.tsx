@@ -100,7 +100,7 @@ export function AgentHistory({
   onDashboard?: () => void
   /** Open Settings, from the sidebar footer where the navbar gear moved. */
   onSettings?: () => void
-  /** The pages the installed modules add (#1774), one nav row each, below Overview. */
+  /** The pages the installed modules add (#1774), the picked project's only when one is picked, one nav row each, below Overview. */
   pages?: readonly { segment: string; label: string; icon?: ComponentType<{ className?: string; 'aria-hidden'?: boolean }> }[]
   /** The module page that is the current view, by its segment, or null. */
   activePage?: string | null
@@ -267,9 +267,9 @@ export function AgentHistory({
         {/* Overview: the way home, its own nav item directly under New and above the session list,
             more prominent than a menu row. Only this — the current view — carries the active fill. */}
         <OverviewButton active={projectId === null && activePage === null} count={interventionCount} onClick={onDashboard} />
-        {/* The installed modules' pages (#1774): cross-project destinations like the Overview, named
-            by the module, never by the dashboard — the tickets' page among them, when a package
-            brings one. */}
+        {/* The modules' pages the shell hands over (#1774), the picked project's only when one is
+            picked: destinations with no project selected, like the Overview, named by the module,
+            never by the dashboard — the tickets' page among them, when a package brings one. */}
         {pages.map(page => (
           <NavRow key={page.segment} icon={page.icon ?? Blocks} label={page.label} active={activePage === page.segment} onClick={() => onPage(page.segment)} />
         ))}

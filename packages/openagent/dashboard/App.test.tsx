@@ -19,7 +19,10 @@ vi.mock('./lib/rpc.js', () => ({
 // Settings and a project's launcher read a dozen things of their own; these tests are about the
 // shell around them, so each is a line naming itself.
 vi.mock('./components/SettingsPage.js', () => ({ SettingsPage: () => createElement('p', null, 'the settings page') }))
-vi.mock('./components/ProjectHome.js', () => ({ ProjectHome: ({ projectName }: { projectName?: string }) => createElement('p', null, `the launcher of ${projectName}`) }))
+vi.mock('./components/ProjectHome.js', () => ({
+  ProjectHome: ({ projectName, onProjectRemoved }: { projectName?: string; onProjectRemoved?: () => void }) =>
+    createElement('p', null, `the launcher of ${projectName}`, createElement('button', { onClick: onProjectRemoved }, 'remove the project')),
+}))
 
 const { App } = await import('./App.js')
 
@@ -290,5 +293,89 @@ describe('the project select (#1513)', () => {
     render(<App />)
     expect(await screen.findByRole('button', { name: 'Project: All projects' })).toBeTruthy()
     expect(await screen.findByText('card for app, site')).toBeTruthy()
+  })
+
+  /** The two projects, with a Tickets page that only `app` has, beside the Logs page both have. */
+  function answerTwoWithTickets(): void {
+    answerTwo()
+    function TicketsPage({ projects }: ModulePageProps) {
+      return createElement('p', null, `tickets of ${projects.map(p => p.name).join(', ')}`)
+    }
+    const logs = (answers.get('onModules')!() as unknown[])[0]
+    answers.set('onModules', () => [logs, { package: '@acme/tickets', url: moduleModule('__ticketsModule', { pages: [{ segment: 'tickets', label: 'Tickets', Page: TicketsPage }] }), projects: [PROJECT.id] }])
+  }
+
+  test('with a project picked the sidebar lists only the pages that project has; all projects lists every page', async () => {
+    answerTwoWithTickets()
+    render(<App />)
+    expect(await screen.findByRole('button', { name: 'Tickets' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Logs' })).toBeTruthy()
+
+    await pick('All projects', /site/)
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Tickets' })).toBeNull())
+    expect(screen.getByRole('button', { name: 'Logs' })).toBeTruthy()
+
+    await pick('site', /app/)
+    expect(await screen.findByRole('button', { name: 'Tickets' })).toBeTruthy()
+    await pick('app', /All projects/)
+    expect(screen.getByRole('button', { name: 'Tickets' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Logs' })).toBeTruthy()
+  })
+
+  test('picking a project on a page it does not have goes to the Overview, and a link to such a page says the project has none', async () => {
+    answerTwoWithTickets()
+    window.history.replaceState(null, '', '/tickets')
+    render(<App />)
+    expect(await screen.findByText('tickets of app')).toBeTruthy()
+    await pick('All projects', /site/)
+    expect(url()).toBe(`/?project=${OTHER.id}`)
+    cleanup()
+    window.history.replaceState(null, '', `/tickets?project=${OTHER.id}`)
+    render(<App />)
+    expect(await screen.findByText('The project "site" has no package that adds a page at "/tickets".')).toBeTruthy()
+    expect(screen.queryByText(/tickets of/)).toBeNull()
+    cleanup()
+    window.history.replaceState(null, '', `/tickets?project=${PROJECT.id}`)
+    render(<App />)
+    expect(await screen.findByText('tickets of app')).toBeTruthy()
+  })
+
+  test('adding a project reads the modules again at once', async () => {
+    answerTwo()
+    answers.set('sendPickProjectDirectory', () => ({ ok: true, path: '/work/new' }))
+    answers.set('sendAddProject', () => ({ ok: true, alreadyActivated: false }))
+    render(<App />)
+    await screen.findByRole('button', { name: 'Logs' })
+    const reads = () => calls.filter(call => call.name === 'onModules').length
+    const before = reads()
+    const { openMenu } = await import('./test-utils.js')
+    await openMenu(screen.getByRole('button', { name: 'Project: All projects' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Add project/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'I trust it, add it' }))
+    await waitFor(() => expect(reads()).toBe(before + 1))
+  })
+
+  test('removing a project reads the modules again at once, and goes to the Overview', async () => {
+    answerTwo()
+    window.history.replaceState(null, '', `/${OTHER.id}`)
+    render(<App />)
+    await screen.findByRole('button', { name: 'Logs' })
+    const reads = () => calls.filter(call => call.name === 'onModules').length
+    const before = reads()
+    fireEvent.click(await screen.findByRole('button', { name: 'remove the project' }))
+    await waitFor(() => expect(reads()).toBe(before + 1))
+    expect(url()).toBe('/')
+  })
+
+  test('a link to a module page with a project picked shows nothing, not "No such page", while the projects are still being read', async () => {
+    answerTwo()
+    // The projects never answer: whether the picked project is a registered one is not known.
+    answers.set('onProjects', () => new Promise(() => {}))
+    window.history.replaceState(null, '', '/logs?project=gone-123')
+    render(<App />)
+    await waitFor(() => expect(calls.some(call => call.name === 'onModules')).toBe(true))
+    // Long enough for the modules to be imported and mounted.
+    await new Promise(resolve => setTimeout(resolve, 300))
+    expect(screen.queryByText('No such page')).toBeNull()
   })
 })

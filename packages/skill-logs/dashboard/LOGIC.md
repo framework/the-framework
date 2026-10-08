@@ -2,7 +2,7 @@ The `logs` skill's module [1] for the dashboard: one page, Logs, listing the rec
 
 ## Context
 
-**User story**: the user clicks Logs in the dashboard's sidebar and sees every run agents made on their projects, newest first: how each ended, what was asked, the branch, the pull request, the cost, when it started. A click opens the run's own page. A project that does not depend on this package shows no runs here, and a dashboard with no project depending on it shows no Logs row at all.
+**User story**: the user clicks Logs in the dashboard's sidebar and sees every run agents made on their projects, newest first: how each ended, what was asked, the branch, the pull request, the cost, when it started. A click opens the run's own page. A project that does not depend on this package shows no runs here, and a dashboard with no project depending on it shows no Logs row at all, as does the sidebar while the picked project does not depend on it.
 
 ## Glossary
 

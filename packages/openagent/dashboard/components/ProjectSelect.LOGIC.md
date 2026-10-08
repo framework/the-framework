@@ -1,4 +1,4 @@
-The project select: the menu at the top of the sidebar that picks the one project every page of the dashboard shows, or all of them. It filters; it opens no page.
+The project select: the menu at the top of the sidebar that picks the one project every page of the dashboard shows, or all of them. It filters; whether the page changes is the caller's (`App.tsx`).
 
 ## Context
 
@@ -6,13 +6,13 @@ The project select: the menu at the top of the sidebar that picks the one projec
 
 ## Glossary
 
-[1] picked project: the one project the project select names. Every page then shows only that project's data. When the select says "All projects", no project is picked and every page shows every project's data.
+[1] picked project: the one project the project select names. The sidebar then lists only the pages added by the packages that project has, and every page shows only that project's data. When the select says "All projects", no project is picked, the sidebar lists the pages added by every project's packages and every page shows every project's data.
 
 ## Business logic — TL;DR
 
 - **The button** - names the picked project [1] with its dot, or reads "All projects".
 - **The menu** - "All projects", then every registered project with its state, then "Add project"; a tick marks the current pick.
-- **A pick** - is reported to the caller, which changes what the pages show.
+- **A pick** - is reported to the caller, which changes what the pages show and which pages the sidebar lists.
 
 ## Business logic
 

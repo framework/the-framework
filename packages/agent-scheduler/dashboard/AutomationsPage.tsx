@@ -259,7 +259,7 @@ function PaceFields({ scheduled, draft, disabled, onChange }: { scheduled: Sched
         <select value={typed.unit} disabled={draft.kind !== 'every'} onChange={e => onChange({ ...typed, unit: e.target.value as PaceUnit })} aria-label="Unit" className={field}>
           {PACE_UNITS.map(unit => (
             <option key={unit} value={unit}>
-              {typed.count.trim() === '1' ? UNIT_WORDS[unit] : `${UNIT_WORDS[unit]}s`}
+              {Number(typed.count) === 1 ? UNIT_WORDS[unit] : `${UNIT_WORDS[unit]}s`}
             </option>
           ))}
         </select>

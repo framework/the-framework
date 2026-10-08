@@ -26,7 +26,7 @@ What the module knows of a project's scheduler and how it changes it: one projec
 - **A typed spend cushion** - the text of the Settings box as a whole number of points held to −50..50; none while the text is empty or no number yet (a minus sign alone).
 - **Saving the spend cushion** - `agent-scheduler offset -- <points>` in every project; each failing project is named.
 - **In words** - the leading status of a project's row, a command's pace [7] as a sentence with its interval spelled out, whether that pace is a person's own, how far a command publishes, what the scheduler last decided for a command, a coming time, the labels of the publish picks, and which picks a project is offered.
-- **A pace in the Edit box** - the draft the box opens with, what a draft is as the words of `agent-scheduler pace`, none while it is half typed, and the command as it would read with the draft saved.
+- **A pace in the Edit box** - the draft the box opens with, what a draft is as the words of `agent-scheduler pace`, none while its count or its time is half typed, what to tell the person then, and the command as it would read with the draft saved.
 
 ## Business logic
 
@@ -87,11 +87,12 @@ A new cushion is saved by running `agent-scheduler offset -- <points>` in every 
 #### Business logic
 
 - **The leading status of a project's row**: "not readable" (red) when the project's status could not be read; else "off" (muted) when the scheduler is off; else "on, not running" (amber) when it is on but its process is not alive; else "on" (green).
-- **An interval, spelled out**: an interval as written, a whole number of 1 or more followed by `m`, `h`, `d`, `w` or `mo` (`../src/pace.ts`), reads as that number of minutes, hours, days, weeks or months: `15m` is "15 minutes", `1h` is "1 hour", `7d` is "7 days", `2w` is "2 weeks", `1mo` is "1 month", and a leading zero is dropped (`06h` is "6 hours"). Anything else (`0d`, `d`, `-3h`, `2y`) is shown as written.
+- **An interval, spelled out**: an interval as written, a whole number from 1 to 9999 followed by `m`, `h`, `d`, `w` or `mo` (`../src/pace.ts`), reads as that number of minutes, hours, days, weeks or months: `15m` is "15 minutes", `1h` is "1 hour", `7d` is "7 days", `2w` is "2 weeks", `1mo` is "1 month", and a leading zero is dropped (`06h` is "6 hours"). Anything else (`0d`, `d`, `-3h`, `2y`, a count above 9999) is shown as written.
 - **A command's pace** [7], as a sentence with a capital, by the pace in force as `../src/pace.ts` works it out from this machine's pace pick [8] and the skill's interval and check:
   - A pace without a time of day, for a command with no check: "Every <interval>", the interval spelled out ("Every 1 day", "Every 2 weeks").
   - A pace without a time of day, for a command with a check: "Every <interval> at most, " followed by what the check waits for ("Every 30 minutes at most, when a ticket has no plan").
-  - A pace with a time of day: "Every <interval> at <time of day>" ("Every 1 month at 09:05"), followed for a command with a check by ", " and what the check waits for, with no "at most" ("Every 2 days at 10:00, when a ticket has no plan").
+  - A pace with a time of day, for a command with no check: "Every <interval> at <time of day>" ("Every 1 month at 09:05").
+  - A pace with a time of day, for a command with a check: "Every <interval> from <time of day>, " followed by what the check waits for ("Every 2 days from 10:00, when a ticket has no plan"). It says "from" and not "at": the command starts once its check finds work, which may be later that day.
   - No pace, the check alone says when (the skill gives no interval, or this machine's pace pick is "whenever there is work"): what the check waits for, with a capital ("When the queue holds a task").
   - What the check waits for is the plain line its skill gives, or "when its check finds work" when the skill gives none.
   - A pace pick that cannot be followed leaves the skill's pace: "whenever there is work" for a command with no check reads "Every 1 day", the skill's interval.
@@ -108,7 +109,7 @@ A new cushion is saved by running `agent-scheduler offset -- <points>` in every 
   7. The decision is `not due (next start from <YYYY-MM-DD HH:MM>, …)`, the command waits for its time of day: "Next: " and that time as a coming time, below ("Next: Saturday 10:00").
   8. The decision is `cap reached (<N> in flight: …)`: "One is already running" when N is 1, else "<N> are already running" ("3 are already running").
   9. Any other decision: the tool's own line with a capital ("Quota: …", "Check failed: …", "Not ready: …").
-- **A coming time**, for a person, from a local time and the time now, by how many local days lie between the two days: "today 10:00" on the same day, "tomorrow 10:00" on the next, the weekday from the second to the sixth day after ("Saturday 10:00"), else the day and the month ("15 Oct 10:00"). The time is written in 24 hours with two digits each.
+- **A coming time**, for a person, from a local time and the time now, by how many local days lie between the two days: "today 10:00" on the same day, "tomorrow 10:00" on the next, the weekday from the second to the sixth day after ("Saturday 10:00"), else the day and the month ("15 Oct 10:00"). The time is written in 24 hours with two digits each. A time that is now or already past reads "as soon as the scheduler looks": it was read off an old tick, and the scheduler has not ticked since ("Next: as soon as the scheduler looks").
 - **The publish picks' labels**: "Nothing", "Commit", "Publish branch", "Open PR", "Merge on green", in that order.
 - **Which picks a project is offered**: all five where one of the project's packages provides a git host; "Nothing", "Commit" and "Publish branch" only where none does, since no pull request can be opened there. The pick a menu shows, when the project is not offered it, is listed after them, so a menu always lists the entry it shows.
 - The bound of the spend cushion as the dashboard's controls set it, 50 points either side of the quota boundary, is the dashboard's own number, handed on from `@openagt/dashboard/module`.
@@ -119,18 +120,20 @@ A new cushion is saved by running `agent-scheduler offset -- <points>` in every 
 
 **User story**: on the Automations page the user opens a page row and picks when its command runs: as the skill says, whenever there is work, or every so many minutes, hours, days, weeks or months, with a time of day beside days or more. The box shows, before anything is saved, how the command would read.
 
-**Problem**: a count and a time are typed a key at a time. A half-typed one ("", "1.5", "25:00") is no pace yet and must not be sent to the command.
+**Problem**: a count and a time are typed a key at a time. A half-typed one ("", "1.5", "25:00") is no pace yet and must not be sent to the command. A browser's time field reports no text at all while its time is half typed, which reads the same as a field left empty on purpose: the two must be told apart.
 
 #### Business logic
 
-A draft is what the Edit box holds of a pace [7] while a person picks. It is one of three kinds: "as the skill says"; "whenever there is work"; or "every", with a count and a time of day as the text typed, and a unit.
+A draft is what the Edit box holds of a pace [7] while a person picks. It is one of three kinds: "as the skill says"; "whenever there is work"; or "every", with a count and a time of day as the text typed, a unit, and whether the time field is half typed (the page says so when the browser reports the field's entry as bad).
 
 **The draft a command's Edit box opens with** follows its pace pick [8]:
 
 - No pace pick: "as the skill says".
-- "Whenever there is work": that, for a command whose skill gives it both an interval and a check. For any other command it is "as the skill says": a command with a check and no interval runs whenever there is work already, and a command with no check cannot follow it.
-- An interval that reads: "every", with its count, its unit, and its time of day when the interval is in days, weeks or months and the time reads as one, else no time. An interval that does not read: "as the skill says".
+- "Whenever there is work", exactly true: that, for a command whose skill gives it both an interval and a check. For any other command it is "as the skill says": a command with a check and no interval runs whenever there is work already, and a command with no check cannot follow it.
+- An interval that reads: "every", with its count, its unit, and its time of day when the interval is in days, weeks or months and the time reads as one, else no time. An interval that does not read: "as the skill says". A saved "whenever there is work" that is not exactly true is passed over, and the pace pick is read by its interval.
 
-**A draft as the words of the command**, after `agent-scheduler pace <command>`: `skill` for "as the skill says", `work` for "whenever there is work", and for "every" the interval (`2d`, `15m`) followed by the time of day when one is typed and the unit is days, weeks or months (`2d 10:00`). Spaces around the count and the time are ignored. A time left in the draft beside minutes or hours is left out, since the page hides the field then. A draft is no pace yet, and has no words, while its count is not a whole number of 1 or more written in digits alone (empty, `0`, `1.5`, `-2`, a word), or while its time is typed and is no time of day (`25:00`).
+**A draft as the words of the command**, after `agent-scheduler pace <command>`: `skill` for "as the skill says", `work` for "whenever there is work", and for "every" the interval (`2d`, `15m`) followed by the time of day when one is typed and the unit is days, weeks or months (`2d 10:00`). Spaces around the count and the time are ignored. A time left in the draft beside minutes or hours is left out, since the page hides the field then. A draft is no pace yet, and has no words, in two cases. Its count is not a whole number from 1 to 9999 written in digits alone (empty, `0`, `1.5`, `-2`, a word, `10000`, `1e2`). Or its unit is days, weeks or months and its time is half typed, or typed and no time of day (`25:00`); beside minutes or hours a half-typed time left behind does not count.
+
+**What keeps a draft from being a pace yet**, for the person typing it: "Type a whole number, from 1 to 9999." for the count, else "Finish the time, like 10:00, or clear it." Nothing for a draft that is a pace.
 
 **The command as it would read with a draft saved** is what the Edit box's sentence describes: the command with the draft as its pace pick, or with no pace pick for "as the skill says". While the draft is no pace yet it is the command as it is.

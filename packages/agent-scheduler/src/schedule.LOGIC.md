@@ -41,7 +41,7 @@ A skill schedules commands with the `schedule` key [9] in the front matter of it
 
 A row is a YAML map of these keys, in any order:
 
-- `every` is the interval [5]: a whole number above zero and a unit of `m` (minutes), `h` (hours), `d` (days), `w` (weeks of 7 days) or `mo` (months of 30 days), written together (`15m`, `6h`, `7d`, `2w`, `1mo`). It is read by `pace.ts`'s rule, the same one a person's pace pick [10] is read by, and remembered as a duration and as written, without a leading zero, for the tick's line. A skill's `schedule` takes no time of day: only a pace pick does.
+- `every` is the interval [5]: a whole number from 1 to 9999 and a unit of `m` (minutes), `h` (hours), `d` (days), `w` (weeks of 7 days) or `mo` (months of 30 days), written together (`15m`, `6h`, `7d`, `2w`, `1mo`). It is read by `pace.ts`'s rule, the same one a person's pace pick [10] is read by, and remembered as a duration and as written, without a leading zero, for the tick's line. A skill's `schedule` takes no time of day: only a pace pick does.
 - `when` is the check [3]: a shell command line, surrounding whitespace removed. It is YAML text, so a check that holds quotes, commas or colons, or that spans several lines, is written as a block (`when: |-` and the lines under it) and is read as written.
 - `waits-for` is one plain line for a person saying what the check waits for (`when the queue holds a task`), surrounding whitespace removed. A check is a shell line that nothing can turn into a sentence, so the skill says it. It says what `when` waits for, so a row has it only beside `when`. This file only carries the line; the package's dashboard part shows it.
 - `agents` is the cap [4]: a whole number, 1 or more. A row naming none has a cap of 1.
@@ -78,7 +78,7 @@ A skill's `schedule` is read as a whole: when one row cannot be read, the skill 
 - A row is not a map of keys (`schedule: daily`): `a row is a list of keys`.
 - A row holds a key other than the five: `unknown key <key>`.
 - `word` is not one word of the shape above: `word is one word of lower-case letters, digits and dashes`.
-- `every` has an unknown unit (`2y`), no unit (`15`) or a number of 0: `every is a number above 0 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)`. An `every` of 0 is refused rather than read as "always", which is the key being absent.
+- `every` has an unknown unit (`2y`), no unit (`15`), a number of 0 or a number above 9999 (`100000000d`): `every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)`. An `every` of 0 is refused rather than read as "always", which is the key being absent.
 - `when` is not text, or is blank: `when is a shell command line`.
 - `waits-for` is not text, is blank, or spans several lines: `waits-for is one line of text`.
 - `agents` is not a whole number of 1 or more (`0`, `many`): `agents is a whole number, 1 or more`.

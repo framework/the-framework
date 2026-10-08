@@ -221,6 +221,10 @@ test("pace writes this machine's pace for a scheduled command: an interval, a ti
     const switched = (await readState(repo)).paces!['triage quick'] as { every: string; at: string; since: string }
     assert.deepEqual({ ...switched, since: '' }, { every: '1d', at: '10:00', since: '' })
     assert.ok(switched.since > pickedAt, 'counted from the switch')
+    // Switched on again while already on: nothing moves, so a missed time is not put off.
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await run(repo, 'switch', 'triage quick', 'on')
+    assert.equal(((await readState(repo)).paces!['triage quick'] as { since: string }).since, switched.since)
     await run(repo, 'switch', 'triage quick', 'off')
     assert.equal(((await readState(repo)).paces!['triage quick'] as { since: string }).since, switched.since, 'off changes nothing of the pace')
     await run(repo, 'pace', 'triage quick', 'skill')

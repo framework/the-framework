@@ -4,7 +4,7 @@ import { projectRoot } from '@openagt/skill-branches'
 import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
 import { cleanup } from './cleanup.js'
-import { PUBLISH_PICKS, updateState, withPace, withPublish, withSwitch, type PublishPick } from './state.js'
+import { PUBLISH_PICKS, isSwitchedOn, updateState, withPace, withPublish, withSwitch, type PublishPick } from './state.js'
 import { parseInterval, parseTimeOfDay, sinceNow, takesTimeOfDay } from './pace.js'
 import { readSchedule, type ScheduledCommand } from './schedule.js'
 
@@ -144,7 +144,8 @@ const COMMANDS: Record<string, Command> = {
     // Off needs no scheduled command: a switch left on for a skill that is gone can always be taken back.
     if (to === 'on') await scheduled(repo, name)
     // Switched on, a time of day counts from now: a row ticked after its time waits for the next one, as when the time was picked.
-    return { ok: true, ...(await updateState(repo, s => (to === 'on' ? withPace(withSwitch(s, name, true), name, sinceNow(s.paces?.[name], new Date())) : withSwitch(s, name, false)), git)) }
+    // A command already on is left as it is, so asking twice does not put a missed time off.
+    return { ok: true, ...(await updateState(repo, s => (to === 'off' ? withSwitch(s, name, false) : isSwitchedOn(s, name) ? s : withPace(withSwitch(s, name, true), name, sinceNow(s.paces?.[name], new Date()))), git)) }
   },
 
   async publish(args, io, git) {

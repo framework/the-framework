@@ -78,9 +78,9 @@ function isPick(value: unknown): value is PublishPick {
 
 /** Whether a value of the state reads as a pace a person set: "whenever there is work", or an interval the tool reads. */
 function isPace(value: unknown): boolean {
+  // The same two readings as the tool's own (`paceInForce`): anything else is no pace, and the row says its skill's.
   const pick = record(value)
   return pick['work'] === true || (typeof pick['every'] === 'string' && parseInterval(pick['every']) !== undefined)
-  // The same two readings as the tool's own (`paceInForce`): anything else is no pace, and the row says its skill's.
 }
 
 function record(value: unknown): Record<string, unknown> {

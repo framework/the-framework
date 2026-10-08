@@ -6,13 +6,14 @@ const GEMSTACK = { id: 'p1', name: 'gemstack', gitHost: true }
 const OTHER = { id: 'p2', name: 'other', gitHost: false }
 
 describe('a scheduler row, from what status printed', () => {
-  test("each scheduled command carries this machine's switch and publish pick over what its line says", () => {
+  test("each scheduled command carries this machine's switch and publish pick: off until switched on here, commit until picked here", () => {
     const row = schedulerRow(GEMSTACK, STATUS)
     expect(row).toMatchObject({ project: GEMSTACK, on: true, keepAlive: false, running: true, model: 'opus', spendOffset: 7 })
     expect(row.commands).toEqual([
-      { command: 'work-queue', when: 'npx queue', on: true, publish: 'merge', publishPick: 'nothing' },
-      // The line says off; this machine switched it on.
-      { command: 'post-merge-cleanup', every: '1d', on: true },
+      // Switched on here; nobody picked a level.
+      { command: 'post-merge-cleanup', every: '1d', on: true, publish: 'commit' },
+      // Nobody switched it on here; the pick made here is nothing.
+      { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', on: false, publish: 'nothing' },
     ])
     expect(row.lastTick).toEqual({ at: '2026-10-03T10:00:00.000Z', decisions: STATUS.lastTick.decisions })
   })
@@ -23,10 +24,11 @@ describe('a scheduler row, from what status printed', () => {
       on: 'yes',
       spendOffset: 'far',
       model: 3,
+      switches: { a: 'yes' },
       publishes: { a: 'push' },
-      lastTick: { at: '2026-10-03T10:00:00.000Z', note: 'no agent-schedule.md', decisions: [{ command: 'a' }, 'x'], schedule: [{ command: 'a', on: true, publish: 'push' }, { command: 'b' }, null] },
+      lastTick: { at: '2026-10-03T10:00:00.000Z', note: 'off', decisions: [{ command: 'a' }, 'x'], schedule: [{ command: 'a', every: 6, waitsFor: ['x'] }, { every: '1d' }, null] },
     })
-    expect(odd).toEqual({ project: GEMSTACK, on: false, keepAlive: false, running: false, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], note: 'no agent-schedule.md' }, commands: [{ command: 'a', on: true }] })
+    expect(odd).toEqual({ project: GEMSTACK, on: false, keepAlive: false, running: false, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], note: 'off' }, commands: [{ command: 'a', on: false, publish: 'commit' }] })
     expect(schedulerRow(GEMSTACK, null).commands).toEqual([])
   })
 })
@@ -81,25 +83,27 @@ describe('in words', () => {
     expect(schedulerStatus({ ...row, on: false }).label).toBe('off')
   })
 
-  test('the pace: an interval, a check, or both', () => {
-    expect(pace({ command: 'a', every: '1d', on: true })).toBe('every 1d')
-    expect(pace({ command: 'a', when: 'npx queue', on: true })).toBe('when its check finds work')
-    expect(pace({ command: 'a', every: '6h', when: 'x', on: true })).toBe('every 6h at most, when its check finds work')
+  test('the pace: an interval, what the check waits for, or both; a check with no plain line is "when its check finds work"', () => {
+    const base = { command: 'a', on: true, publish: 'commit' as const }
+    expect(pace({ ...base, every: '1d' })).toBe('every 1d')
+    expect(pace({ ...base, when: 'npx queue' })).toBe('when its check finds work')
+    expect(pace({ ...base, when: 'npx queue', waitsFor: 'when the queue holds a task' })).toBe('when the queue holds a task')
+    expect(pace({ ...base, every: '6h', when: 'x' })).toBe('every 6h at most, when its check finds work')
+    expect(pace({ ...base, every: '6h', when: 'x', waitsFor: 'when a ticket has no plan' })).toBe('every 6h at most, when a ticket has no plan')
   })
 
-  test('how far a scheduled command publishes: this machine\'s pick, else what its line says, nothing when it says none', () => {
-    expect(publishes({ command: 'a', on: true })).toBe('publishes nothing')
-    expect(publishes({ command: 'a', on: true, publish: 'commit' })).toBe('commits its work')
-    expect(publishes({ command: 'a', on: true, publish: 'branch' })).toBe('publishes its branch')
-    expect(publishes({ command: 'a', on: true, publish: 'pr' })).toBe('opens a pull request')
-    expect(publishes({ command: 'a', on: true, publish: 'merge' })).toBe('opens a pull request that merges on green')
-    expect(publishes({ command: 'a', on: true, publish: 'merge', publishPick: 'nothing' })).toBe('publishes nothing')
-    expect(publishes({ command: 'a', on: true, publishPick: 'pr' })).toBe('opens a pull request')
+  test("how far a scheduled command publishes, by this machine's pick", () => {
+    const base = { command: 'a', on: true }
+    expect(publishes({ ...base, publish: 'nothing' })).toBe('publishes nothing')
+    expect(publishes({ ...base, publish: 'commit' })).toBe('commits its work')
+    expect(publishes({ ...base, publish: 'branch' })).toBe('publishes its branch')
+    expect(publishes({ ...base, publish: 'pr' })).toBe('opens a pull request')
+    expect(publishes({ ...base, publish: 'merge' })).toBe('opens a pull request that merges on green')
   })
 
-  test('the publish menu: every pick with a git host package, Nothing, Commit and Publish branch without; a saved pick no longer offered is still listed', () => {
+  test('the publish menu: every pick with a git host package, Nothing, Commit and Publish branch without; the pick in force is listed even when not offered', () => {
     expect(publishChoices(true, 'pr')).toEqual(['nothing', 'commit', 'branch', 'pr', 'merge'])
-    expect(publishChoices(false, undefined)).toEqual(['nothing', 'commit', 'branch'])
+    expect(publishChoices(false, 'commit')).toEqual(['nothing', 'commit', 'branch'])
     expect(publishChoices(false, 'pr')).toEqual(['nothing', 'commit', 'branch', 'pr'])
   })
 })

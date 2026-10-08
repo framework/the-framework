@@ -54,18 +54,19 @@ test('a state file that does not parse reads as the default rather than stopping
   }
 })
 
-test("a switch is kept only where it differs from the line: a command switched back leaves no trace", () => {
-  const on = withSwitch(DEFAULT_STATE, 'post-merge-cleanup', true, false)
+test('every command starts switched off; only a command switched on is kept, so switching it off leaves no trace', () => {
+  assert.equal(isSwitchedOn(DEFAULT_STATE, 'work-queue'), false)
+  const on = withSwitch(DEFAULT_STATE, 'post-merge-cleanup', true)
   assert.deepEqual(on.switches, { 'post-merge-cleanup': true })
-  assert.equal(isSwitchedOn(on, { name: 'post-merge-cleanup', on: false }), true)
-  const both = withSwitch(on, 'triage-quick', false, true)
-  assert.deepEqual(both.switches, { 'post-merge-cleanup': true, 'triage-quick': false })
-  assert.equal(isSwitchedOn(both, { name: 'triage-quick', on: true }), false)
-  // Nobody switched it: the line decides.
-  assert.equal(isSwitchedOn(both, { name: 'work-queue', on: true }), true)
-  assert.equal(isSwitchedOn(both, { name: 'work-queue', on: false }), false)
-  const back = withSwitch(withSwitch(both, 'triage-quick', true, true), 'post-merge-cleanup', false, false)
+  assert.equal(isSwitchedOn(on, 'post-merge-cleanup'), true)
+  assert.equal(isSwitchedOn(on, 'work-queue'), false)
+  // Switching off a command nobody switched on keeps nothing of it.
+  const both = withSwitch(withSwitch(on, 'triage quick', true), 'work-queue', false)
+  assert.deepEqual(both.switches, { 'post-merge-cleanup': true, 'triage quick': true })
+  const back = withSwitch(withSwitch(both, 'triage quick', false), 'post-merge-cleanup', false)
   assert.equal('switches' in back, false)
+  // A state edited by hand: anything but true is off.
+  assert.equal(isSwitchedOn({ ...DEFAULT_STATE, switches: { 'work-queue': 'on' as never } }, 'work-queue'), false)
 })
 
 test('a scheduler ending clears its own pid only: a pid another scheduler wrote meanwhile stays', async () => {
@@ -77,27 +78,19 @@ test('a scheduler ending clears its own pid only: a pid another scheduler wrote 
   assert.deepEqual(withoutPid({ ...DEFAULT_STATE, on: true }, 100), { ...DEFAULT_STATE, on: true })
 })
 
-test("a publish pick stands in for the line's level until it is taken back, even when it says what the line says", () => {
-  // Nobody picked: the line decides, and a line that says nothing publishes nothing.
-  assert.equal(publishInForce(DEFAULT_STATE, { name: 'work-queue', publish: 'merge' }), 'merge')
-  assert.equal(publishInForce(DEFAULT_STATE, { name: 'triage quick' }), undefined)
+test('a run of a scheduled command commits its work until a person picks a level on this machine; nothing is a pick too', () => {
+  assert.equal(publishInForce(DEFAULT_STATE, 'work-queue'), 'commit')
 
   const picked = withPublish(withPublish(DEFAULT_STATE, 'work-queue', 'nothing'), 'triage quick', 'pr')
   assert.deepEqual(picked.publishes, { 'work-queue': 'nothing', 'triage quick': 'pr' })
-  assert.equal(publishInForce(picked, { name: 'work-queue', publish: 'merge' }), undefined)
-  assert.equal(publishInForce(picked, { name: 'triage quick' }), 'pr')
-  // Another command is still its line's.
-  assert.equal(publishInForce(picked, { name: 'post-merge-cleanup', publish: 'branch' }), 'branch')
+  assert.equal(publishInForce(picked, 'work-queue'), undefined)
+  assert.equal(publishInForce(picked, 'triage quick'), 'pr')
+  // Another command is still nobody's pick.
+  assert.equal(publishInForce(picked, 'post-merge-cleanup'), 'commit')
 
-  // A pick that says what the line says is kept: the line may change, the pick stays.
-  const same = withPublish(DEFAULT_STATE, 'work-queue', 'merge')
-  assert.deepEqual(same.publishes, { 'work-queue': 'merge' })
-  assert.equal(publishInForce(same, { name: 'work-queue', publish: 'branch' }), 'merge')
+  // A pick of commit is kept like any other.
+  assert.deepEqual(withPublish(DEFAULT_STATE, 'work-queue', 'commit').publishes, { 'work-queue': 'commit' })
 
-  // A hand-edited state with a word that is no pick: the line decides.
-  assert.equal(publishInForce({ ...DEFAULT_STATE, publishes: { 'work-queue': 'push' as never } }, { name: 'work-queue', publish: 'merge' }), 'merge')
-
-  const back = withPublish(withPublish(picked, 'work-queue', undefined), 'triage quick', undefined)
-  assert.equal('publishes' in back, false)
-  assert.equal(publishInForce(back, { name: 'work-queue', publish: 'merge' }), 'merge')
+  // A hand-edited state with a word that is no pick: as if nobody picked.
+  assert.equal(publishInForce({ ...DEFAULT_STATE, publishes: { 'work-queue': 'push' as never } }, 'work-queue'), 'commit')
 })

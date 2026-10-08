@@ -1,8 +1,5 @@
 /** The names the package hangs off. No node imports. */
 
-/** The schedule a person writes and tracks at the repository root: one line per command. */
-export const SCHEDULE_FILE = 'agent-schedule.md'
-
 /** The tool's own directory at the repository root, hidden from git by the tool itself. */
 export const STATE_DIR = '.agent-scheduler'
 
@@ -12,8 +9,17 @@ export const STATE_FILE = 'state.json'
 /** Under the state directory: the scheduler's own log. */
 export const SCHEDULER_LOG = 'scheduler.log'
 
-/** Where the agent's harness looks for a command: the project's tracked skill folder. */
-export const COMMANDS_DIR = '.claude/skills'
+/**
+ * Where the coding agent a scheduled run is on, Claude Code, reads a project's skills. A skill that
+ * is only in another folder is no command to it: typed with a slash, it expands to nothing.
+ */
+export const RUN_SKILLS_DIR = '.claude/skills'
+
+/** A skill's file inside its folder: its front matter may hold the skill's `schedule`. */
+export const SKILL_FILE = 'SKILL.md'
+
+/** How far a run of a scheduled command publishes on a machine where nobody picked a level for it: it commits its work and pushes nothing. */
+export const DEFAULT_PUBLISH = 'commit'
 
 /** The model a scheduled run starts on when the state names none. */
 export const DEFAULT_MODEL = 'opus'
@@ -24,7 +30,7 @@ export const DEFAULT_MODEL = 'opus'
  */
 export const DEFAULT_SPEND_OFFSET = 100 / 14
 
-/** Runs of one command in flight at once, across every machine, when its line names no cap. */
+/** Runs of one command in flight at once, across every machine, when its skill names no number. */
 export const DEFAULT_CAP = 1
 
 /** How often a started scheduler ticks. */

@@ -20,7 +20,7 @@ export function hostAnswering(answer: (projectId: string, args: string[]) => Mod
   return { host, runCommand }
 }
 
-/** What `agent-scheduler status` prints for a scheduler that ticked once with a two-line schedule. */
+/** What `agent-scheduler status` prints for a scheduler that ticked once in a project whose skills schedule two commands: one switched on here, one with a publish pick made here. */
 export const STATUS = {
   ok: true,
   on: true,
@@ -34,12 +34,12 @@ export const STATUS = {
   lastTick: {
     at: '2026-10-03T10:00:00.000Z',
     decisions: [
-      { command: 'work-queue', outcome: 'started', run: '2026-10-03T10-00-00-000Z' },
-      { command: 'post-merge-cleanup', outcome: 'not due' },
+      { command: 'post-merge-cleanup', outcome: 'started', run: '2026-10-03T10-00-00-000Z' },
+      { command: 'work-queue', outcome: 'switched off on this machine' },
     ],
     schedule: [
-      { command: 'work-queue', when: 'npx queue', on: true, publish: 'merge' },
-      { command: 'post-merge-cleanup', every: '1d', on: false },
+      { command: 'post-merge-cleanup', every: '1d' },
+      { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task' },
     ],
   },
 }

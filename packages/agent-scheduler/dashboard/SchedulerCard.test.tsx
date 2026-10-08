@@ -21,8 +21,8 @@ describe('the Scheduler card', () => {
   test("one row per project: its status, its model, the last tick's decisions; a decision that started a run opens that agent", async () => {
     const { host } = hostAnswering(projectId => ({ ok: true, output: projectId === 'p1' ? STATUS : { ok: true, on: false, keepAlive: true, running: false, model: 'opus', spendOffset: 7 } }))
     show(host)
-    const started = await screen.findByRole('button', { name: 'work-queue: started' })
-    expect(screen.getByText('post-merge-cleanup: not due').tagName).toBe('SPAN')
+    const started = await screen.findByRole('button', { name: 'post-merge-cleanup: started' })
+    expect(screen.getByText('work-queue: switched off on this machine').tagName).toBe('SPAN')
     expect(screen.getByText('on').className).toMatch(/text-success/)
     expect(screen.getByText('off')).toBeTruthy()
     expect(screen.getByText('keep-alive')).toBeTruthy()
@@ -32,10 +32,10 @@ describe('the Scheduler card', () => {
   })
 
   test('a tick that decided nothing says why; a scheduler whose process is gone is on, not running', async () => {
-    const { host } = hostAnswering(() => ({ ok: true, output: { ...STATUS, running: false, lastTick: { at: STATUS.lastTick.at, decisions: [], note: 'no agent-schedule.md' } } }))
+    const { host } = hostAnswering(() => ({ ok: true, output: { ...STATUS, running: false, lastTick: { at: STATUS.lastTick.at, decisions: [], note: 'no skill of this project schedules a command' } } }))
     show(host, [GEMSTACK])
     expect((await screen.findByText('on, not running')).className).toMatch(/text-warning/)
-    expect(screen.getByText(/: no agent-schedule\.md/)).toBeTruthy()
+    expect(screen.getByText(/: no skill of this project schedules a command/)).toBeTruthy()
   })
 
   test('a project whose status cannot be read says why', async () => {

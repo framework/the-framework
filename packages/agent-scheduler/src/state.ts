@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { PUBLISH_LEVELS, type Publish } from '@openagt/agent-runner'
-import { DEFAULT_MODEL, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE } from './names.js'
+import { DEFAULT_MODEL, DEFAULT_PUBLISH, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE } from './names.js'
 
 /**
  * The tool's state (#1774): one JSON file under `.agent-scheduler/` at the repository root,
@@ -12,7 +12,7 @@ import { DEFAULT_MODEL, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE } from './na
  *
  * What is here is what would otherwise live in a process's memory: whether the scheduler is on,
  * whether it should outlive whatever started it, the model this user's scheduled runs start on
- * and the spend cushion they take, which scheduled commands this machine switched on or off, how far this machine's runs of a scheduled command publish where a person picked it, the pid of the scheduler's own process when one runs, and the last tick with what it
+ * and the spend cushion they take, which scheduled commands this machine switched on, how far this machine's runs of a scheduled command publish where a person picked it, the pid of the scheduler's own process when one runs, and the last tick with what it
  * decided per command. A restart loses nothing.
  */
 
@@ -26,16 +26,14 @@ export interface TickDecision {
 }
 
 /** One command of the schedule as the tick read it, for a dashboard to list with its switch. */
-export interface ScheduleLine {
+export interface ListedCommand {
   command: string
   /** How often at most, as written (`1d`). */
   every?: string
-  /** The check, when the line has one. */
+  /** The check, when the skill gives one. */
   when?: string
-  /** Whether the line runs it on a machine where nobody switched it. */
-  on: boolean
-  /** How far a run of the command publishes, when the line says: `commit`, `branch`, `pr` or `merge`. */
-  publish?: Publish
+  /** What the check waits for, in one plain line, when the skill gives one. */
+  waitsFor?: string
 }
 
 /** One tick as the state remembers it. */
@@ -43,9 +41,9 @@ export interface TickRecord {
   /** ISO timestamp. */
   at: string
   decisions: TickDecision[]
-  /** The schedule's commands, as this tick read them; absent when there is no schedule. */
-  schedule?: ScheduleLine[]
-  /** Why the tick decided nothing, when it could not: the schedule is missing, the pull failed. */
+  /** The schedule's commands, as this tick read them. */
+  schedule: ListedCommand[]
+  /** Why the tick decided nothing for the scheduled commands, when it could not: the scheduler is off, no skill schedules a command, the pull failed. */
   note?: string
 }
 
@@ -58,15 +56,9 @@ export interface State {
   model: string
   /** How far past the spend boundary a run may still start, in percentage points. */
   spendOffset: number
-  /**
-   * This machine's switch per command, kept only where it differs from the schedule line: `true`
-   * runs a command the line lists `off`, `false` holds back one it lists on.
-   */
-  switches?: Record<string, boolean>
-  /**
-   * This machine's publish pick per command, kept until a person takes it back: it stands in for
-   * the `publish` clause of the schedule line, whatever the line says now or later.
-   */
+  /** The scheduled commands this machine switched on. Every command starts switched off: a skill that arrives in a project starts no agent by itself. */
+  switches?: Record<string, true>
+  /** This machine's publish pick per command. */
   publishes?: Record<string, PublishPick>
   /** The scheduler's own process, while `start` has one running. */
   pid?: number
@@ -75,7 +67,7 @@ export interface State {
   lastTick?: TickRecord
 }
 
-/** A person's pick of how far a scheduled command's runs publish on their machine: nothing, or one of the levels a schedule line may say. */
+/** A person's pick of how far a scheduled command's runs publish on their machine: nothing, or one of the levels a run may be given. */
 export type PublishPick = 'nothing' | Publish
 
 export const PUBLISH_PICKS: readonly PublishPick[] = ['nothing', ...PUBLISH_LEVELS]
@@ -123,42 +115,37 @@ export function withoutPid(state: State, pid: number): State {
   return rest
 }
 
-/** Whether a scheduled command runs on this machine: its switch here, else what its line says. */
-export function isSwitchedOn(state: State, command: { name: string; on: boolean }): boolean {
-  return state.switches?.[command.name] ?? command.on
+/** Whether a scheduled command runs on this machine: only where a person switched it on. The state is a file a person may edit: anything but `true` is off. */
+export function isSwitchedOn(state: State, command: string): boolean {
+  return state.switches?.[command] === true
 }
 
-/**
- * The state with one command switched: kept only when it differs from the line, so switching a
- * command back to what the line says leaves no trace.
- */
-export function withSwitch(state: State, command: string, on: boolean, lineOn: boolean): State {
+/** The state with one command switched: only a command switched on is kept, so switching it off leaves no trace. */
+export function withSwitch(state: State, command: string, on: boolean): State {
   const { [command]: _previous, ...others } = state.switches ?? {}
-  const switches = on === lineOn ? others : { ...others, [command]: on }
+  const switches = on ? { ...others, [command]: true as const } : others
   const { switches: _switches, ...rest } = state
   return Object.keys(switches).length ? { ...rest, switches } : rest
 }
 
 /**
- * How far a run of a scheduled command publishes on this machine: its publish pick here, else what
- * its line says; absent for nothing. The state is a file a person may edit: a word that is no pick
- * is no pick.
+ * This machine's publish pick for a scheduled command: what a person picked here, else commit. The
+ * state is a file a person may edit: a word that is no pick is no pick.
  */
-export function publishInForce(state: State, command: { name: string; publish?: Publish }): Publish | undefined {
-  const pick = state.publishes?.[command.name]
-  if (pick === undefined || !PUBLISH_PICKS.includes(pick)) return command.publish
+function publishPick(state: State, command: string): PublishPick {
+  const pick = state.publishes?.[command]
+  return pick !== undefined && PUBLISH_PICKS.includes(pick) ? pick : DEFAULT_PUBLISH
+}
+
+/** How far a run of a scheduled command publishes on this machine: its publish pick here; absent for nothing. */
+export function publishInForce(state: State, command: string): Publish | undefined {
+  const pick = publishPick(state, command)
   return pick === 'nothing' ? undefined : pick
 }
 
-/**
- * The state with one command's publish pick set, or taken back when there is none. Unlike a
- * switch, a pick that says what the line says is kept: the person chose it, and the line may change.
- */
-export function withPublish(state: State, command: string, pick: PublishPick | undefined): State {
-  const { [command]: _previous, ...others } = state.publishes ?? {}
-  const publishes = pick === undefined ? others : { ...others, [command]: pick }
-  const { publishes: _publishes, ...rest } = state
-  return Object.keys(publishes).length ? { ...rest, publishes } : rest
+/** The state with one command's publish pick set. */
+export function withPublish(state: State, command: string, pick: PublishPick): State {
+  return { ...state, publishes: { ...state.publishes, [command]: pick } }
 }
 
 /** Read, change, write: one edit of the state. */

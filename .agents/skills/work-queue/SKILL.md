@@ -2,6 +2,10 @@
 name: work-queue
 description: Work one queued task off the project's agent queue, unattended.
 disable-model-invocation: true
+schedule:
+  waits-for: when the queue holds a task nobody has claimed
+  when: |-
+    npx queue | jq --argjson t "$(npx tickets list)" '[.[] | . as $e | select($t | any(.[]; .locked and ((.file | rtrimstr(".md")) as $s | $e | contains($s))) | not)]'
 ---
 
 Work one task off the project's agent queue. Nobody will answer you: never ask, decide yourself.

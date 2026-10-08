@@ -2,6 +2,11 @@
 name: post-merge-cleanup
 description: Bring the project's knowledge files up to date from merged pull requests, or from an agent run's pull request before it merges.
 disable-model-invocation: true
+schedule:
+  every: 1h
+  waits-for: when a pull request merged since the last clean-up has no clean-up yet
+  when: |-
+    gh pr list --state merged --limit 50 --json number,body --search "merged:>=$(npx logs --limit 200 | jq -r '[.[] | select(.intent == "/post-merge-cleanup" and .status == "done")][0].startedAt // (now - 86400 | todate)')" | jq '[.[] | select(.body | contains("Post-merge cleanup done.") | not) | .number]'
 ---
 
 Write what merged work decided and taught into the project's knowledge files. Nobody will answer you: never ask, decide yourself.

@@ -2,6 +2,11 @@
 name: update-tickets
 description: Bring the project's tickets up to date with its issue tracker and its merged pull requests, unattended.
 disable-model-invocation: true
+schedule:
+  every: 15m
+  waits-for: when an issue changed or a pull request that closes a ticket merged since the last import, or nothing was imported yet
+  when: |-
+    { gh issue list --state all --limit 1 --json number --search "updated:>=$(npx tickets meta | jq -r .lastImportedAt)"; gh pr list --state merged --limit 100 --json number,body --search "merged:>=$(npx tickets meta | jq -r .lastImportedAt)" | jq '[.[] | select(.body | test("(?m)^Closes tickets/\\w")) | {number}]'; npx tickets meta | jq --argjson t "$(npx tickets list)" '[select(.lastImportedAt == null and ($t | length) == 0) | "first import"]'; } | jq -s add
 ---
 
 Bring the tickets up to date with the project's issue tracker and its merged pull requests. Nobody will answer you: never ask, decide yourself.

@@ -31,51 +31,49 @@ describe('Settings → Scheduler', () => {
     expect(container.textContent).toBe('')
   })
 
-  test("one switch per scheduled command, showing this machine's switch; flipping one runs `switch` in its project", async () => {
+  test("one switch per scheduled command, off until this machine switched it on; flipping one runs `switch` in its project", async () => {
     const { host, runCommand } = scheduler()
     show(host)
     const cleanup = (await screen.findByLabelText('Run /post-merge-cleanup on a schedule')) as HTMLElement
     const queue = screen.getByLabelText('Run /work-queue on a schedule') as HTMLElement
-    // The line says off, this machine switched it on.
     expect(cleanup.getAttribute('aria-checked')).toBe('true')
-    expect(queue.getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByText('every 1d · publishes nothing')).toBeTruthy()
+    // Nobody switched it on here.
+    expect(queue.getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByText('every 1d · commits its work')).toBeTruthy()
     cleanup.click()
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['switch', 'post-merge-cleanup', 'off']))
     queue.click()
-    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['switch', 'work-queue', 'off']))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['switch', 'work-queue', 'on']))
   })
 
-  test("each command's publish menu shows this machine's pick, else what the file says; picking runs `publish`, and \"As the file says\" takes the pick back with `file`", async () => {
+  test("each command's publish menu shows this machine's pick, Commit where nobody picked; picking runs `publish`; the row says in the skill's plain words what the command waits for", async () => {
     const { host, runCommand } = scheduler()
     show(host)
     const queue = (await screen.findByLabelText('What /work-queue publishes')) as HTMLSelectElement
     const cleanup = screen.getByLabelText('What /post-merge-cleanup publishes') as HTMLSelectElement
-    expect(options(queue)).toEqual(['As the file says (Merge on green)', 'Nothing', 'Commit', 'Publish branch', 'Open PR', 'Merge on green'])
+    expect(options(queue)).toEqual(['Nothing', 'Commit', 'Publish branch', 'Open PR', 'Merge on green'])
     expect(queue.value).toBe('nothing')
-    expect(options(cleanup)[0]).toBe('As the file says (Nothing)')
-    expect(cleanup.value, 'nobody picked here: the file decides').toBe('')
-    // The description says the level in force: this machine's pick over the line's.
-    expect(screen.getByText('when its check finds work · publishes nothing')).toBeTruthy()
+    expect(cleanup.value, 'nobody picked here').toBe('commit')
+    expect(screen.getByText('when the queue holds a task · publishes nothing')).toBeTruthy()
 
     fireEvent.change(cleanup, { target: { value: 'pr' } })
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['publish', 'post-merge-cleanup', 'pr']))
-    fireEvent.change(queue, { target: { value: '' } })
-    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['publish', 'work-queue', 'file']))
+    fireEvent.change(queue, { target: { value: 'commit' } })
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['publish', 'work-queue', 'commit']))
   })
 
-  test('a project with no git host package is offered Nothing, Commit and Publish branch only, beside what the file says', async () => {
+  test('a project with no git host package is offered Nothing, Commit and Publish branch only', async () => {
     const { host } = scheduler()
     show(host, [OTHER])
     const cleanup = (await screen.findByLabelText('What /post-merge-cleanup publishes')) as HTMLSelectElement
-    expect(options(cleanup)).toEqual(['As the file says (Nothing)', 'Nothing', 'Commit', 'Publish branch'])
+    expect(options(cleanup)).toEqual(['Nothing', 'Commit', 'Publish branch'])
   })
 
   test('a save the command refused says which and why', async () => {
-    const { host } = scheduler(() => ({ ok: false, error: 'agent-schedule.md has no line for work-queue' }))
+    const { host } = scheduler(() => ({ ok: false, error: 'no skill of this project schedules work-queue' }))
     show(host)
     ;((await screen.findByLabelText('Run /work-queue on a schedule')) as HTMLElement).click()
-    expect((await screen.findByRole('alert')).textContent).toBe('The switch was not saved: /work-queue: agent-schedule.md has no line for work-queue')
+    expect((await screen.findByRole('alert')).textContent).toBe('The switch was not saved: /work-queue: no skill of this project schedules work-queue')
   })
 
   test('the spend offset shows the loosest one, and a typed one is saved in every project once it rests, held to the reach of the bar', async () => {
@@ -119,7 +117,7 @@ describe('Settings → Scheduler', () => {
     expect(within(gemstack).getByText('on').className).toMatch(/text-success/)
     expect(within(other).getByText('off')).toBeTruthy()
     expect(within(gemstack).getByText('opus')).toBeTruthy()
-    expect(within(other).getByText('On this machine only; agent-schedule.md sets the defaults.')).toBeTruthy()
+    expect(within(other).getByText('On this machine only. Every scheduled command starts switched off.')).toBeTruthy()
     expect(within(other).queryByLabelText('Spend offset')).toBeNull()
     // The same command in two projects: each row saves in its own project.
     expect(within(gemstack).getByLabelText('Run /post-merge-cleanup on a schedule').getAttribute('aria-checked')).toBe('true')
@@ -143,11 +141,11 @@ describe('Settings → Scheduler', () => {
     expect(screen.queryByText(/Shown: the loosest/)).toBeNull()
   })
 
-  test('a project whose scheduler has read no schedule says so under its name', async () => {
+  test('a project with no scheduled command to list says so under its name', async () => {
     const { host } = hostAnswering(() => ({ ok: true, output: { ok: true, on: true, keepAlive: false, running: true, model: 'opus', spendOffset: 7 } }))
     show(host)
     const gemstack = await screen.findByRole('group', { name: 'gemstack' })
-    expect(within(gemstack).getByText("No scheduled command yet: this project's scheduler has not read a schedule.")).toBeTruthy()
+    expect(within(gemstack).getByText('No scheduled command: no skill of this project has a schedule that can be read, or its scheduler has not ticked yet.')).toBeTruthy()
   })
 
   test('a project whose scheduler cannot be read says so', async () => {

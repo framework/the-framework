@@ -153,6 +153,9 @@ importers:
       '@openagt/skill-logs':
         specifier: workspace:*
         version: link:../skill-logs
+      yaml:
+        specifier: ^2.5.0
+        version: 2.9.0
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.0.0
@@ -193,9 +196,6 @@ importers:
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@20.19.43)(jsdom@29.1.1)(vite@8.1.4(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
-      yaml:
-        specifier: ^2.5.0
-        version: 2.9.0
 
   packages/files:
     dependencies:

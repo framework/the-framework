@@ -6,7 +6,6 @@
   "intent": "/work-queue",
   "driver": "claude-code",
   "model": "claude-opus-5-5",
-  "branch": "agent-2026-10-08T13-53-56-834Z",
   "cost": 0.8103884,
   "caller": {
     "runner": {

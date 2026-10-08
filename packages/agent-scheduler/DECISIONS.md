@@ -71,12 +71,22 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   agrees and nothing new is stored). A routine whose run changes nothing cannot be paced by
   a check alone: it would start every minute. Picked over a rotation of the routines in a
   fixed order behind an empty queue (one command then depends on another, and idle it
-  started an agent every 30 minutes), and over a clock time (`at 09:00`: machine-local, and
-  two machines fire twice). Order is what the numbers say.
+  started an agent every 30 minutes). Order is what the numbers say.
+- The skill's pace is where a command starts. Each person may set another for their own
+  machine, in the state file like the switch: an interval in minutes, hours, days, weeks or
+  months, or whenever there is work. Picked over the pace being the skill's alone, where
+  slowing a command on one machine meant editing a tracked file.
+- A pace in days, weeks or months may name a time of day, in the machine's own time, like a
+  calendar event: the command is due from that time on, on a day at least that many days
+  after the day it last started. A time that was missed runs once, as soon as the scheduler
+  looks. This takes back the earlier pick against a clock time (machine-local, and two
+  machines fire twice): the pace counts from the last start on any machine, so two machines
+  never run the work twice.
 - The state, `.agent-scheduler/state.json`, untracked, per user, hidden through git's
-  exclude file the way `.branches/` is: on or off, keep-alive, the model, the spend cushion,
-  the scheduler's pid, the last tick and what it decided. Nothing the tool knows is only in
-  memory; a restart loses nothing.
+  exclude file the way `.branches/` is: on or off, keep-alive, the model, the spend
+  cushion, this machine's switches, paces and publish picks, the scheduler's pid, the last
+  tick and what it decided. Nothing the tool knows is only in memory; a restart loses
+  nothing.
 - Keep-alive, whether the scheduler outlives what started it, is per user, in the state
   file. Picked over a line in the tracked schedule: in the schedule it would switch on the
   next person's machine the first time they pull.
@@ -87,9 +97,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The tick
 - The checks in the cheapest order: the coding agent can run the command, it is switched
-  on, the check says due, the cap, then the quota. The quota is read only when everything
-  else says start, because the reading spawns the agent's CLI and its usage fetch is
-  refused upstream when asked too often.
+  on, it is due by its pace, the check says due, the cap, then the quota. The quota is read
+  only when everything else says start, because the reading spawns the agent's CLI and its
+  usage fetch is refused upstream when asked too often.
 - The quota gate is OpenAgent's spend boundary, copied: a window in force may be used
   only as far as the week has elapsed, plus the user's cushion, half a day when unset.
   Picked over a plainer line (a window at 100% stands down): nothing would pace the week.
@@ -127,9 +137,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The dashboard part
 - The scheduler brings its own part of a dashboard: an Automations page (one row per
-  scheduled command, with its switch and its publish pick), a Settings section (the spend
-  cushion) and an Overview card (on or off, the last tick). All read `status` and write
-  through `offset`, `switch` and `publish`. Picked over a hook line per setting that a
-  dashboard runs, and over the dashboard reading the state file by name. The rows are on a
-  page of their own, picked over rows inside Settings: Settings keeps only what reaches
-  every project.
+  scheduled command, with its switch, its pace and its publish pick), a Settings section
+  (the spend cushion) and an Overview card (on or off, the last tick). All read `status`
+  and write through `offset`, `switch`, `pace` and `publish`. Picked over a hook line per
+  setting that a dashboard runs, and over the dashboard reading the state file by name. The
+  rows are on a page of their own, picked over rows inside Settings: Settings keeps only
+  what reaches every project.

@@ -52,6 +52,7 @@ export async function readyToRun(repo: string, driver: DriverName, deps: { probe
 /** The command line of a spawned run: the model, the coding agent, the follow-up, the publish level, the attached text, the parent and the base named only when the run has them, so the run's own defaults apply otherwise. */
 export function runArgs(run: SpawnedRun): string[] {
   const args = ['run', run.prompt, '--id', run.id]
+  if (run.startedAt !== undefined) args.push('--started', run.startedAt)
   if (run.mark) args.push('--mark')
   if (run.model !== undefined) args.push('--model', run.model)
   if (run.driver !== undefined) args.push('--driver', run.driver)
@@ -68,6 +69,8 @@ export function runArgs(run: SpawnedRun): string[] {
 export interface SpawnedRun {
   id: string
   prompt: string
+  /** When the run was asked for (`run --started`), ISO: the start on its marker, kept as its record's start. */
+  startedAt?: string
   /** The run writes its own marker: a person's detached start, answered before the marker is pushed. */
   mark?: boolean
   model?: string
@@ -175,13 +178,14 @@ export async function detachResume(
  * one given; none given, the coding agent starts on its own default. A parent it names that has
  * ended by the time this run ends is continued in a process of its own.
  */
-export async function runProject(repo: string, opts: { prompt: string; id?: string; mark?: boolean; model?: string; driver?: DriverName; then?: string; publish?: Publish; attached?: string; parent?: string; base?: string; log?: (line: string) => void }): Promise<RunOutcome> {
+export async function runProject(repo: string, opts: { prompt: string; id?: string; startedAt?: string; mark?: boolean; model?: string; driver?: DriverName; then?: string; publish?: Publish; attached?: string; parent?: string; base?: string; log?: (line: string) => void }): Promise<RunOutcome> {
   const id = opts.id ?? runIdFrom(new Date().toISOString())
   const driver = opts.driver ?? 'claude-code'
   const setup = await readPersonal(repo, opts.log ?? (() => {}))
   return runCommand(repo, {
     prompt: opts.prompt,
     id,
+    ...(opts.startedAt !== undefined ? { startedAt: opts.startedAt } : {}),
     // A run given its id was marked by whoever spawned it, unless it was told to mark itself.
     marked: opts.id !== undefined && opts.mark !== true,
     ...(opts.model !== undefined ? { model: opts.model } : {}),

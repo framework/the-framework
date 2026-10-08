@@ -1,5 +1,6 @@
 import { runnerMark } from '@openagt/agent-runner'
 import { listRuns, type LogsDeps, type RunCard } from '@openagt/skill-logs'
+import { isTime } from './names.js'
 import { promptCommand, type Schedule } from './schedule.js'
 
 /**
@@ -17,12 +18,16 @@ export function commandOf(card: RunCard, schedule: Schedule): string | undefined
   return promptCommand(card.intent, schedule)
 }
 
-/** When one command last started, on any machine, whatever became of the run; nothing when it never did. */
+/**
+ * When one command last started, on any machine, whatever became of the run; nothing when it never
+ * did. A scheduled run's start is when its command was asked about, before its check ran: the tick
+ * gives the run that moment as its start. A record whose start is not a time is not counted.
+ */
 export async function lastStart(repo: string, command: string, schedule: Schedule, deps: LogsDeps = {}): Promise<string | undefined> {
   const cards = await listRuns(repo, {}, deps)
   let latest: string | undefined
   for (const card of cards) {
-    if (commandOf(card, schedule) === command && (latest === undefined || card.startedAt > latest)) latest = card.startedAt
+    if (commandOf(card, schedule) === command && isTime(card.startedAt) && (latest === undefined || card.startedAt > latest)) latest = card.startedAt
   }
   return latest
 }

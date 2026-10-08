@@ -33,7 +33,10 @@ import { parseInterval, type Interval } from './pace.js'
  * its interval, its cap, its run records).
  *
  * `when` is a shell command, run at the repository root. The command is due while the check
- * exits 0 and prints something other than an empty JSON value. `every` is how often at most: the
+ * exits 0 and prints something other than an empty JSON value. The check may read `$LAST_RUN`,
+ * the time its command last started on any machine, or was switched on on this one when that is
+ * later: a check that asks what is new since then goes quiet once a run was started for it.
+ * Inside a single-quoted `jq` program the shell does not fill it in: `env.LAST_RUN` reads it there. `every` is how often at most: the
  * command is due only once that long has passed since its last recorded start. A row carries one
  * or both; with both, the command starts only when both hold. `waits-for` is one plain line
  * saying what the check waits for, for a person: a check is a shell line nothing can turn into a
@@ -183,22 +186,34 @@ export function commandPrompt(name: string): string {
 }
 
 /**
+ * The time a check is given as `$LAST_RUN`: an ISO time in UTC to the whole second
+ * (`2026-10-09T10:00:00Z`), the shape `gh --search`, a GitHub `since` and `jq`'s `fromdate` all
+ * read. The fraction of a second is dropped, never rounded up: a thing that came in that same
+ * second is found twice rather than never.
+ */
+export function lastRunValue(iso: string): string {
+  return new Date(Math.floor(Date.parse(iso) / 1000) * 1000).toISOString().replace('.000Z', 'Z')
+}
+
+/**
  * What a run is handed with its prompt when a check started it: {@link FOUND_OPENING}, then what
  * the check printed, so an agent whose command asks for the new thing has it. The command's prompt
  * stays the command alone: it is what the run is counted under.
  *
  * A NUL character is dropped: the text travels as a command-line argument, which can hold none.
  * Output past {@link FOUND_MAX} characters is cut at the end of the last whole line that fits,
- * mid-line when its first line alone is longer, and a last line says how much was printed.
+ * mid-line when its first line alone is longer. A last line then says how much was printed and
+ * the time the check was given: the next check asks from this run's start, so what was cut is
+ * found again only by an agent that asks from that earlier time itself.
  */
-export function checkFound(stdout: string): string {
+export function checkFound(stdout: string, lastRun: string): string {
   const printed = stdout.replaceAll('\0', '').trim()
   if (printed.length <= FOUND_MAX) return `${FOUND_OPENING}\n${printed}`
   const fits = printed.slice(0, FOUND_MAX)
   // A line that ends exactly at the limit is whole: the line end is the next character.
   const lineEnd = printed[FOUND_MAX] === '\n' ? FOUND_MAX : fits.lastIndexOf('\n')
   const shown = lineEnd > 0 ? fits.slice(0, lineEnd) : fits
-  return `${FOUND_OPENING}\n${shown}\n(cut: the check printed ${printed.length} characters, these are the first ${shown.length})`
+  return `${FOUND_OPENING}\n${shown}\n(cut: the check printed ${printed.length} characters, these are the first ${shown.length}; it asked what is new since ${lastRun})`
 }
 
 /**

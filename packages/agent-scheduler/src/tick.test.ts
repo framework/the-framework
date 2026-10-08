@@ -5,12 +5,15 @@ import type { RunCard } from '@openagt/skill-logs'
 import { DEFAULT_STATE, type State } from './state.js'
 import { parseInterval, type Interval } from './pace.js'
 import { FOUND_OPENING, type ScheduledCommand } from './schedule.js'
-import { tick, type TickDeps } from './tick.js'
+import { runCheck, tick, type TickDeps } from './tick.js'
 
 // The tick's decisions with every reading injected: what it reads, in which order, and the one
 // line each outcome leaves in the state. The wiring to a real project is scheduler.ts's.
 
 const NOW = new Date('2026-09-16T14:01:00.000Z')
+
+/** When this machine switched its commands on: two hours before the tick. */
+const ON = '2026-09-16T12:00:00.250Z'
 
 /** A week that resets four days out, with the account's week at `percentUsed`. */
 function quota(percentUsed: number): DriverQuota {
@@ -34,25 +37,28 @@ function command(name: string, over: Partial<ScheduledCommand> = { when: 'npx qu
 interface Seen {
   markers: RunCard[]
   withdrawn: string[]
-  spawned: { id: string; prompt: string; model: string; publish?: string; attached?: string }[]
+  spawned: { id: string; prompt: string; startedAt: string; model: string; publish?: string; attached?: string }[]
   checks: string[]
+  /** What each check was given as `$LAST_RUN`, in the order of `checks`. */
+  since: string[]
 }
 
 /** Every command switched on on this machine, unless the state says otherwise: a command nobody switched on starts nothing. */
 function deps(over: Partial<TickDeps> & { stateOver?: Partial<State>; commands?: ScheduledCommand[]; inFlightCards?: RunCard[]; seen?: Seen } = {}): { deps: TickDeps; seen: Seen } {
-  const seen: Seen = over.seen ?? { markers: [], withdrawn: [], spawned: [], checks: [] }
+  const seen: Seen = over.seen ?? { markers: [], withdrawn: [], spawned: [], checks: [], since: [] }
   let ids = 0
   const cards = over.inFlightCards ?? []
   const commands = over.commands ?? [command('work-queue')]
   const d: TickDeps = {
-    state: { ...DEFAULT_STATE, on: true, spendOffset: 0, switches: Object.fromEntries(commands.map(c => [c.name, true as const])), ...over.stateOver },
+    state: { ...DEFAULT_STATE, on: true, spendOffset: 0, switches: Object.fromEntries(commands.map(c => [c.name, ON])), ...over.stateOver },
     schedule: { commands, unreadable: [] },
     host: 'this-box',
     now: () => NOW,
     pull: async () => ({ ok: true }),
     sweep: async () => {},
-    check: async shell => {
+    check: async (shell, lastRun) => {
       seen.checks.push(shell)
+      seen.since.push(lastRun)
       return { ok: true, stdout: '["one entry"]', stderr: '' }
     },
     lastStart: async () => undefined,
@@ -108,7 +114,7 @@ test("this machine's pace stands in for the skill's: its own interval, or whenev
   assert.deepEqual((await tick(skills.deps)).decisions.map(d => d.outcome.replace(/ 2026.*$/, '')), ['started', 'not due (last start 20m ago, every 6h)', 'not due (last start 20m ago, every 6h)'])
 
   const since = '2026-09-01T00:00:00.000Z'
-  const mine = deps({ commands, lastStart, stateOver: { switches: { 'update-tickets': true, 'plan-tickets': true, 'triage quick': true }, paces: { 'update-tickets': { every: '1h', since }, 'plan-tickets': { work: true }, 'triage quick': { every: '10m', since } } } })
+  const mine = deps({ commands, lastStart, stateOver: { switches: { 'update-tickets': ON, 'plan-tickets': ON, 'triage quick': ON }, paces: { 'update-tickets': { every: '1h', since }, 'plan-tickets': { work: true }, 'triage quick': { every: '10m', since } } } })
   const record = await tick(mine.deps)
   assert.deepEqual(record.decisions.map(d => d.outcome.replace(/ 2026.*$/, '')), ['not due (last start 20m ago, every 1h)', 'started', 'started'])
   // Slowed down, its check never ran; "whenever there is work" asked the check alone.
@@ -116,7 +122,7 @@ test("this machine's pace stands in for the skill's: its own interval, or whenev
   assert.deepEqual(record.schedule.map(row => [row.command, row.every]), [['update-tickets', '15m'], ['plan-tickets', '6h'], ['triage quick', '6h']])
 
   // A count no date can hold must never read as "due on every tick": it is no pace, and the skill's stands.
-  const huge = deps({ commands, lastStart, stateOver: { switches: { 'plan-tickets': true }, paces: { 'plan-tickets': { every: '100000000d', at: '10:00', since } } } })
+  const huge = deps({ commands, lastStart, stateOver: { switches: { 'plan-tickets': ON }, paces: { 'plan-tickets': { every: '100000000d', at: '10:00', since } } } })
   assert.deepEqual((await tick(huge.deps)).decisions.filter(d => d.command === 'plan-tickets'), [{ command: 'plan-tickets', outcome: 'not due (last start 20m ago, every 6h)' }])
 })
 
@@ -125,18 +131,18 @@ test('a pace with a time of day: not due before that time, with the time it is d
   // The machine's own local time: the 16th at 09:00, last started on the 14th at 10:02.
   const local = (day: number, hour: number, minute = 0): Date => new Date(2026, 8, day, hour, minute)
   const paces = { 'post-merge-cleanup': { every: '2d', at: '10:00', since: local(1, 8).toISOString() } }
-  const early = deps({ commands, now: () => local(16, 9), lastStart: async () => local(14, 10, 2).toISOString(), stateOver: { switches: { 'post-merge-cleanup': true }, paces } })
+  const early = deps({ commands, now: () => local(16, 9), lastStart: async () => local(14, 10, 2).toISOString(), stateOver: { switches: { 'post-merge-cleanup': ON }, paces } })
   assert.deepEqual((await tick(early.deps)).decisions, [{ command: 'post-merge-cleanup', outcome: 'not due (next start from 2026-09-16 10:00, every 2d at 10:00)' }])
   assert.deepEqual(early.seen.checks, [], 'no check runs before the time')
 
-  const onTime = deps({ commands, now: () => local(16, 10), lastStart: async () => local(14, 10, 2).toISOString(), stateOver: { switches: { 'post-merge-cleanup': true }, paces } })
+  const onTime = deps({ commands, now: () => local(16, 10), lastStart: async () => local(14, 10, 2).toISOString(), stateOver: { switches: { 'post-merge-cleanup': ON }, paces } })
   assert.match((await tick(onTime.deps)).decisions[0]!.outcome, /^started /)
   assert.deepEqual(onTime.seen.checks, ['gh pr list'], 'from the time on, the check decides')
 
   // The scheduler was not running on the 16th at 10:00: on the 17th at 08:00 the missed time is due, once.
-  const late = deps({ commands, now: () => local(17, 8), lastStart: async () => local(14, 10, 2).toISOString(), stateOver: { switches: { 'post-merge-cleanup': true }, paces } })
+  const late = deps({ commands, now: () => local(17, 8), lastStart: async () => local(14, 10, 2).toISOString(), stateOver: { switches: { 'post-merge-cleanup': ON }, paces } })
   assert.match((await tick(late.deps)).decisions[0]!.outcome, /^started /)
-  const after = deps({ commands, now: () => local(17, 10, 5), lastStart: async () => local(17, 8).toISOString(), stateOver: { switches: { 'post-merge-cleanup': true }, paces } })
+  const after = deps({ commands, now: () => local(17, 10, 5), lastStart: async () => local(17, 8).toISOString(), stateOver: { switches: { 'post-merge-cleanup': ON }, paces } })
   assert.deepEqual((await tick(after.deps)).decisions, [{ command: 'post-merge-cleanup', outcome: 'not due (next start from 2026-09-19 10:00, every 2d at 10:00)' }])
 })
 
@@ -153,7 +159,47 @@ test('a due command under its cap with quota to spare is marked on the branch, t
   // Nobody picked a publish level on this machine: the run commits its work.
   assert.deepEqual(marker.caller, { runner: { host: 'this-box', publish: 'commit' }, host: 'this-box' })
   // The run is handed what its check printed; its prompt stays the command alone, as the marker's does.
-  assert.deepEqual(seen.spawned, [{ id: marker.id, prompt: '/work-queue', model: 'opus', publish: 'commit', attached: `${FOUND_OPENING}\n["one entry"]` }])
+  assert.deepEqual(seen.spawned, [{ id: marker.id, prompt: '/work-queue', startedAt: NOW.toISOString(), model: 'opus', publish: 'commit', attached: `${FOUND_OPENING}\n["one entry"]` }])
+})
+
+test('a check is given the time its command last started, to the whole second, or the time it was switched on on this machine when that is later or it never started', async () => {
+  const commands = [command('answer-comments', { when: 'gh api comments' }), command('watch-competitor', { when: 'curl reddit' }), command('update-tickets', { when: 'npx tickets meta', every: every('15m') })]
+  // The third last started a week before this machine switched it on: off means off, so it asks from the switch.
+  const started: Record<string, string> = { 'answer-comments': '2026-09-16T13:40:07.912Z', 'update-tickets': '2026-09-09T13:30:00.000Z' }
+  const { deps: d, seen } = deps({ commands, lastStart: async name => started[name] })
+  await tick(d)
+  assert.deepEqual(seen.checks.map((shell, i) => [shell, seen.since[i]]), [
+    ['gh api comments', '2026-09-16T13:40:07Z'],
+    // Never started: what is new since a person switched it on, not since the beginning of time.
+    ['curl reddit', '2026-09-16T12:00:00Z'],
+    ['npx tickets meta', '2026-09-16T12:00:00Z'],
+  ])
+})
+
+test("a run's start is the moment its command was asked about, before its check ran, on its marker and for its process alike: the next check's last start is that moment, not the seconds later the run began", async () => {
+  // A clock that moves a second each time it is read: the check and the readings after it take time.
+  let reads = 0
+  const now = (): Date => new Date(NOW.getTime() + 1000 * reads++)
+  const { deps: d, seen } = deps({ commands: [command('answer-comments', { when: 'gh api comments' })], now })
+  let checkedAt = ''
+  d.check = async () => ((checkedAt = now().toISOString()), { ok: true, stdout: '[1]', stderr: '' })
+  const record = await tick(d)
+  const started = seen.spawned[0]!.startedAt
+  assert.ok(started < checkedAt, `the start ${started} is before the check ran at ${checkedAt}`)
+  assert.ok(record.at <= started, 'and not before the tick began')
+  assert.equal(seen.markers[0]!.startedAt, started, 'the marker names the same start')
+})
+
+test('a run handed a cut output is told the time its check was given, so its agent can ask again for what was cut', async () => {
+  const { deps: d, seen } = deps({ commands: [command('answer-comments', { when: 'gh api comments' })], check: async () => ({ ok: true, stdout: 'x'.repeat(9000), stderr: '' }), lastStart: async () => '2026-09-16T13:40:07.912Z' })
+  await tick(d)
+  assert.match(seen.spawned[0]!.attached!, /; it asked what is new since 2026-09-16T13:40:07Z\)$/)
+})
+
+test('a check reads the time it is given as $LAST_RUN, run through the shell at the repository root', async () => {
+  const printed = await runCheck(process.cwd(), 'printf "%s|%s|%s" "$LAST_RUN" "$(basename "$PWD")" "$HOME"', 10_000, '2026-10-09T10:00:00Z')
+  // The rest of the environment comes along: a check needs its PATH, its HOME and its logins.
+  assert.deepEqual(printed, { ok: true, stdout: `2026-10-09T10:00:00Z|${process.cwd().split('/').at(-1)}|${process.env['HOME']}`, stderr: '' })
 })
 
 test('a run is handed what its check printed, and only a run a check started: a command its pace alone starts is handed nothing', async () => {
@@ -170,7 +216,7 @@ test('a run is handed what its check printed, and only a run a check started: a 
 
 test("this machine's publish pick goes on the marker and to the spawned run: commit where nobody picked, no level for nothing; the recorded schedule says what the skills say, with what each skill says it does", async () => {
   const commands = [command('work-queue', { when: 'npx queue', waitsFor: 'when the queue holds a task', description: 'Work one queued task.' }), command('triage quick', { every: every('6h') }), command('plan-tickets', { every: every('6h') })]
-  const { deps: d, seen } = deps({ commands, stateOver: { switches: { 'work-queue': true, 'triage quick': true, 'plan-tickets': true }, publishes: { 'work-queue': 'nothing', 'triage quick': 'merge' } } })
+  const { deps: d, seen } = deps({ commands, stateOver: { switches: { 'work-queue': ON, 'triage quick': ON, 'plan-tickets': ON }, publishes: { 'work-queue': 'nothing', 'triage quick': 'merge' } } })
   const record = await tick(d)
   assert.deepEqual(seen.markers.map(m => m.caller), [
     { runner: { host: 'this-box' }, host: 'this-box' },
@@ -188,14 +234,14 @@ test("this machine's publish pick goes on the marker and to the spawned run: com
 test('a command with a word after its folder name: the whole name is what the switch, the interval, the marker and the decision carry, and the prompt is the name with a slash', async () => {
   const commands = [command('triage quick', { every: every('6h') }), command('triage consensual', { every: every('7d') })]
   const started: Record<string, string> = { 'triage consensual': '2026-09-15T14:00:00.000Z' }
-  const { deps: d, seen } = deps({ commands, lastStart: async name => started[name], stateOver: { switches: { 'triage quick': true } } })
+  const { deps: d, seen } = deps({ commands, lastStart: async name => started[name], stateOver: { switches: { 'triage quick': ON } } })
   const record = await tick(d)
   assert.deepEqual(record.decisions, [
     { command: 'triage quick', outcome: 'started 2026-09-16T14-01-00-000Z', run: '2026-09-16T14-01-00-000Z' },
     { command: 'triage consensual', outcome: 'switched off on this machine' },
   ])
   assert.equal(seen.markers[0]!.intent, '/triage quick')
-  assert.deepEqual(seen.spawned, [{ id: '2026-09-16T14-01-00-000Z', prompt: '/triage quick', model: 'opus', publish: 'commit' }])
+  assert.deepEqual(seen.spawned, [{ id: '2026-09-16T14-01-00-000Z', prompt: '/triage quick', startedAt: NOW.toISOString(), model: 'opus', publish: 'commit' }])
   assert.deepEqual(record.schedule, [
     { command: 'triage quick', every: '6h' },
     { command: 'triage consensual', every: '7d' },
@@ -233,12 +279,12 @@ test('every command starts switched off: it is not started, and says so, until a
     { command: 'post-merge-cleanup', every: '1d' },
   ])
 
-  const switched = deps({ commands, stateOver: { switches: { 'post-merge-cleanup': true } } })
+  const switched = deps({ commands, stateOver: { switches: { 'post-merge-cleanup': ON } } })
   const after = await tick(switched.deps)
   assert.deepEqual(after.decisions.map(d => [d.command, d.outcome.split(' ')[0]]), [['work-queue', 'switched'], ['post-merge-cleanup', 'started']])
   assert.deepEqual(switched.seen.checks, [])
 
-  // A state edited by hand: anything but true is off.
+  // A state edited by hand: anything but a time is off.
   const edited = deps({ commands, stateOver: { switches: { 'work-queue': 'yes' as never } } })
   assert.equal((await tick(edited.deps)).decisions[0]!.outcome, 'switched off on this machine')
 })
@@ -344,15 +390,15 @@ test('with a cap of two, the marker within the cap keeps its place even when a l
 test("this machine's number of agents at once stands in for the skill's, against every machine's runs: a second one starts under a number of two, none under a number of one where the skill allows two; a marker is ranked by this machine's number", async () => {
   const one = running('2026-09-16T13-00-00-000Z', 'work-queue')
   // The skill says one at a time; this machine's person says two: with one in flight on another machine, a second starts here.
-  const more = deps({ inFlightCards: [one], stateOver: { switches: { 'work-queue': true }, agents: { 'work-queue': 2 } } })
+  const more = deps({ inFlightCards: [one], stateOver: { switches: { 'work-queue': ON }, agents: { 'work-queue': 2 } } })
   assert.match((await tick(more.deps)).decisions[0]!.outcome, /^started /)
   assert.equal(more.seen.spawned.length, 1)
   // Two in flight: this machine's number is reached.
-  const full = deps({ inFlightCards: [one, running('2026-09-16T13-30-00-000Z', 'work-queue', 'third-box')], stateOver: { switches: { 'work-queue': true }, agents: { 'work-queue': 2 } } })
+  const full = deps({ inFlightCards: [one, running('2026-09-16T13-30-00-000Z', 'work-queue', 'third-box')], stateOver: { switches: { 'work-queue': ON }, agents: { 'work-queue': 2 } } })
   assert.deepEqual((await tick(full.deps)).decisions, [{ command: 'work-queue', outcome: 'cap reached (2 in flight: 2026-09-16T13-00-00-000Z on other-box, 2026-09-16T13-30-00-000Z on third-box)' }])
 
   // The skill allows two; this machine's person says one: with one in flight anywhere, nothing starts here.
-  const fewer = deps({ commands: [command('work-queue', { when: 'npx queue', cap: 2 })], inFlightCards: [one], stateOver: { switches: { 'work-queue': true }, agents: { 'work-queue': 1 } } })
+  const fewer = deps({ commands: [command('work-queue', { when: 'npx queue', cap: 2 })], inFlightCards: [one], stateOver: { switches: { 'work-queue': ON }, agents: { 'work-queue': 1 } } })
   assert.match((await tick(fewer.deps)).decisions[0]!.outcome, /^cap reached \(1 in flight/)
   assert.deepEqual(fewer.seen.markers, [])
   // The recorded schedule says the skill's number, and only when it is more than one.
@@ -361,7 +407,7 @@ test("this machine's number of agents at once stands in for the skill's, against
 
   // Another machine's marker lands first: under this machine's number of two its own marker ranks second and stays.
   const cards: RunCard[] = []
-  const raced = deps({ inFlightCards: cards, stateOver: { switches: { 'work-queue': true }, agents: { 'work-queue': 2 } } })
+  const raced = deps({ inFlightCards: cards, stateOver: { switches: { 'work-queue': ON }, agents: { 'work-queue': 2 } } })
   const write = raced.deps.writeMarker
   raced.deps.writeMarker = async card => {
     cards.push(running('2026-09-16T14-00-59-000Z', 'work-queue'))
@@ -373,7 +419,7 @@ test("this machine's number of agents at once stands in for the skill's, against
 
   // The other way: the skill allows two, this machine's person says one, and another machine's marker lands first: this machine's is withdrawn.
   const fewerCards: RunCard[] = []
-  const lost = deps({ commands: [command('work-queue', { when: 'npx queue', cap: 2 })], inFlightCards: fewerCards, stateOver: { switches: { 'work-queue': true }, agents: { 'work-queue': 1 } } })
+  const lost = deps({ commands: [command('work-queue', { when: 'npx queue', cap: 2 })], inFlightCards: fewerCards, stateOver: { switches: { 'work-queue': ON }, agents: { 'work-queue': 1 } } })
   const writeLost = lost.deps.writeMarker
   lost.deps.writeMarker = async card => {
     fewerCards.push(running('2026-09-16T14-00-59-000Z', 'work-queue'))

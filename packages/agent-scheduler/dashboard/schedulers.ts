@@ -1,6 +1,6 @@
 import type { ModuleHost, ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick, TickDecision } from '../src/state.js'
-import { DEFAULT_PUBLISH, isAgents } from '../src/names.js'
+import { DEFAULT_PUBLISH, isAgents, isTime } from '../src/names.js'
 import { MAX_COUNT, paceInForce, parseInterval, parseTimeOfDay, takesTimeOfDay, type PacePick, type PaceUnit } from '../src/pace.js'
 
 // What the module shows of each project's scheduler: the answer of `agent-scheduler status`, the
@@ -120,7 +120,7 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
       ...(typeof row['every'] === 'string' ? { every: row['every'] } : {}),
       ...(typeof row['when'] === 'string' ? { when: row['when'] } : {}),
       ...(typeof row['waitsFor'] === 'string' ? { waitsFor: row['waitsFor'] } : {}),
-      on: switches[command] === true,
+      on: isTime(switches[command]),
       publish: isPick(picked) ? picked : DEFAULT_PUBLISH,
       ...(isPace(paces[command]) ? { pace: paces[command] as PacePick } : {}),
       ...(isAgents(row['agents']) && row['agents'] > 1 ? { skillAgents: row['agents'] } : {}),

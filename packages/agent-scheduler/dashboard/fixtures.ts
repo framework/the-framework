@@ -29,7 +29,7 @@ export const STATUS = {
   spendOffset: 7,
   running: true,
   pid: 4242,
-  switches: { 'post-merge-cleanup': true },
+  switches: { 'post-merge-cleanup': '2026-10-03T08:00:00.000Z' },
   publishes: { 'work-queue': 'nothing' },
   lastTick: {
     at: '2026-10-03T10:00:00.000Z',

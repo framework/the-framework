@@ -117,11 +117,19 @@ test('switch writes this machine\'s switch for a scheduled command: only a comma
     await writeSkill(repo, 'triage', 'schedule:\n  - word: quick\n    every: 6h\n  - word: consensual\n    every: 7d\n')
     const on = await run(repo, 'switch', 'triage quick', 'on')
     assert.equal(on.code, 0)
-    assert.deepEqual((on.out as { switches: unknown }).switches, { 'triage quick': true })
+    // The switch holds when it was switched on: a check of a command that never started asks what is new since then.
+    const before = Date.now()
+    const switched = (on.out as { switches: Record<string, string> }).switches
+    assert.deepEqual(Object.keys(switched), ['triage quick'])
+    const at = Date.parse(switched['triage quick']!)
+    assert.ok(at <= before && at > before - 60_000, `switched on just now, not at ${switched['triage quick']}`)
     await run(repo, 'switch', 'work-queue', 'on')
-    // Switching off a command nobody switched on changes nothing.
+    // Switching off a command nobody switched on changes nothing, and switching on one that is on keeps its time.
     await run(repo, 'switch', 'triage consensual', 'off')
-    assert.deepEqual((await readState(repo)).switches, { 'triage quick': true, 'work-queue': true })
+    await run(repo, 'switch', 'triage quick', 'on')
+    const both = (await readState(repo)).switches!
+    assert.deepEqual(Object.keys(both), ['triage quick', 'work-queue'])
+    assert.equal(both['triage quick'], switched['triage quick'])
     // Everything off again: nothing kept.
     await run(repo, 'switch', 'triage quick', 'off')
     await run(repo, 'switch', 'work-queue', 'off')
@@ -142,7 +150,7 @@ test('switch writes this machine\'s switch for a scheduled command: only a comma
     assert.equal(typo.err, 'the schedule of triage cannot be read: unknown key evry')
     assert.equal((await run(repo, 'publish', 'triage quick', 'pr')).err, 'the schedule of triage cannot be read: unknown key evry')
     // A switch left on can always be taken back, whatever became of the skill.
-    assert.deepEqual((await readState(repo)).switches, { 'triage quick': true })
+    assert.deepEqual(Object.keys((await readState(repo)).switches ?? {}), ['triage quick'])
     const off = await run(repo, 'switch', 'triage quick', 'off')
     assert.equal(off.code, 0)
     assert.equal((await readState(repo)).switches, undefined)

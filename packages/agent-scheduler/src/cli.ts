@@ -148,7 +148,9 @@ const COMMANDS: Record<string, Command> = {
     if (to === 'on') await scheduled(repo, name)
     // Switched on, a time of day counts from now: a row ticked after its time waits for the next one, as when the time was picked.
     // A command already on is left as it is, so asking twice does not put a missed time off.
-    return { ok: true, ...(await updateState(repo, s => (to === 'off' ? withSwitch(s, name, false) : isSwitchedOn(s, name) ? s : withPace(withSwitch(s, name, true), name, sinceNow(s.paces?.[name], new Date()))), git)) }
+    // The switch keeps when it was switched on: a check of a command that never started asks what is new since then.
+    const now = new Date()
+    return { ok: true, ...(await updateState(repo, s => (to === 'off' ? withSwitch(s, name, undefined) : isSwitchedOn(s, name) ? s : withPace(withSwitch(s, name, now.toISOString()), name, sinceNow(s.paces?.[name], now))), git)) }
   },
 
   async publish(args, io, git) {

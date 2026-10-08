@@ -19,7 +19,7 @@ The runs a scheduled command [1] has, read off the run records [2] on the projec
 
 - **The command a run counts for** - for a card with `agent-runner`'s mark [6] and a prompt: the scheduled command the prompt names without its slash, else the prompt's first word without its slash (`schedule.ts`); none for any other card.
 - **In flight** - the running cards that count for one command on the branch, whatever the machine; a running card without the mark, a dashboard's own run for instance, is not counted.
-- **The last start** - the newest start time among the cards that count for one command on the branch, whatever the machine and whatever became of the run, for the schedule's interval, or for the pace a person set for the command on this machine (`pace.ts`); nothing when the command never started.
+- **The last start** - the newest start time among the cards that count for one command on the branch, whatever the machine and whatever became of the run, a card whose start time is no time left out, for the schedule's interval, for the pace a person set for the command on this machine (`pace.ts`), and for the time the command's check is given as `$LAST_RUN` (`tick.ts`); nothing when the command never started.
 
 ## Business logic
 
@@ -47,8 +47,12 @@ The runs of one command in flight are the cards on the branch whose status is `r
 
 #### Context
 
-**User story**: `triage quick`, scheduled with `every: 6h`, starts at most every six hours, whichever machine started the last one, and whether that run ended done, failed or stopped.
+**User story**: `triage quick`, scheduled with `every: 6h`, starts at most every six hours, whichever machine started the last one, and whether that run ended done, failed or stopped. A command's check that asks what is new since `$LAST_RUN` is given this same last start (`tick.ts`).
+
+**Business logic story**: the start time on a scheduled run's card is the moment the tick turned to the run's command, before the command's check ran, not the seconds later the run's process began: the tick writes that moment on the marker and gives it to the run, which keeps it as its record's start (`tick.ts`, `agent-runner`'s `run --started`). So a check that asks what is new since the last start misses nothing that came in between.
+
+**Problem**: a run record is a file on a branch, which a person can write by hand. A card whose start time is no time must not stop the tick.
 
 #### Business logic
 
-The last start of a command is the newest start time among every card on the branch that counts for the command, whatever its status and whatever the machine; a command no card counts for has none.
+The last start of a command is the newest start time among every card on the branch that counts for the command, whatever its status and whatever the machine; a command no card counts for has none. A card whose start time is not a time as `names.ts` reads one (an ISO date and time; the word `yesterday` is none) is not counted. The same last start is what a command's pace is counted from (`pace.ts`) and what its check is given as `$LAST_RUN`, unless this machine switched the command on later (`tick.ts`).

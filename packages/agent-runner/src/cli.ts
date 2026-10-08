@@ -99,7 +99,7 @@ type Command = (args: string[], io: CliIo, git: GitRunner) => Promise<unknown>
 
 const COMMANDS: Record<string, Command> = {
   async run(args, io, git) {
-    const { positionals, values } = parse(args, { id: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' }, mark: { type: 'boolean' }, driver: { type: 'string' }, then: { type: 'string' }, publish: { type: 'string' }, attach: { type: 'string' }, parent: { type: 'string' }, base: { type: 'string' } }, 0, 1)
+    const { positionals, values } = parse(args, { id: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' }, mark: { type: 'boolean' }, driver: { type: 'string' }, then: { type: 'string' }, publish: { type: 'string' }, attach: { type: 'string' }, started: { type: 'string' }, parent: { type: 'string' }, base: { type: 'string' } }, 0, 1)
     const repo = await project(io.cwd, git)
     const driver = values.driver
     if (driver !== undefined && !isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
@@ -111,12 +111,14 @@ const COMMANDS: Record<string, Command> = {
       if (values.then !== undefined) throw new Usage('--resume takes no --then: a run continues with the follow-up its record names')
       if (publish !== undefined) throw new Usage('--resume takes no --publish: a run continues at the publish level its record names')
       if (values.attach !== undefined) throw new Usage('--resume takes no --attach: a text is handed over with a run\'s first prompt only')
+      if (values.started !== undefined) throw new Usage('--resume takes no --started: a run continues from the start its record names')
       if (values.parent !== undefined) throw new Usage('--resume takes no --parent: a run continues for the parent its record names')
       if (values.base !== undefined) throw new Usage('--resume takes no --base: a run continues on its own branch')
       if (positionals[0] === undefined && values.answer === undefined) throw new Usage('a text or --answer is needed to resume a run')
     }
     if (values.then !== undefined && !values.then.trim()) throw new Usage('--then needs a prompt')
     if (values.attach !== undefined && !values.attach.trim()) throw new Usage('--attach needs a text')
+    if (values.started !== undefined && (values.id === undefined || Number.isNaN(Date.parse(values.started)))) throw new Usage('--started is the time a run spawned with --id was asked for, like 2026-10-09T10:00:00.000Z')
     // A parent this project has no record of is refused while someone is still listening; a run
     // spawned with its id was asked about already.
     if (values.parent !== undefined && values.id === undefined && !(await findRun(repo, values.parent))) {
@@ -158,6 +160,7 @@ const COMMANDS: Record<string, Command> = {
     const outcome = await runProject(repo, {
       prompt: positionals[0],
       ...(values.id !== undefined ? { id: values.id } : {}),
+      ...(values.started !== undefined ? { startedAt: new Date(values.started).toISOString() } : {}),
       ...(values.mark ? { mark: true } : {}),
       ...(values.model !== undefined ? { model: values.model } : {}),
       ...(driver !== undefined ? { driver } : {}),

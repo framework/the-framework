@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { PUBLISH_LEVELS, type Publish } from '@openagt/agent-runner'
-import { DEFAULT_MODEL, DEFAULT_PUBLISH, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE, isAgents } from './names.js'
+import { DEFAULT_MODEL, DEFAULT_PUBLISH, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE, isAgents, isTime } from './names.js'
 import type { PacePick } from './pace.js'
 
 /**
@@ -61,8 +61,8 @@ export interface State {
   model: string
   /** How far past the spend boundary a run may still start, in percentage points. */
   spendOffset: number
-  /** The scheduled commands this machine switched on. Every command starts switched off: a skill that arrives in a project starts no agent by itself. */
-  switches?: Record<string, true>
+  /** The scheduled commands this machine switched on, each with when it was, ISO. Every command starts switched off: a skill that arrives in a project starts no agent by itself. */
+  switches?: Record<string, string>
   /** This machine's publish pick per command. */
   publishes?: Record<string, PublishPick>
   /** This machine's pace per command, kept only where a person set one: a command without one runs at its skill's pace. */
@@ -124,15 +124,21 @@ export function withoutPid(state: State, pid: number): State {
   return rest
 }
 
-/** Whether a scheduled command runs on this machine: only where a person switched it on. The state is a file a person may edit: anything but `true` is off. */
-export function isSwitchedOn(state: State, command: string): boolean {
-  return state.switches?.[command] === true
+/** When a person switched a scheduled command on on this machine, ISO; nothing for a command that is off. The state is a file a person may edit: anything but a time is off. */
+export function switchedOnAt(state: State, command: string): string | undefined {
+  const at = state.switches?.[command]
+  return isTime(at) ? at : undefined
 }
 
-/** The state with one command switched: only a command switched on is kept, so switching it off leaves no trace. */
-export function withSwitch(state: State, command: string, on: boolean): State {
+/** Whether a scheduled command runs on this machine: only where a person switched it on. */
+export function isSwitchedOn(state: State, command: string): boolean {
+  return switchedOnAt(state, command) !== undefined
+}
+
+/** The state with one command switched on at a time, or off when no time is given: only a command switched on is kept, so switching it off leaves no trace. */
+export function withSwitch(state: State, command: string, at: string | undefined): State {
   const { [command]: _previous, ...others } = state.switches ?? {}
-  const switches = on ? { ...others, [command]: true as const } : others
+  const switches = at !== undefined ? { ...others, [command]: at } : others
   const { switches: _switches, ...rest } = state
   return Object.keys(switches).length ? { ...rest, switches } : rest
 }

@@ -12,6 +12,17 @@ import { removeRepo, testRepo } from './test-repo.js'
 const mark = { host: 'this-box', pid: 4242 }
 const NONE: Schedule = { commands: [], unreadable: [] }
 
+test('a record whose start is not a time is not counted as a start: a record written by hand cannot stop the tick', async () => {
+  const repo = await testRepo()
+  try {
+    await recordRun(repo, { id: 'b0', startedAt: '2026-09-16T09:00:00.000Z', status: 'done', intent: '/answer-comments', caller: { runner: { host: 'this-box' } } }, [])
+    await recordRun(repo, { id: 'b1', startedAt: 'yesterday', status: 'done', intent: '/answer-comments', caller: { runner: { host: 'this-box' } } }, [])
+    assert.equal(await lastStart(repo, 'answer-comments', NONE), '2026-09-16T09:00:00.000Z')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
 test('the last start of a command is its newest card on any machine, whatever became of the run; a command never started has none', async () => {
   const repo = await testRepo()
   try {

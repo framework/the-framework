@@ -37,7 +37,7 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     now,
     pull: () => pullFileBranch(repo, DATA_BRANCH, { git, log }),
     sweep: () => sweep(repo, { host, isAlive: isPidAlive, now, git, log, resume: resumeDetached(repo) }),
-    check: shell => runCheck(repo, shell, CHECK_TIMEOUT_MS),
+    check: (shell, lastRun) => runCheck(repo, shell, CHECK_TIMEOUT_MS, lastRun),
     lastStart: command => lastStart(repo, command, schedule),
     inFlight: command => inFlight(repo, command, schedule),
     ready: () => readyToRun(repo, 'claude-code'),

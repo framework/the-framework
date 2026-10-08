@@ -41,6 +41,14 @@ export function isAgents(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_AGENTS
 }
 
+/** The name a check reads the time of its command's last start under (`$LAST_RUN`). */
+export const LAST_RUN_ENV = 'LAST_RUN'
+
+/** Whether a value is a time as the tools write one: an ISO date and time a date reads (`2026-10-09T10:00:00.000Z`). What a switched-on command's switch holds, and a run record's start. */
+export function isTime(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) && !Number.isNaN(Date.parse(value))
+}
+
 /** How often a started scheduler ticks. */
 export const TICK_MS = 60_000
 

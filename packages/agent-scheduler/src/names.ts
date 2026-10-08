@@ -9,6 +9,12 @@ export const STATE_FILE = 'state.json'
 /** Under the state directory: the scheduler's own log. */
 export const SCHEDULER_LOG = 'scheduler.log'
 
+/**
+ * Where the coding agent a scheduled run is on, Claude Code, reads a project's skills. A skill that
+ * is only in another folder is no command to it: typed with a slash, it expands to nothing.
+ */
+export const RUN_SKILLS_DIR = '.claude/skills'
+
 /** A skill's file inside its folder: its front matter may hold the skill's `schedule`. */
 export const SKILL_FILE = 'SKILL.md'
 

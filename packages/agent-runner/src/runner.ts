@@ -72,7 +72,7 @@ export interface SpawnedRun {
   driver?: DriverName
   /** The follow-up's prompt (`run --then`); a person's start only. */
   then?: string
-  /** How far the run publishes (`run --publish`): the person's pick, made for a scheduled command or for a detached start. */
+  /** How far the run publishes (`run --publish`): the level in force for a scheduler's run, the person's pick for a detached start. */
   publish?: Publish
   /** The run this one is started for (`run --parent`). */
   parent?: string

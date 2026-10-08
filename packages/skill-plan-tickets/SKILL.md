@@ -4,7 +4,7 @@ description: Queue a plan for the open tickets that have none or whose plan is o
 disable-model-invocation: true
 schedule:
   every: 6h
-  waits-for: when an open ticket has no plan, or an outdated one
+  waits-for: when a ticket that is not waiting, claimed, in review or queued has no plan, or an outdated one
   when: |-
     npx tickets list | jq --argjson q "$(npx queue)" '[.[] | select(((.planned | not) or .outdated) and .pr == null and (.waiting | not) and (.locked | not) and ((.file | rtrimstr(".md")) as $s | $q | any(contains($s)) | not)) | .file]'
 ---

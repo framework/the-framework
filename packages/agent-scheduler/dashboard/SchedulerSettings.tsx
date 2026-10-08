@@ -103,7 +103,7 @@ export function SchedulerSettings({ projects }: ModuleSettingsProps) {
               {row.model && <span className="text-xs text-muted-foreground">{row.model}</span>}
             </GroupHeading>
             {row.error !== undefined && <p role="alert" className="py-2 text-xs text-danger">{`The scheduler could not be read: ${row.error}`}</p>}
-            {row.error === undefined && row.commands.length === 0 && <p className="py-2 text-xs text-muted-foreground">No scheduled command: no skill of this project schedules one, or its scheduler has not ticked yet.</p>}
+            {row.error === undefined && row.commands.length === 0 && <p className="py-2 text-xs text-muted-foreground">No scheduled command: no skill of this project has a schedule that can be read, or its scheduler has not ticked yet.</p>}
             {row.commands.map(scheduled => {
               const label = `Run /${scheduled.command} on a schedule`
               const id = `${row.project.id}/${scheduled.command}`

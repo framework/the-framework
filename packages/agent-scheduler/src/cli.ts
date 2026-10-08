@@ -22,7 +22,7 @@ export const USAGE = `usage: agent-scheduler <command>
   status                        the state file, and whether the scheduler's process is alive
   model <id>                    the model every scheduled run starts on (this user)
   offset <points>               how far past the spend boundary a run may still start (this user)
-  switch <command> <on|off>     whether a scheduled command runs on this machine, the command as status names it (quoted when it has a word after it); every one starts off
+  switch <command> <on|off>     whether a scheduled command runs on this machine, the command as status names it (quoted when it has a word after it); every one starts off, and off is taken for any name
   publish <command> <nothing|commit|branch|pr|merge>
                                 how far this machine's runs of a scheduled command publish; commit until picked
   cleanup                       remove what this tool left in the project: the state file and the scheduler's log, then .agent-scheduler/ and the rule hiding it from git once it is empty;
@@ -137,7 +137,8 @@ const COMMANDS: Record<string, Command> = {
     const [name, to] = positionals as [string, string]
     if (to !== 'on' && to !== 'off') throw new Usage(`${to} is neither on nor off`)
     const repo = await project(io.cwd, git)
-    await scheduled(repo, name)
+    // Off needs no scheduled command: a switch left on for a skill that is gone can always be taken back.
+    if (to === 'on') await scheduled(repo, name)
     return { ok: true, ...(await updateState(repo, s => withSwitch(s, name, to === 'on'), git)) }
   },
 
@@ -158,10 +159,14 @@ const COMMANDS: Record<string, Command> = {
   },
 }
 
-/** Refused where no skill of the project schedules the command. */
+/** Refused where no skill of the project schedules the command, with why when its skill's schedule cannot be read. */
 async function scheduled(repo: string, name: string): Promise<void> {
   const schedule = await readSchedule(repo)
-  if (!schedule.commands.some(c => c.name === name)) throw new Refused({ ok: false, reason: 'not-scheduled', command: name }, `no skill of this project schedules ${name}`)
+  if (schedule.commands.some(c => c.name === name)) return
+  const skill = name.split(' ')[0]!
+  const unreadable = schedule.unreadable.find(u => u.skill === skill)
+  if (unreadable) throw new Refused({ ok: false, reason: 'unreadable-schedule', skill, detail: unreadable.reason }, `the schedule of ${skill} cannot be read: ${unreadable.reason}`)
+  throw new Refused({ ok: false, reason: 'not-scheduled', command: name }, `no skill of this project schedules ${name}`)
 }
 
 /** The project the working directory belongs to, even from inside a checkout under `.branches/`. */

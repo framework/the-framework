@@ -5,12 +5,12 @@ disable-model-invocation: true
 schedule:
   - word: quick
     every: 6h
-    waits-for: when a planned ticket is a quick win and not on the queue
+    waits-for: when a planned ticket is a quick win and is not waiting, claimed, in review or queued
     when: |-
       npx tickets list | jq --argjson q "$(npx queue)" '[.[] | select(.planned and .pr == null and (.waiting | not) and (.locked | not) and (.outdated | not) and .effort != null and .uncertainty != null and .effort <= 2 and .uncertainty <= 2 and (.file as $f | $q | any(contains($f)) | not)) | .file]'
   - word: consensual
     every: 7d
-    waits-for: when a planned ticket is consensual work and not on the queue
+    waits-for: when a planned ticket is consensual work and is not waiting, claimed, in review or queued
     when: |-
       npx tickets list | jq --argjson q "$(npx queue)" '[.[] | select(.planned and .pr == null and (.waiting | not) and (.locked | not) and (.outdated | not) and .effort != null and .uncertainty != null and .uncertainty <= 3 and (.effort > 2 or .uncertainty > 2) and (.file as $f | $q | any(contains($f)) | not)) | .file]'
 ---

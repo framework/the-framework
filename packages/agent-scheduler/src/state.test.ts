@@ -4,7 +4,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@openagt/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, withSwitch, publishInForce, publishPick, withPublish } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, withSwitch, publishInForce, withPublish } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
@@ -79,12 +79,10 @@ test('a scheduler ending clears its own pid only: a pid another scheduler wrote 
 })
 
 test('a run of a scheduled command commits its work until a person picks a level on this machine; nothing is a pick too', () => {
-  assert.equal(publishPick(DEFAULT_STATE, 'work-queue'), 'commit')
   assert.equal(publishInForce(DEFAULT_STATE, 'work-queue'), 'commit')
 
   const picked = withPublish(withPublish(DEFAULT_STATE, 'work-queue', 'nothing'), 'triage quick', 'pr')
   assert.deepEqual(picked.publishes, { 'work-queue': 'nothing', 'triage quick': 'pr' })
-  assert.equal(publishPick(picked, 'work-queue'), 'nothing')
   assert.equal(publishInForce(picked, 'work-queue'), undefined)
   assert.equal(publishInForce(picked, 'triage quick'), 'pr')
   // Another command is still nobody's pick.

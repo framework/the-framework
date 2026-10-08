@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
-import { DEFAULT_CAP, SKILL_FILE } from './names.js'
+import { DEFAULT_CAP, RUN_SKILLS_DIR, SKILL_FILE } from './names.js'
 
 /**
  * The schedule (#2022): the scheduled commands of a project, each brought by the skill it runs.
@@ -44,6 +44,10 @@ import { DEFAULT_CAP, SKILL_FILE } from './names.js'
  *
  * A `schedule` the reader cannot read is skipped and named, so a typo stands down one skill's
  * commands and says so rather than silently doing nothing.
+ *
+ * The schedule is read from every folder a coding agent reads skills from, so a project's skills
+ * are all listed; a command whose skill is not in the folder of the agent that runs scheduled
+ * commands is listed and never started, and the tick says so.
  */
 
 /** One command as its skill schedules it. */
@@ -58,6 +62,8 @@ export interface ScheduledCommand {
   waitsFor?: string
   /** Runs in flight at once, across every machine. */
   cap: number
+  /** The skills folder the skill was read from (`.claude/skills`). */
+  dir: string
 }
 
 /** The schedule as read. */
@@ -74,11 +80,11 @@ const UNIT_MS = { m: 60_000, h: 3_600_000, d: 86_400_000 } as const
 const ROW_KEYS = ['word', 'every', 'when', 'waits-for', 'agents']
 
 /**
- * The commands a skill schedules, out of its `SKILL.md`: none when the file has no front matter
- * or the front matter no `schedule`. One row or a list of rows; any row that cannot be read makes
- * the whole `schedule` unreadable, and the reason names the row. Pure.
+ * The commands a skill schedules, out of its `SKILL.md` in the skills folder `dir`: none when the
+ * file has no front matter or the front matter no `schedule`. One row or a list of rows; any row
+ * that cannot be read makes the whole `schedule` unreadable, and the reason names the row. Pure.
  */
-export function skillSchedule(skill: string, md: string): Schedule {
+export function skillSchedule(skill: string, md: string, dir: string): Schedule {
   const unreadable = (reason: string): Schedule => ({ commands: [], unreadable: [{ skill, reason }] })
   const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(md)
   if (!front) return { commands: [], unreadable: [] }
@@ -86,7 +92,9 @@ export function skillSchedule(skill: string, md: string): Schedule {
   try {
     data = parseYaml(front[1]!)
   } catch {
-    return unreadable('the front matter is not YAML')
+    // Only a skill that tries to schedule something is named: a coding agent reads front matter
+    // more loosely than YAML does, and a skill with no `schedule` is none of this tool's business.
+    return /^schedule\s*:/m.test(front[1]!) ? unreadable('the front matter is not YAML') : { commands: [], unreadable: [] }
   }
   const written = isMap(data) ? data['schedule'] : undefined
   if (written === undefined) return { commands: [], unreadable: [] }
@@ -95,7 +103,7 @@ export function skillSchedule(skill: string, md: string): Schedule {
   if (rows.length === 0) return unreadable('the schedule lists no row')
   const commands: ScheduledCommand[] = []
   for (const row of rows) {
-    const command = parseRow(skill, row)
+    const command = parseRow(skill, row, dir)
     if (typeof command === 'string') return unreadable(rows.length > 1 ? `row ${commands.length + 1}: ${command}` : command)
     if (commands.some(c => c.name === command.name)) return unreadable(`two rows are named ${command.name}`)
     commands.push(command)
@@ -108,9 +116,10 @@ export function skillSchedule(skill: string, md: string): Schedule {
  * `word: <the skill's argument>`. At least one of `every` and `when`, else nothing says when.
  * `every: 0m` is refused rather than read as "always", which is the key being absent. A key the
  * reader does not know is refused too: it is a typo, or a rule this tool would not follow.
+ * `waits-for` says what the check waits for, so a row without `when` has none.
  * Answers the command, or why the row cannot be read.
  */
-function parseRow(skill: string, row: unknown): ScheduledCommand | string {
+function parseRow(skill: string, row: unknown, dir: string): ScheduledCommand | string {
   if (!isMap(row)) return 'a row is a list of keys'
   const unknown = Object.keys(row).find(key => !ROW_KEYS.includes(key))
   if (unknown !== undefined) return `unknown key ${unknown}`
@@ -123,12 +132,14 @@ function parseRow(skill: string, row: unknown): ScheduledCommand | string {
   if (waitsFor !== undefined && !(typeof waitsFor === 'string' && waitsFor.trim() && !waitsFor.trim().includes('\n'))) return 'waits-for is one line of text'
   if (agents !== undefined && !(typeof agents === 'number' && Number.isInteger(agents) && agents >= 1)) return 'agents is a whole number, 1 or more'
   if (when === undefined && every === undefined) return 'neither every nor when says when'
+  if (waitsFor !== undefined && when === undefined) return 'waits-for says what when waits for, and there is no when'
   return {
     name: word === undefined ? skill : `${skill} ${word}`,
     ...(typeof when === 'string' ? { when: when.trim() } : {}),
     ...(asEvery ? { every: { ms: Number(asEvery[1]) * UNIT_MS[asEvery[2] as keyof typeof UNIT_MS], text: `${asEvery[1]}${asEvery[2]}` } } : {}),
     ...(typeof waitsFor === 'string' ? { waitsFor: waitsFor.trim() } : {}),
     cap: typeof agents === 'number' ? agents : DEFAULT_CAP,
+    dir,
   }
 }
 
@@ -138,22 +149,24 @@ function isMap(value: unknown): value is Record<string, unknown> {
 
 /**
  * The project's schedule: every skill's commands, the skills in name order. Read from each folder
- * a coding agent's harness reads skills from; a skill in two folders is read once, its first
- * readable copy deciding, as with the harness. A project with no skills folder schedules nothing.
+ * a coding agent reads skills from, the folder of the agent that runs scheduled commands first; a
+ * skill in two folders is read once, from the first folder that holds its `SKILL.md`. A project
+ * with no skills folder schedules nothing.
  */
 export async function readSchedule(repo: string): Promise<Schedule> {
-  const files = new Map<string, string>()
-  for (const dir of HARNESS_SKILL_DIRS) {
+  const files = new Map<string, { md: string; dir: string }>()
+  for (const dir of [RUN_SKILLS_DIR, ...HARNESS_SKILL_DIRS.filter(d => d !== RUN_SKILLS_DIR)]) {
     const entries = await readdir(join(repo, dir)).catch(() => [])
     for (const skill of entries) {
       if (files.has(skill) || !SKILL.test(skill)) continue
       const md = await readFile(join(repo, dir, skill, SKILL_FILE), 'utf8').catch(() => undefined)
-      if (md !== undefined) files.set(skill, md)
+      if (md !== undefined) files.set(skill, { md, dir })
     }
   }
   const schedule: Schedule = { commands: [], unreadable: [] }
   for (const skill of [...files.keys()].sort()) {
-    const read = skillSchedule(skill, files.get(skill)!)
+    const { md, dir } = files.get(skill)!
+    const read = skillSchedule(skill, md, dir)
     schedule.commands.push(...read.commands)
     schedule.unreadable.push(...read.unreadable)
   }

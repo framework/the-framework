@@ -1,10 +1,10 @@
-Settings → Scheduler: the section this package adds to the dashboard's Settings page. It is drawn in groups that say what a setting reaches: "All projects" holds the spend cushion [3] as a number, "Spend offset", the one setting saved to every project; then each project that has the package has its own group, under its name, with one row per scheduled command, a checkbox for its schedule switch [2] and a menu for its publish pick [4]. Everything here is this machine's, read with `agent-scheduler status` and saved with `agent-scheduler offset`, `switch` and `publish`. A scheduled command is off until its checkbox is checked here, and its runs commit their work and push nothing until another publish pick is made here.
+Settings → Scheduler: the section this package adds to the dashboard's Settings page. It is drawn in groups that say what a setting reaches: "All projects" holds the spend cushion [3] as a number, "Spend offset", the one setting saved to every project; then each project that has the package has its own group, under its name, with one Settings row per scheduled command, a checkbox for its schedule switch [2] and a menu for its publish pick [4]. Everything here is this machine's, read with `agent-scheduler status` and saved with `agent-scheduler offset`, `switch` and `publish`. A scheduled command is off until its checkbox is checked here, and its runs commit their work and push nothing until another publish pick is made here.
 
 ## Context
 
-**User story**: the project's `post-merge-cleanup` skill schedules a clean-up after merges. Like every scheduled command it is off on every machine until someone switches it on there; the user wants it to run on their own machine, so they check "Run /post-merge-cleanup on a schedule" here, and from then on that project's scheduler starts it on this machine when it is due; a teammate's machine is unchanged. Likewise a user unchecks "Run /work-queue on a schedule" to stop their laptop from working the queue. Each row's menu says how far the command's runs publish on this machine, "Commit" until the user picks; a user who wants the queue's runs on their own machine to open a pull request picks "Open PR" in that row's menu. No tracked file changes either way. And a user who wants scheduled work to spend exactly so far ahead of the week's pace types the number rather than dragging the usage bar's handle to it.
+**User story**: the project's `post-merge-cleanup` skill schedules a clean-up after merges. Like every scheduled command it is off on every machine until someone switches it on there; the user wants it to run on their own machine, so they check "Run /post-merge-cleanup on a schedule" here, and from then on that project's scheduler starts it on this machine when it is due; a teammate's machine is unchanged. Likewise a user unchecks "Run /work-queue on a schedule" to stop their laptop from working the queue. Each Settings row's menu says how far the command's runs publish on this machine, "Commit" until the user picks; a user who wants the queue's runs on their own machine to open a pull request picks "Open PR" in that Settings row's menu. No tracked file changes either way. And a user who wants scheduled work to spend exactly so far ahead of the week's pace types the number rather than dragging the usage bar's handle to it.
 
-**Business logic story**: a person decides, per machine, whether a command runs on its own, how far its runs publish and how far past the quota boundary scheduled work may start; the project's skills only say which commands are scheduled and when each is due. The section does not read the skills: its rows are what each project's scheduler recorded at its last tick [5] (`schedulers.ts`). The dashboard gives the section the projects that have this package and runs this package's command for it; it knows nothing of what the section holds.
+**Business logic story**: a person decides, per machine, whether a command runs on its own, how far its runs publish and how far past the quota boundary scheduled work may start; the project's skills only say which commands are scheduled and when each is due. The section does not read the skills: its Settings rows are what each project's scheduler recorded at its last tick [5] (`schedulers.ts`). The dashboard gives the section the projects that have this package and runs this package's command for it; it knows nothing of what the section holds.
 
 **Problem**: the section is one for every project, yet most of its settings are one project's: with several projects registered, a person must see at a glance which setting changes every project and which changes one.
 
@@ -17,15 +17,16 @@ Settings → Scheduler: the section this package adds to the dashboard's Setting
 [3] spend cushion: how far past the quota boundary (the share of the account's quota week that may be spent by now) a scheduled run may still start, in percentage points of the week; the state's `spendOffset`. Positive is lenient, negative is strict. The dashboard calls it the spend offset.
 [4] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: nothing, a commit, the branch, a pull request, or a pull request set to merge on its own once its checks pass; kept in the state, not in the skill. Until the person picks, the command's runs commit their work and push nothing.
 [5] tick: one pass of the scheduler, every minute: one decision per scheduled command, each one line in the state.
+[6] Settings row: one line of a section of the Settings page: a label, a description and its controls. It is not a row of a skill's `schedule` key (the key in the front matter of its `SKILL.md` where the skill says which commands it schedules), which the section never reads.
 
 ## Business logic — TL;DR
 
 - **Where it shows** - after the Settings page's own sections, at order 20, titled "Scheduler"; not at all while no registered project has the package.
 - **What it reads** - `agent-scheduler status` in every project that has the package, when shown and every 10 seconds, and again after every save.
 - **Groups** - "All projects" first, then one group per project under its name, with its scheduler's status and model beside the name and one line saying its settings are this machine's.
-- **Saves go one at a time** - each save waits for the one before it; the row being saved is disabled until its save has answered; a refused save says which and why.
+- **Saves go one at a time** - each save waits for the one before it; the Settings row being saved is disabled until its save has answered; a refused save says which and why.
 - **Spend offset** - under "All projects": the loosest spend cushion [3] any project holds, as a number from −50 to 50; a typed value is saved to every project once it has rested for half a second; projects holding another cushion are named with theirs.
-- **A scheduled command's row** - under its project's name: "Run /<command> on a schedule", with the pace, said in the skill's own plain line for what its check waits for when the skill gives one, and how far its runs publish; a checkbox for its schedule switch [2], unchecked until it is checked here, and a menu for its publish pick [4], showing "Commit" where nobody picked; a project with no git host package is offered "Nothing", "Commit" and "Publish branch" only.
+- **A scheduled command's Settings row** - under its project's name: "Run /<command> on a schedule", with the pace, said in the skill's own plain line for what its check waits for when the skill gives one, and how far its runs publish; a checkbox for its schedule switch [2], unchecked until it is checked here, and a menu for its publish pick [4], showing "Commit" where nobody picked; a project with no git host package is offered "Nothing", "Commit" and "Publish branch" only.
 - **A project that cannot be read, or has no scheduled command to list** - says so under its own name.
 
 ## Business logic
@@ -48,7 +49,7 @@ See `## Context`.
 
 #### Business logic
 
-The section runs `agent-scheduler status` in every project it was given (`schedulers.ts`), when it is first shown, every 10 seconds after, when the set of projects changes, and once more after each save, so a row shows what the scheduler holds rather than what was clicked.
+The section runs `agent-scheduler status` in every project it was given (`schedulers.ts`), when it is first shown, every 10 seconds after, when the set of projects changes, and once more after each save, so a Settings row shows what the scheduler holds rather than what was clicked.
 
 ### Groups
 
@@ -58,7 +59,7 @@ See the first **Problem** in `## Context`.
 
 #### Business logic
 
-The section's rows sit in groups, each under a heading in capitals. The first group, "All projects", holds the spend offset and nothing else; it is absent while no project has answered a spend cushion [3]. Then comes one group per project the section was given, in the order given, headed by the project's name. Beside the name stand the scheduler's leading status as `schedulers.ts` says it ("on" in green, "on, not running" in amber, "off", "not readable" in red) and the model its scheduled runs start on. Under the name one line reads "On this machine only. Every scheduled command starts switched off." A project's group holds only that project's scheduled commands, so the same command scheduled in two projects is two rows, each saved in its own project.
+The section's Settings rows sit in groups, each under a heading in capitals. The first group, "All projects", holds the spend offset and nothing else; it is absent while no project has answered a spend cushion [3]. Then comes one group per project the section was given, in the order given, headed by the project's name. Beside the name stand the scheduler's leading status as `schedulers.ts` says it ("on" in green, "on, not running" in amber, "off", "not readable" in red) and the model its scheduled runs start on. Under the name one line reads "On this machine only. Every scheduled command starts switched off." A project's group holds only that project's scheduled commands, so the same command scheduled in two projects is two Settings rows, each saved in its own project.
 
 ### Saves go one at a time
 
@@ -68,7 +69,7 @@ See the **Problem** in `## Context`.
 
 #### Business logic
 
-Every save, of the spend cushion, of a schedule switch or of a publish pick, joins one queue: it starts only when the save before it has answered. The row saved last is greyed, with its checkbox and menu disabled, until its save has answered; the rows are then read again. A save that was refused shows, under the rows, as an alert: "The switch was not saved: /<command>: <why>", "The publish pick was not saved: /<command>: <why>" or "The spend offset was not saved: <project>: <why>", the reason being what the command said. The next save clears the alert.
+Every save, of the spend cushion, of a schedule switch or of a publish pick, joins one queue: it starts only when the save before it has answered. The Settings row saved last is greyed, with its checkbox and menu disabled, until its save has answered; the Settings rows are then read again. A save that was refused shows, under the Settings rows, as an alert: "The switch was not saved: /<command>: <why>", "The publish pick was not saved: /<command>: <why>" or "The spend offset was not saved: <project>: <why>", the reason being what the command said. The next save clears the alert.
 
 ### Spend offset
 
@@ -78,9 +79,9 @@ Every save, of the spend cushion, of a schedule switch or of a publish pick, joi
 
 #### Business logic
 
-The one row of the "All projects" group is "Spend offset" ("How far every project's scheduler may start work past the quota boundary, in percentage points (max 50). Negative holds it back; positive lets it borrow from the days ahead. One number, saved to every project; the handle on the usage bar moves the same number."): a number box bounded to −50 and 50. It shows the spend cushion [3] in force, the loosest any project holds, rounded to one decimal. When projects hold different cushions (one was set by hand from the command line), the description goes on: "Shown: the loosest. <project> is at <its cushion>, …; saving sets every project to the same number.", naming each project whose cushion is not the one shown. The row is absent until a project has answered one. While the box has the focus it shows the text as typed, so a number can be typed through text that is no number yet (a minus sign alone); such text, and an empty box, change nothing. A typed number is rounded to whole points and held to −50..50, the reach of the usage bar's handle. Once the box loses the focus it shows that number, kept on the page until a read brings the same value back. It is saved once it has rested for half a second, since typing a number is several changes: the save runs `agent-scheduler offset -- <points>` in every project the section was given. A save that fails shows "The spend offset was not saved: <project>: <why>" and the box goes back to the value the schedulers hold.
+The one Settings row of the "All projects" group is "Spend offset" ("How far every project's scheduler may start work past the quota boundary, in percentage points (max 50). Negative holds it back; positive lets it borrow from the days ahead. One number, saved to every project; the handle on the usage bar moves the same number."): a number box bounded to −50 and 50. It shows the spend cushion [3] in force, the loosest any project holds, rounded to one decimal. When projects hold different cushions (one was set by hand from the command line), the description goes on: "Shown: the loosest. <project> is at <its cushion>, …; saving sets every project to the same number.", naming each project whose cushion is not the one shown. The Settings row is absent until a project has answered one. While the box has the focus it shows the text as typed, so a number can be typed through text that is no number yet (a minus sign alone); such text, and an empty box, change nothing. A typed number is rounded to whole points and held to −50..50, the reach of the usage bar's handle. Once the box loses the focus it shows that number, kept on the page until a read brings the same value back. It is saved once it has rested for half a second, since typing a number is several changes: the save runs `agent-scheduler offset -- <points>` in every project the section was given. A save that fails shows "The spend offset was not saved: <project>: <why>" and the box goes back to the value the schedulers hold.
 
-### A scheduled command's row
+### A scheduled command's Settings row
 
 #### Context
 
@@ -88,11 +89,13 @@ See `## Context`.
 
 #### Business logic
 
-Each project's group lists one row per scheduled command of that project, in its schedule's order. A row's label is "Run /<command> on a schedule" and its description "<pace> · <how far its runs publish>", the pace and the publish words as `schedulers.ts` says them: the pace uses the skill's own plain line for what its check waits for when the skill gives one ("when the queue holds a task · publishes nothing"), and the publish words are those of this machine's publish pick [4] ("every 1d · commits its work" for a command nobody picked for).
+Each project's group lists one Settings row per scheduled command of that project, in its schedule's order. A Settings row's label is "Run /<command> on a schedule" and its description "<pace> · <how far its runs publish>", the pace and the publish words as `schedulers.ts` says them: the pace uses the skill's own plain line for what its check waits for when the skill gives one ("when the queue holds a task · publishes nothing"), and the publish words are those of this machine's publish pick [4] ("every 1d · commits its work" for a command nobody picked for).
 
 The checkbox is checked when the command runs on this machine: only once its schedule switch [2] was switched on here. Flipping it runs `agent-scheduler switch <command> on` or `… off` in that project.
 
 The menu, labelled "What /<command> publishes" for a screen reader, lists the picks the project is offered: all five ("Nothing", "Commit", "Publish branch", "Open PR", "Merge on green") in a project with a git host package, "Nothing", "Commit" and "Publish branch" only in a project without one, and after them the command's pick in force when the project is not offered it. The menu shows this machine's publish pick [4] for the command, "Commit" where nobody picked. Picking an entry runs `agent-scheduler publish <command> <nothing|commit|branch|pr|merge>` in that project. A pick is kept until another replaces it. Two machines may hold different picks for one command; each publishes its own runs by its own pick.
+
+A scheduled command whose skill is only under `.agents/skills` is listed like any other, since the tick records it; checking its checkbox starts nothing, and the Scheduler card's line for that command says why (`not a command of the coding agent: …`).
 
 ### A project that cannot be read, or has no scheduled command to list
 
@@ -102,4 +105,4 @@ See the **Problem** in `schedulers.LOGIC.md`.
 
 #### Business logic
 
-A project whose status could not be read shows, in its own group, an alert: "The scheduler could not be read: <why>", and its heading says "not readable". That project lists no row and adds no spend cushion; with no project readable, the "All projects" group is absent too. A project that was read but lists no scheduled command (no skill of the project schedules one, or its scheduler has not ticked yet) shows, in its group, "No scheduled command: no skill of this project schedules one, or its scheduler has not ticked yet."
+A project whose status could not be read shows, in its own group, an alert: "The scheduler could not be read: <why>", and its heading says "not readable". That project lists no Settings row and adds no spend cushion; with no project readable, the "All projects" group is absent too. A project that was read but lists no scheduled command (no skill of the project schedules one, every skill that tries to has a `schedule` key that cannot be read, or its scheduler has not ticked yet) shows, in its group, "No scheduled command: no skill of this project has a schedule that can be read, or its scheduler has not ticked yet."

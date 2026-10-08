@@ -27,9 +27,9 @@ function every(text: string): { ms: number; text: string } {
   return { ms: Number(text.slice(0, -1)) * { m: 60_000, h: 3_600_000, d: 86_400_000 }[text.slice(-1) as 'm' | 'h' | 'd'], text }
 }
 
-/** A scheduled command with a check and a cap of one, unless said otherwise. */
+/** A scheduled command with a check and a cap of one, its skill in Claude Code's folder, unless said otherwise. */
 function command(name: string, over: Partial<ScheduledCommand> = { when: 'npx queue' }): ScheduledCommand {
-  return { name, cap: 1, ...over }
+  return { name, cap: 1, dir: '.claude/skills', ...over }
 }
 
 interface Seen {
@@ -205,7 +205,16 @@ test('no skill schedules a command: no decisions, and the note says so', async (
   assert.deepEqual(record.schedule, [])
 })
 
-test('the checks in order: check failed, not due, cap reached, quota', async () => {
+test('the checks in order: not a command of the coding agent, check failed, not due, cap reached, quota', async () => {
+  // Its skill is only in the folder another coding agent reads: Claude Code would be handed a command it cannot expand.
+  const elsewhere = deps({ commands: [command('work-queue', { when: 'npx queue', dir: '.agents/skills' })] })
+  assert.deepEqual((await tick(elsewhere.deps)).decisions, [{ command: 'work-queue', outcome: 'not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills' }])
+  assert.deepEqual(elsewhere.seen.checks, [], 'a command that cannot run is not checked')
+  assert.deepEqual(elsewhere.seen.spawned, [])
+  // Said before the switch: a person reads why switching it on would start nothing.
+  const unswitched = deps({ commands: elsewhere.deps.schedule.commands, stateOver: { switches: {} } })
+  assert.match((await tick(unswitched.deps)).decisions[0]!.outcome, /^not a command of the coding agent/)
+
   const failed = deps({ check: async () => ({ ok: false, stdout: '', stderr: 'npm ERR! missing script\nnot found: queue' }) })
   assert.deepEqual((await tick(failed.deps)).decisions, [{ command: 'work-queue', outcome: 'check failed: not found: queue' }])
 
@@ -301,6 +310,16 @@ test("a skill's unreadable schedule is named in the state and the readable comma
   const alone = await tick(only.deps)
   assert.equal(alone.note, undefined)
   assert.deepEqual(alone.decisions, [{ command: 'triage', outcome: 'unreadable schedule: the front matter is not YAML' }])
+
+  // With the scheduler off, or the branch not pulled, it is named all the same: nothing else says why the commands are missing.
+  const off = deps({ stateOver: { on: false } })
+  off.deps.schedule = only.deps.schedule
+  const idle = await tick(off.deps)
+  assert.equal(idle.note, 'off')
+  assert.deepEqual(idle.decisions, alone.decisions)
+  const stale = deps({ pull: async () => ({ ok: false, error: 'origin is unreachable' }) })
+  stale.deps.schedule = only.deps.schedule
+  assert.deepEqual((await tick(stale.deps)).decisions, alone.decisions)
 })
 
 test('the quota is read once per tick, however many commands start', async () => {

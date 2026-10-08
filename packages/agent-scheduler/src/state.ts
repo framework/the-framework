@@ -26,7 +26,7 @@ export interface TickDecision {
 }
 
 /** One command of the schedule as the tick read it, for a dashboard to list with its switch. */
-export interface ScheduleRow {
+export interface ListedCommand {
   command: string
   /** How often at most, as written (`1d`). */
   every?: string
@@ -42,8 +42,8 @@ export interface TickRecord {
   at: string
   decisions: TickDecision[]
   /** The schedule's commands, as this tick read them. */
-  schedule: ScheduleRow[]
-  /** Why the tick decided nothing, when it could not: no skill schedules a command, the pull failed. */
+  schedule: ListedCommand[]
+  /** Why the tick decided nothing for the scheduled commands, when it could not: the scheduler is off, no skill schedules a command, the pull failed. */
   note?: string
 }
 
@@ -132,7 +132,7 @@ export function withSwitch(state: State, command: string, on: boolean): State {
  * This machine's publish pick for a scheduled command: what a person picked here, else commit. The
  * state is a file a person may edit: a word that is no pick is no pick.
  */
-export function publishPick(state: State, command: string): PublishPick {
+function publishPick(state: State, command: string): PublishPick {
   const pick = state.publishes?.[command]
   return pick !== undefined && PUBLISH_PICKS.includes(pick) ? pick : DEFAULT_PUBLISH
 }

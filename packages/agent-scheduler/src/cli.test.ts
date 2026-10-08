@@ -104,7 +104,7 @@ test('stop --unless-keep-alive leaves a keep-alive scheduler running, and stops 
   }
 })
 
-test('switch writes this machine\'s switch for a scheduled command: only a command switched on is kept; a command no skill schedules is refused', async () => {
+test('switch writes this machine\'s switch for a scheduled command: only a command switched on is kept; switching on a command no skill schedules is refused, with why when its skill\'s schedule cannot be read; off is taken for any name', async () => {
   const repo = await testRepo()
   try {
     // The project's one skill schedules nothing.
@@ -132,6 +132,21 @@ test('switch writes this machine\'s switch for a scheduled command: only a comma
     assert.equal(unknown.code, 1)
     assert.deepEqual(unknown.out, { ok: false, reason: 'not-scheduled', command: 'triage' })
     assert.equal(unknown.err, 'no skill of this project schedules triage')
+
+    // A skill whose schedule cannot be read: the refusal says why, not that nothing schedules it.
+    await run(repo, 'switch', 'triage quick', 'on')
+    await writeSkill(repo, 'triage', 'schedule:\n  word: quick\n  evry: 6h\n')
+    const typo = await run(repo, 'switch', 'triage quick', 'on')
+    assert.equal(typo.code, 1)
+    assert.deepEqual(typo.out, { ok: false, reason: 'unreadable-schedule', skill: 'triage', detail: 'unknown key evry' })
+    assert.equal(typo.err, 'the schedule of triage cannot be read: unknown key evry')
+    assert.equal((await run(repo, 'publish', 'triage quick', 'pr')).err, 'the schedule of triage cannot be read: unknown key evry')
+    // A switch left on can always be taken back, whatever became of the skill.
+    assert.deepEqual((await readState(repo)).switches, { 'triage quick': true })
+    const off = await run(repo, 'switch', 'triage quick', 'off')
+    assert.equal(off.code, 0)
+    assert.equal((await readState(repo)).switches, undefined)
+    assert.equal((await run(repo, 'switch', 'never-heard-of', 'off')).code, 0)
   } finally {
     await removeRepo(repo)
   }

@@ -145,7 +145,7 @@ describe('Settings → Scheduler', () => {
     const { host } = hostAnswering(() => ({ ok: true, output: { ok: true, on: true, keepAlive: false, running: true, model: 'opus', spendOffset: 7 } }))
     show(host)
     const gemstack = await screen.findByRole('group', { name: 'gemstack' })
-    expect(within(gemstack).getByText('No scheduled command: no skill of this project schedules one, or its scheduler has not ticked yet.')).toBeTruthy()
+    expect(within(gemstack).getByText('No scheduled command: no skill of this project has a schedule that can be read, or its scheduler has not ticked yet.')).toBeTruthy()
   })
 
   test('a project whose scheduler cannot be read says so', async () => {

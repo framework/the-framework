@@ -2,13 +2,14 @@ import type { DriverQuota, DriverReadiness } from '@openagt/agent-driver'
 import { markerCard, runnerMark, type Publish, type RunnerMark } from '@openagt/agent-runner'
 import type { FileBranchWrite } from '@openagt/agent-data'
 import type { RunCard } from '@openagt/skill-logs'
+import { RUN_SKILLS_DIR } from './names.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
 import { commandPrompt, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
-import { isSwitchedOn, publishInForce, type ScheduleRow, type State, type TickDecision, type TickRecord } from './state.js'
+import { isSwitchedOn, publishInForce, type ListedCommand, type State, type TickDecision, type TickRecord } from './state.js'
 
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
- * the cheapest order — is it switched on on this machine, has its interval passed, is its check
+ * the cheapest order — can the coding agent run it, is it switched on on this machine, has its interval passed, is its check
  * due, is its cap reached, can the coding agent start at all, is there quota — then mark and spawn one run. Every decision is one line in the state, so a
  * dashboard or a person reads why nothing started without a log.
  *
@@ -55,12 +56,13 @@ export interface TickDeps {
 
 export async function tick(deps: TickDeps): Promise<TickRecord> {
   const at = deps.now().toISOString()
-  const record: TickRecord = { at, decisions: [], schedule: deps.schedule.commands.map(scheduleRow) }
+  // A schedule that cannot be read is named on every tick, on or off: nothing else says why a skill's commands are missing.
+  const unreadable = deps.schedule.unreadable.map(({ skill, reason }): TickDecision => ({ command: skill, outcome: `unreadable schedule: ${reason}` }))
+  const record: TickRecord = { at, decisions: unreadable, schedule: deps.schedule.commands.map(listed) }
   const pulled = await deps.pull()
   if (!pulled.ok) return { ...record, note: `agent-data could not be pulled: ${pulled.error}` }
   await deps.sweep()
   if (!deps.state.on) return { ...record, note: 'off' }
-  for (const { skill, reason } of deps.schedule.unreadable) record.decisions.push({ command: skill, outcome: `unreadable schedule: ${reason}` })
   if (record.decisions.length === 0 && deps.schedule.commands.length === 0) return { ...record, note: 'no skill of this project schedules a command' }
 
   let readiness: DriverReadiness | undefined
@@ -68,6 +70,10 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
   for (const command of deps.schedule.commands) {
     const decide = (outcome: string, run?: string): void => {
       record.decisions.push({ command: command.name, outcome, ...(run ? { run } : {}) })
+    }
+    if (command.dir !== RUN_SKILLS_DIR) {
+      decide(`not a command of the coding agent: its skill is only under ${command.dir}, not ${RUN_SKILLS_DIR}`)
+      continue
     }
     if (!isSwitchedOn(deps.state, command.name)) {
       decide('switched off on this machine')
@@ -148,7 +154,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
 }
 
 /** A command as a dashboard lists it: what its skill says, not this machine's switch or publish pick, which the state carries. */
-function scheduleRow(command: ScheduledCommand): ScheduleRow {
+function listed(command: ScheduledCommand): ListedCommand {
   return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}) }
 }
 

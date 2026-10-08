@@ -12,7 +12,7 @@ The runs a scheduled command [1] has, read off the run records [2] on the projec
 [2] run record: the `logs` skill's record of a run on the `agent-data` branch: a card (`<id>.json`) and a diary (`<id>.jsonl`), written by `agent-runner` as a marker before the agent exists and again when the run ends.
 [3] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [4] cap: how many runs of one command may be in flight at once, across every machine that shares the repository.
-[5] the schedule: all the scheduled commands of a project. A skill of the project schedules its own with the key `schedule` in the front matter of its `SKILL.md`.
+[5] the schedule: all the scheduled commands of a project. A skill of the project brings its own with the `schedule` key in the front matter of its `SKILL.md`, called the skill's `schedule`.
 [6] `agent-runner`'s mark: `caller.runner` on a card, with the machine that started the run.
 
 ## Business logic — TL;DR

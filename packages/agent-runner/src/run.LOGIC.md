@@ -196,7 +196,7 @@ A run whose mark [6] names a parent [14] tells it once the end is settled, throu
 
 #### Context
 
-**User story**: the user picks "Open PR" in the launcher's publish menu and starts a run with a plain task; the agent works, then pushes its branch and opens its pull request, though the task said nothing about publishing. A person who picked `merge` for a scheduled command on their machine gets the same from every run the scheduler starts there for that command, with the pull request set to merge on its own.
+**User story**: the user picks "Open PR" in the launcher's publish menu and starts a run with a plain task; the agent works, then pushes its branch and opens its pull request, though the task said nothing about publishing. A scheduler's run is given the level in force for its scheduled command on that machine: the person's pick there, or `commit` where nobody picked. A person who picked `merge` for a scheduled command gets a pull request from every run the scheduler starts there for that command, set to merge on its own.
 
 **Problem**: an agent commits and publishes only when asked, and how far to take its work is the choice of whoever started the run, not of the prompt or of the command's skill file. This process publishes nothing itself, so the choice has to reach the agent in words.
 

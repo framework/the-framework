@@ -57,6 +57,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   and that the command says what the work is, because a check may print only a sign that
   there is work. Picked over the agent getting the command's name alone: the check had
   already found the new thing, and the agent had to look for it again.
+- A check is given the time its command last started, on any machine, as `$LAST_RUN`, or
+  the time a person switched the command on on this machine when that is later. A check
+  that asks what is new since then goes quiet once a run was started for it. Picked over
+  the scheduler remembering what it had already handed over, which it would have to store
+  where every machine shares it.
 - Every scheduled command starts switched off, on every machine, and runs only where a
   person switched it on. Picked over a command that runs unless a person switched it off: a
   skill that arrives in a project would start agents by itself.

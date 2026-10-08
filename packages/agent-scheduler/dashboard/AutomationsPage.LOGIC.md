@@ -1,32 +1,34 @@
-The Automations page: the page this package adds to the dashboard, at `/automations`. It lists what starts by itself while nobody is at the keyboard: one group per project the page is given (every project that has the package, or the picked project [7] alone when one is picked in the dashboard), and in it one page row [6] per scheduled command of that project. A page row says what the command is, what its skill says it does, when it runs, how far its runs publish and what the scheduler last decided for it. Its checkbox is the command's schedule switch [2], and "Edit" opens the page row in place to set the command's publish pick [3]. Everything here is this machine's, read with `agent-scheduler status` and saved with `agent-scheduler switch` and `publish`. A scheduled command is off until its checkbox is checked here, and its runs commit their work and push nothing until another publish pick is saved here.
+The Automations page: the page this package adds to the dashboard, at `/automations`. It lists what starts by itself while nobody is at the keyboard: one group per project the page is given (every project that has the package, or the picked project [7] alone when one is picked in the dashboard), and in it one page row [6] per scheduled command of that project. A page row says what the command is, what its skill says it does, when it runs, how far its runs publish and what the scheduler last decided for it. Its checkbox is the command's schedule switch [2], and "Edit" opens the page row in place to set the command's pace pick [9] and its publish pick [3]. Everything here is this machine's, read with `agent-scheduler status` and saved with `agent-scheduler switch`, `pace` and `publish`. A scheduled command is off until its checkbox is checked here, runs at its skill's pace [8] until a pace pick is saved here, and its runs commit their work and push nothing until another publish pick is saved here.
 
 ## Context
 
-**User story**: the project's `post-merge-cleanup` skill schedules a clean-up after merges. Like every scheduled command it is off on every machine until someone switches it on there. The user opens Automations, reads under the project's name what `/post-merge-cleanup` does and when it runs, and checks its checkbox: from then on that project's scheduler starts it on this machine when it is due, and a teammate's machine is unchanged. Likewise a user unchecks `/work-queue` to stop their laptop from working the queue. A user who wants the queue's runs on their own machine to open a pull request presses "Edit" on `/work-queue`, picks "Open PR" and presses Save. No tracked file changes either way. Later the user comes back and reads, on each page row, why nothing started ("No work", "One is already running") or opens the run that did start.
+**User story**: the project's `post-merge-cleanup` skill schedules a clean-up after merges. Like every scheduled command it is off on every machine until someone switches it on there. The user opens Automations, reads under the project's name what `/post-merge-cleanup` does and when it runs, and checks its checkbox: from then on that project's scheduler starts it on this machine when it is due, and a teammate's machine is unchanged. Likewise a user unchecks `/work-queue` to stop their laptop from working the queue. A user who wants the queue's runs on their own machine to open a pull request presses "Edit" on `/work-queue`, picks "Open PR" and presses Save. A user who finds a skill's six hours too often for their laptop presses "Edit", picks "Every 2 days at 10:00" and presses Save; the page row then reads "Every 2 days at 10:00 · your pick". No tracked file changes either way. Later the user comes back and reads, on each page row, why nothing started ("No work", "One is already running", "Next: Saturday 10:00") or opens the run that did start.
 
-**Business logic story**: a person decides, per machine, whether a command runs on its own and how far its runs publish; the project's skills only say which commands are scheduled, what each does and when each is due. The page does not read the skills: its page rows are what each project's scheduler recorded at its last tick [4] (`schedulers.ts`). The dashboard gives the page its projects, the projects that have this package or the picked project [7] alone, and runs this package's command for it; it knows nothing of what the page holds. The one setting that reaches every project, the spend offset, is not here: it is in the Scheduler section of the Settings page (`SchedulerSettings.tsx`).
+**Business logic story**: a person decides, per machine, whether a command runs on its own, how often at most it starts and how far its runs publish; the project's skills say which commands are scheduled and what each does, and give each a starting pace [8]. The page does not read the skills: its page rows are what each project's scheduler recorded at its last tick [4] (`schedulers.ts`). The dashboard gives the page its projects, the projects that have this package or the picked project [7] alone, and runs this package's command for it; it knows nothing of what the page holds. The one setting that reaches every project, the spend offset, is not here: it is in the Scheduler section of the Settings page (`SchedulerSettings.tsx`).
 
 **Problem**: every save is a separate process that reads the state [1], changes it and writes it back. Two at once could each write over the other's change.
 
 ## Glossary
 
-[1] the state: `.agent-scheduler/state.json` at the project's root, per user, hidden from git: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches and publish picks, the scheduler's pid, the last tick's decisions and the schedule it read. `agent-scheduler status` prints it, plus whether the scheduler's process is alive.
+[1] the state: `.agent-scheduler/state.json` at the project's root, per user, hidden from git: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches, pace picks and publish picks, the scheduler's pid, the last tick's decisions and the schedule it read. `agent-scheduler status` prints it, plus whether the scheduler's process is alive.
 [2] schedule switch: a person's choice, on one machine, whether a scheduled command (a command one of the project's skills schedules in the front matter of its `SKILL.md`) runs there; kept in the state, not in the skill. Every scheduled command is off on a machine until a person switches it on there.
 [3] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: nothing, a commit, the branch, a pull request, or a pull request set to merge on its own once its checks pass; kept in the state, not in the skill. Until the person picks, the command's runs commit their work and push nothing.
 [4] tick: one pass of the scheduler, every minute: one decision per scheduled command, each one line in the state.
 [5] the skill's `schedule`: the key `schedule` in the front matter of a skill's `SKILL.md`, where the skill says which commands it schedules.
 [6] page row: one line of the Automations page: one scheduled command of one project, with its checkbox and its "Edit". It is not a row of a skill's `schedule` [5], which the page never reads.
 [7] picked project: the one project the dashboard's project select, the menu at the top of the sidebar, names. The sidebar then lists only the pages, and the Overview draws only the cards, added by the packages that project has, and every page shows only that project's data. When the select says "All projects", no project is picked, the sidebar lists the pages added by every project's packages and every page shows every project's data.
+[8] pace: how often at most a scheduled command starts, the one in force on this machine: this machine's pace pick [9] for the command, else the interval its skill gives; an interval (a count of minutes, hours, days, weeks or months), with a time of day when it has one. A command its check alone paces has no pace.
+[9] pace pick: a person's choice, on one machine, of a pace for one scheduled command there: "whenever there is work", or an interval with an optional time of day; kept in the state, not in the skill. A command with no pace pick runs at its skill's pace.
 
 ## Business logic — TL;DR
 
 - **Where it shows** - a sidebar row "Automations" and the URL `/automations`; titled "Automations".
 - **What it reads** - `agent-scheduler status` in every project the page is given (every project that has the package, or the picked project [7] alone), when shown and every 10 seconds, and again after every save.
 - **A project's group** - one per project, under its name, with "Scheduler <status>", the model and "last tick <age>" beside the name, followed by why that tick [4] decided nothing when it says; under the heading, one line when the scheduler is off, or on with no live process, saying nothing here starts and how the scheduler starts.
-- **A page row** - `/<command>`, what its skill says it does, cut after two lines, and one line: when it runs, how far its runs publish, and what the scheduler last decided for it; a decision that started a run opens that agent.
+- **A page row** - `/<command>`, what its skill says it does, cut after two lines, and one line: when it runs, "your pick" when that pace [8] is the person's own, how far its runs publish, and what the scheduler last decided for it; a decision that started a run opens that agent.
 - **The checkbox** - the command's schedule switch [2]; flipping it saves at once.
-- **Edit** - opens the page row in place: a menu of the publish picks [3] the project is offered, a sentence that follows the menu, Cancel and Save; nothing is saved until Save, and Save with nothing changed saves nothing.
-- **The keyboard** - opening a page row puts the focus on the menu; Escape closes it like Cancel; closing puts the focus back on the page row's "Edit".
+- **Edit** - opens the page row in place: "When it runs" (as the skill says, whenever there is work, or every so many minutes, hours, days, weeks or months, with a time of day beside days or more), a menu of the publish picks [3] the project is offered, a sentence that follows both, Cancel and Save; nothing is saved until Save; Save sends the pace pick [9] and then the publish pick, each only when changed; a count or a time that is half typed disables Save.
+- **The keyboard** - opening a page row puts the focus on the checked choice of "When it runs"; Escape closes it like Cancel; closing puts the focus back on the page row's "Edit".
 - **Saves go one at a time** - each save waits until the one before it has answered and the status has been read again; a page row is held, greyed and disabled, until its own saves have answered and been read back; a save not taken says why on its own page row, and the next save still runs.
 - **A skill whose `schedule` cannot be read** - named above the project's page rows, with the reason.
 - **A project that cannot be read, or has nothing to list** - says so under its own name.
@@ -86,10 +88,11 @@ A page row [6] shows, from the top:
 
 - The command as a person types it, `/<command>`.
 - What its skill says it does, in the skill's own words, when the skill says (`schedulers.ts`). Text longer than two lines is cut after the second.
-- One line of two or three parts, separated by "·":
-  1. When the command runs, as `schedulers.ts` says the pace: "Every 1 day", "When the queue holds a task", "Every 6 hours at most, when a ticket has no plan".
-  2. How far its runs publish on this machine, by its publish pick [3]: "Commits its work" for a command nobody picked for, "Opens a pull request", "Publishes nothing".
-  3. What the scheduler last decided for the command, as `schedulers.ts` says it for a person: "Off" for a command switched off on this machine, "No work", "Started a run", "Started 2h ago, not due yet", "One is already running", else the tool's own words with a capital ("Quota: …", "Check failed: …"). This part is absent for a command that is switched on and that no tick [4] has decided yet.
+- One line of two to four parts, separated by "·":
+  1. When the command runs, as `schedulers.ts` says the pace [8] in force: "Every 1 day", "When the queue holds a task", "Every 6 hours at most, when a ticket has no plan", "Every 2 days at 10:00".
+  2. "your pick", only when that pace is the person's own on this machine and not the skill's (`schedulers.ts`).
+  3. How far its runs publish on this machine, by its publish pick [3]: "Commits its work" for a command nobody picked for, "Opens a pull request", "Publishes nothing".
+  4. What the scheduler last decided for the command, as `schedulers.ts` says it for a person: "Off" for a command switched off on this machine, "No work", "Started a run", "Started 2h ago, not due yet", "Next: Saturday 10:00" for a command waiting for its time of day, "One is already running", else the tool's own words with a capital ("Quota: …", "Check failed: …"). This part is absent for a command that is switched on and that no tick [4] has decided yet.
 
 "Started a run" is a button that opens that agent's page in the dashboard; every other decision is plain text.
 
@@ -111,22 +114,33 @@ The checkbox, labelled "Run /<command> by itself" for a screen reader, is checke
 
 #### Context
 
-**User story**: how far a command's runs publish decides what leaves the machine, so the user picks it, reads what the pick means, and only then saves it.
+**User story**: how far a command's runs publish decides what leaves the machine, and how often it starts decides what it spends, so the user picks both, reads in one sentence what the picks mean, and only then saves them.
+
+**Problem**: a count and a time are typed a key at a time. A half-typed one must not be saved, and must not be said as if it were a pace.
 
 #### Business logic
 
-"Edit" opens the page row [6] in place. The command and what its skill says it does stay; the one line and "Edit" give way to a box holding:
+"Edit" opens the page row [6] in place. The command and what its skill says it does stay; the one line and "Edit" give way to a box holding, from the top:
 
+- "When it runs", one choice of up to three. The box opens on the choice `schedulers.ts` gives for the command's pace pick [9]: "As the skill says" where there is none.
+  - "As the skill says", with the skill's own pace beside it: "every 6 hours" for a skill that gives an interval, "whenever there is work" for one that gives only a check. Saved, it takes the pace pick back.
+  - "Whenever there is work", offered only for a command whose skill gives it both an interval and a check: the interval is taken away and the check alone says when.
+  - "Every", followed by a count, a unit ("minutes", "hours", "days", "weeks", "months") and, only while the unit is days, weeks or months, "at" and a time of day, with the words "optional, this machine's time". The count, the unit and the time can be changed only while "Every" is the checked choice. Checking "Every" from another choice starts from the skill's own interval, or from 1 day for a skill that gives none, with no time. A time typed beside days stays in the box while the unit is changed to minutes or hours, hidden and not saved, and shows again when the unit goes back to days.
 - A menu, "What its runs publish". It opens on this machine's pick for the command, "Commit" where nobody picked. It lists the publish picks [3] the project is offered, as `schedulers.ts` says them: all five ("Nothing", "Commit", "Publish branch", "Open PR", "Merge on green") in a project with a git host package, "Nothing", "Commit" and "Publish branch" only in a project without one. The pick the menu shows is listed after them when the project is not offered it: a command whose pick in force is "Open PR" in a project without a git host package opens on "Open PR", and once the person picks another entry "Open PR" is no longer listed.
-- A sentence that follows the menu: when the command runs and how far its runs would publish with the pick the menu shows ("Every 1 day. Opens a pull request.").
+- A sentence that follows both: when the command would run with the choice made above, and how far its runs would publish with the pick the menu shows ("Every 2 days at 10:00. Commits its work.", "Every 1 day. Opens a pull request."). While the count or the time is no pace yet (`schedulers.ts`: a count that is not a whole number of 1 or more, a time that is none), the sentence gives way to "Type a whole number, 1 or more, and a time like 10:00 or none." and "Save" is disabled.
 - The note "Saved for you, in this project, on this machine. No tracked file changes."
 - "Cancel" and "Save".
 
-Changing the menu saves nothing. "Cancel" closes the page row and saves nothing. "Save" with the menu on the pick already in force closes the page row and runs nothing. "Save" with another pick runs `agent-scheduler publish <command> <nothing|commit|branch|pr|merge>` in that project. The page row closes once the save was taken and the status has been read again, so the closed page row shows the new pick. A save not taken leaves the page row open, with the reason under it (see "Saves go one at a time").
+Changing a choice or the menu saves nothing. "Cancel" closes the page row and saves nothing. "Save" sends what changed, each as a save of its own (see "Saves go one at a time"), the pace first:
 
-One page row is open at a time: "Edit" on another page row closes the open one, and its unsaved pick is dropped. A save that answers closes only its own page row: when the person opened another page row while the save was in flight, that one stays open with its pick. The checkbox stays where it is while the page row is open.
+1. The pace, when the choice made is not the one the box would open on now: `agent-scheduler pace <command> skill`, `… work`, or `… <interval> [<time of day>]` (`pace post-merge-cleanup 2d 10:00`) in that project, as `schedulers.ts` words it.
+2. The publish pick, when the menu is not on the pick in force: `agent-scheduler publish <command> <nothing|commit|branch|pr|merge>` in that project.
 
-A pick is kept until another replaces it. Two machines may hold different picks for one command; each publishes its own runs by its own pick.
+With nothing changed, "Save" closes the page row and runs nothing. A pace that did not change is not sent again, so the time its pace pick was made stays (`../src/pace.ts` counts from it). The page row closes once the last of its saves was taken and the status has been read again, so the closed page row shows what was saved. When the last save is not taken, the page row stays open, with the reason under it. When the pace is not taken and the publish pick sent after it is taken, the page row closes all the same, and the reason the pace was not saved stays under the closed page row.
+
+One page row is open at a time: "Edit" on another page row closes the open one, and what was picked in it and not saved is dropped. A save that answers closes only its own page row: when the person opened another page row while the save was in flight, that one stays open with its picks. The checkbox stays where it is while the page row is open.
+
+A pace pick and a publish pick are each kept until another replaces it, and a pace pick until it is taken back. Two machines may hold different picks for one command; each starts and publishes its own runs by its own picks, and both count the command's last start on either machine.
 
 ### The keyboard
 
@@ -136,7 +150,7 @@ A pick is kept until another replaces it. Two machines may hold different picks 
 
 #### Business logic
 
-Opening a page row [6] puts the focus on its menu. Escape, pressed anywhere in the open box, closes the page row like "Cancel": nothing is saved; while the page row is held for a save, Escape does nothing, as "Cancel" does nothing then. Every way of closing a page row ("Cancel", Escape, a save that was taken, "Save" with nothing changed) puts the focus back on that page row's "Edit". A save that is taken after the person opened another page row closes nothing and leaves the focus where it is.
+Opening a page row [6] puts the focus on the checked choice of "When it runs". Escape, pressed anywhere in the open box, closes the page row like "Cancel": nothing is saved; while the page row is held for a save, Escape does nothing, as "Cancel" does nothing then. Every way of closing a page row ("Cancel", Escape, a save that was taken, "Save" with nothing changed) puts the focus back on that page row's "Edit". A save that is taken after the person opened another page row closes nothing and leaves the focus where it is.
 
 ### Saves go one at a time
 
@@ -148,9 +162,9 @@ See the **Problem** in `## Context`.
 
 #### Business logic
 
-Every save, of a schedule switch [2] or of a publish pick [3], joins one queue. A save runs its command, then the status of every project is read again; the next save starts only after both. A page row [6] is held, greyed, with its checkbox, its "Edit", its menu, "Cancel" and "Save" disabled, from the click until its save has answered and the status has been read again, however many of its saves are queued. Only that page row is held: the same command in another project is not.
+Every save, of a schedule switch [2], of a pace pick [9] or of a publish pick [3], joins one queue. A save runs its command, then the status of every project is read again; the next save starts only after both. A page row [6] is held, greyed, with its checkbox, its "Edit", its "When it runs", its menu, "Cancel" and "Save" disabled, from the click until its save has answered and the status has been read again, however many of its saves are queued. Only that page row is held: the same command in another project is not.
 
-A save is not taken when the command refused it, or when the command could not even be asked (the dashboard could not be reached). Either way the page row comes back, and under it an alert says why: "The switch was not saved: <why>" or "The publish pick was not saved: <why>", the reason being what the command said, or why it could not be asked. The line sits on its own page row, so it names neither the command nor the project. The next save of that page row takes the line away. The page shows one such line at a time: a later save not taken on another page row replaces it. The saves queued behind a save not taken still run.
+A save is not taken when the command refused it, or when the command could not even be asked (the dashboard could not be reached). Either way the page row comes back, and under it an alert says why: "The switch was not saved: <why>", "The pace was not saved: <why>" or "The publish pick was not saved: <why>", the reason being what the command said, or why it could not be asked. The line sits on its own page row, so it names neither the command nor the project. The next save of that page row takes the line away. The page shows one such line at a time: a later save not taken on another page row replaces it. The saves queued behind a save not taken still run.
 
 ### A skill whose `schedule` cannot be read
 

@@ -61,15 +61,19 @@ export function AutomationsPage({ projects }: ModulePageProps) {
     })
   }
 
-  /** Save what the open row changed, the pace then the publish pick, each a command of its own; the row closes once the last one is taken, and at once when nothing changed. */
+  /** Save what the open row changed, the pace then the publish pick, each a command of its own and the second only once the first is taken; the row closes once the last one is taken, and at once when nothing changed. A save not taken leaves the row open with what was picked. */
   const saveRow = (id: string, project: ModuleProject, scheduled: SchedulerCommand, open: Editing): void => {
     const paced = paceArgs(open.pace)
     if (!paced) return
     const saves: [what: string, args: string[]][] = []
     if (paced.join(' ') !== paceArgs(draftOf(scheduled))!.join(' ')) saves.push(['pace', ['pace', scheduled.command, ...paced]])
     if (open.publish !== scheduled.publish) saves.push(['publish pick', ['publish', scheduled.command, open.publish]])
-    if (saves.length === 0) return close(id)
-    saves.forEach(([what, args], index) => save(what, id, project, args, index === saves.length - 1 ? () => close(id) : undefined))
+    const step = (index: number): void => {
+      const next = saves[index]
+      if (!next) return close(id)
+      save(next[0], id, project, next[1], () => step(index + 1))
+    }
+    step(0)
   }
 
   return (

@@ -1,18 +1,20 @@
-The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Ten commands: `tick`, `init`, `start [--keep-alive]`, `stop [--unless-keep-alive]`, `status`, `model <id>`, `offset <points>`, `switch <command> <on|off>`, `publish <command> <nothing|commit|branch|pr|merge>`, `cleanup`.
+The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Eleven commands: `tick`, `init`, `start [--keep-alive]`, `stop [--unless-keep-alive]`, `status`, `model <id>`, `offset <points>`, `switch <command> <on|off>`, `publish <command> <nothing|commit|branch|pr|merge>`, `pace <command> <skill|work|N<m|h|d|w|mo>> [HH:MM]`, `cleanup`.
 
 ## Context
 
-**User story**: the user runs `init` once so the dashboard opens and closes the scheduler, turns the scheduler on and off, reads its state, sets the model and the spend cushion for their machine, switches a scheduled command on or off for their machine, picks how far a scheduled command's runs publish on their machine, ticks once by hand, or runs `cleanup` to remove what this tool left in the project, all from any directory of the project, and a dashboard runs the same commands and parses the same JSON: the package's own dashboard part (`../dashboard/`) reads with `status` and saves with `offset`, `switch` and `publish`. Running, continuing and checking one run are `agent-runner`'s commands, not this tool's.
+**User story**: the user runs `init` once so the dashboard opens and closes the scheduler, turns the scheduler on and off, reads its state, sets the model and the spend cushion for their machine, switches a scheduled command on or off for their machine, picks how far a scheduled command's runs publish on their machine, sets how often at most a scheduled command starts on their machine, ticks once by hand, or runs `cleanup` to remove what this tool left in the project, all from any directory of the project, and a dashboard runs the same commands and parses the same JSON: the package's own dashboard part (`../dashboard/`) reads with `status` and saves with `offset`, `switch`, `publish` and `pace`. Running, continuing and checking one run are `agent-runner`'s commands, not this tool's.
 
-**Business logic story**: every command acts on the project the working directory belongs to, found by the `branches` package even from inside a checkout under `.branches/`. What each command does is `scheduler.ts`'s, `state.ts`'s and `cleanup.ts`'s; this file is the contract around them.
+**Business logic story**: every command acts on the project the working directory belongs to, found by the `branches` package even from inside a checkout under `.branches/`. What each command does is `scheduler.ts`'s, `state.ts`'s, `pace.ts`'s and `cleanup.ts`'s; this file is the contract around them.
 
 ## Glossary
 
-[1] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches [3] and publish picks [4], the scheduler's pid, the last tick's decisions.
+[1] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches [3], pace picks [6] and publish picks [4], the scheduler's pid, the last tick's decisions.
 [2] tick: one pass of the scheduler: pull the `agent-data` branch, sweep, then one decision per scheduled command.
 [3] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the skill that schedules the command. Every scheduled command is off on a machine until a person switches it on there.
 [4] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: `nothing`, or one of the publish levels a run may be given (`commit`, `branch`, `pr`, `merge`); kept in the state, not in the skill. It is `commit` until the person picks.
 [5] scheduled command: one command a skill of the project schedules with the `schedule` key in the front matter of its `SKILL.md`, called the skill's `schedule`; named by the skill's folder name and at most one word after it (`triage quick`). The schedule is all the scheduled commands of a project.
+[6] pace pick: a person's choice, on one machine, of a pace for one scheduled command there: "whenever there is work", or an interval with an optional time of day; kept in the state, not in the skill. A command with no pace pick runs at its skill's pace.
+[7] pace: how often at most a scheduled command starts, the one in force on a machine: this machine's pace pick [6], else the interval the command's skill gives.
 
 ## Business logic — TL;DR
 
@@ -24,6 +26,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 - **`model <id>`, `offset <points>`** - the state's model (the one every scheduled run starts on) or spend cushion written for this user and the state answered; `offset` with something that is not a number is a usage error, `<value> is not a number of percentage points`.
 - **`switch <command> <on|off>`** - this machine's schedule switch [3] for one scheduled command [5], named by its whole name (quoted when it holds a word after the skill's name: `switch "triage quick" on`), written and the state answered; `on` is refused `not-scheduled` when no skill of the project schedules the command, and `unreadable-schedule` when the skill's `schedule` cannot be read; `off` is taken for any name; a value neither `on` nor `off` is a usage error.
 - **`publish <command> <nothing|commit|branch|pr|merge>`** - this machine's publish pick [4] for one scheduled command [5], named the same way, written and the state answered; refused `not-scheduled` when no skill of the project schedules the command, and `unreadable-schedule` when the skill's `schedule` cannot be read; any other value is a usage error.
+- **`pace <command> <skill|work|N<m|h|d|w|mo>> [HH:MM]`** - this machine's pace pick [6] for one scheduled command [5], named the same way, written and the state answered: an interval (`15m`, `6h`, `2d`, `2w`, `1mo`), with a time of day beside days, weeks or months (`2d 10:00`); `work` for whenever its check finds work, refused `no-check` for a command with no check; `skill` takes the pick back; refused `not-scheduled` and `unreadable-schedule` as `publish` is; a value that is none of these, a time that is none, and a time beside anything but days, weeks or months are usage errors.
 - **`cleanup`** - what this tool left in the project removed: the state file and the scheduler's log, then `.agent-scheduler/` once it is empty, then the rule hiding it from git once no checkout of the repository has one; answered with what was removed and what was kept, each kept path with its reason; refused `running` with the pid while the state names a live scheduler, with the line `the scheduler is running here (pid <pid>): stop it first with agent-scheduler stop` (`cleanup.ts`).
 
 ## Business logic
@@ -36,7 +39,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 
 #### Business logic
 
-A command that ran prints exactly one JSON document on stdout, an object with `ok`, and exits 0. A refusal, a rule saying no (the working directory is not inside a repository), prints `{"ok":false,"reason":…}` on stdout, one line on stderr, and exits 1. Anything else that fails (git, the file system, a driver) prints `{"ok":false,"reason":"failed","detail":<the error's message>}` on stdout, the detail on stderr, and exits 1. A command line that cannot be read is rejected before anything runs: no command or an unknown one (`agent-runner`'s `run` and `check` among them) prints the usage on stderr and exits 2; an unknown flag or the wrong number of arguments (`model` and `offset` take exactly one, `switch` and `publish` exactly two, the others none) prints what was wrong (`expected 1 argument(s), got 0`) followed by the usage on stderr, nothing on stdout, and exits 2. The usage names the ten commands and the contract.
+A command that ran prints exactly one JSON document on stdout, an object with `ok`, and exits 0. A refusal, a rule saying no (the working directory is not inside a repository), prints `{"ok":false,"reason":…}` on stdout, one line on stderr, and exits 1. Anything else that fails (git, the file system, a driver) prints `{"ok":false,"reason":"failed","detail":<the error's message>}` on stdout, the detail on stderr, and exits 1. A command line that cannot be read is rejected before anything runs: no command or an unknown one (`agent-runner`'s `run` and `check` among them) prints the usage on stderr and exits 2; an unknown flag or the wrong number of arguments (`model` and `offset` take exactly one, `switch` and `publish` exactly two, `pace` two or three, the others none) prints what was wrong (`expected 1 argument(s), got 0`, `expected 2 to 3 argument(s), got 1`) followed by the usage on stderr, nothing on stdout, and exits 2. The usage names the eleven commands and the contract.
 
 ### The project
 
@@ -109,3 +112,29 @@ See `## Context`.
 #### Business logic
 
 `publish` takes exactly two arguments: a command's name and one of `nothing`, `commit`, `branch`, `pr`, `merge`; any other value is a usage error, `<value> is none of nothing, commit, branch, pr, merge`, exit 2. When no skill of the project schedules a command of exactly that name, it is refused as `switch <command> on` is: `unreadable-schedule` with `the schedule of <skill> cannot be read: <the reason>` when the `schedule` of the name's skill cannot be read, else `not-scheduled` with `no skill of this project schedules <name>`, exit 1. Otherwise it writes that value as this machine's publish pick [4] for the command, by `state.ts`'s rule (a pick of `commit` is kept like any other), and answers the state with `ok: true`. A pick is never removed: another pick replaces it.
+
+### `pace <command> <skill|work|N<m|h|d|w|mo>> [HH:MM]`
+
+#### Context
+
+**User story**: the project's `triage` skill says `every: 6h`, which the user finds too often for their laptop. They press "Edit" on the command on the dashboard's Automations page, pick "Every 2 days at 10:00" and save, which runs this command in the project, or type `agent-scheduler pace "triage quick" 2d 10:00`; no tracked file changes, and every other machine keeps its own pace [7]. `agent-scheduler pace "triage quick" skill` gives the skill's pace again.
+
+#### Business logic
+
+`pace` takes two or three arguments: a command's name, what the pace is, and an optional time of day. The second argument is one of:
+
+- `skill`: the command's pace pick [6] on this machine is taken back, and the command runs at its skill's pace again.
+- `work`: whenever the command's check finds work, with no interval.
+- An interval as `pace.ts` reads it: a whole number of 1 or more and a unit, `m`, `h`, `d`, `w` or `mo` (`15m`, `6h`, `2d`, `2w`, `1mo`).
+
+The third argument is a time of day as `pace.ts` reads it, `HH:MM` on a 24-hour clock, in this machine's time. It goes only with an interval in days, weeks or months.
+
+Three usage errors, exit 2, are told before the project is read:
+
+- The second argument is none of the three: `<value> is none of skill, work, or an interval like 15m, 6h, 2d, 2w, 1mo`.
+- The third argument is no time of day: `<value> is no time of day like 10:00`.
+- A time of day beside `skill`, `work`, minutes or hours: `a time of day goes with days, weeks or months`.
+
+Then, when no skill of the project schedules a command of exactly that name, it is refused as `publish` is: `unreadable-schedule` with `the schedule of <skill> cannot be read: <the reason>` when the `schedule` of the name's skill cannot be read, else `not-scheduled` with `no skill of this project schedules <name>`, exit 1. That holds for `skill` too: a pace pick is taken back only for a command a skill of the project schedules. `work` for a command whose skill gives it no check is refused `{"ok":false,"reason":"no-check","command":<name>}` with `<name> has no check, so nothing would say when there is work` on stderr, exit 1. A refusal writes nothing.
+
+Otherwise it writes this machine's pace pick for the command by `state.ts`'s rule and answers the state with `ok: true`. `skill` removes the pick. `work` is kept as "whenever there is work". An interval is kept as its text without a leading zero, with the time of day when one was given, the hour in two digits (`9:05` is kept as `09:05`), and with the time the pick was made, which `pace.ts` uses so that a pace with a time of day starts nothing before its first such time.

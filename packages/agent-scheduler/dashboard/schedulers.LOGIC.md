@@ -1,29 +1,32 @@
-What the module knows of a project's scheduler and how it changes it: one project's row [6] per project, made from what `agent-scheduler status` printed, the spend cushion [3] in force across projects, the save of a new one, and the words the page, the section and the card say about a scheduler and its commands. The Automations page, the Scheduler section, the Scheduler card and the usage bar's stop line all read through here, and the spend cushion is saved through here.
+What the module knows of a project's scheduler and how it changes it: one project's row [6] per project, made from what `agent-scheduler status` printed, the spend cushion [3] in force across projects, the save of a new one, the words the page, the section and the card say about a scheduler and its commands, and what the Automations page's Edit box holds of a pace [7] while a person picks one. The Automations page, the Scheduler section, the Scheduler card and the usage bar's stop line all read through here, and the spend cushion is saved through here.
 
 ## Context
 
-**User story**: the user sees, per project, whether the scheduler is on and what its last tick [5] decided, and per scheduled command what it does, whether it runs on this machine, how far its runs publish here and what the scheduler last decided for it, each said in plain words ("Every 1 day", "Opens a pull request", "No work", "One is already running").
+**User story**: the user sees, per project, whether the scheduler is on and what its last tick [5] decided, and per scheduled command what it does, whether it runs on this machine, how often at most it starts here, how far its runs publish here and what the scheduler last decided for it, each said in plain words ("Every 2 days at 10:00", "Opens a pull request", "No work", "One is already running", "Next: Saturday 10:00").
 
 **Problem**: the module reads another process's output. A project whose command fails, or a state [1] written by an older version, must not break the page, the section or the card for every other project.
 
 ## Glossary
 
-[1] the state: `.agent-scheduler/state.json` at the project's root, per user, hidden from git: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches and publish picks, the scheduler's pid, the last tick's decisions and the schedule it read. `agent-scheduler status` prints it, plus whether the scheduler's process is alive.
+[1] the state: `.agent-scheduler/state.json` at the project's root, per user, hidden from git: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches, pace picks and publish picks, the scheduler's pid, the last tick's decisions and the schedule it read. `agent-scheduler status` prints it, plus whether the scheduler's process is alive.
 [2] schedule switch: a person's choice, on one machine, whether a scheduled command (a command one of the project's skills schedules in the front matter of its `SKILL.md`) runs there; kept in the state, not in the skill. Every scheduled command is off on a machine until a person switches it on there.
 [3] spend cushion: how far past the quota boundary (the share of the account's quota week that may be spent by now) a scheduled run may still start, in percentage points of the week; the state's `spendOffset`. Positive is lenient, negative is strict. The dashboard calls it the spend offset.
 [4] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: nothing, a commit, the branch, a pull request, or a pull request set to merge on its own once its checks pass; kept in the state, not in the skill. Until the person picks, the command's runs commit their work and push nothing.
 [5] tick: one pass of the scheduler, every minute: one decision per scheduled command, each one line in the state.
 [6] project's row: what the module holds of one project's scheduler, made from what `agent-scheduler status` printed for that project. It is not a row of a skill's `schedule` key (the key in the front matter of its `SKILL.md` where the skill says which commands it schedules), which the module never reads.
+[7] pace: how often at most a scheduled command starts, the one in force on this machine: this machine's pace pick [8] for the command, else the interval its skill gives; an interval (a count of minutes, hours, days, weeks or months), with a time of day when it has one. A command its check alone paces has no pace.
+[8] pace pick: a person's choice, on one machine, of a pace for one scheduled command there: "whenever there is work", or an interval with an optional time of day; kept in the state, not in the skill. A command with no pace pick runs at its skill's pace.
 
 ## Business logic — TL;DR
 
-- **A project's row** - on, keep-alive, running, the model, the spend cushion [3], the last tick [5] with its decisions and its note, the schedule's commands, each with what its skill says it does and with this machine's schedule switch [2], its publish pick [4] and the last tick's decision for it folded in, and the skills whose `schedule` key the last tick could not read, each with the reason; anything that is not what the command promises reads as absent.
+- **A project's row** - on, keep-alive, running, the model, the spend cushion [3], the last tick [5] with its decisions and its note, the schedule's commands, each with what its skill says it does and with this machine's schedule switch [2], its pace pick [8] when it has one, its publish pick [4] and the last tick's decision for it folded in, and the skills whose `schedule` key the last tick could not read, each with the reason; anything that is not what the command promises reads as absent.
 - **Reading every project** - `agent-scheduler status` in each project, at once; a project whose command fails is a project's row that says why and holds nothing else.
 - **The spend cushion in force** - the loosest one any project holds; none when no project answered one.
 - **Projects holding another cushion** - each project whose spend cushion is not the one in force, with its own, to one decimal; none when they agree.
 - **A typed spend cushion** - the text of the Settings box as a whole number of points held to −50..50; none while the text is empty or no number yet (a minus sign alone).
 - **Saving the spend cushion** - `agent-scheduler offset -- <points>` in every project; each failing project is named.
-- **In words** - the leading status of a project's row, a command's pace as a sentence with its interval spelled out, how far a command publishes, what the scheduler last decided for a command, the labels of the publish picks, and which picks a project is offered.
+- **In words** - the leading status of a project's row, a command's pace [7] as a sentence with its interval spelled out, whether that pace is a person's own, how far a command publishes, what the scheduler last decided for a command, a coming time, the labels of the publish picks, and which picks a project is offered.
+- **A pace in the Edit box** - the draft the box opens with, what a draft is as the words of `agent-scheduler pace`, none while it is half typed, and the command as it would read with the draft saved.
 
 ## Business logic
 
@@ -37,7 +40,7 @@ See `## Context`.
 
 A project's row [6] is made from the JSON `agent-scheduler status` printed for one project. It carries the project (id, name, whether it has a git host package), whether the scheduler is on, whether it keeps alive, whether its process is running, the model when the state names one, the spend cushion [3] when it is a finite number, and the last tick [5] when the state has one with a time: its time, its decisions (each a command, an outcome line and the run's id when one started; an entry missing its command or outcome is left out) and its note when it has one.
 
-The commands of a project's row are the schedule as the last tick recorded it, in its order: each with its name, its interval as written when it has one, its check when it has one, the plain line saying what its check waits for when its skill gives one, and what its skill says it does, in the skill's own words, when the tick recorded it. Two things of this machine are folded in. Whether the command is on: it is on only when the state holds this machine's schedule switch [2] for it, switched on; a command nobody switched on here is off. And the command's publish pick [4]: the one the state holds for it when that is one of `nothing`, `commit`, `branch`, `pr`, `merge`, else `commit`. The last tick's decision for the command is folded in too: the first of the tick's decisions under the command's name, when there is one. A recorded command with no name is left out; an interval, a check, a waits-for line or a description that is not text is dropped; a switch that is anything but on reads as off, and a pick that is none of the known words reads as `commit`. A scheduler that has not ticked yet lists no command, and neither does one in a project where no skill schedules a command. Output that is not an object reads as an empty project's row: off, not running, no commands.
+The commands of a project's row are the schedule as the last tick recorded it, in its order: each with its name, its interval as written when it has one, its check when it has one, the plain line saying what its check waits for when its skill gives one, and what its skill says it does, in the skill's own words, when the tick recorded it. Three things of this machine are folded in. Whether the command is on: it is on only when the state holds this machine's schedule switch [2] for it, switched on; a command nobody switched on here is off. And the command's publish pick [4]: the one the state holds for it when that is one of `nothing`, `commit`, `branch`, `pr`, `merge`, else `commit`. And the command's pace pick [8], when the state holds one for it that reads as one: "whenever there is work", or an interval the tool reads (`../src/pace.ts`); a command with none carries none, and a pace pick held for a command the schedule does not list is not shown. The last tick's decision for the command is folded in too: the first of the tick's decisions under the command's name, when there is one. A recorded command with no name is left out; an interval, a check, a waits-for line or a description that is not text is dropped; a switch that is anything but on reads as off, a publish pick that is none of the known words reads as `commit`, and a pace pick whose interval is no interval reads as none. A scheduler that has not ticked yet lists no command, and neither does one in a project where no skill schedules a command. Output that is not an object reads as an empty project's row: off, not running, no commands.
 
 A project's row also names the skills whose `schedule` key the last tick could not read. The tick writes one decision per such skill, under the skill's name, with the outcome `unreadable schedule: <reason>`; each is listed with the skill's name and the reason. Such a skill gives no scheduled command, so its decision is never a command's. A scheduler that has not ticked names none.
 
@@ -84,8 +87,16 @@ A new cushion is saved by running `agent-scheduler offset -- <points>` in every 
 #### Business logic
 
 - **The leading status of a project's row**: "not readable" (red) when the project's status could not be read; else "off" (muted) when the scheduler is off; else "on, not running" (amber) when it is on but its process is not alive; else "on" (green).
-- **An interval, spelled out**: an interval as the skill writes it, a whole number of 1 or more followed by `m`, `h` or `d`, reads as that number of minutes, hours or days: `15m` is "15 minutes", `1h` is "1 hour", `7d` is "7 days". Anything else (`0d`, `d`, `-3h`, `2w`) is shown as written.
-- **A command's pace**, as a sentence with a capital: "Every <interval>" for a command with only an interval, the interval spelled out ("Every 1 day"). For a command with only a check, the plain line its skill gives for what the check waits for ("When the queue holds a task"), or "When its check finds work" when the skill gives none. For a command with both, "Every <interval> at most, " followed by those same words without the capital ("Every 15 minutes at most, when a ticket has no plan", "Every 6 hours at most, when its check finds work").
+- **An interval, spelled out**: an interval as written, a whole number of 1 or more followed by `m`, `h`, `d`, `w` or `mo` (`../src/pace.ts`), reads as that number of minutes, hours, days, weeks or months: `15m` is "15 minutes", `1h` is "1 hour", `7d` is "7 days", `2w` is "2 weeks", `1mo` is "1 month", and a leading zero is dropped (`06h` is "6 hours"). Anything else (`0d`, `d`, `-3h`, `2y`) is shown as written.
+- **A command's pace** [7], as a sentence with a capital, by the pace in force as `../src/pace.ts` works it out from this machine's pace pick [8] and the skill's interval and check:
+  - A pace without a time of day, for a command with no check: "Every <interval>", the interval spelled out ("Every 1 day", "Every 2 weeks").
+  - A pace without a time of day, for a command with a check: "Every <interval> at most, " followed by what the check waits for ("Every 30 minutes at most, when a ticket has no plan").
+  - A pace with a time of day: "Every <interval> at <time of day>" ("Every 1 month at 09:05"), followed for a command with a check by ", " and what the check waits for, with no "at most" ("Every 2 days at 10:00, when a ticket has no plan").
+  - No pace, the check alone says when (the skill gives no interval, or this machine's pace pick is "whenever there is work"): what the check waits for, with a capital ("When the queue holds a task").
+  - What the check waits for is the plain line its skill gives, or "when its check finds work" when the skill gives none.
+  - A pace pick that cannot be followed leaves the skill's pace: "whenever there is work" for a command with no check reads "Every 1 day", the skill's interval.
+  - A skill's interval the tool would not have read, on a command with no pace pick, is shown as written ("Every 2y").
+- **Whether a command's pace is a person's own**: it is when the draft its Edit box opens with (below) is not "as the skill says". So a pace pick that changes nothing does not count: "whenever there is work" for a command its check alone paces already, or for a command with no check.
 - **How far a command publishes** on this machine, by its publish pick [4], as a sentence with a capital: "Commits its work" for `commit`, which is also the pick of a command nobody picked for, "Publishes its branch" for `branch`, "Opens a pull request" for `pr`, "Opens a pull request that merges on green" for `merge`, and "Publishes nothing" for a pick of nothing.
 - **What the scheduler last decided for a command**, for a person, by the first rule that holds:
   1. The last tick's decision for the command is `not a command of the coding agent: its skill is only under <folder>, …`: "Cannot start: its skill is only in <folder>, which Claude Code does not read" ("Cannot start: its skill is only in .agents/skills, which Claude Code does not read"), whether the command is switched on or off on this machine, since switching it on would start nothing.
@@ -93,9 +104,33 @@ A new cushion is saved by running `agent-scheduler offset -- <points>` in every 
   3. The command is on and the last tick decided nothing for it, or still said `switched off on this machine` (it was switched on since): nothing is said.
   4. The decision is `not due`, the check found no work: "No work".
   5. The decision starts with `started `: "Started a run".
-  6. The decision is `not due (last start <age> ago, …)`, the command's interval has not passed: "Started <age> ago, not due yet", the age as the tick wrote it ("Started 2h ago, not due yet", "Started less than a minute ago, not due yet").
-  7. The decision is `cap reached (<N> in flight: …)`: "One is already running" when N is 1, else "<N> are already running" ("3 are already running").
-  8. Any other decision: the tool's own line with a capital ("Quota: …", "Check failed: …", "Not ready: …").
+  6. The decision is `not due (last start <age> ago, …)`, the interval of the command's pace [7] has not passed: "Started <age> ago, not due yet", the age as the tick wrote it ("Started 2h ago, not due yet", "Started less than a minute ago, not due yet").
+  7. The decision is `not due (next start from <YYYY-MM-DD HH:MM>, …)`, the command waits for its time of day: "Next: " and that time as a coming time, below ("Next: Saturday 10:00").
+  8. The decision is `cap reached (<N> in flight: …)`: "One is already running" when N is 1, else "<N> are already running" ("3 are already running").
+  9. Any other decision: the tool's own line with a capital ("Quota: …", "Check failed: …", "Not ready: …").
+- **A coming time**, for a person, from a local time and the time now, by how many local days lie between the two days: "today 10:00" on the same day, "tomorrow 10:00" on the next, the weekday from the second to the sixth day after ("Saturday 10:00"), else the day and the month ("15 Oct 10:00"). The time is written in 24 hours with two digits each.
 - **The publish picks' labels**: "Nothing", "Commit", "Publish branch", "Open PR", "Merge on green", in that order.
 - **Which picks a project is offered**: all five where one of the project's packages provides a git host; "Nothing", "Commit" and "Publish branch" only where none does, since no pull request can be opened there. The pick a menu shows, when the project is not offered it, is listed after them, so a menu always lists the entry it shows.
 - The bound of the spend cushion as the dashboard's controls set it, 50 points either side of the quota boundary, is the dashboard's own number, handed on from `@openagt/dashboard/module`.
+
+### A pace in the Edit box
+
+#### Context
+
+**User story**: on the Automations page the user opens a page row and picks when its command runs: as the skill says, whenever there is work, or every so many minutes, hours, days, weeks or months, with a time of day beside days or more. The box shows, before anything is saved, how the command would read.
+
+**Problem**: a count and a time are typed a key at a time. A half-typed one ("", "1.5", "25:00") is no pace yet and must not be sent to the command.
+
+#### Business logic
+
+A draft is what the Edit box holds of a pace [7] while a person picks. It is one of three kinds: "as the skill says"; "whenever there is work"; or "every", with a count and a time of day as the text typed, and a unit.
+
+**The draft a command's Edit box opens with** follows its pace pick [8]:
+
+- No pace pick: "as the skill says".
+- "Whenever there is work": that, for a command whose skill gives it both an interval and a check. For any other command it is "as the skill says": a command with a check and no interval runs whenever there is work already, and a command with no check cannot follow it.
+- An interval that reads: "every", with its count, its unit, and its time of day when the interval is in days, weeks or months and the time reads as one, else no time. An interval that does not read: "as the skill says".
+
+**A draft as the words of the command**, after `agent-scheduler pace <command>`: `skill` for "as the skill says", `work` for "whenever there is work", and for "every" the interval (`2d`, `15m`) followed by the time of day when one is typed and the unit is days, weeks or months (`2d 10:00`). Spaces around the count and the time are ignored. A time left in the draft beside minutes or hours is left out, since the page hides the field then. A draft is no pace yet, and has no words, while its count is not a whole number of 1 or more written in digits alone (empty, `0`, `1.5`, `-2`, a word), or while its time is typed and is no time of day (`25:00`).
+
+**The command as it would read with a draft saved** is what the Edit box's sentence describes: the command with the draft as its pace pick, or with no pace pick for "as the skill says". While the draft is no pace yet it is the command as it is.

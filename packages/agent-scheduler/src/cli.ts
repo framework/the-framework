@@ -5,7 +5,7 @@ import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './s
 import { initHooks } from './init.js'
 import { cleanup } from './cleanup.js'
 import { PUBLISH_PICKS, updateState, withPace, withPublish, withSwitch, type PublishPick } from './state.js'
-import { parseInterval, parseTimeOfDay, takesTimeOfDay, type PacePick } from './pace.js'
+import { parseInterval, parseTimeOfDay, takesTimeOfDay } from './pace.js'
 import { readSchedule, type ScheduledCommand } from './schedule.js'
 
 /**
@@ -28,7 +28,7 @@ export const USAGE = `usage: agent-scheduler <command>
                                 how far this machine's runs of a scheduled command publish; commit until picked
   pace <command> <skill|work|N<m|h|d|w|mo>> [HH:MM]
                                 how often at most a scheduled command starts on this machine: an interval (15m, 6h, 2d, 2w, 1mo), with a time of day
-                                for days, weeks or months (2d 10:00, this machine's time); work for whenever its check finds work; skill for the skill's own pace again
+                                for days, weeks or months (2d 10:00, this machine's time); work for whenever its check finds work; skill for the skill's own pace again, taken for any name
   cleanup                       remove what this tool left in the project: the state file and the scheduler's log, then .agent-scheduler/ and the rule hiding it from git once it is empty;
                                 refused while the state names a scheduler that is alive; the command a dashboard asks for when a project is removed with its files
 
@@ -164,10 +164,25 @@ const COMMANDS: Record<string, Command> = {
     if (at !== undefined && !time) throw new Usage(`${at} is no time of day like 10:00`)
     if (time && !(interval && takesTimeOfDay(interval))) throw new Usage('a time of day goes with days, weeks or months')
     const repo = await project(io.cwd, git)
+    // Taking a pace back needs no scheduled command: one left for a skill that is gone can always be taken back.
+    if (to === 'skill') return { ok: true, ...(await updateState(repo, s => withPace(s, name, undefined), git)) }
     const command = await scheduled(repo, name)
     if (to === 'work' && command.when === undefined) throw new Refused({ ok: false, reason: 'no-check', command: name }, `${name} has no check, so nothing would say when there is work`)
-    const pick: PacePick | undefined = to === 'skill' ? undefined : to === 'work' ? { work: true } : { every: interval!.text, ...(time ? { at: time.text } : {}), since: new Date().toISOString() }
-    return { ok: true, ...(await updateState(repo, s => withPace(s, name, pick), git)) }
+    const every = interval?.text
+    return {
+      ok: true,
+      ...(await updateState(
+        repo,
+        s => {
+          if (every === undefined) return withPace(s, name, { work: true })
+          // The same pace picked again is the same pick: when it was made stays, so a time that was missed is still due.
+          const before = s.paces?.[name]
+          const same = before !== undefined && 'every' in before && before.every === every && before.at === time?.text
+          return withPace(s, name, { every, ...(time ? { at: time.text } : {}), since: same ? before.since : new Date().toISOString() })
+        },
+        git,
+      )),
+    }
   },
 
   async cleanup(args, io, git) {

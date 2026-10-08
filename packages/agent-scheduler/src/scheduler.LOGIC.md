@@ -11,7 +11,7 @@ The tool's process side: the tick [1] wired to the real project, and the schedul
 [1] tick: one pass of the scheduler: pull the `agent-data` branch, sweep, then one decision per scheduled command, each decision one line in the state.
 [2] run: one agent the scheduler starts: a detached process of `agent-runner` (`agent-runner run`), a checkout, one prompt to the coding agent, and a run record when it ends.
 [3] the scheduler's process: the tool's own process between `start` and `stop`, ticking every minute; the state holds its pid.
-[4] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches and publish picks, the scheduler's pid, the last tick's decisions.
+[4] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches, pace picks and publish picks, the scheduler's pid, the last tick's decisions.
 
 ## Business logic — TL;DR
 

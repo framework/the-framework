@@ -211,6 +211,23 @@ describe('the Automations page', () => {
     await waitFor(() => expect(screen.queryByRole('group', { name: 'Editing /update-tickets' })).toBeNull())
   })
 
+  test('a pace that is not taken stops there: the publish pick is not sent, the row stays open with both picks, and its line says why', async () => {
+    const { host, runCommand } = scheduler((projectId, args) => (args[0] === 'pace' ? { ok: false, error: 'post-merge-cleanup has no check, so nothing would say when there is work' } : { ok: true, output: { ok: true } }))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit /post-merge-cleanup' }))
+    const editor = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
+    fireEvent.click(within(editor).getByRole('radio', { name: 'Every' }))
+    fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: '3' } })
+    fireEvent.change(within(editor).getByLabelText('What its runs publish'), { target: { value: 'pr' } })
+    fireEvent.click(within(editor).getByRole('button', { name: 'Save' }))
+    expect((await within(row('/post-merge-cleanup')).findByRole('alert')).textContent).toBe('The pace was not saved: post-merge-cleanup has no check, so nothing would say when there is work')
+    const still = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
+    expect((within(still).getByLabelText('How many') as HTMLInputElement).value).toBe('3')
+    expect((within(still).getByLabelText('What its runs publish') as HTMLSelectElement).value).toBe('pr')
+    expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'publish')).toHaveLength(0)
+  })
+
   test('a project with no git host package is offered Nothing, Commit and Publish branch only', async () => {
     const { host } = scheduler()
     show(host, [OTHER])

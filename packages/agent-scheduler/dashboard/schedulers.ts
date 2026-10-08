@@ -298,9 +298,10 @@ export function decided(command: SchedulerCommand, now: Date = new Date()): stri
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** A coming local time, for a person: "today 10:00", "tomorrow 10:00", the weekday within a week ("Saturday 10:00"), else the date ("24 Oct 10:00"). */
+/** A coming local time, for a person: "today 10:00", "tomorrow 10:00", the weekday within a week ("Saturday 10:00"), else the date ("24 Oct 10:00"). A time already past, read off an old tick, is "as soon as the scheduler looks". */
 export function nextWords(when: Date, now: Date): string {
   const two = (n: number): string => String(n).padStart(2, '0')
+  if (when.getTime() <= now.getTime()) return 'as soon as the scheduler looks'
   const time = `${two(when.getHours())}:${two(when.getMinutes())}`
   const days = Math.round((new Date(when.getFullYear(), when.getMonth(), when.getDate()).getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86_400_000)
   if (days === 0) return `today ${time}`

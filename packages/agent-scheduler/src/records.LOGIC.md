@@ -19,7 +19,7 @@ The runs a scheduled command [1] has, read off the run records [2] on the projec
 
 - **The command a run counts for** - for a card with `agent-runner`'s mark [6] and a prompt: the scheduled command the prompt names without its slash, else the prompt's first word without its slash (`schedule.ts`); none for any other card.
 - **In flight** - the running cards that count for one command on the branch, whatever the machine; a running card without the mark, a dashboard's own run for instance, is not counted.
-- **The last start** - the newest start time among the cards that count for one command on the branch, whatever the machine and whatever became of the run, for the schedule's interval; nothing when the command never started.
+- **The last start** - the newest start time among the cards that count for one command on the branch, whatever the machine and whatever became of the run, for the schedule's interval, or for the pace a person set for the command on this machine (`pace.ts`); nothing when the command never started.
 
 ## Business logic
 

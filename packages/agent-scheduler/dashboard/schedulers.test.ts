@@ -162,6 +162,9 @@ describe('in words', () => {
     expect(nextWords(new Date(2026, 9, 14, 10, 0), now)).toBe('Wednesday 10:00')
     expect(nextWords(new Date(2026, 9, 15, 10, 0), now)).toBe('15 Oct 10:00')
     expect(nextWords(new Date(2026, 10, 7, 10, 0), now)).toBe('7 Nov 10:00')
+    // Read off an old tick: the time has passed, and the scheduler has not looked since.
+    expect(nextWords(new Date(2026, 9, 8, 10, 0), now)).toBe('as soon as the scheduler looks')
+    expect(nextWords(new Date(2026, 9, 3, 10, 0), now)).toBe('as soon as the scheduler looks')
     const waiting = { command: 'a', on: true, publish: 'commit' as const, decision: { command: 'a', outcome: 'not due (next start from 2026-10-10 10:00, every 2d at 10:00)' } }
     expect(decided(waiting, now)).toBe('Next: Saturday 10:00')
     expect(decided({ ...waiting, on: false }, now)).toBe('Off')

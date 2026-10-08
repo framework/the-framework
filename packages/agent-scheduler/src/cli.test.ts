@@ -191,7 +191,14 @@ test("pace writes this machine's pace for a scheduled command: an interval, a ti
     assert.equal('at' in picked, false)
     assert.equal(new Date(picked.since).toISOString(), picked.since, 'when it was picked is recorded')
     await run(repo, 'pace', 'triage quick', '2w', '9:05')
-    assert.deepEqual({ ...(await readState(repo)).paces!['triage quick'], since: '' }, { every: '2w', at: '09:05', since: '' })
+    const timed = (await readState(repo)).paces!['triage quick'] as { every: string; at: string; since: string }
+    assert.deepEqual({ ...timed, since: '' }, { every: '2w', at: '09:05', since: '' })
+    // The same pace picked again keeps when it was first made, so a time that was missed is still due; another one is a new pick.
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await run(repo, 'pace', 'triage quick', '2w', '09:05')
+    assert.equal(((await readState(repo)).paces!['triage quick'] as { since: string }).since, timed.since)
+    await run(repo, 'pace', 'triage quick', '2w', '10:00')
+    assert.notEqual(((await readState(repo)).paces!['triage quick'] as { since: string }).since, timed.since)
     await run(repo, 'pace', 'work-queue', 'work')
     assert.deepEqual((await readState(repo)).paces!['work-queue'], { work: true })
     // The skill's own pace again: nothing kept.
@@ -208,6 +215,13 @@ test("pace writes this machine's pace for a scheduled command: an interval, a ti
     assert.equal(unknown.code, 1)
     assert.deepEqual(unknown.out, { ok: false, reason: 'not-scheduled', command: 'triage' })
     assert.equal((await readState(repo)).paces, undefined, 'a refusal writes nothing')
+    // A pace left for a skill that is gone, or cannot be read any more, can always be taken back.
+    await run(repo, 'pace', 'triage quick', '2d')
+    await writeSkill(repo, 'triage', 'schedule:\n  word: quick\n  evry: 6h\n')
+    assert.equal((await run(repo, 'pace', 'triage quick', '3d')).err, 'the schedule of triage cannot be read: unknown key evry')
+    assert.equal((await run(repo, 'pace', 'triage quick', 'skill')).code, 0)
+    assert.equal((await readState(repo)).paces, undefined)
+    assert.equal((await run(repo, 'pace', 'never-heard-of', 'skill')).code, 0)
 
     for (const argv of [['pace', 'work-queue'], ['pace', 'work-queue', 'often'], ['pace', 'work-queue', '0h'], ['pace', 'work-queue', '2d', '25:00'], ['pace', 'work-queue', '6h', '10:00'], ['pace', 'work-queue', 'work', '10:00'], ['pace', 'work-queue', '2d', '10:00', 'extra']]) {
       const bad = await run(repo, ...argv)

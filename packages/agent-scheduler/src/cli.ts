@@ -4,7 +4,7 @@ import { projectRoot } from '@openagt/skill-branches'
 import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
 import { cleanup } from './cleanup.js'
-import { PUBLISH_PICKS, isSwitchedOn, updateState, withPace, withPublish, withSwitch, type PublishPick } from './state.js'
+import { PUBLISH_PICKS, isSwitchedOn, updateState, withAgents, withPace, withPublish, withSwitch, type PublishPick } from './state.js'
 import { parseInterval, parseTimeOfDay, sinceNow, takesTimeOfDay } from './pace.js'
 import { readSchedule, type ScheduledCommand } from './schedule.js'
 
@@ -29,6 +29,8 @@ export const USAGE = `usage: agent-scheduler <command>
   pace <command> <skill|work|N<m|h|d|w|mo>> [HH:MM]
                                 how often at most a scheduled command starts on this machine: an interval (15m, 6h, 2d, 2w, 1mo; 1 to 9999), with a time of day
                                 for days, weeks or months (2d 10:00, this machine's time); work for whenever its check finds work; skill for the skill's own pace again, taken for any name
+  agents <command> <skill|N>    how many runs of a scheduled command may be in flight at once, as this machine counts them, every machine's runs counted;
+                                a whole number, 1 or more; skill for the skill's own number again, taken for any name
   cleanup                       remove what this tool left in the project: the state file and the scheduler's log, then .agent-scheduler/ and the rule hiding it from git once it is empty;
                                 refused while the state names a scheduler that is alive; the command a dashboard asks for when a project is removed with its files
 
@@ -185,6 +187,17 @@ const COMMANDS: Record<string, Command> = {
         git,
       )),
     }
+  },
+
+  async agents(args, io, git) {
+    const { positionals } = parse(args, {}, 2)
+    const [name, to] = positionals as [string, string]
+    const count = /^\d+$/.test(to) ? Number(to) : undefined
+    if (to !== 'skill' && !(count !== undefined && Number.isSafeInteger(count) && count >= 1)) throw new Usage(`${to} is neither skill nor a whole number, 1 or more`)
+    const repo = await project(io.cwd, git)
+    // Taking a number back needs no scheduled command: one left for a skill that is gone can always be taken back.
+    if (to !== 'skill') await scheduled(repo, name)
+    return { ok: true, ...(await updateState(repo, s => withAgents(s, name, count), git)) }
   },
 
   async cleanup(args, io, git) {

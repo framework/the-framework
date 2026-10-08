@@ -108,7 +108,7 @@ describe('the Automations page', () => {
     await screen.findByRole('region', { name: 'gemstack' })
     fireEvent.click(screen.getByRole('button', { name: 'Edit /post-merge-cleanup' }))
     const editor = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
-    const skills = within(editor).getByRole('radio', { name: /As the skill says/ }) as HTMLInputElement
+    const skills = within(within(editor).getByRole('group', { name: 'When it runs' })).getByRole('radio', { name: /As the skill says/ }) as HTMLInputElement
     expect(skills.checked).toBe(true)
     expect(within(editor).getByText('every 1 day')).toBeTruthy()
     // Its skill gives no check: nothing could say when there is work.
@@ -208,7 +208,7 @@ describe('the Automations page', () => {
     const editor = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
     expect((within(editor).getByRole('radio', { name: 'Every' }) as HTMLInputElement).checked).toBe(true)
     expect([(within(editor).getByLabelText('How many') as HTMLInputElement).value, (within(editor).getByLabelText('Unit') as HTMLSelectElement).value, (within(editor).getByLabelText('Time of day') as HTMLInputElement).value]).toEqual(['2', 'd', '10:00'])
-    fireEvent.click(within(editor).getByRole('radio', { name: /As the skill says/ }))
+    fireEvent.click(within(within(editor).getByRole('group', { name: 'When it runs' })).getByRole('radio', { name: /As the skill says/ }))
     expect(within(editor).getByText('Every 1 day. Commits its work.')).toBeTruthy()
     fireEvent.click(within(editor).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['pace', 'post-merge-cleanup', 'skill']))
@@ -244,6 +244,62 @@ describe('the Automations page', () => {
     expect((within(still).getByLabelText('How many') as HTMLInputElement).value).toBe('3')
     expect((within(still).getByLabelText('What its runs publish') as HTMLSelectElement).value).toBe('pr')
     expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'publish')).toHaveLength(0)
+  })
+
+  test('Edit offers how many agents may work on the row at once: as the skill says, or up to a number; Save runs `agents`, between the pace and the publish pick; a row with its own number says so', async () => {
+    const { host, runCommand } = hostAnswering((projectId, args) =>
+      args[0] !== 'status'
+        ? { ok: true, output: { ok: true } }
+        : { ok: true, output: { ...STATUS, agents: { 'work-queue': 3 }, lastTick: { ...STATUS.lastTick, schedule: [{ command: 'post-merge-cleanup', every: '1d', agents: 2 }, STATUS.lastTick.schedule[1]] } } },
+    )
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    // The skill lets two run at once; a person's own number shows on the row too.
+    expect(within(row('/post-merge-cleanup')).getByText('Up to 2 at once')).toBeTruthy()
+    expect(within(row('/work-queue')).getByText('Up to 3 at once')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit /post-merge-cleanup' }))
+    const editor = screen.getByRole('group', { name: 'Editing /post-merge-cleanup' })
+    const many = within(editor).getByRole('group', { name: 'How many at once' })
+    expect((within(many).getByRole('radio', { name: /As the skill says/ }) as HTMLInputElement).checked).toBe(true)
+    expect(within(many).getByText('up to 2 at once')).toBeTruthy()
+    expect(within(many).getByText('Counted with the agents of every machine that shares this repository.')).toBeTruthy()
+    expect(within(editor).getByText('Every 1 day. Up to 2 at once. Commits its work.')).toBeTruthy()
+    // Picking a number starts from the skill's.
+    fireEvent.click(within(many).getByRole('radio', { name: 'Up to' }))
+    const count = within(many).getByLabelText('How many agents') as HTMLInputElement
+    expect(count.value).toBe('2')
+    const save = within(editor).getByRole('button', { name: 'Save' }) as HTMLButtonElement
+    for (const typed of ['', '0', '1.5']) {
+      fireEvent.change(count, { target: { value: typed } })
+      expect(save.disabled, typed).toBe(true)
+      expect(within(editor).getByText('Type a whole number of agents, 1 or more.')).toBeTruthy()
+    }
+    fireEvent.change(count, { target: { value: '1' } })
+    expect(within(many).getByText('agent at once')).toBeTruthy()
+    expect(within(editor).getByText('Every 1 day. Commits its work.')).toBeTruthy()
+    fireEvent.change(count, { target: { value: '4' } })
+    expect(within(editor).getByText('Every 1 day. Up to 4 at once. Commits its work.')).toBeTruthy()
+    fireEvent.click(within(within(editor).getByRole('group', { name: 'When it runs' })).getByRole('radio', { name: 'Every' }))
+    fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: '3' } })
+    fireEvent.change(within(editor).getByLabelText('What its runs publish'), { target: { value: 'pr' } })
+    fireEvent.click(save)
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['publish', 'post-merge-cleanup', 'pr']))
+    expect(runCommand.mock.calls.filter(([, args]) => args[0] !== 'status').map(([, args]) => args)).toEqual([
+      ['pace', 'post-merge-cleanup', '3d'],
+      ['agents', 'post-merge-cleanup', '4'],
+      ['publish', 'post-merge-cleanup', 'pr'],
+    ])
+
+    // A row with its own number opens on it, and "As the skill says" takes it back.
+    fireEvent.click(screen.getByRole('button', { name: 'Edit /work-queue' }))
+    const second = within(screen.getByRole('group', { name: 'Editing /work-queue' })).getByRole('group', { name: 'How many at once' })
+    expect((within(second).getByRole('radio', { name: 'Up to' }) as HTMLInputElement).checked).toBe(true)
+    expect((within(second).getByLabelText('How many agents') as HTMLInputElement).value).toBe('3')
+    expect(within(second).getByText('one at a time')).toBeTruthy()
+    fireEvent.click(within(second).getByRole('radio', { name: /As the skill says/ }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Editing /work-queue' })).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['agents', 'work-queue', 'skill']))
   })
 
   test('a project with no git host package is offered Nothing, Commit and Publish branch only', async () => {
@@ -335,7 +391,7 @@ describe('the Automations page', () => {
     // The row opened meanwhile stays open, and keeps the keyboard.
     const second = within(gemstack).getByRole('group', { name: 'Editing /work-queue' })
     await new Promise(resolve => setTimeout(resolve, 20))
-    expect(document.activeElement).toBe(within(second).getByRole('radio', { name: /As the skill says/ }))
+    expect(document.activeElement).toBe(within(within(second).getByRole('group', { name: 'When it runs' })).getByRole('radio', { name: /As the skill says/ }))
   })
 
   test('the keyboard follows the row: opening it lands on the pace in force, Escape closes it and hands the keyboard back to its Edit button', async () => {
@@ -344,7 +400,7 @@ describe('the Automations page', () => {
     await screen.findByRole('region', { name: 'gemstack' })
     fireEvent.click(screen.getByRole('button', { name: 'Edit /work-queue' }))
     const menu = screen.getByLabelText('What its runs publish')
-    expect(document.activeElement).toBe(screen.getByRole('radio', { name: /As the skill says/ }))
+    expect(document.activeElement).toBe(within(screen.getByRole('group', { name: 'When it runs' })).getByRole('radio', { name: /As the skill says/ }))
     fireEvent.change(menu, { target: { value: 'merge' } })
     fireEvent.keyDown(menu, { key: 'Escape' })
     expect(screen.queryByRole('group', { name: 'Editing /work-queue' })).toBeNull()

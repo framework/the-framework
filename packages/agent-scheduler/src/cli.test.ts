@@ -261,6 +261,36 @@ test("pace writes this machine's pace for a scheduled command: an interval, a ti
   }
 })
 
+test("agents writes this machine's number of agents at once for a scheduled command, and `skill` takes it back, for any name", async () => {
+  const repo = await testRepo()
+  try {
+    await writeSkill(repo, 'work-queue', 'schedule:\n  when: npx queue\n')
+    const three = await run(repo, 'agents', 'work-queue', '3')
+    assert.equal(three.code, 0)
+    assert.deepEqual((three.out as { agents: unknown }).agents, { 'work-queue': 3 })
+    await run(repo, 'agents', 'work-queue', '1')
+    assert.deepEqual((await readState(repo)).agents, { 'work-queue': 1 }, 'one is a pick too, kept')
+    await run(repo, 'agents', 'work-queue', 'skill')
+    assert.equal((await readState(repo)).agents, undefined)
+
+    const unknown = await run(repo, 'agents', 'triage', '2')
+    assert.equal(unknown.code, 1)
+    assert.deepEqual(unknown.out, { ok: false, reason: 'not-scheduled', command: 'triage' })
+    // A number left for a skill that is gone can always be taken back.
+    assert.equal((await run(repo, 'agents', 'never-heard-of', 'skill')).code, 0)
+
+    for (const argv of [['agents', 'work-queue'], ['agents', 'work-queue', '0'], ['agents', 'work-queue', '1.5'], ['agents', 'work-queue', '-2'], ['agents', 'work-queue', 'many'], ['agents', 'work-queue', '2', 'extra']]) {
+      const bad = await run(repo, ...argv)
+      assert.equal(bad.code, 2, argv.join(' '))
+      assert.equal(bad.out, undefined)
+    }
+    assert.match((await run(repo, 'agents', 'work-queue', 'many')).err, /^many is neither skill nor a whole number, 1 or more/)
+    assert.equal((await readState(repo)).agents, undefined, 'a usage error writes nothing')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
 test('tick on a project with the scheduler off: the branch is pulled, nothing is decided, the state remembers the tick', async () => {
   const repo = await testRepo()
   try {

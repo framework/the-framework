@@ -13,7 +13,7 @@ import type { PacePick } from './pace.js'
  *
  * What is here is what would otherwise live in a process's memory: whether the scheduler is on,
  * whether it should outlive whatever started it, the model this user's scheduled runs start on
- * and the spend cushion they take, which scheduled commands this machine switched on, the pace a person set for one here, how far this machine's runs of a scheduled command publish where a person picked it, the pid of the scheduler's own process when one runs, and the last tick with what it
+ * and the spend cushion they take, which scheduled commands this machine switched on, the pace and the number of agents at once a person set for one here, how far this machine's runs of a scheduled command publish where a person picked it, the pid of the scheduler's own process when one runs, and the last tick with what it
  * decided per command. A restart loses nothing.
  */
 
@@ -37,6 +37,8 @@ export interface ListedCommand {
   waitsFor?: string
   /** What the command's skill does, in the skill's own words, when it says. */
   description?: string
+  /** How many runs of the command its skill lets be in flight at once, when it is more than one. */
+  agents?: number
 }
 
 /** One tick as the state remembers it. */
@@ -65,6 +67,8 @@ export interface State {
   publishes?: Record<string, PublishPick>
   /** This machine's pace per command, kept only where a person set one: a command without one runs at its skill's pace. */
   paces?: Record<string, PacePick>
+  /** This machine's number of runs of a command in flight at once, kept only where a person set one: a command without one has its skill's number. */
+  agents?: Record<string, number>
   /** The scheduler's own process, while `start` has one running. */
   pid?: number
   /** When that process started, ISO. */
@@ -159,6 +163,29 @@ export function withPace(state: State, command: string, pick: PacePick | undefin
   const paces = pick === undefined ? others : { ...others, [command]: pick }
   const { paces: _paces, ...rest } = state
   return Object.keys(paces).length ? { ...rest, paces } : rest
+}
+
+/** Whether a value is a number of agents at once: a whole number, 1 or more. */
+export function isAgents(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1
+}
+
+/**
+ * How many runs of a command may be in flight at once, as this machine counts: the number a
+ * person set here, else the skill's. The count it is held against is every machine's runs. The
+ * state is a file a person may edit: a value that is no such number is no number set.
+ */
+export function capInForce(state: State, command: { name: string; cap: number }): number {
+  const own = state.agents?.[command.name]
+  return isAgents(own) ? own : command.cap
+}
+
+/** The state with one command's number of agents at once set, or taken back when there is none: the command then has its skill's number again. */
+export function withAgents(state: State, command: string, count: number | undefined): State {
+  const { [command]: _previous, ...others } = state.agents ?? {}
+  const agents = count === undefined ? others : { ...others, [command]: count }
+  const { agents: _agents, ...rest } = state
+  return Object.keys(agents).length ? { ...rest, agents } : rest
 }
 
 /** Read, change, write: one edit of the state. */

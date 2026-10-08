@@ -13,7 +13,7 @@ const read = (name: string, md: string) => skillSchedule(name, md, CLAUDE)
 
 /** A skill file whose front matter ends with the lines given. */
 function skill(name: string, frontMatter: string): string {
-  return `---\nname: ${name}\ndescription: A job.\ndisable-model-invocation: true\n${frontMatter}---\n\nDo the job.\n`
+  return `---\nname: ${name}\ndisable-model-invocation: true\n${frontMatter}---\n\nDo the job.\n`
 }
 
 test("a skill's schedule names its command, its check, what the check waits for and how many agents at once; a skill with no schedule has no command", () => {
@@ -22,6 +22,12 @@ test("a skill's schedule names its command, its check, what the check waits for 
     unreadable: [],
   })
   assert.deepEqual(read('update-tickets', skill('update-tickets', 'schedule:\n  when: npx tickets due\n')).commands, [{ name: 'update-tickets', when: 'npx tickets due', cap: 1, dir: CLAUDE }])
+  // What the skill says it does goes with each of its commands; one that says nothing, or nothing a person can read, has none.
+  assert.deepEqual(read('triage', skill('triage', 'description: "  Queue the ready tickets.  "\nschedule:\n  - word: quick\n    every: 6h\n  - word: consensual\n    every: 7d\n')).commands.map(c => [c.name, c.description]), [
+    ['triage quick', 'Queue the ready tickets.'],
+    ['triage consensual', 'Queue the ready tickets.'],
+  ])
+  assert.equal('description' in read('a', skill('a', 'description: [a, list]\nschedule:\n  every: 6h\n')).commands[0]!, false)
   assert.deepEqual(read('tickets', skill('tickets', '')), { commands: [], unreadable: [] })
   assert.deepEqual(read('notes', 'No front matter at all.\n'), { commands: [], unreadable: [] })
 })

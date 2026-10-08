@@ -21,7 +21,7 @@ describe('the Scheduler card', () => {
   test("one row per project: its status, its model, the last tick's decisions; a decision that started a run opens that agent", async () => {
     const { host } = hostAnswering(projectId => ({ ok: true, output: projectId === 'p1' ? STATUS : { ok: true, on: false, keepAlive: true, running: false, model: 'opus', spendOffset: 7 } }))
     show(host)
-    const started = await screen.findByRole('button', { name: 'post-merge-cleanup: started' })
+    const started = await screen.findByRole('button', { name: 'post-merge-cleanup: started 2026-10-03T10-00-00-000Z' })
     expect(screen.getByText('work-queue: switched off on this machine').tagName).toBe('SPAN')
     expect(screen.getByText('on').className).toMatch(/text-success/)
     expect(screen.getByText('off')).toBeTruthy()

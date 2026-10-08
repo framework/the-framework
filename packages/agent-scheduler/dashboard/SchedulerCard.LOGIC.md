@@ -13,7 +13,7 @@ The Scheduler card this package adds to the dashboard's Overview: the scheduler 
 
 ## Business logic
 
-The dashboard draws the card on the Overview among the installed packages' cards, at order 90, after those that name no order. Given no project (no registered project depends on the package), the card draws nothing. Otherwise it is titled "Scheduler", with the line "Agents started on a schedule while nobody is at the keyboard, per project", and reads every given project's status when shown and every 10 seconds after; until the first answer it says "Loading…".
+The dashboard draws the card on the Overview among the installed packages' cards, at order 90, after those that name no order. The dashboard draws it only when one of the projects the Overview shows has the package, so the card is always given at least one project. It is titled "Scheduler", with the line "Agents started on a schedule while nobody is at the keyboard, per project", and reads every given project's status when shown and every 10 seconds after; until the first answer it says "Loading…".
 
 Each project is one row: its name; its status in one word and colour, "on" in green, "on, not running" in amber when the state says on but the scheduler's process is not alive, "off" muted, "not readable" in red when its status could not be read (the reason is then shown under the name); a "keep-alive" chip when the scheduler outlives the dashboard that started it; and, on the right, the model its scheduled runs start on.
 

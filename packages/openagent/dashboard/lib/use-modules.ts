@@ -52,7 +52,7 @@ const DEFAULT_CARD_ORDER = 50
 /** What the installed modules bring, once loaded: their pages, their cards and their link actions. */
 export interface MountedModules {
   pages: MountedPage[]
-  /** The Overview's cards, in the order they are drawn: by `order`, then by package name. */
+  /** Every package's cards, in the order the Overview draws the ones it draws: by `order`, then by package name. */
   cards: MountedCard[]
   linkActions: MountedLinkAction[]
   /** The side-rail tabs, in package order. */

@@ -2,7 +2,7 @@ Loads the modules [1] the registered projects have and gives the shell their pag
 
 ## Context
 
-**User story**: the user opens the dashboard with no project picked; a moment later the sidebar shows a Logs row and a Tickets row under Overview, because one of the registered projects depends on the logs package and one on the tickets package, and a ticket's page shows an "Add to queue" button, because that ticket's project depends on the queue package. Installing a module's package in a project adds its row and its buttons within half a minute, with no restart. Which rows show while a project is picked is the shell's (`App.tsx`).
+**User story**: the user opens the dashboard with no project picked; a moment later the sidebar shows a Logs row and a Tickets row under Overview, because one of the registered projects depends on the logs package and one on the tickets package, and a ticket's page shows an "Add to queue" button, because that ticket's project depends on the queue package. Installing a module's package in a project adds its row and its buttons within half a minute, with no restart. Which rows show while a project is picked is the shell's (`App.tsx`); which cards are drawn then is `components/ModuleCards.tsx`'s.
 
 ## Glossary
 

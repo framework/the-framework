@@ -93,16 +93,16 @@ export interface LinkAction {
   run(host: ModuleHost, projectId: string, links: ModuleLink[]): Promise<LinkActionResult>
 }
 
-/** What a module card is rendered with: the projects that have its package. A card has no URL and no sub-path. */
+/** What a module card is rendered with: the projects that have its package, never none: the card is not drawn then. With a project picked in the dashboard, that project alone. A card has no URL and no sub-path. */
 export interface ModuleCardProps {
-  /** The registered projects whose dependencies include the module's package, in the registry's order. */
+  /** The registered projects that have the module's package, in the registry's order; with a project picked in the dashboard, that project alone. Never empty. */
   projects: ModuleProject[]
 }
 
 /**
  * A card a module adds to the Overview (#1818): the package's own summary of its data across the
- * projects that have it, drawn beside the dashboard's own cards. A project none of whose packages
- * declares a card sees none.
+ * projects that have it, drawn beside the dashboard's own cards. Drawn only when one of the
+ * projects the Overview shows has the package: with a project picked, only when that project has it.
  */
 export interface ModuleCard {
   /** Which card this is, for the shell's key and its error line; never shown as a title. */

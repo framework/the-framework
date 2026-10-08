@@ -34,6 +34,8 @@ export interface ListedCommand {
   when?: string
   /** What the check waits for, in one plain line, when the skill gives one. */
   waitsFor?: string
+  /** What the command's skill does, in the skill's own words, when it says. */
+  description?: string
 }
 
 /** One tick as the state remembers it. */

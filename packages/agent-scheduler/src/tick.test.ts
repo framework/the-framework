@@ -116,8 +116,8 @@ test('a due command under its cap with quota to spare is marked on the branch, t
   assert.deepEqual(seen.spawned, [{ id: marker.id, prompt: '/work-queue', model: 'opus', publish: 'commit' }])
 })
 
-test("this machine's publish pick goes on the marker and to the spawned run: commit where nobody picked, no level for nothing; the recorded schedule says what the skills say", async () => {
-  const commands = [command('work-queue', { when: 'npx queue', waitsFor: 'when the queue holds a task' }), command('triage quick', { every: every('6h') }), command('plan-tickets', { every: every('6h') })]
+test("this machine's publish pick goes on the marker and to the spawned run: commit where nobody picked, no level for nothing; the recorded schedule says what the skills say, with what each skill says it does", async () => {
+  const commands = [command('work-queue', { when: 'npx queue', waitsFor: 'when the queue holds a task', description: 'Work one queued task.' }), command('triage quick', { every: every('6h') }), command('plan-tickets', { every: every('6h') })]
   const { deps: d, seen } = deps({ commands, stateOver: { switches: { 'work-queue': true, 'triage quick': true, 'plan-tickets': true }, publishes: { 'work-queue': 'nothing', 'triage quick': 'merge' } } })
   const record = await tick(d)
   assert.deepEqual(seen.markers.map(m => m.caller), [
@@ -127,7 +127,7 @@ test("this machine's publish pick goes on the marker and to the spawned run: com
   ])
   assert.deepEqual(seen.spawned.map(s => [s.prompt, s.publish]), [['/work-queue', undefined], ['/triage quick', 'merge'], ['/plan-tickets', 'commit']])
   assert.deepEqual(record.schedule, [
-    { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task' },
+    { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', description: 'Work one queued task.' },
     { command: 'triage quick', every: '6h' },
     { command: 'plan-tickets', every: '6h' },
   ])

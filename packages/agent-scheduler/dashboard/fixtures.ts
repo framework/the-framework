@@ -34,12 +34,12 @@ export const STATUS = {
   lastTick: {
     at: '2026-10-03T10:00:00.000Z',
     decisions: [
-      { command: 'post-merge-cleanup', outcome: 'started', run: '2026-10-03T10-00-00-000Z' },
+      { command: 'post-merge-cleanup', outcome: 'started 2026-10-03T10-00-00-000Z', run: '2026-10-03T10-00-00-000Z' },
       { command: 'work-queue', outcome: 'switched off on this machine' },
     ],
     schedule: [
-      { command: 'post-merge-cleanup', every: '1d' },
-      { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task' },
+      { command: 'post-merge-cleanup', every: '1d', description: 'Write up merged pull requests.' },
+      { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', description: 'Work one queued task.' },
     ],
   },
 }

@@ -61,7 +61,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   Picked over reading `.claude/skills` alone, where such a skill would have no row and
   nothing would say why.
 - How far a scheduled command's runs publish is each person's pick on their own machine, in
-  the state file like the switch; the scheduler's own Settings section shows the pick and
+  the state file like the switch; the scheduler's own Automations page shows the pick and
   changes it. Until a person picks, a run commits its work and pushes nothing. Picked over
   a level written beside the command for the whole team, which a person could only
   override: nothing leaves a machine before its own person said so.
@@ -126,8 +126,10 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   verb (one stop).
 
 ## The dashboard part
-- The scheduler brings its own part of a dashboard: a Settings section (the spend cushion, a
-  switch and a publish pick per scheduled command) and an Overview card (on or off, the last
-  tick). Both read `status` and write through `offset`, `switch` and `publish`. Picked over a
-  hook line per setting that a dashboard runs, and over the dashboard reading the state file
-  by name.
+- The scheduler brings its own part of a dashboard: an Automations page (one row per
+  scheduled command, with its switch and its publish pick), a Settings section (the spend
+  cushion) and an Overview card (on or off, the last tick). All read `status` and write
+  through `offset`, `switch` and `publish`. Picked over a hook line per setting that a
+  dashboard runs, and over the dashboard reading the state file by name. The rows are on a
+  page of their own, picked over rows inside Settings: Settings keeps only what reaches
+  every project.

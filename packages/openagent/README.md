@@ -76,11 +76,11 @@ The `check` line is what the launcher runs before a Start, with the picked codin
 out: said in red) and `warnings` (said in amber), each line naming its own fix. A project
 with no `check` line shows nothing there.
 
-A package's own settings are no hook. The scheduler's (how far past the quota boundary it may
-start unattended work, a switch and a publish pick per scheduled command) are the scheduler
-package's own Settings section and Overview card, and the handle on the usage bar is its stop
-line: its part of the dashboard reads them with `agent-scheduler status` and saves them with
-`agent-scheduler offset`, `switch` and `publish`.
+A package's own settings are no hook. The scheduler's are the scheduler package's own part of
+the dashboard: its Automations page holds a switch and a publish pick per scheduled command, its
+Settings section holds how far past the quota boundary it may start unattended work, and the
+handle on the usage bar is its stop line. That part reads them with `agent-scheduler status` and
+saves them with `agent-scheduler offset`, `switch` and `publish`.
 
 The dashboard is a **projection of the agent's own files**. The agent's tool keeps the
 agent's card (`<id>.json`) and diary (`<id>.jsonl`) under `.openagent/` in the agent's

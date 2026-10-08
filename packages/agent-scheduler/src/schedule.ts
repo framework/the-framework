@@ -64,6 +64,8 @@ export interface ScheduledCommand {
   cap: number
   /** The skills folder the skill was read from (`.claude/skills`). */
   dir: string
+  /** What the skill does, in its own words: the `description` of its front matter, when it has one. */
+  description?: string
 }
 
 /** The schedule as read. */
@@ -101,12 +103,14 @@ export function skillSchedule(skill: string, md: string, dir: string): Schedule 
   // A `schedule:` with nothing after it is YAML's null: no row, like an empty list.
   const rows = Array.isArray(written) ? written : written === null ? [] : [written]
   if (rows.length === 0) return unreadable('the schedule lists no row')
+  const said = isMap(data) ? data['description'] : undefined
+  const description = typeof said === 'string' && said.trim() ? { description: said.trim() } : {}
   const commands: ScheduledCommand[] = []
   for (const row of rows) {
     const command = parseRow(skill, row, dir)
     if (typeof command === 'string') return unreadable(rows.length > 1 ? `row ${commands.length + 1}: ${command}` : command)
     if (commands.some(c => c.name === command.name)) return unreadable(`two rows are named ${command.name}`)
-    commands.push(command)
+    commands.push({ ...command, ...description })
   }
   return { commands, unreadable: [] }
 }

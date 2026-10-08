@@ -35,6 +35,16 @@ export interface SchedulerCommand {
   on: boolean
   /** How far a run of the command publishes on this machine: the pick made here, commit until one is made. */
   publish: PublishPick
+  /** What the command's skill does, in the skill's own words, when it says. */
+  description?: string
+  /** What the scheduler's last tick decided for the command, when it decided anything. */
+  decision?: TickDecision
+}
+
+/** A skill of the project whose `schedule` the scheduler could not read, with why: its commands are missing from the list. */
+export interface UnreadableSchedule {
+  skill: string
+  reason: string
 }
 
 /** One project's scheduler, as its `status` answered. */
@@ -55,6 +65,8 @@ export interface SchedulerRow {
   lastTick?: { at: string; decisions: TickDecision[]; note?: string }
   /** The scheduled commands; empty until the scheduler has ticked once, and where no skill of the project schedules one. */
   commands: SchedulerCommand[]
+  /** The skills whose `schedule` the last tick could not read. */
+  unreadable: UnreadableSchedule[]
 }
 
 function isPick(value: unknown): value is PublishPick {
@@ -65,18 +77,28 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }
 
-/** A project's row from what `status` printed: each scheduled command with this machine's switch and publish pick folded in. */
+/** What a tick says of a skill whose `schedule` it could not read, before the reason. */
+const UNREADABLE = 'unreadable schedule: '
+
+/** A project's row from what `status` printed: each scheduled command with this machine's switch and publish pick and the last tick's decision folded in, and the skills the tick could not read. */
 export function schedulerRow(project: ModuleProject, output: unknown): SchedulerRow {
   const state = record(output)
   const tick = record(state['lastTick'])
   const switches = record(state['switches'])
   const publishes = record(state['publishes'])
+  const decisions: TickDecision[] = []
+  for (const item of Array.isArray(tick['decisions']) ? (tick['decisions'] as unknown[]) : []) {
+    const d = record(item)
+    if (typeof d['command'] !== 'string' || typeof d['outcome'] !== 'string') continue
+    decisions.push({ command: d['command'], outcome: d['outcome'], ...(typeof d['run'] === 'string' ? { run: d['run'] } : {}) })
+  }
   const commands: SchedulerCommand[] = []
   for (const item of Array.isArray(tick['schedule']) ? (tick['schedule'] as unknown[]) : []) {
     const row = record(item)
     const command = row['command']
     if (typeof command !== 'string') continue
     const picked = publishes[command]
+    const decision = decisions.find(d => d.command === command)
     commands.push({
       command,
       ...(typeof row['every'] === 'string' ? { every: row['every'] } : {}),
@@ -84,13 +106,9 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
       ...(typeof row['waitsFor'] === 'string' ? { waitsFor: row['waitsFor'] } : {}),
       on: switches[command] === true,
       publish: isPick(picked) ? picked : DEFAULT_PUBLISH,
+      ...(typeof row['description'] === 'string' ? { description: row['description'] } : {}),
+      ...(decision ? { decision } : {}),
     })
-  }
-  const decisions: TickDecision[] = []
-  for (const item of Array.isArray(tick['decisions']) ? (tick['decisions'] as unknown[]) : []) {
-    const d = record(item)
-    if (typeof d['command'] !== 'string' || typeof d['outcome'] !== 'string') continue
-    decisions.push({ command: d['command'], outcome: d['outcome'], ...(typeof d['run'] === 'string' ? { run: d['run'] } : {}) })
   }
   const offset = state['spendOffset']
   return {
@@ -102,6 +120,7 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
     ...(typeof offset === 'number' && Number.isFinite(offset) ? { spendOffset: offset } : {}),
     ...(typeof tick['at'] === 'string' ? { lastTick: { at: tick['at'], decisions, ...(typeof tick['note'] === 'string' ? { note: tick['note'] } : {}) } } : {}),
     commands,
+    unreadable: decisions.flatMap(d => (d.outcome.startsWith(UNREADABLE) ? [{ skill: d.command, reason: d.outcome.slice(UNREADABLE.length) }] : [])),
   }
 }
 
@@ -110,7 +129,7 @@ export function readSchedulers(host: ModuleHost, projects: readonly ModuleProjec
   return Promise.all(
     projects.map(async project => {
       const answer = await host.runCommand(project.id, ['status'])
-      return answer.ok ? schedulerRow(project, answer.output) : { project, error: answer.error, on: false, keepAlive: false, running: false, commands: [] }
+      return answer.ok ? schedulerRow(project, answer.output) : { project, error: answer.error, on: false, keepAlive: false, running: false, commands: [], unreadable: [] }
     }),
   )
 }
@@ -152,25 +171,59 @@ export function publishChoices(gitHost: boolean, saved: PublishPick): readonly P
   return offered.includes(saved) ? offered : [...offered, saved]
 }
 
-/** How often a scheduled command runs, in words: its interval, what its check waits for, or both. A check whose skill gives no plain line is "when its check finds work". */
-export function pace(command: SchedulerCommand): string {
-  const waits = command.waitsFor ?? 'when its check finds work'
-  if (command.every && command.when) return `every ${command.every} at most, ${waits}`
-  if (command.every) return `every ${command.every}`
-  return waits
+const UNITS: Readonly<Record<string, string>> = { m: 'minute', h: 'hour', d: 'day' }
+
+/** An interval as a skill writes it, spelled out: `15m` is "15 minutes", `1h` is "1 hour". One the tool would not have read is shown as written. */
+export function spelled(every: string): string {
+  const read = /^(\d+)(m|h|d)$/.exec(every)
+  const count = Number(read?.[1])
+  return read && count >= 1 ? `${count} ${UNITS[read[2]!]}${count === 1 ? '' : 's'}` : every
 }
 
-/** How far a scheduled command's runs publish on this machine, in words. */
+const sentence = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
+
+/** How often a scheduled command runs, as a sentence: its interval, what its check waits for, or both. A check whose skill gives no plain line is "when its check finds work". */
+export function pace(command: SchedulerCommand): string {
+  const waits = command.waitsFor ?? 'when its check finds work'
+  if (command.every && command.when) return `Every ${spelled(command.every)} at most, ${waits}`
+  if (command.every) return `Every ${spelled(command.every)}`
+  return sentence(waits)
+}
+
+/** How far a scheduled command's runs publish on this machine, as a sentence. */
 export function publishes(command: SchedulerCommand): string {
-  if (command.publish === 'commit') return 'commits its work'
-  if (command.publish === 'branch') return 'publishes its branch'
-  if (command.publish === 'pr') return 'opens a pull request'
-  if (command.publish === 'merge') return 'opens a pull request that merges on green'
-  return 'publishes nothing'
+  if (command.publish === 'commit') return 'Commits its work'
+  if (command.publish === 'branch') return 'Publishes its branch'
+  if (command.publish === 'pr') return 'Opens a pull request'
+  if (command.publish === 'merge') return 'Opens a pull request that merges on green'
+  return 'Publishes nothing'
+}
+
+/**
+ * What the scheduler last decided for a scheduled command, for a person. A command the coding
+ * agent cannot run says so whatever its switch: switching it on would start nothing. Then "Off"
+ * for a command switched off here, and nothing for one switched on that no tick has decided yet.
+ * A decision is said in plain words where the tool's own are a rule's shorthand ("No work", "One
+ * is already running"), and in the tool's words with a capital where they carry a reason only the
+ * tool knows (`Quota: …`, `Check failed: …`).
+ */
+export function decided(command: SchedulerCommand): string | undefined {
+  const outcome = command.decision?.outcome
+  const elsewhere = /^not a command of the coding agent: its skill is only under (\S+),/.exec(outcome ?? '')
+  if (elsewhere) return `Cannot start: its skill is only in ${elsewhere[1]}, which Claude Code does not read`
+  if (!command.on) return 'Off'
+  if (outcome === undefined || outcome === 'switched off on this machine') return undefined
+  if (outcome === 'not due') return 'No work'
+  if (outcome.startsWith('started ')) return 'Started a run'
+  const paced = /^not due \(last start (.+) ago, /.exec(outcome)
+  if (paced) return `Started ${paced[1]} ago, not due yet`
+  const capped = /^cap reached \((\d+) in flight/.exec(outcome)
+  if (capped) return capped[1] === '1' ? 'One is already running' : `${capped[1]} are already running`
+  return sentence(outcome)
 }
 
 /** The one word a scheduler's row leads with, and its colour. */
-export function schedulerStatus(row: SchedulerRow): { label: string; tone: string } {
+export function schedulerStatus(row: Pick<SchedulerRow, 'error' | 'on' | 'running'>): { label: string; tone: string } {
   if (row.error !== undefined) return { label: 'not readable', tone: 'text-danger' }
   if (!row.on) return { label: 'off', tone: 'text-muted-foreground' }
   if (!row.running) return { label: 'on, not running', tone: 'text-warning' }

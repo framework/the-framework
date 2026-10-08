@@ -92,7 +92,7 @@ See `## Context`.
 
 #### Context
 
-**User story**: the user wants the clean-up after merges, which the project's `post-merge-cleanup` skill schedules, to run on their own machine. Like every scheduled command [5] it starts switched off, so they flip its schedule switch [3] in the Scheduler section of the dashboard's Settings page, which runs this command in the project, or type `agent-scheduler switch post-merge-cleanup on`; no tracked file changes, and no other machine runs it.
+**User story**: the user wants the clean-up after merges, which the project's `post-merge-cleanup` skill schedules, to run on their own machine. Like every scheduled command [5] it starts switched off, so they check its checkbox on the dashboard's Automations page, which flips its schedule switch [3] by running this command in the project, or type `agent-scheduler switch post-merge-cleanup on`; no tracked file changes, and no other machine runs it.
 
 #### Business logic
 
@@ -104,7 +104,7 @@ See `## Context`.
 
 #### Context
 
-**User story**: the user wants the queue's runs on their own machine to open a pull request and not merge it, so they pick "Open PR" on the command's Settings row in the Scheduler section of the dashboard's Settings page, which runs this command in the project, or type `agent-scheduler publish work-queue pr`; no tracked file changes, and every other machine keeps its own publish pick [4]. Until they pick, the command's runs on their machine commit their work and push nothing.
+**User story**: the user wants the queue's runs on their own machine to open a pull request and not merge it, so they press "Edit" on the command on the dashboard's Automations page, pick "Open PR" and save, which runs this command in the project, or type `agent-scheduler publish work-queue pr`; no tracked file changes, and every other machine keeps its own publish pick [4]. Until they pick, the command's runs on their machine commit their work and push nothing.
 
 #### Business logic
 

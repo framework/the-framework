@@ -3,6 +3,7 @@ export { skillSchedule, readSchedule, commandPrompt, promptCommand, isDue, type 
 export { readState, writeState, updateState, statePath, DEFAULT_STATE, type State, type TickRecord, type TickDecision } from './state.js'
 export { quotaBoundaryStatus, quotaHeadroom, parseResetsAt, boundaryFromResetsAt, type QuotaBoundaryStatus, type QuotaDecision } from './quota-boundary.js'
 export { inFlight, lastStart, commandOf } from './records.js'
+export { parseInterval, parseTimeOfDay, paceInForce, dueFrom, type Interval, type Pace, type PacePick, type PaceUnit } from './pace.js'
 export { tick, runCheck, type TickDeps, type CheckResult } from './tick.js'
 export { tickProject, startScheduler, stopScheduler, schedulerStatus } from './scheduler.js'
 export { runCli, USAGE, type CliIo, type CliRefusal } from './cli.js'

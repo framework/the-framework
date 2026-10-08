@@ -3,13 +3,14 @@ import { markerCard, runnerMark, type Publish, type RunnerMark } from '@openagt/
 import type { FileBranchWrite } from '@openagt/agent-data'
 import type { RunCard } from '@openagt/skill-logs'
 import { RUN_SKILLS_DIR } from './names.js'
+import { dueFrom, localStamp, paceInForce, paceText } from './pace.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
 import { commandPrompt, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
 import { isSwitchedOn, publishInForce, type ListedCommand, type State, type TickDecision, type TickRecord } from './state.js'
 
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
- * the cheapest order — can the coding agent run it, is it switched on on this machine, has its interval passed, is its check
+ * the cheapest order — can the coding agent run it, is it switched on on this machine, is it due by its pace (this machine's, else its skill's), is its check
  * due, is its cap reached, can the coding agent start at all, is there quota — then mark and spawn one run. Every decision is one line in the state, so a
  * dashboard or a person reads why nothing started without a log.
  *
@@ -79,12 +80,15 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       decide('switched off on this machine')
       continue
     }
-    if (command.every) {
-      // The interval before the check: the records are on disk already, the check spawns a shell.
+    // The pace in force: this machine's pick, else the skill's; none for a command its check alone paces.
+    const pace = paceInForce(deps.state.paces?.[command.name], command)
+    if (pace) {
+      // The pace before the check: the records are on disk already, the check spawns a shell.
       const last = await deps.lastStart(command.name)
-      const since = last === undefined ? undefined : deps.now().getTime() - Date.parse(last)
-      if (since !== undefined && since < command.every.ms) {
-        decide(`not due (last start ${age(since)} ago, every ${command.every.text})`)
+      const now = deps.now()
+      const from = dueFrom(pace, last === undefined ? undefined : new Date(last), now)
+      if (now.getTime() < from.getTime()) {
+        decide(pace.at ? `not due (next start from ${localStamp(from)}, every ${paceText(pace)})` : `not due (last start ${age(now.getTime() - Date.parse(last!))} ago, every ${paceText(pace)})`)
         continue
       }
     }

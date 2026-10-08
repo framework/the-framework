@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { parseInterval } from './pace.js'
 import { commandPrompt, isDue, promptCommand, readSchedule, skillSchedule } from './schedule.js'
 
 const CLAUDE = '.claude/skills'
@@ -33,25 +34,25 @@ test("a skill's schedule names its command, its check, what the check waits for 
 })
 
 test('a row paces by time with `every`, alone or beside a check, the keys in any order; a check written as a block, with quotes and commas or over several lines, is the check as written', () => {
-  assert.deepEqual(read('plan-tickets', skill('plan-tickets', 'schedule:\n  every: 6h\n')).commands, [{ name: 'plan-tickets', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1, dir: CLAUDE }])
+  assert.deepEqual(read('plan-tickets', skill('plan-tickets', 'schedule:\n  every: 6h\n')).commands, [{ name: 'plan-tickets', every: parseInterval('6h')!, cap: 1, dir: CLAUDE }])
   assert.deepEqual(read('plan-tickets', skill('plan-tickets', 'schedule:\n  agents: 1\n  when: npx tickets list\n  every: 30m\n')).commands, [
-    { name: 'plan-tickets', when: 'npx tickets list', every: { ms: 30 * 60_000, text: '30m' }, cap: 1, dir: CLAUDE },
+    { name: 'plan-tickets', when: 'npx tickets list', every: parseInterval('30m')!, cap: 1, dir: CLAUDE },
   ])
   const check = `gh issue list --search "a, b: c" | jq '[.[] | select(.body | test("(?m)^Closes tickets/\\\\w"))]'`
   assert.deepEqual(read('update-tickets', skill('update-tickets', `schedule:\n  every: 7d\n  when: |-\n    ${check}\n`)).commands, [
-    { name: 'update-tickets', when: check, every: { ms: 7 * 86_400_000, text: '7d' }, cap: 1, dir: CLAUDE },
+    { name: 'update-tickets', when: check, every: parseInterval('7d')!, cap: 1, dir: CLAUDE },
   ])
   // Several lines, a blank one after them, Windows line ends: the lines as written, nothing around them.
   assert.equal(read('a', skill('a', 'schedule:\n  when: |\n    one &&\n      two\n\n')).commands[0]!.when, 'one &&\n  two')
-  assert.deepEqual(read('a', skill('a', 'schedule:\n  every: 6h\n  when: npx queue\n').replaceAll('\n', '\r\n')).commands, [{ name: 'a', when: 'npx queue', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1, dir: CLAUDE }])
+  assert.deepEqual(read('a', skill('a', 'schedule:\n  every: 6h\n  when: npx queue\n').replaceAll('\n', '\r\n')).commands, [{ name: 'a', when: 'npx queue', every: parseInterval('6h')!, cap: 1, dir: CLAUDE }])
 })
 
 test('a skill with several modes lists one row per mode, each with the word the skill gets: the whole name is the command', () => {
   const schedule = read('triage', skill('triage', 'schedule:\n  - word: quick\n    every: 6h\n  - word: consensual\n    every: 7d\n    when: npx tickets list\n'))
   assert.deepEqual(schedule, {
     commands: [
-      { name: 'triage quick', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1, dir: CLAUDE },
-      { name: 'triage consensual', when: 'npx tickets list', every: { ms: 7 * 86_400_000, text: '7d' }, cap: 1, dir: CLAUDE },
+      { name: 'triage quick', every: parseInterval('6h')!, cap: 1, dir: CLAUDE },
+      { name: 'triage consensual', when: 'npx tickets list', every: parseInterval('7d')!, cap: 1, dir: CLAUDE },
     ],
     unreadable: [],
   })
@@ -73,9 +74,9 @@ test('a skill with several modes lists one row per mode, each with the word the 
 test('a schedule the reader cannot read gives no command and says why, the row named when there are several', () => {
   const why = (frontMatter: string): unknown => read('a', skill('a', frontMatter))
   const refused = (reason: string): unknown => ({ commands: [], unreadable: [{ skill: 'a', reason }] })
-  assert.deepEqual(why('schedule:\n  every: 2w\n'), refused('every is a number above 0 and a unit, m, h or d (15m, 6h, 7d)'))
-  assert.deepEqual(why('schedule:\n  every: 0h\n'), refused('every is a number above 0 and a unit, m, h or d (15m, 6h, 7d)'))
-  assert.deepEqual(why('schedule:\n  every: 15\n'), refused('every is a number above 0 and a unit, m, h or d (15m, 6h, 7d)'))
+  assert.deepEqual(why('schedule:\n  every: 2y\n'), refused('every is a number above 0 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'))
+  assert.deepEqual(why('schedule:\n  every: 0h\n'), refused('every is a number above 0 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'))
+  assert.deepEqual(why('schedule:\n  every: 15\n'), refused('every is a number above 0 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'))
   assert.deepEqual(why('schedule:\n  every: 1h\n  always: true\n'), refused('unknown key always'))
   assert.deepEqual(why('schedule:\n  waits-for: when there is work\n'), refused('neither every nor when says when'))
   assert.deepEqual(why('schedule:\n  every: 1d\n  waits-for: when there is work\n'), refused('waits-for says what when waits for, and there is no when'))
@@ -128,13 +129,13 @@ test("the schedule is read from both folders a coding agent reads skills from, e
 
     assert.deepEqual(await readSchedule(repo), {
       commands: [
-        { name: 'archive', every: { ms: 2 * 86_400_000, text: '2d' }, cap: 1, dir: AGENTS },
-        { name: 'plan-tickets', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1, dir: CLAUDE },
-        { name: 'review', every: { ms: 3 * 86_400_000, text: '3d' }, cap: 1, dir: AGENTS },
-        { name: 'update-tickets', every: { ms: 3_600_000, text: '1h' }, cap: 1, dir: CLAUDE },
+        { name: 'archive', every: parseInterval('2d')!, cap: 1, dir: AGENTS },
+        { name: 'plan-tickets', every: parseInterval('6h')!, cap: 1, dir: CLAUDE },
+        { name: 'review', every: parseInterval('3d')!, cap: 1, dir: AGENTS },
+        { name: 'update-tickets', every: parseInterval('1h')!, cap: 1, dir: CLAUDE },
         { name: 'work-queue', when: 'npx queue', cap: 1, dir: CLAUDE },
       ],
-      unreadable: [{ skill: 'broken', reason: 'every is a number above 0 and a unit, m, h or d (15m, 6h, 7d)' }],
+      unreadable: [{ skill: 'broken', reason: 'every is a number above 0 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)' }],
     })
   } finally {
     await rm(repo, { recursive: true, force: true })

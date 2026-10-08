@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
 import { DEFAULT_CAP, RUN_SKILLS_DIR, SKILL_FILE } from './names.js'
+import { parseInterval, type Interval } from './pace.js'
 
 /**
  * The schedule (#2022): the scheduled commands of a project, each brought by the skill it runs.
@@ -56,8 +57,8 @@ export interface ScheduledCommand {
   name: string
   /** The check, a shell command line; absent when the row paces by time alone. */
   when?: string
-  /** How often at most: the least time since the command's last recorded start, and the text as written (`6h`). */
-  every?: { ms: number; text: string }
+  /** How often at most, where no person set another pace: the least time since the command's last recorded start. */
+  every?: Interval
   /** What the check waits for, in one plain line for a person. */
   waitsFor?: string
   /** Runs in flight at once, across every machine. */
@@ -77,8 +78,6 @@ export interface Schedule {
 
 const SKILL = /^[a-z0-9][a-z0-9-]*$/
 const WORD = SKILL
-const EVERY = /^(\d+)(m|h|d)$/
-const UNIT_MS = { m: 60_000, h: 3_600_000, d: 86_400_000 } as const
 const ROW_KEYS = ['word', 'every', 'when', 'waits-for', 'agents']
 
 /**
@@ -116,7 +115,7 @@ export function skillSchedule(skill: string, md: string, dir: string): Schedule 
 }
 
 /**
- * One row: `every: <N><m|h|d>`, `when: <shell line>`, `waits-for: <one line>`, `agents: <N>`,
+ * One row: `every: <N><m|h|d|w|mo>`, `when: <shell line>`, `waits-for: <one line>`, `agents: <N>`,
  * `word: <the skill's argument>`. At least one of `every` and `when`, else nothing says when.
  * `every: 0m` is refused rather than read as "always", which is the key being absent. A key the
  * reader does not know is refused too: it is a typo, or a rule this tool would not follow.
@@ -130,8 +129,8 @@ function parseRow(skill: string, row: unknown, dir: string): ScheduledCommand | 
   const { word, every, when, agents } = row
   const waitsFor = row['waits-for']
   if (word !== undefined && !(typeof word === 'string' && WORD.test(word))) return 'word is one word of lower-case letters, digits and dashes'
-  const asEvery = every === undefined ? undefined : EVERY.exec(String(every))
-  if (asEvery === null || (asEvery && Number(asEvery[1]) === 0)) return 'every is a number above 0 and a unit, m, h or d (15m, 6h, 7d)'
+  const asEvery = every === undefined ? undefined : parseInterval(String(every))
+  if (every !== undefined && !asEvery) return 'every is a number above 0 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)'
   if (when !== undefined && !(typeof when === 'string' && when.trim())) return 'when is a shell command line'
   if (waitsFor !== undefined && !(typeof waitsFor === 'string' && waitsFor.trim() && !waitsFor.trim().includes('\n'))) return 'waits-for is one line of text'
   if (agents !== undefined && !(typeof agents === 'number' && Number.isInteger(agents) && agents >= 1)) return 'agents is a whole number, 1 or more'
@@ -140,7 +139,7 @@ function parseRow(skill: string, row: unknown, dir: string): ScheduledCommand | 
   return {
     name: word === undefined ? skill : `${skill} ${word}`,
     ...(typeof when === 'string' ? { when: when.trim() } : {}),
-    ...(asEvery ? { every: { ms: Number(asEvery[1]) * UNIT_MS[asEvery[2] as keyof typeof UNIT_MS], text: `${asEvery[1]}${asEvery[2]}` } } : {}),
+    ...(asEvery ? { every: asEvery } : {}),
     ...(typeof waitsFor === 'string' ? { waitsFor: waitsFor.trim() } : {}),
     cap: typeof agents === 'number' ? agents : DEFAULT_CAP,
     dir,

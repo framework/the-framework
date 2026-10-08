@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { PUBLISH_LEVELS, type Publish } from '@openagt/agent-runner'
 import { DEFAULT_MODEL, DEFAULT_PUBLISH, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE } from './names.js'
+import type { PacePick } from './pace.js'
 
 /**
  * The tool's state (#1774): one JSON file under `.agent-scheduler/` at the repository root,
@@ -12,7 +13,7 @@ import { DEFAULT_MODEL, DEFAULT_PUBLISH, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_
  *
  * What is here is what would otherwise live in a process's memory: whether the scheduler is on,
  * whether it should outlive whatever started it, the model this user's scheduled runs start on
- * and the spend cushion they take, which scheduled commands this machine switched on, how far this machine's runs of a scheduled command publish where a person picked it, the pid of the scheduler's own process when one runs, and the last tick with what it
+ * and the spend cushion they take, which scheduled commands this machine switched on, the pace a person set for one here, how far this machine's runs of a scheduled command publish where a person picked it, the pid of the scheduler's own process when one runs, and the last tick with what it
  * decided per command. A restart loses nothing.
  */
 
@@ -62,6 +63,8 @@ export interface State {
   switches?: Record<string, true>
   /** This machine's publish pick per command. */
   publishes?: Record<string, PublishPick>
+  /** This machine's pace per command, kept only where a person set one: a command without one runs at its skill's pace. */
+  paces?: Record<string, PacePick>
   /** The scheduler's own process, while `start` has one running. */
   pid?: number
   /** When that process started, ISO. */
@@ -148,6 +151,14 @@ export function publishInForce(state: State, command: string): Publish | undefin
 /** The state with one command's publish pick set. */
 export function withPublish(state: State, command: string, pick: PublishPick): State {
   return { ...state, publishes: { ...state.publishes, [command]: pick } }
+}
+
+/** The state with one command's pace set, or taken back when there is none: the command then runs at its skill's pace again. */
+export function withPace(state: State, command: string, pick: PacePick | undefined): State {
+  const { [command]: _previous, ...others } = state.paces ?? {}
+  const paces = pick === undefined ? others : { ...others, [command]: pick }
+  const { paces: _paces, ...rest } = state
+  return Object.keys(paces).length ? { ...rest, paces } : rest
 }
 
 /** Read, change, write: one edit of the state. */

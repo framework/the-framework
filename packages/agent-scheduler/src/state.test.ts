@@ -4,7 +4,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@openagt/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, withSwitch, publishInForce, withPublish } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, withSwitch, publishInForce, withPace, withPublish } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
@@ -93,4 +93,17 @@ test('a run of a scheduled command commits its work until a person picks a level
 
   // A hand-edited state with a word that is no pick: as if nobody picked.
   assert.equal(publishInForce({ ...DEFAULT_STATE, publishes: { 'work-queue': 'push' as never } }, 'work-queue'), 'commit')
+})
+
+test("a pace is kept only where a person set one: taking it back leaves no trace, and the command runs at its skill's pace again", () => {
+  const since = '2026-10-08T07:00:00.000Z'
+  const one = withPace(DEFAULT_STATE, 'update-tickets', { every: '1h', since })
+  const two = withPace(one, 'work-queue', { work: true })
+  assert.deepEqual(two.paces, { 'update-tickets': { every: '1h', since }, 'work-queue': { work: true } })
+  // A new pick replaces the old one.
+  assert.deepEqual(withPace(two, 'update-tickets', { every: '2d', at: '10:00', since }).paces!['update-tickets'], { every: '2d', at: '10:00', since })
+  const back = withPace(withPace(two, 'update-tickets', undefined), 'work-queue', undefined)
+  assert.equal('paces' in back, false)
+  // Taking back a pace nobody set changes nothing.
+  assert.deepEqual(withPace(one, 'triage quick', undefined), one)
 })

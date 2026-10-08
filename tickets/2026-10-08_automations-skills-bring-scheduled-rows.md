@@ -5,7 +5,7 @@ Issue: [#2022](https://github.com/openagt/openagent/issues/2022)
 
 ## TLDR
 
-A project's scheduled commands stop being lines of a hand-written `agent-schedule.md`. A command skill says in its own `SKILL.md` that it can be scheduled, with its check and its default pace, so an installed skill adds its own row. Each person sets the rest per repository: whether the row runs, its pace (down to a time of day), and how far its runs publish. A new Automations page shows and sets the rows.
+A project's scheduled commands stop being lines of a hand-written `agent-schedule.md`. A command skill says in its own `SKILL.md` that it can be scheduled, with its check, its default pace and its default number of agents at once, so an installed skill adds its own row. Each person sets the rest per repository: whether the row runs (every row starts switched off), its pace (down to a time of day), how many agents of it work at once, and how far its runs publish. A new Automations page shows and sets the rows.
 
 ## Why it matters
 
@@ -35,29 +35,28 @@ A project's scheduled commands stop being lines of a hand-written `agent-schedul
    ---
    ```
 
-   A skill with two modes lists two rows, as `triage quick` and `triage consensual` are today. The exact shape is open; the point is that the row, its check and its default pace travel with the skill. A skill that is not in the project has no row.
+   A skill with two modes lists two rows, as `triage quick` and `triage consensual` are today. The exact shape is open; the point is that the row, its check, its default pace and its default number of agents at once travel with the skill. A row with a check also carries one short plain line saying what it waits for ("when a ticket has no plan yet"), because a check is a shell line the page cannot turn into a sentence. A skill that is not in the project has no row.
 
-2. **Each person sets the rest, per repository.** Whether the row runs, its pace, and how far its runs publish.
+2. **Each person sets the rest, per repository.** Whether the row runs, its pace, how many agents of it work at once, and how far its runs publish.
+   - Every row starts switched off: a skill that arrives in a project starts no agent by itself. That changes this repository, where four of the six lines run today unless a person switched them off.
    - A row starts at the pace its skill says. The person can set another as a number and a unit: minutes, hours, days, weeks or months ("every 15 minutes", "every 2 weeks", "every 2 months").
    - A row that has a check also offers "whenever there is work", and "As the skill says" takes the pick back.
    - A pace in minutes or hours is the least time since the command last started, as today.
    - A pace in days, weeks or months may also name a time of day ("every 2 days at 10:00"), like a calendar event: the row is then due from that time on, on a day at least that many days after the day it last started. The time is the machine's own local time. A week is 7 days and a month 30; picking a weekday ("every Monday") is left out.
    - All of it is saved where the switch and the publish pick already are, so nothing tracked changes.
+   - **How many at once.** A row starts at the number its skill says, 1 when it says none. A machine starts another agent of a command only while fewer than its person's number are working on it, counting the agents of every machine that shares the repository. The person asked for "per user"; counting every machine's agents is the curating agent's reading.
+   - **Two people, two paces.** The pace counts from the command's last start on any machine, so the work never runs twice. The machine of the person with the faster pace, or the earlier time of day, starts it.
+   - **A missed time.** A row set to 10:00 when the scheduler is not running then (the dashboard closed, the laptop asleep), or has no quota then, starts once when the scheduler next can. It never starts twice for one missed day.
 
 3. **`agent-schedule.md` goes away.** The skill holds the default, the person's state holds the choice, and there is no third place. No code for the old file: nobody outside uses it.
 
-4. **An Automations page.** The scheduler's package brings it, the way it brings its Settings section today. One row per scheduled command of the project: its switch, its pace, its publish level, and what the scheduler last decided for it ("no work", "quota", "started run …"). Settings keeps only what reaches every project (the spend offset).
+4. **An Automations page.** The scheduler's package brings it, the way it brings its Settings section today. One row per scheduled command of the project: its switch, its pace, its number of agents at once, its publish level, what it waits for in plain words, and what the scheduler last decided for it ("no work", "quota", "started run …"). Settings keeps only what reaches every project (the spend offset).
 
 ## Open questions
 
-1. Does every row start switched off? Proposed: yes, a skill that arrives in a project should not start spending quota by itself. It changes this repository, where four of the six lines run today unless a person switched them off.
-2. The cap: does it stay with the skill? It counts runs across every machine that shares the repository, so it is not one person's to set.
-3. Two people on one repository can pick two paces for the same row. The pace counts from the command's last start on any machine, so they do not double up, but the faster pace, or the earlier time of day, wins for both. Is that fine?
-4. An unknown `schedule` key in a skill file must be harmless to Claude Code and to Codex. To check before building.
-5. The scheduler looks for a command under `.claude/skills` only. The launcher reads `.agents/skills` too. The rows should be read from both.
-6. A row set to 10:00 when the scheduler is not running at 10:00 (the dashboard closed, the laptop asleep) or has no quota then. Proposed: start it once, when the scheduler next can, and never twice for one missed day.
-7. Saying in words what a row waits for. A check is a shell line, so the page cannot turn it into a sentence. To show "when there are merged pull requests to write up", the skill has to give that short line beside its check. Without it the page can only say "when its check finds work".
-8. This reverses a written decision. `packages/agent-scheduler/DECISIONS.md` says the schedule is a tracked file a person writes, and that a line is the team's default. That text has to be rewritten by a person.
+1. An unknown `schedule` key in a skill file must be harmless to Claude Code and to Codex. To check before building.
+2. The scheduler looks for a command under `.claude/skills` only. The launcher reads `.agents/skills` too. The rows should be read from both.
+3. This reverses a written decision. `packages/agent-scheduler/DECISIONS.md` says the schedule is a tracked file a person writes, and that a line is the team's default. That text has to be rewritten by a person.
 
 ## Not part of this
 

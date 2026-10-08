@@ -80,6 +80,23 @@ describe('Settings → Scheduler', () => {
     expect(screen.queryByText(/Shown: the loosest/)).toBeNull()
   })
 
+  test('an offset save that could not even be asked says why, and the next one still saves', async () => {
+    let down = true
+    const { host, runCommand } = hostAnswering((projectId, args) => {
+      if (args[0] === 'status') return { ok: true, output: STATUS }
+      if (down) throw new Error('Failed to fetch')
+      return { ok: true, output: { ok: true } }
+    })
+    show(host)
+    const offset = (await screen.findByLabelText('Spend offset')) as HTMLInputElement
+    fireEvent.change(offset, { target: { value: '20' } })
+    expect((await screen.findByRole('alert', undefined, { timeout: 3000 })).textContent).toBe('The spend offset was not saved: Failed to fetch')
+    down = false
+    fireEvent.change(offset, { target: { value: '21' } })
+    await waitFor(() => expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'offset').map(([, args]) => args[2])).toEqual(['20', '21']), { timeout: 3000 })
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+  })
+
   test('a project whose scheduler cannot be read is named with the reason, and the offset of the others still shows', async () => {
     const { host } = hostAnswering(projectId => (projectId === 'p1' ? { ok: true, output: STATUS } : { ok: false, error: 'not inside a git repository' }))
     show(host, [GEMSTACK, OTHER])

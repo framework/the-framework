@@ -200,19 +200,25 @@ export function publishes(command: SchedulerCommand): string {
 }
 
 /**
- * What the scheduler last decided for a scheduled command, for a person: "Off" for a command
- * switched off here, "No work" for a check that found none, "Started a run", else the tool's own
- * words (`Cap reached (…)`, `Quota: …`, `Not due (last start 2h ago, every 6h)`). A command the
- * coding agent cannot run says so whatever its switch. Nothing for a command switched on that no
- * tick has decided yet.
+ * What the scheduler last decided for a scheduled command, for a person. A command the coding
+ * agent cannot run says so whatever its switch: switching it on would start nothing. Then "Off"
+ * for a command switched off here, and nothing for one switched on that no tick has decided yet.
+ * A decision is said in plain words where the tool's own are a rule's shorthand ("No work", "One
+ * is already running"), and in the tool's words with a capital where they carry a reason only the
+ * tool knows (`Quota: …`, `Check failed: …`).
  */
 export function decided(command: SchedulerCommand): string | undefined {
   const outcome = command.decision?.outcome
-  if (outcome?.startsWith('not a command of the coding agent')) return sentence(outcome)
+  const elsewhere = /^not a command of the coding agent: its skill is only under (\S+),/.exec(outcome ?? '')
+  if (elsewhere) return `Cannot start: its skill is only in ${elsewhere[1]}, which Claude Code does not read`
   if (!command.on) return 'Off'
   if (outcome === undefined || outcome === 'switched off on this machine') return undefined
   if (outcome === 'not due') return 'No work'
   if (outcome.startsWith('started ')) return 'Started a run'
+  const paced = /^not due \(last start (.+) ago, /.exec(outcome)
+  if (paced) return `Started ${paced[1]} ago, not due yet`
+  const capped = /^cap reached \((\d+) in flight/.exec(outcome)
+  if (capped) return capped[1] === '1' ? 'One is already running' : `${capped[1]} are already running`
   return sentence(outcome)
 }
 

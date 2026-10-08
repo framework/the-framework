@@ -36,12 +36,13 @@ export function SchedulerSettings({ projects }: ModuleSettingsProps) {
     timer.current = setTimeout(() => {
       setError(undefined)
       queue.current = queue.current.then(async () => {
-        const saved = await saveSpendOffset(host, projects, points)
+        // A command that could not even be asked is a save not taken, and the next save still runs.
+        const saved = await saveSpendOffset(host, projects, points).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }))
         if (!saved.ok) {
           setTyped(undefined)
           setError(`The spend offset was not saved: ${saved.error}`)
         }
-        await reload()
+        await reload().catch(() => {})
       })
     }, OFFSET_SAVE_DELAY_MS)
   }
@@ -50,7 +51,7 @@ export function SchedulerSettings({ projects }: ModuleSettingsProps) {
   const unread = rows.filter(row => row.error !== undefined)
   if (projects.length === 0) return null
   return (
-    <SettingsSection title="Scheduler" description="How far scheduled work may spend, in every project, on this machine. What each project starts by itself is on the Automations page.">
+    <SettingsSection title="Scheduler" description="How far past the quota scheduled work may go, in every project, on this machine. What each project starts by itself is on the Automations page.">
       {offset !== undefined && (
         <SettingsRow
           label="Spend offset"

@@ -111,14 +111,19 @@ describe('in words', () => {
     expect(publishes({ ...base, publish: 'merge' })).toBe('Opens a pull request that merges on green')
   })
 
-  test("what the scheduler last decided for a command, for a person: Off, No work, Started a run, else the tool's own words", () => {
+  test("what the scheduler last decided for a command, for a person: Off, No work, Started a run, a pace in words, how many are running, else the tool's own words", () => {
     const on = { command: 'a', on: true, publish: 'commit' as const }
     const said = (outcome: string, over: object = {}) => decided({ ...on, ...over, decision: { command: 'a', outcome } })
     expect(said('not due')).toBe('No work')
     expect(said('started 2026-10-03T10-00-00-000Z')).toBe('Started a run')
-    expect(said('not due (last start 2h ago, every 6h)')).toBe('Not due (last start 2h ago, every 6h)')
-    expect(said('cap reached (1 in flight: x on other-box)')).toBe('Cap reached (1 in flight: x on other-box)')
+    expect(said('not due (last start 2h ago, every 6h)')).toBe('Started 2h ago, not due yet')
+    expect(said('not due (last start less than a minute ago, every 15m)')).toBe('Started less than a minute ago, not due yet')
+    expect(said('cap reached (1 in flight: 2026-10-03T10-00-00-000Z on other-box)')).toBe('One is already running')
+    expect(said('cap reached (3 in flight: a on x, b on y, c on z)')).toBe('3 are already running')
+    // A reason only the tool knows stays in the tool's words.
     expect(said('quota: the week is 90% used')).toBe('Quota: the week is 90% used')
+    expect(said('check failed: not found: queue')).toBe('Check failed: not found: queue')
+    expect(said('not ready: `claude` is not logged in.')).toBe('Not ready: `claude` is not logged in.')
     // Switched on a moment ago: the last tick still said off, and no tick has decided yet.
     expect(said('switched off on this machine')).toBeUndefined()
     expect(decided(on)).toBeUndefined()
@@ -127,8 +132,8 @@ describe('in words', () => {
     expect(decided({ ...on, on: false })).toBe('Off')
     // A command the coding agent cannot run says so whatever its switch: switching it on would start nothing.
     const elsewhere = 'not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills'
-    expect(said(elsewhere, { on: false })).toBe('Not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills')
-    expect(said(elsewhere)).toMatch(/^Not a command of the coding agent/)
+    expect(said(elsewhere, { on: false })).toBe('Cannot start: its skill is only in .agents/skills, which Claude Code does not read')
+    expect(said(elsewhere)).toBe('Cannot start: its skill is only in .agents/skills, which Claude Code does not read')
   })
 
   test('the publish menu: every pick with a git host package, Nothing, Commit and Publish branch without; the pick in force is listed even when not offered', () => {

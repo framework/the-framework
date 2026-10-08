@@ -2,6 +2,17 @@
 name: triage
 description: Put the tickets whose plan says they are ready on the project's agent queue, unattended; the quick wins, the consensual work, or both.
 disable-model-invocation: true
+schedule:
+  - word: quick
+    every: 6h
+    waits-for: when a planned ticket is a quick win and not on the queue
+    when: |-
+      npx tickets list | jq --argjson q "$(npx queue)" '[.[] | select(.planned and .pr == null and (.waiting | not) and (.locked | not) and (.outdated | not) and .effort != null and .uncertainty != null and .effort <= 2 and .uncertainty <= 2 and (.file as $f | $q | any(contains($f)) | not)) | .file]'
+  - word: consensual
+    every: 7d
+    waits-for: when a planned ticket is consensual work and not on the queue
+    when: |-
+      npx tickets list | jq --argjson q "$(npx queue)" '[.[] | select(.planned and .pr == null and (.waiting | not) and (.locked | not) and (.outdated | not) and .effort != null and .uncertainty != null and .uncertainty <= 3 and (.effort > 2 or .uncertainty > 2) and (.file as $f | $q | any(contains($f)) | not)) | .file]'
 ---
 
 Choose work for the agent queue. Nobody will answer you: never ask, decide yourself. You only queue work, you never do it: the only thing you change is the queue. The word after the command is the mode: `quick`, `consensual`, or nothing for both.

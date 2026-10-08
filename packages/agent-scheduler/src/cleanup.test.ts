@@ -4,7 +4,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cleanup } from './cleanup.js'
 import { runCli } from './cli.js'
-import { SCHEDULER_LOG, SCHEDULE_FILE, STATE_DIR } from './names.js'
+import { SCHEDULER_LOG, STATE_DIR } from './names.js'
 import { DEFAULT_STATE, statePath, writeState } from './state.js'
 import { git, removeRepo, testRepo } from './test-repo.js'
 
@@ -25,12 +25,9 @@ async function ran(repo: string, pid?: number): Promise<void> {
   await writeFile(join(repo, STATE_DIR, SCHEDULER_LOG), '[agent-scheduler] tick\n')
 }
 
-test('the state, the log, the directory and the rule hiding it go; the schedule, the project and the remote stay as they were', async () => {
+test('the state, the log, the directory and the rule hiding it go; the project, its skills and the remote stay as they were', async () => {
   const repo = await testRepo()
   try {
-    await writeFile(join(repo, SCHEDULE_FILE), '- work-queue every 30 minutes\n')
-    await git(['add', SCHEDULE_FILE], repo)
-    await git(['commit', '-q', '-m', 'a schedule'], repo)
     const before = await outside(repo)
     await ran(repo)
     assert.match(await excludeOf(repo), /^\/\.agent-scheduler$/m)
@@ -38,7 +35,6 @@ test('the state, the log, the directory and the rule hiding it go; the schedule,
     assert.deepEqual(await cleanup(repo), { ok: true, removed: [STATE_DIR], kept: [] })
     assert.equal(await exists(join(repo, STATE_DIR)), false)
     assert.doesNotMatch(await excludeOf(repo), /agent-scheduler/)
-    assert.equal(await readFile(join(repo, SCHEDULE_FILE), 'utf8'), '- work-queue every 30 minutes\n')
     assert.equal(await outside(repo), before)
 
     assert.deepEqual(await cleanup(repo), { ok: true, removed: [], kept: [] }, 'a second pass finds nothing')

@@ -2,6 +2,11 @@
 name: plan-tickets
 description: Queue a plan for the open tickets that have none or whose plan is outdated, unattended; at most ten a run.
 disable-model-invocation: true
+schedule:
+  every: 6h
+  waits-for: when an open ticket has no plan, or an outdated one
+  when: |-
+    npx tickets list | jq --argjson q "$(npx queue)" '[.[] | select(((.planned | not) or .outdated) and .pr == null and (.waiting | not) and (.locked | not) and ((.file | rtrimstr(".md")) as $s | $q | any(contains($s)) | not)) | .file]'
 ---
 
 Queue plans for the tickets that need one. Nobody will answer you: never ask, decide yourself. You only queue work, you never do it: write no plan yourself, the only thing you change is the queue.

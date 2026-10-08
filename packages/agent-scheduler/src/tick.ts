@@ -1,17 +1,14 @@
-import { stat } from 'node:fs/promises'
-import { join } from 'node:path'
 import type { DriverQuota, DriverReadiness } from '@openagt/agent-driver'
 import { markerCard, runnerMark, type Publish, type RunnerMark } from '@openagt/agent-runner'
 import type { FileBranchWrite } from '@openagt/agent-data'
 import type { RunCard } from '@openagt/skill-logs'
-import { COMMANDS_DIR } from './names.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
-import { commandPrompt, commandSkill, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
-import { isSwitchedOn, publishInForce, type ScheduleLine, type State, type TickDecision, type TickRecord } from './state.js'
+import { commandPrompt, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
+import { isSwitchedOn, publishInForce, type ScheduleRow, type State, type TickDecision, type TickRecord } from './state.js'
 
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
- * the cheapest order — does the project have the command, is it switched on on this machine, has its interval passed, is its check
+ * the cheapest order — is it switched on on this machine, has its interval passed, is its check
  * due, is its cap reached, can the coding agent start at all, is there quota — then mark and spawn one run. Every decision is one line in the state, so a
  * dashboard or a person reads why nothing started without a log.
  *
@@ -32,12 +29,11 @@ export interface CheckResult {
 
 export interface TickDeps {
   state: State
-  schedule: Schedule | undefined
+  schedule: Schedule
   host: string
   now: () => Date
   pull: () => Promise<{ ok: true } | { ok: false; error: string }>
   sweep: () => Promise<unknown>
-  hasCommand: (name: string) => Promise<boolean>
   check: (shell: string) => Promise<CheckResult>
   /** When the command last started on any machine, ISO; nothing when it never did. */
   lastStart: (command: string) => Promise<string | undefined>
@@ -59,14 +55,13 @@ export interface TickDeps {
 
 export async function tick(deps: TickDeps): Promise<TickRecord> {
   const at = deps.now().toISOString()
-  const record: TickRecord = { at, decisions: [], ...(deps.schedule ? { schedule: deps.schedule.commands.map(scheduleLine) } : {}) }
+  const record: TickRecord = { at, decisions: [], schedule: deps.schedule.commands.map(scheduleRow) }
   const pulled = await deps.pull()
   if (!pulled.ok) return { ...record, note: `agent-data could not be pulled: ${pulled.error}` }
   await deps.sweep()
   if (!deps.state.on) return { ...record, note: 'off' }
-  if (!deps.schedule) return { ...record, note: 'no agent-schedule.md' }
-
-  for (const { line, text } of deps.schedule.unreadable) record.decisions.push({ command: `line ${line}`, outcome: `unreadable: ${text}` })
+  for (const { skill, reason } of deps.schedule.unreadable) record.decisions.push({ command: skill, outcome: `unreadable schedule: ${reason}` })
+  if (record.decisions.length === 0 && deps.schedule.commands.length === 0) return { ...record, note: 'no skill of this project schedules a command' }
 
   let readiness: DriverReadiness | undefined
   let quota: Awaited<ReturnType<typeof quotaHeadroom>> | undefined
@@ -74,11 +69,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     const decide = (outcome: string, run?: string): void => {
       record.decisions.push({ command: command.name, outcome, ...(run ? { run } : {}) })
     }
-    if (!(await deps.hasCommand(commandSkill(command.name)))) {
-      decide('no such command in this project')
-      continue
-    }
-    if (!isSwitchedOn(deps.state, command)) {
+    if (!isSwitchedOn(deps.state, command.name)) {
       decide('switched off on this machine')
       continue
     }
@@ -125,8 +116,8 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     }
     const id = deps.mint()
     const prompt = commandPrompt(command.name)
-    // The publish level in force, this machine's pick else the line's, goes on the marker and to the run: the agent is told it after its prompt.
-    const level = publishInForce(deps.state, command)
+    // The publish level in force, this machine's pick, goes on the marker and to the run: the agent is told it after its prompt.
+    const level = publishInForce(deps.state, command.name)
     const publish = level !== undefined ? { publish: level } : {}
     const mark: RunnerMark = { host: deps.host, ...publish }
     const marked = await deps.writeMarker(markerCard({ id, startedAt: deps.now().toISOString(), prompt, driver: deps.driver, model: deps.state.model, mark }))
@@ -156,9 +147,9 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
   return record
 }
 
-/** A command as a dashboard lists it: what the line says, not this machine's switch or publish pick, which the state carries. */
-function scheduleLine(command: ScheduledCommand): ScheduleLine {
-  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), on: command.on, ...(command.publish !== undefined ? { publish: command.publish } : {}) }
+/** A command as a dashboard lists it: what its skill says, not this machine's switch or publish pick, which the state carries. */
+function scheduleRow(command: ScheduledCommand): ScheduleRow {
+  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}) }
 }
 
 /** An age for a decision line: `less than a minute`, `12m`, `3h`, `2d`, floored. */
@@ -180,12 +171,6 @@ async function boundary(deps: TickDeps) {
   const reading = await deps.quota().catch((): DriverQuota => ({ available: false, reason: 'fetch-failed' }))
   if (!reading.available) return undefined
   return quotaBoundaryStatus({ windows: reading.windows, now: deps.now().getTime(), model: deps.state.model, limitOffset: deps.state.spendOffset })
-}
-
-/** Whether the project has a command's skill: its folder is there, tracked file or link. */
-export async function projectHasCommand(repo: string, name: string): Promise<boolean> {
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) return false
-  return stat(join(repo, COMMANDS_DIR, name)).then(s => s.isDirectory(), () => false)
 }
 
 /** Run a check at the repository root through the shell, within its budget. */

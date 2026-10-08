@@ -1,4 +1,4 @@
-The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Ten commands: `tick`, `init`, `start [--keep-alive]`, `stop [--unless-keep-alive]`, `status`, `model <id>`, `offset <points>`, `switch <command> <on|off>`, `publish <command> <file|nothing|commit|branch|pr|merge>`.
+The command line, `agent-scheduler <command>`: JSON on stdout, one line for a person on stderr, and the exit code says how it went, 0 for a result, 1 for a refusal or a failure, 2 for a command line that could not be read. The same contract as the skills' commands, so a person and a dashboard read it the same way. Ten commands: `tick`, `init`, `start [--keep-alive]`, `stop [--unless-keep-alive]`, `status`, `model <id>`, `offset <points>`, `switch <command> <on|off>`, `publish <command> <nothing|commit|branch|pr|merge>`, `cleanup`.
 
 ## Context
 
@@ -10,8 +10,9 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 
 [1] the state: `.agent-scheduler/state.json` at the repository root, per user: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches [3] and publish picks [4], the scheduler's pid, the last tick's decisions.
 [2] tick: one pass of the scheduler: pull the `agent-data` branch, sweep, then one decision per scheduled command.
-[3] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the schedule (`agent-schedule.md`). The schedule line is the default where nobody switched the command: on, unless the line says `off`.
-[4] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: `nothing`, or one of the levels a schedule line may say (`commit`, `branch`, `pr`, `merge`); kept in the state, not in the schedule. It stands in for the `publish` clause of the command's schedule line until the person takes it back.
+[3] schedule switch: a person's choice, on one machine, whether a scheduled command runs there; kept in the state, not in the skill that schedules the command. Every scheduled command is off on a machine until a person switches it on there.
+[4] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: `nothing`, or one of the publish levels a run may be given (`commit`, `branch`, `pr`, `merge`); kept in the state, not in the skill. It is `commit` until the person picks.
+[5] scheduled command: one command a skill of the project schedules with the key `schedule` in the front matter of its `SKILL.md`, named by the skill's folder name and at most one word after it (`triage quick`). The schedule is all the scheduled commands of a project.
 
 ## Business logic — TL;DR
 
@@ -21,9 +22,9 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 - **`init`** - this tool's lines written into the dashboard's hooks file, a line already there kept; answered with the file and which keys gained a line; refused `no-dashboard` where the project has no `.openagent/` directory and `unreadable` where the file is not a YAML map (`init.ts`).
 - **`start`, `stop`, `status`** - the state answered after each; `start --foreground` makes this process the scheduler's; `start --keep-alive` writes keep-alive on; `stop --unless-keep-alive` leaves a keep-alive scheduler running, says so on stderr, and answers `kept: true`.
 - **`model <id>`, `offset <points>`** - the state's model (the one every scheduled run starts on) or spend cushion written for this user and the state answered; `offset` with something that is not a number is a usage error, `<value> is not a number of percentage points`.
-- **`switch <command> <on|off>`** - this machine's schedule switch [3] for one command of `agent-schedule.md`, named as its line names it (quoted when it holds a word after the folder: `switch "triage quick" on`), written and the state answered; refused `no-schedule` without the file and `not-scheduled` when it has no line for the command; a value neither `on` nor `off` is a usage error.
-- **`publish <command> <file|nothing|commit|branch|pr|merge>`** - this machine's publish pick [4] for one command of `agent-schedule.md`, named as its line names it, written and the state answered; `file` takes the pick back, so the line decides again; refused `no-schedule` without the file and `not-scheduled` when it has no line for the command; any other value is a usage error.
-- **`cleanup`** - what this tool left in the project removed: the state file and the scheduler's log, then `.agent-scheduler/` once it is empty, then the rule hiding it from git once no checkout of the repository has one; `agent-schedule.md` stays; answered with what was removed and what was kept, each kept path with its reason; refused `running` with the pid while the state names a live scheduler, with the line `the scheduler is running here (pid <pid>): stop it first with agent-scheduler stop` (`cleanup.ts`).
+- **`switch <command> <on|off>`** - this machine's schedule switch [3] for one scheduled command [5], named by its whole name (quoted when it holds a word after the skill's name: `switch "triage quick" on`), written and the state answered; refused `not-scheduled` when no skill of the project schedules the command; a value neither `on` nor `off` is a usage error.
+- **`publish <command> <nothing|commit|branch|pr|merge>`** - this machine's publish pick [4] for one scheduled command [5], named the same way, written and the state answered; refused `not-scheduled` when no skill of the project schedules the command; any other value is a usage error.
+- **`cleanup`** - what this tool left in the project removed: the state file and the scheduler's log, then `.agent-scheduler/` once it is empty, then the rule hiding it from git once no checkout of the repository has one; answered with what was removed and what was kept, each kept path with its reason; refused `running` with the pid while the state names a live scheduler, with the line `the scheduler is running here (pid <pid>): stop it first with agent-scheduler stop` (`cleanup.ts`).
 
 ## Business logic
 
@@ -35,7 +36,7 @@ The command line, `agent-scheduler <command>`: JSON on stdout, one line for a pe
 
 #### Business logic
 
-A command that ran prints exactly one JSON document on stdout, an object with `ok`, and exits 0. A refusal, a rule saying no (the working directory is not inside a repository), prints `{"ok":false,"reason":…}` on stdout, one line on stderr, and exits 1. Anything else that fails (git, the file system, a driver) prints `{"ok":false,"reason":"failed","detail":<the error's message>}` on stdout, the detail on stderr, and exits 1. A command line that cannot be read is rejected before anything runs: no command or an unknown one (`agent-runner`'s `run` and `check` among them) prints the usage on stderr and exits 2; an unknown flag or the wrong number of arguments (`model` and `offset` take exactly one, `switch` exactly two, the others none) prints what was wrong (`expected 1 argument(s), got 0`) followed by the usage on stderr, nothing on stdout, and exits 2. The usage names the ten commands and the contract.
+A command that ran prints exactly one JSON document on stdout, an object with `ok`, and exits 0. A refusal, a rule saying no (the working directory is not inside a repository), prints `{"ok":false,"reason":…}` on stdout, one line on stderr, and exits 1. Anything else that fails (git, the file system, a driver) prints `{"ok":false,"reason":"failed","detail":<the error's message>}` on stdout, the detail on stderr, and exits 1. A command line that cannot be read is rejected before anything runs: no command or an unknown one (`agent-runner`'s `run` and `check` among them) prints the usage on stderr and exits 2; an unknown flag or the wrong number of arguments (`model` and `offset` take exactly one, `switch` and `publish` exactly two, the others none) prints what was wrong (`expected 1 argument(s), got 0`) followed by the usage on stderr, nothing on stdout, and exits 2. The usage names the ten commands and the contract.
 
 ### The project
 
@@ -55,7 +56,7 @@ See `tick.ts` and `scheduler.ts`.
 
 #### Business logic
 
-`tick` runs one tick [2] of the project now, the way the scheduler's process would, a due command started as a run of `agent-runner`, its lines told on stderr, and answers the tick's record (`at`, `decisions`, `note`) with `ok: true`. It runs whether or not the state is on: an off state answers the note `off` after the pull and the sweep.
+`tick` runs one tick [2] of the project now, the way the scheduler's process would, a due command started as a run of `agent-runner`, its lines told on stderr, and answers the tick's record (`at`, `decisions`, `schedule`, `note`) with `ok: true`. It runs whether or not the state is on: an off state answers the note `off` after the pull and the sweep.
 
 ### `start`, `stop`, `status`
 
@@ -91,18 +92,18 @@ See `## Context`.
 
 #### Context
 
-**User story**: the user wants the daily clean-up after merges, listed `off` in the tracked `agent-schedule.md`, to run on their own machine; they flip its schedule switch [3] in the Scheduler section of the dashboard's Settings page, which runs this command in the project, or type `agent-scheduler switch post-merge-cleanup on`; the tracked file does not change, and no other machine runs it.
+**User story**: the user wants the clean-up after merges, which the project's `post-merge-cleanup` skill schedules, to run on their own machine. Like every scheduled command [5] it starts switched off, so they flip its schedule switch [3] in the Scheduler section of the dashboard's Settings page, which runs this command in the project, or type `agent-scheduler switch post-merge-cleanup on`; no tracked file changes, and no other machine runs it.
 
 #### Business logic
 
-`switch` takes exactly two arguments: a command's name and `on` or `off`; any other value is a usage error, `<value> is neither on nor off`, exit 2. With no `agent-schedule.md` in the repository it refuses `{"ok":false,"reason":"no-schedule"}` with `no agent-schedule.md in this repository` on stderr, exit 1; when the schedule has no readable line for the command it refuses `{"ok":false,"reason":"not-scheduled","command":<name>}` with `agent-schedule.md has no line for <name>` on stderr, exit 1. Otherwise it writes this machine's schedule switch [3] for the command by `state.ts`'s rule (kept only where it differs from what the line says) and answers the state with `ok: true`.
+`switch` takes exactly two arguments: a command's name and `on` or `off`; any other value is a usage error, `<value> is neither on nor off`, exit 2. The project's schedule is then read as `schedule.ts` reads it. When no skill of the project schedules a command of exactly that name, it refuses `{"ok":false,"reason":"not-scheduled","command":<name>}` with `no skill of this project schedules <name>` on stderr, exit 1. The name is the whole name: for a skill whose scheduled commands each carry a word (`triage quick`, `triage consensual`), the skill's name alone (`triage`) is refused. A skill whose `schedule` cannot be read schedules no command, so its commands are refused too. Otherwise it writes this machine's schedule switch [3] for the command by `state.ts`'s rule (only a command switched on is kept) and answers the state with `ok: true`.
 
-### `publish <command> <file|nothing|commit|branch|pr|merge>`
+### `publish <command> <nothing|commit|branch|pr|merge>`
 
 #### Context
 
-**User story**: the tracked `agent-schedule.md` says `- work-queue: when \`npx queue\`, cap 1, publish merge`, the team's default; the user wants the queue's runs on their own machine to open a pull request and not merge it, so they pick "Open PR" on the command's row in the Scheduler section of the dashboard's Settings page, which runs this command in the project, or type `agent-scheduler publish work-queue pr`; the tracked file does not change, and every other machine still merges. Picking "As the file says" there, or typing `agent-scheduler publish work-queue file`, takes the pick back.
+**User story**: the user wants the queue's runs on their own machine to open a pull request and not merge it, so they pick "Open PR" on the command's row in the Scheduler section of the dashboard's Settings page, which runs this command in the project, or type `agent-scheduler publish work-queue pr`; no tracked file changes, and every other machine keeps its own publish pick [4]. Until they pick, the command's runs on their machine commit their work and push nothing.
 
 #### Business logic
 
-`publish` takes exactly two arguments: a command's name and one of `file`, `nothing`, `commit`, `branch`, `pr`, `merge`; any other value is a usage error, `<value> is none of file, nothing, commit, branch, pr, merge`, exit 2. With no `agent-schedule.md` in the repository it refuses `{"ok":false,"reason":"no-schedule"}` with `no agent-schedule.md in this repository` on stderr, exit 1; when the schedule has no readable line for the command it refuses `{"ok":false,"reason":"not-scheduled","command":<name>}` with `agent-schedule.md has no line for <name>` on stderr, exit 1. Otherwise, for `file` it removes this machine's publish pick [4] for the command, and for any other value it writes that value as the pick, by `state.ts`'s rule (a pick is kept even when it says what the line says); it answers the state with `ok: true`.
+`publish` takes exactly two arguments: a command's name and one of `nothing`, `commit`, `branch`, `pr`, `merge`; any other value is a usage error, `<value> is none of nothing, commit, branch, pr, merge`, exit 2. When no skill of the project schedules a command of exactly that name, it refuses `{"ok":false,"reason":"not-scheduled","command":<name>}` with `no skill of this project schedules <name>` on stderr, exit 1, as `switch` does. Otherwise it writes that value as this machine's publish pick [4] for the command, by `state.ts`'s rule (a pick of `commit` is kept like any other), and answers the state with `ok: true`. A pick is never removed: another pick replaces it.

@@ -1,11 +1,11 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runCli } from './cli.js'
 import { DEFAULT_STATE, readState, statePath, writeState } from './state.js'
-import { removeRepo, testRepo } from './test-repo.js'
+import { removeRepo, testRepo, writeSkill } from './test-repo.js'
 
 // The contract on top of the functions: JSON on stdout, a line for a person on stderr, and an
 // exit code that says refusal or failure. The commands that spawn or talk to Claude are covered
@@ -55,7 +55,7 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
   const repo = await testRepo()
   const elsewhere = await mkdtemp(join(tmpdir(), 'not-a-repo-'))
   try {
-    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['init', 'extra'], ['run', 'Read the docs'], ['check'], ['switch', 'work-queue'], ['switch', 'work-queue', 'maybe'], ['publish', 'work-queue'], ['publish', 'work-queue', 'push']]) {
+    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['init', 'extra'], ['run', 'Read the docs'], ['check'], ['switch', 'work-queue'], ['switch', 'work-queue', 'maybe'], ['publish', 'work-queue'], ['publish', 'work-queue', 'push'], ['publish', 'work-queue', 'file']]) {
       const bad = await run(repo, ...argv)
       assert.equal(bad.code, 2, argv.join(' '))
       assert.equal(bad.out, undefined)
@@ -104,58 +104,61 @@ test('stop --unless-keep-alive leaves a keep-alive scheduler running, and stops 
   }
 })
 
-test('switch writes this machine\'s switch for a scheduled command; a command with no line, or no schedule, is refused', async () => {
+test('switch writes this machine\'s switch for a scheduled command: only a command switched on is kept; a command no skill schedules is refused', async () => {
   const repo = await testRepo()
   try {
-    const none = await run(repo, 'switch', 'post-merge-cleanup', 'on')
+    // The project's one skill schedules nothing.
+    const none = await run(repo, 'switch', 'work-queue', 'on')
     assert.equal(none.code, 1)
-    assert.deepEqual(none.out, { ok: false, reason: 'no-schedule' })
+    assert.deepEqual(none.out, { ok: false, reason: 'not-scheduled', command: 'work-queue' })
+    assert.equal(none.err, 'no skill of this project schedules work-queue')
 
-    await writeFile(join(repo, 'agent-schedule.md'), '- work-queue: when `npx queue`\n- post-merge-cleanup: every 1d, off\n')
-    const on = await run(repo, 'switch', 'post-merge-cleanup', 'on')
+    await writeSkill(repo, 'work-queue', 'schedule:\n  when: npx queue\n')
+    await writeSkill(repo, 'triage', 'schedule:\n  - word: quick\n    every: 6h\n  - word: consensual\n    every: 7d\n')
+    const on = await run(repo, 'switch', 'triage quick', 'on')
     assert.equal(on.code, 0)
-    assert.deepEqual((on.out as { switches: unknown }).switches, { 'post-merge-cleanup': true })
-    await run(repo, 'switch', 'work-queue', 'off')
-    assert.deepEqual((await readState(repo)).switches, { 'post-merge-cleanup': true, 'work-queue': false })
-    // Back to what the lines say: nothing kept.
-    await run(repo, 'switch', 'post-merge-cleanup', 'off')
+    assert.deepEqual((on.out as { switches: unknown }).switches, { 'triage quick': true })
     await run(repo, 'switch', 'work-queue', 'on')
+    // Switching off a command nobody switched on changes nothing.
+    await run(repo, 'switch', 'triage consensual', 'off')
+    assert.deepEqual((await readState(repo)).switches, { 'triage quick': true, 'work-queue': true })
+    // Everything off again: nothing kept.
+    await run(repo, 'switch', 'triage quick', 'off')
+    await run(repo, 'switch', 'work-queue', 'off')
     assert.equal((await readState(repo)).switches, undefined)
 
-    const unknown = await run(repo, 'switch', 'triage-quick', 'on')
+    // The skill alone is no command when its rows carry a word.
+    const unknown = await run(repo, 'switch', 'triage', 'on')
     assert.equal(unknown.code, 1)
-    assert.deepEqual(unknown.out, { ok: false, reason: 'not-scheduled', command: 'triage-quick' })
-    assert.equal(unknown.err, 'agent-schedule.md has no line for triage-quick')
+    assert.deepEqual(unknown.out, { ok: false, reason: 'not-scheduled', command: 'triage' })
+    assert.equal(unknown.err, 'no skill of this project schedules triage')
   } finally {
     await removeRepo(repo)
   }
 })
 
-test('publish writes this machine\'s publish pick for a scheduled command, and `file` takes it back; a command with no line, or no schedule, is refused', async () => {
+test('publish writes this machine\'s publish pick for a scheduled command; a command no skill schedules is refused', async () => {
   const repo = await testRepo()
   try {
     const none = await run(repo, 'publish', 'work-queue', 'pr')
     assert.equal(none.code, 1)
-    assert.deepEqual(none.out, { ok: false, reason: 'no-schedule' })
+    assert.deepEqual(none.out, { ok: false, reason: 'not-scheduled', command: 'work-queue' })
 
-    await writeFile(join(repo, 'agent-schedule.md'), '- work-queue: when `npx queue`, publish merge\n- triage quick: every 6h\n')
+    await writeSkill(repo, 'work-queue', 'schedule:\n  when: npx queue\n')
+    await writeSkill(repo, 'triage', 'schedule:\n  word: quick\n  every: 6h\n')
     const nothing = await run(repo, 'publish', 'work-queue', 'nothing')
     assert.equal(nothing.code, 0)
     assert.deepEqual((nothing.out as { publishes: unknown }).publishes, { 'work-queue': 'nothing' })
     await run(repo, 'publish', 'triage quick', 'pr')
     assert.deepEqual((await readState(repo)).publishes, { 'work-queue': 'nothing', 'triage quick': 'pr' })
-    // A pick that says what the line says is kept all the same.
-    await run(repo, 'publish', 'work-queue', 'merge')
-    assert.deepEqual((await readState(repo)).publishes, { 'work-queue': 'merge', 'triage quick': 'pr' })
-    // Back to the file: nothing kept.
-    await run(repo, 'publish', 'work-queue', 'file')
-    await run(repo, 'publish', 'triage quick', 'file')
-    assert.equal((await readState(repo)).publishes, undefined)
+    // A pick of what nobody picking gives, commit, is kept all the same.
+    await run(repo, 'publish', 'work-queue', 'commit')
+    assert.deepEqual((await readState(repo)).publishes, { 'work-queue': 'commit', 'triage quick': 'pr' })
 
     const unknown = await run(repo, 'publish', 'triage-quick', 'pr')
     assert.equal(unknown.code, 1)
     assert.deepEqual(unknown.out, { ok: false, reason: 'not-scheduled', command: 'triage-quick' })
-    assert.equal(unknown.err, 'agent-schedule.md has no line for triage-quick')
+    assert.equal(unknown.err, 'no skill of this project schedules triage-quick')
   } finally {
     await removeRepo(repo)
   }
@@ -164,12 +167,14 @@ test('publish writes this machine\'s publish pick for a scheduled command, and `
 test('tick on a project with the scheduler off: the branch is pulled, nothing is decided, the state remembers the tick', async () => {
   const repo = await testRepo()
   try {
-    await writeFile(join(repo, 'agent-schedule.md'), '- work-queue: when `echo []`\n')
+    await writeSkill(repo, 'work-queue', 'schedule:\n  when: echo []\n  waits-for: when the queue holds a task\n')
     const ticked = await run(repo, 'tick')
     assert.equal(ticked.code, 0)
-    const out = ticked.out as { ok: boolean; note?: string; decisions: unknown[] }
+    const out = ticked.out as { ok: boolean; note?: string; decisions: unknown[]; schedule: unknown[] }
     assert.equal(out.note, 'off')
     assert.deepEqual(out.decisions, [])
+    // The tick lists the commands the project's skills schedule, on or off: what a dashboard draws.
+    assert.deepEqual(out.schedule, [{ command: 'work-queue', when: 'echo []', waitsFor: 'when the queue holds a task' }])
     assert.equal((await readState(repo)).lastTick?.note, 'off')
   } finally {
     await removeRepo(repo)

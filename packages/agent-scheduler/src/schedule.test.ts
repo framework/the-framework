@@ -1,101 +1,121 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { commandPrompt, commandSkill, isDue, parseSchedule, promptCommand } from './schedule.js'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { commandPrompt, isDue, promptCommand, readSchedule, skillSchedule } from './schedule.js'
 
-test('a schedule line names a command, its check and its cap; prose and headings are not read', () => {
-  const schedule = parseSchedule(`# Agent schedule
+/** A skill file whose front matter ends with the lines given. */
+function skill(name: string, frontMatter: string): string {
+  return `---\nname: ${name}\ndescription: A job.\ndisable-model-invocation: true\n${frontMatter}---\n\nDo the job.\n`
+}
 
-Some words a person wrote.
+test("a skill's schedule names its command, its check, what the check waits for and how many agents at once; a skill with no schedule has no command", () => {
+  assert.deepEqual(skillSchedule('work-queue', skill('work-queue', 'schedule:\n  when: npx queue\n  waits-for: when the queue holds a task\n  agents: 2\n')), {
+    commands: [{ name: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', cap: 2 }],
+    unreadable: [],
+  })
+  assert.deepEqual(skillSchedule('update-tickets', skill('update-tickets', 'schedule:\n  when: npx tickets due\n')).commands, [{ name: 'update-tickets', when: 'npx tickets due', cap: 1 }])
+  assert.deepEqual(skillSchedule('tickets', skill('tickets', '')), { commands: [], unreadable: [] })
+  assert.deepEqual(skillSchedule('notes', 'No front matter at all.\n'), { commands: [], unreadable: [] })
+})
 
-- work-queue: when \`npx queue\`, cap 2
-- update-tickets: when \`npx tickets due\`
-`)
-  assert.deepEqual(schedule.commands, [
-    { name: 'work-queue', when: 'npx queue', cap: 2, on: true, line: 5 },
-    { name: 'update-tickets', when: 'npx tickets due', cap: 1, on: true, line: 6 },
+test('a row paces by time with `every`, alone or beside a check, the keys in any order; a check over several lines, with quotes and commas, is the check as written', () => {
+  assert.deepEqual(skillSchedule('plan-tickets', skill('plan-tickets', 'schedule:\n  every: 6h\n')).commands, [{ name: 'plan-tickets', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1 }])
+  assert.deepEqual(skillSchedule('plan-tickets', skill('plan-tickets', 'schedule:\n  agents: 1\n  when: npx tickets list\n  every: 30m\n')).commands, [
+    { name: 'plan-tickets', when: 'npx tickets list', every: { ms: 30 * 60_000, text: '30m' }, cap: 1 },
   ])
-  assert.deepEqual(schedule.unreadable, [])
-})
-
-test('a line paces by time with `every`, alone or beside a check, the clauses in any order; a comma inside the check is the check\'s', () => {
-  const schedule = parseSchedule(`- triage-quick: every 6h
-- triage-consensual: every 7d, cap 2
-- update-tickets: every 1h, when \`gh issue list --search "a, b"\`
-- plan-tickets: cap 1, when \`npx tickets list\`, every 30m
-`)
-  assert.deepEqual(schedule.commands, [
-    { name: 'triage-quick', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1, on: true, line: 1 },
-    { name: 'triage-consensual', every: { ms: 7 * 86_400_000, text: '7d' }, cap: 2, on: true, line: 2 },
-    { name: 'update-tickets', when: 'gh issue list --search "a, b"', every: { ms: 3_600_000, text: '1h' }, cap: 1, on: true, line: 3 },
-    { name: 'plan-tickets', when: 'npx tickets list', every: { ms: 30 * 60_000, text: '30m' }, cap: 1, on: true, line: 4 },
+  const check = `gh issue list --search "a, b: c" | jq '[.[] | select(.body | test("(?m)^Closes tickets/\\\\w"))]'`
+  assert.deepEqual(skillSchedule('update-tickets', skill('update-tickets', `schedule:\n  every: 7d\n  when: |-\n    ${check}\n`)).commands, [
+    { name: 'update-tickets', when: check, every: { ms: 7 * 86_400_000, text: '7d' }, cap: 1 },
   ])
-  assert.deepEqual(schedule.unreadable, [])
 })
 
-test('an `every` the parser cannot read is unreadable: a unit it does not know, zero, a clause twice, a word it does not know', () => {
-  const schedule = parseSchedule(`- a: every 2w
-- b: every 0h
-- c: every 1h, every 2h
-- d: every 1h, always
-- e: every day
-`)
-  assert.deepEqual(schedule.commands, [])
-  assert.deepEqual(schedule.unreadable.map(u => u.line), [1, 2, 3, 4, 5])
-})
+test('a skill with several modes lists one row per mode, each with the word the skill gets: the whole name is the command', () => {
+  const schedule = skillSchedule('triage', skill('triage', 'schedule:\n  - word: quick\n    every: 6h\n  - word: consensual\n    every: 7d\n    when: npx tickets list\n'))
+  assert.deepEqual(schedule, {
+    commands: [
+      { name: 'triage quick', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1 },
+      { name: 'triage consensual', when: 'npx tickets list', every: { ms: 7 * 86_400_000, text: '7d' }, cap: 1 },
+    ],
+    unreadable: [],
+  })
+  // One row with a word, and a list where one row has none: both read.
+  assert.deepEqual(skillSchedule('triage', skill('triage', 'schedule:\n  word: quick\n  every: 6h\n')).commands.map(c => c.name), ['triage quick'])
+  assert.deepEqual(skillSchedule('triage', skill('triage', 'schedule:\n  - every: 1d\n  - word: quick\n    every: 6h\n')).commands.map(c => c.name), ['triage', 'triage quick'])
 
-test('a list line the parser cannot read is skipped and named with its line', () => {
-  const schedule = parseSchedule(`- work-queue: when \`npx queue\`
-- Work Queue: every day
-- triage: cap 3
-- plan: when npx plan
-`)
-  assert.deepEqual(schedule.commands.map(c => c.name), ['work-queue'])
-  assert.deepEqual(schedule.unreadable.map(u => u.line), [2, 3, 4])
-  assert.equal(schedule.unreadable[0]!.text, '- Work Queue: every day')
-})
-
-test('`off` lists a command that runs only where a machine switched it on; once only', () => {
-  const schedule = parseSchedule(`- post-merge-cleanup: every 1d, off
-- triage-quick: off, every 6h, cap 2
-- a: every 1d, off, off
-- b: off
-`)
-  assert.deepEqual(schedule.commands, [
-    { name: 'post-merge-cleanup', every: { ms: 86_400_000, text: '1d' }, cap: 1, on: false, line: 1 },
-    { name: 'triage-quick', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 2, on: false, line: 2 },
-  ])
-  // Twice is a typo; `off` alone still says nothing about when.
-  assert.deepEqual(schedule.unreadable.map(u => u.line), [3, 4])
-})
-
-test('a command may carry one word after its folder name, the argument the skill gets: the whole name is the command, the first word is the folder', () => {
-  const schedule = parseSchedule(`- triage quick: every 6h
-- triage consensual: every 7d, when \`npx tickets list\`, off
-- triage quick wins: every 6h
-- triage  quick: every 6h
-- triage quick : every 6h
-`)
-  assert.deepEqual(schedule.commands, [
-    { name: 'triage quick', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1, on: true, line: 1 },
-    { name: 'triage consensual', when: 'npx tickets list', every: { ms: 7 * 86_400_000, text: '7d' }, cap: 1, on: false, line: 2 },
-  ])
-  // Two words after the folder, two spaces, or a space before the colon: not a command a person types.
-  assert.deepEqual(schedule.unreadable.map(u => u.line), [3, 4, 5])
   assert.equal(commandPrompt('triage quick'), '/triage quick')
-  assert.equal(commandSkill('triage quick'), 'triage')
-  assert.equal(commandSkill('work-queue'), 'work-queue')
-  // A person's prompt is filed under the line it names, else under its first word.
+  // A person's prompt is filed under the command it names, else under its first word.
   assert.equal(promptCommand('/triage quick', schedule), 'triage quick')
   assert.equal(promptCommand('/triage consensual', schedule), 'triage consensual')
   assert.equal(promptCommand('/triage', schedule), 'triage')
-  assert.equal(promptCommand('/triage quick', undefined), 'triage')
+  assert.equal(promptCommand('/triage quick', { commands: [], unreadable: [] }), 'triage')
   assert.equal(promptCommand('/work-queue now', schedule), 'work-queue')
   assert.equal(promptCommand('Read the docs', schedule), 'Read')
   assert.equal(promptCommand('  /triage quick  ', schedule), 'triage quick')
 })
 
-test('a cap of zero reads as one: zero would spell "never", which is the line being absent', () => {
-  assert.equal(parseSchedule('- work-queue: when `npx queue`, cap 0')!.commands[0]!.cap, 1)
+test('a schedule the reader cannot read gives no command and says why, the row named when there are several', () => {
+  const why = (frontMatter: string): unknown => skillSchedule('a', skill('a', frontMatter))
+  const refused = (reason: string): unknown => ({ commands: [], unreadable: [{ skill: 'a', reason }] })
+  assert.deepEqual(why('schedule:\n  every: 2w\n'), refused('every is a number above 0 and a unit, m, h or d (15m, 6h, 7d)'))
+  assert.deepEqual(why('schedule:\n  every: 0h\n'), refused('every is a number above 0 and a unit, m, h or d (15m, 6h, 7d)'))
+  assert.deepEqual(why('schedule:\n  every: 15\n'), refused('every is a number above 0 and a unit, m, h or d (15m, 6h, 7d)'))
+  assert.deepEqual(why('schedule:\n  every: 1h\n  always: true\n'), refused('unknown key always'))
+  assert.deepEqual(why('schedule:\n  waits-for: when there is work\n'), refused('neither every nor when says when'))
+  assert.deepEqual(why('schedule:\n  when: ""\n'), refused('when is a shell command line'))
+  assert.deepEqual(why('schedule:\n  when: [npx, queue]\n'), refused('when is a shell command line'))
+  assert.deepEqual(why('schedule:\n  every: 1h\n  waits-for: |\n    one line\n    and another\n'), refused('waits-for is one line of text'))
+  assert.deepEqual(why('schedule:\n  every: 1h\n  agents: 0\n'), refused('agents is a whole number, 1 or more'))
+  assert.deepEqual(why('schedule:\n  every: 1h\n  agents: many\n'), refused('agents is a whole number, 1 or more'))
+  assert.deepEqual(why('schedule:\n  every: 1h\n  word: Quick Wins\n'), refused('word is one word of lower-case letters, digits and dashes'))
+  assert.deepEqual(why('schedule: daily\n'), refused('a row is a list of keys'))
+  assert.deepEqual(why('schedule: []\n'), refused('the schedule lists no row'))
+  assert.deepEqual(why('schedule:\n'), refused('the schedule lists no row'))
+  // One bad row stands the whole skill down, and the reason says which.
+  assert.deepEqual(why('schedule:\n  - word: quick\n    every: 6h\n  - word: slow\n    evry: 7d\n'), refused('row 2: unknown key evry'))
+  assert.deepEqual(why('schedule:\n  - word: quick\n    every: 6h\n  - word: quick\n    every: 7d\n'), refused('two rows are named a quick'))
+  // A front matter that is no YAML at all: the skill is named, since its schedule cannot be known.
+  assert.deepEqual(skillSchedule('a', '---\nname: a\nschedule: [\n---\nDo.\n'), refused('the front matter is not YAML'))
+})
+
+test('the schedule is read from both folders a coding agent reads skills from, each skill once, in name order; a linked skill folder is read like a plain one', async () => {
+  const repo = await mkdtemp(join(tmpdir(), 'scheduler-skills-'))
+  const write = async (dir: string, name: string, frontMatter: string): Promise<void> => {
+    await mkdir(join(repo, dir, name), { recursive: true })
+    await writeFile(join(repo, dir, name, 'SKILL.md'), skill(name, frontMatter))
+  }
+  try {
+    assert.deepEqual(await readSchedule(repo), { commands: [], unreadable: [] }, 'no skills folder, nothing scheduled')
+
+    await write('.agents/skills', 'work-queue', 'schedule:\n  when: npx queue\n')
+    await write('.agents/skills', 'update-tickets', 'schedule:\n  every: 15m\n')
+    await write('.agents/skills', 'tickets', '')
+    // Only in the second folder, and first by name: the order is the names', not the folders'.
+    await write('.agents/skills', 'archive', 'schedule:\n  every: 2d\n')
+    await write('.agents/skills', 'broken', 'schedule:\n  every: often\n')
+    // In both folders with two texts: the first folder's copy decides, as with the coding agent.
+    await write('.claude/skills', 'update-tickets', 'schedule:\n  every: 1h\n')
+    // Linked from one folder into the other, the way a project shares one copy.
+    await symlink(join('..', '..', '.agents', 'skills', 'work-queue'), join(repo, '.claude', 'skills', 'work-queue'))
+    // Only in Claude Code's folder.
+    await write('.claude/skills', 'plan-tickets', 'schedule:\n  every: 6h\n')
+    // Not a skill: a folder with no SKILL.md, and a file.
+    await mkdir(join(repo, '.claude', 'skills', 'empty'))
+    await writeFile(join(repo, '.claude', 'skills', 'README.md'), 'schedule:\n  every: 1h\n')
+
+    assert.deepEqual(await readSchedule(repo), {
+      commands: [
+        { name: 'archive', every: { ms: 2 * 86_400_000, text: '2d' }, cap: 1 },
+        { name: 'plan-tickets', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1 },
+        { name: 'update-tickets', every: { ms: 3_600_000, text: '1h' }, cap: 1 },
+        { name: 'work-queue', when: 'npx queue', cap: 1 },
+      ],
+      unreadable: [{ skill: 'broken', reason: 'every is a number above 0 and a unit, m, h or d (15m, 6h, 7d)' }],
+    })
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
 })
 
 test('due is a check whose JSON is not empty; a non-JSON answer is due by its text', () => {
@@ -114,25 +134,4 @@ test('due is a check whose JSON is not empty; a non-JSON answer is due by its te
 
 test("a command's prompt is its slash command", () => {
   assert.equal(commandPrompt('work-queue'), '/work-queue')
-})
-
-test('a line may say how far its runs publish; a line that says nothing publishes nothing, and a word that is no level makes the line unreadable', () => {
-  const schedule = parseSchedule(`
-- work-queue: when \`npx queue\`, publish merge
-- post-merge-cleanup: publish pr, every 1h
-- readability: every 7d, publish branch
-- triage quick: every 6h
-- ux: every 7d, publish push
-- maintainability: every 7d, publish pr, publish merge
-`)
-  assert.deepEqual(schedule.commands, [
-    { name: 'work-queue', when: 'npx queue', cap: 1, on: true, publish: 'merge', line: 2 },
-    { name: 'post-merge-cleanup', every: { ms: 3_600_000, text: '1h' }, cap: 1, on: true, publish: 'pr', line: 3 },
-    { name: 'readability', every: { ms: 7 * 86_400_000, text: '7d' }, cap: 1, on: true, publish: 'branch', line: 4 },
-    { name: 'triage quick', every: { ms: 6 * 3_600_000, text: '6h' }, cap: 1, on: true, line: 5 },
-  ])
-  assert.deepEqual(schedule.unreadable, [
-    { line: 6, text: '- ux: every 7d, publish push' },
-    { line: 7, text: '- maintainability: every 7d, publish pr, publish merge' },
-  ])
 })

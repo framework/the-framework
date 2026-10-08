@@ -9,9 +9,9 @@ What the module knows of a project's scheduler and how it changes it: one row pe
 ## Glossary
 
 [1] the state: `.agent-scheduler/state.json` at the project's root, per user, hidden from git: on or off, keep-alive, the model, the spend cushion, this machine's schedule switches and publish picks, the scheduler's pid, the last tick's decisions and the schedule it read. `agent-scheduler status` prints it, plus whether the scheduler's process is alive.
-[2] schedule switch: a person's choice, on one machine, whether a scheduled command (a line of the project's `agent-schedule.md`) runs there; kept in the state, not in the schedule. The schedule line is the default where nobody switched the command: on, unless the line says `off`.
+[2] schedule switch: a person's choice, on one machine, whether a scheduled command (a command one of the project's skills schedules in the front matter of its `SKILL.md`) runs there; kept in the state, not in the skill. Every scheduled command is off on a machine until a person switches it on there.
 [3] spend cushion: how far past the quota boundary (the share of the account's quota week that may be spent by now) a scheduled run may still start, in percentage points of the week; the state's `spendOffset`. Positive is lenient, negative is strict. The dashboard calls it the spend offset.
-[4] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: nothing, the branch, a pull request, or a pull request set to merge on its own once its checks pass; kept in the state, where it stands in for the level the command's schedule line says until the person takes it back.
+[4] publish pick: a person's choice, on one machine, of how far a scheduled command's runs publish there: nothing, a commit, the branch, a pull request, or a pull request set to merge on its own once its checks pass; kept in the state, not in the skill. Until the person picks, the command's runs commit their work and push nothing.
 [5] tick: one pass of the scheduler, every minute: one decision per scheduled command, each one line in the state.
 
 ## Business logic — TL;DR
@@ -36,7 +36,7 @@ See `## Context`.
 
 A row is made from the JSON `agent-scheduler status` printed for one project. It carries the project (id, name, whether it has a git host package), whether the scheduler is on, whether it keeps alive, whether its process is running, the model when the state names one, the spend cushion [3] when it is a finite number, and the last tick [5] when the state has one with a time: its time, its decisions (each a command, an outcome line and the run's id when one started; an entry missing its command or outcome is left out) and its note when it has one.
 
-The row's commands are the schedule as the last tick recorded it, in its order: each with its name, its interval as written when it has one, its check when it has one, and how far its line says its runs publish (`commit`, `branch`, `pr` or `merge`) when it says so. Two things of this machine are folded in. Whether the command is on is this machine's schedule switch [2] for it when the state holds one, else what the line says. And the command carries this machine's publish pick [4] when the state holds one that is one of `nothing`, `commit`, `branch`, `pr`, `merge`. A recorded line with no name or no on/off is left out; a level or a pick that is none of the known words is dropped. A scheduler that has not ticked with a schedule yet lists no command. Output that is not an object reads as an empty row: off, not running, no commands.
+The row's commands are the schedule as the last tick recorded it, in its order: each with its name, its interval as written when it has one, its check when it has one, and the plain line saying what its check waits for when its skill gives one. Two things of this machine are folded in. Whether the command is on: it is on only when the state holds this machine's schedule switch [2] for it, switched on; a command nobody switched on here is off. And the command's publish pick [4]: the one the state holds for it when that is one of `nothing`, `commit`, `branch`, `pr`, `merge`, else `commit`. A recorded command with no name is left out; an interval, a check or a waits-for line that is not text is dropped; a switch that is anything but on reads as off, and a pick that is none of the known words reads as `commit`. A scheduler that has not ticked yet lists no command, and neither does one in a project where no skill schedules a command. Output that is not an object reads as an empty row: off, not running, no commands.
 
 ### Reading every project
 
@@ -72,13 +72,13 @@ A new cushion is saved by running `agent-scheduler offset -- <points>` in every 
 
 #### Context
 
-**User story**: the user reads a row without knowing the schedule file's syntax.
+**User story**: the user reads a row without reading the skill that schedules the command, or its check, which is a shell line.
 
 #### Business logic
 
 - **A row's leading status**: "not readable" (red) when the project's status could not be read; else "off" (muted) when the scheduler is off; else "on, not running" (amber) when it is on but its process is not alive; else "on" (green).
-- **A command's pace**: "every <interval>" for a command with only an interval, as written ("every 1d"); "when its check finds work" for one with only a check; "every <interval> at most, when its check finds work" for one with both.
-- **How far a command publishes** on this machine: its publish pick [4] when this machine has one, else what its line says: "commits its work" for `commit`, "publishes its branch" for `branch`, "opens a pull request" for `pr`, "opens a pull request that merges on green" for `merge`, and "publishes nothing" for a pick of nothing or for no level at all.
+- **A command's pace**: "every <interval>" for a command with only an interval, as written ("every 1d"). For a command with only a check, the plain line its skill gives for what the check waits for ("when the queue holds a task"), or "when its check finds work" when the skill gives none. For a command with both, "every <interval> at most, " followed by those same words ("every 6h at most, when a ticket has no plan", "every 6h at most, when its check finds work").
+- **How far a command publishes** on this machine, by its publish pick [4]: "commits its work" for `commit`, which is also the pick of a command nobody picked for, "publishes its branch" for `branch`, "opens a pull request" for `pr`, "opens a pull request that merges on green" for `merge`, and "publishes nothing" for a pick of nothing.
 - **The publish picks' labels**: "Nothing", "Commit", "Publish branch", "Open PR", "Merge on green", in that order.
-- **Which picks a project is offered**: all five where one of the project's packages provides a git host; "Nothing", "Commit" and "Publish branch" only where none does, since no pull request can be opened there. A pick already saved that the project is no longer offered is listed after them, so a menu always shows what is in force.
+- **Which picks a project is offered**: all five where one of the project's packages provides a git host; "Nothing", "Commit" and "Publish branch" only where none does, since no pull request can be opened there. The command's pick in force, when the project is not offered it, is listed after them, so a menu always shows what is in force.
 - The bound of the spend cushion as the dashboard's controls set it, 50 points either side of the quota boundary, is the dashboard's own number, handed on from `@openagt/dashboard/module`.

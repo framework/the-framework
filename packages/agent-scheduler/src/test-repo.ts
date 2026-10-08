@@ -41,6 +41,12 @@ export async function testRepo(): Promise<string> {
   return repo
 }
 
+/** A skill of the project, in the folder a coding agent reads it from, with the lines given as the rest of its front matter. */
+export async function writeSkill(repo: string, name: string, frontMatter = '', dir = '.claude/skills'): Promise<void> {
+  await mkdir(join(repo, dir, name), { recursive: true })
+  await writeFile(join(repo, dir, name, 'SKILL.md'), `---\nname: ${name}\n${frontMatter}---\nDo the job.\n`)
+}
+
 /** The repository and its origin go together. */
 export async function removeRepo(repo: string): Promise<void> {
   await rm(dirname(repo), RETRIED_RM)

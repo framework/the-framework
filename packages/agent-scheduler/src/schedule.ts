@@ -1,146 +1,163 @@
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { PUBLISH_LEVELS, type Publish } from '@openagt/agent-runner'
-import { DEFAULT_CAP, SCHEDULE_FILE } from './names.js'
+import { parse as parseYaml } from 'yaml'
+import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
+import { DEFAULT_CAP, SKILL_FILE } from './names.js'
 
 /**
- * The schedule (#1774): a markdown file a person writes and tracks at the repository root, one
- * list line per command. The tool knows no command by name; this file is the only place a
- * command is named. A command is written as a person types it, without the slash: a skill's
- * folder name, then at most one word the skill takes as its argument; `.claude/skills/<folder>`
- * in the repository is what runs, and the whole name is the command's identity (its prompt,
- * its switch, its interval, its cap, its run records).
+ * The schedule (#2022): the scheduled commands of a project, each brought by the skill it runs.
+ * The tool knows no command by name; a skill says it can be scheduled with a `schedule` in the
+ * front matter of its `SKILL.md`, and a skill that is not in the project has no command here.
  *
- *     - work-queue: when `npx queue`, cap 1
- *     - triage quick: every 6h
- *     - triage consensual: every 7d, when `npx tickets list | jq …`
- *     - update-tickets: every 1h, when `npx tickets meta | jq …`
- *     - post-merge-cleanup: every 1d, off
+ *     ---
+ *     name: update-tickets
+ *     disable-model-invocation: true
+ *     schedule:
+ *       every: 15m
+ *       when: npx tickets meta | jq …
+ *       waits-for: when an issue changed since the last import
+ *     ---
+ *
+ * A skill with several modes lists one row per mode, each with the `word` the skill gets as its
+ * argument (`triage quick`, `triage consensual`):
+ *
+ *     schedule:
+ *       - word: quick
+ *         every: 6h
+ *       - word: consensual
+ *         every: 7d
+ *
+ * A command is named as a person types it, without the slash: the skill's folder name, then the
+ * row's word when it has one. The whole name is the command's identity (its prompt, its switch,
+ * its interval, its cap, its run records).
  *
  * `when` is a shell command, run at the repository root. The command is due while the check
  * exits 0 and prints something other than an empty JSON value. `every` is how often at most: the
- * command is due only once that long has passed since its last recorded start. A line carries
- * one or both; with both, the command starts only when both hold. `cap` is how many runs of the
- * command may be in flight at once, across every machine that shares the repository. `off` lists
- * a command that runs only on a machine where a person switched it on; every other command runs
- * unless a person switched it off there. The switches are per machine, in the tool's state.
- * `publish` says how far a run of the command takes its work: `commit` it, and from there push its
- * `branch`, open its `pr`, or set the request to `merge` once its checks pass; a line that says
- * nothing commits and publishes nothing, as a run given no level does. The level is the team's default: a person may pick another for
- * one command on their machine, kept in the tool's state like the switches.
+ * command is due only once that long has passed since its last recorded start. A row carries one
+ * or both; with both, the command starts only when both hold. `waits-for` is one plain line
+ * saying what the check waits for, for a person: a check is a shell line nothing can turn into a
+ * sentence. `agents` is how many runs of the command may be in flight at once, across every
+ * machine that shares the repository.
  *
- * Every other line — headings, blank lines, prose — is the person's, and is not read. A list line
- * the parser cannot read is skipped and named, so a typo stands down one command and says so
- * rather than silently doing nothing.
+ * Whether a command runs, and how far its runs publish, is not the skill's to say: each person
+ * sets both on their own machine, in the tool's state.
+ *
+ * A `schedule` the reader cannot read is skipped and named, so a typo stands down one skill's
+ * commands and says so rather than silently doing nothing.
  */
 
-/** One command as the schedule names it. */
+/** One command as its skill schedules it. */
 export interface ScheduledCommand {
   /** The command as typed without its slash: the skill's folder name, then at most one word the skill gets as its argument (`triage quick`). */
   name: string
-  /** The check, a shell command line; absent when the line paces by time alone. */
+  /** The check, a shell command line; absent when the row paces by time alone. */
   when?: string
   /** How often at most: the least time since the command's last recorded start, and the text as written (`6h`). */
   every?: { ms: number; text: string }
+  /** What the check waits for, in one plain line for a person. */
+  waitsFor?: string
   /** Runs in flight at once, across every machine. */
   cap: number
-  /** Whether the command runs on a machine where nobody switched it: the line says `off` when it does not. */
-  on: boolean
-  /** How far a run of the command publishes its work; absent when the line says nothing: the run publishes nothing. */
-  publish?: Publish
-  /** The file's line number, for a message. */
-  line: number
 }
 
 /** The schedule as read. */
 export interface Schedule {
   commands: ScheduledCommand[]
-  /** List lines the parser could not read, each with its text. */
-  unreadable: { line: number; text: string }[]
+  /** The skills whose `schedule` could not be read, each with why. */
+  unreadable: { skill: string; reason: string }[]
 }
 
-const COMMAND_LINE = /^-\s+([a-z0-9][a-z0-9-]*(?: [a-z0-9][a-z0-9-]*)?):\s*(.+)$/
-const EVERY = /^every\s+(\d+)(m|h|d)$/
-const WHEN = /^when\s+`([^`]+)`$/
-const CAP = /^cap\s+(\d+)$/
-const OFF = /^off$/
-const PUBLISH = new RegExp(`^publish\\s+(${PUBLISH_LEVELS.join('|')})$`)
+const SKILL = /^[a-z0-9][a-z0-9-]*$/
+const WORD = SKILL
+const EVERY = /^(\d+)(m|h|d)$/
 const UNIT_MS = { m: 60_000, h: 3_600_000, d: 86_400_000 } as const
+const ROW_KEYS = ['word', 'every', 'when', 'waits-for', 'agents']
 
-/** The schedule out of the file's markdown. Pure. */
-export function parseSchedule(md: string): Schedule {
-  const schedule: Schedule = { commands: [], unreadable: [] }
-  md.split('\n').forEach((text, index) => {
-    const line = index + 1
-    if (!/^-\s/.test(text)) return
-    const head = COMMAND_LINE.exec(text.trim())
-    const command = head ? parseRule(head[1]!, head[2]!, line) : undefined
-    if (!command) {
-      schedule.unreadable.push({ line, text: text.trim() })
-      return
-    }
-    schedule.commands.push(command)
-  })
-  return schedule
+/**
+ * The commands a skill schedules, out of its `SKILL.md`: none when the file has no front matter
+ * or the front matter no `schedule`. One row or a list of rows; any row that cannot be read makes
+ * the whole `schedule` unreadable, and the reason names the row. Pure.
+ */
+export function skillSchedule(skill: string, md: string): Schedule {
+  const unreadable = (reason: string): Schedule => ({ commands: [], unreadable: [{ skill, reason }] })
+  const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(md)
+  if (!front) return { commands: [], unreadable: [] }
+  let data: unknown
+  try {
+    data = parseYaml(front[1]!)
+  } catch {
+    return unreadable('the front matter is not YAML')
+  }
+  const written = isMap(data) ? data['schedule'] : undefined
+  if (written === undefined) return { commands: [], unreadable: [] }
+  // A `schedule:` with nothing after it is YAML's null: no row, like an empty list.
+  const rows = Array.isArray(written) ? written : written === null ? [] : [written]
+  if (rows.length === 0) return unreadable('the schedule lists no row')
+  const commands: ScheduledCommand[] = []
+  for (const row of rows) {
+    const command = parseRow(skill, row)
+    if (typeof command === 'string') return unreadable(rows.length > 1 ? `row ${commands.length + 1}: ${command}` : command)
+    if (commands.some(c => c.name === command.name)) return unreadable(`two rows are named ${command.name}`)
+    commands.push(command)
+  }
+  return { commands, unreadable: [] }
 }
 
 /**
- * The clauses after the name, in any order, each at most once: `every <N><m|h|d>`, `when \`…\``,
- * `cap <N>`, `off`, `publish <commit|branch|pr|merge>`. At least one of `every` and `when`, else nothing
- * says when. `every 0` is refused rather than read as "always", which is the clause being absent.
+ * One row: `every: <N><m|h|d>`, `when: <shell line>`, `waits-for: <one line>`, `agents: <N>`,
+ * `word: <the skill's argument>`. At least one of `every` and `when`, else nothing says when.
+ * `every: 0m` is refused rather than read as "always", which is the key being absent. A key the
+ * reader does not know is refused too: it is a typo, or a rule this tool would not follow.
+ * Answers the command, or why the row cannot be read.
  */
-function parseRule(name: string, rule: string, line: number): ScheduledCommand | undefined {
-  let when: string | undefined
-  let every: { ms: number; text: string } | undefined
-  let cap: number | undefined
-  let off = false
-  let publish: Publish | undefined
-  for (const clause of clauses(rule)) {
-    const asEvery = EVERY.exec(clause)
-    const asWhen = WHEN.exec(clause)
-    const asCap = CAP.exec(clause)
-    const asOff = OFF.exec(clause)
-    const asPublish = PUBLISH.exec(clause)
-    if (asEvery && every === undefined && Number(asEvery[1]) > 0) {
-      every = { ms: Number(asEvery[1]) * UNIT_MS[asEvery[2] as keyof typeof UNIT_MS], text: `${asEvery[1]}${asEvery[2]}` }
-    } else if (asWhen && when === undefined) {
-      when = asWhen[1]!.trim()
-    } else if (asCap && cap === undefined) {
-      cap = Math.max(1, Number(asCap[1]))
-    } else if (asOff && !off) {
-      off = true
-    } else if (asPublish && publish === undefined) {
-      publish = asPublish[1] as Publish
-    } else {
-      return undefined
-    }
+function parseRow(skill: string, row: unknown): ScheduledCommand | string {
+  if (!isMap(row)) return 'a row is a list of keys'
+  const unknown = Object.keys(row).find(key => !ROW_KEYS.includes(key))
+  if (unknown !== undefined) return `unknown key ${unknown}`
+  const { word, every, when, agents } = row
+  const waitsFor = row['waits-for']
+  if (word !== undefined && !(typeof word === 'string' && WORD.test(word))) return 'word is one word of lower-case letters, digits and dashes'
+  const asEvery = every === undefined ? undefined : EVERY.exec(String(every))
+  if (asEvery === null || (asEvery && Number(asEvery[1]) === 0)) return 'every is a number above 0 and a unit, m, h or d (15m, 6h, 7d)'
+  if (when !== undefined && !(typeof when === 'string' && when.trim())) return 'when is a shell command line'
+  if (waitsFor !== undefined && !(typeof waitsFor === 'string' && waitsFor.trim() && !waitsFor.trim().includes('\n'))) return 'waits-for is one line of text'
+  if (agents !== undefined && !(typeof agents === 'number' && Number.isInteger(agents) && agents >= 1)) return 'agents is a whole number, 1 or more'
+  if (when === undefined && every === undefined) return 'neither every nor when says when'
+  return {
+    name: word === undefined ? skill : `${skill} ${word}`,
+    ...(typeof when === 'string' ? { when: when.trim() } : {}),
+    ...(asEvery ? { every: { ms: Number(asEvery[1]) * UNIT_MS[asEvery[2] as keyof typeof UNIT_MS], text: `${asEvery[1]}${asEvery[2]}` } } : {}),
+    ...(typeof waitsFor === 'string' ? { waitsFor: waitsFor.trim() } : {}),
+    cap: typeof agents === 'number' ? agents : DEFAULT_CAP,
   }
-  if (when === undefined && every === undefined) return undefined
-  return { name, ...(when !== undefined ? { when } : {}), ...(every ? { every } : {}), cap: cap ?? DEFAULT_CAP, on: !off, ...(publish !== undefined ? { publish } : {}), line }
 }
 
-/** The rule split on the commas outside backticks, each piece trimmed. */
-function clauses(rule: string): string[] {
-  const out: string[] = []
-  let current = ''
-  let quoted = false
-  for (const ch of rule) {
-    if (ch === '`') quoted = !quoted
-    if (ch === ',' && !quoted) {
-      out.push(current)
-      current = ''
-    } else {
-      current += ch
-    }
-  }
-  out.push(current)
-  return out.map(s => s.trim()).filter(Boolean)
+function isMap(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** The repository's schedule, or `undefined` when it has none. */
-export async function readSchedule(repo: string): Promise<Schedule | undefined> {
-  const md = await readFile(join(repo, SCHEDULE_FILE), 'utf8').catch(() => undefined)
-  return md === undefined ? undefined : parseSchedule(md)
+/**
+ * The project's schedule: every skill's commands, the skills in name order. Read from each folder
+ * a coding agent's harness reads skills from; a skill in two folders is read once, its first
+ * readable copy deciding, as with the harness. A project with no skills folder schedules nothing.
+ */
+export async function readSchedule(repo: string): Promise<Schedule> {
+  const files = new Map<string, string>()
+  for (const dir of HARNESS_SKILL_DIRS) {
+    const entries = await readdir(join(repo, dir)).catch(() => [])
+    for (const skill of entries) {
+      if (files.has(skill) || !SKILL.test(skill)) continue
+      const md = await readFile(join(repo, dir, skill, SKILL_FILE), 'utf8').catch(() => undefined)
+      if (md !== undefined) files.set(skill, md)
+    }
+  }
+  const schedule: Schedule = { commands: [], unreadable: [] }
+  for (const skill of [...files.keys()].sort()) {
+    const read = skillSchedule(skill, files.get(skill)!)
+    schedule.commands.push(...read.commands)
+    schedule.unreadable.push(...read.unreadable)
+  }
+  return schedule
 }
 
 /** The prompt a command runs with: its slash command, which the agent's harness expands, the word after it handed to the skill. */
@@ -148,20 +165,15 @@ export function commandPrompt(name: string): string {
   return `/${name}`
 }
 
-/** The skill folder a command runs: the name's first word; the rest is the skill's argument. */
-export function commandSkill(name: string): string {
-  return name.split(' ')[0]!
-}
-
 /**
  * The command a run's prompt is counted under, so a run a person started counts against that
- * command's cap and interval like a scheduled one: the schedule line whose name the prompt is, without its
+ * command's cap and interval like a scheduled one: the scheduled command whose name the prompt is, without its
  * slash (`/triage quick` → `triage quick`), else the prompt's first word (`/work-queue now` →
  * `work-queue`; a plain prompt's first word).
  */
-export function promptCommand(prompt: string, schedule: Schedule | undefined): string {
+export function promptCommand(prompt: string, schedule: Schedule): string {
   const typed = prompt.trim().replace(/^\//, '')
-  if (schedule?.commands.some(c => c.name === typed)) return typed
+  if (schedule.commands.some(c => c.name === typed)) return typed
   return typed.split(/\s+/)[0] || prompt
 }
 

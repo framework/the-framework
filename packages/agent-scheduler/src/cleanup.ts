@@ -10,8 +10,7 @@ import { readState } from './state.js'
  * package.json, and holds no list of this tool's files.
  *
  * What goes is the state file and the scheduler's log, then the directory once it is empty, then
- * the rule hiding it from git (`removeOwnDirectory`). The schedule, `agent-schedule.md`, is the
- * person's own tracked file and is never touched. While the state names a scheduler whose process
+ * the rule hiding it from git (`removeOwnDirectory`). While the state names a scheduler whose process
  * is alive nothing is removed: it would write its state back on the next tick.
  */
 

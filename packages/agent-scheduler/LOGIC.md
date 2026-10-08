@@ -15,7 +15,7 @@ The `@openagt/agent-scheduler` package: a standalone tool, like `@openagt/agent-
 [5] the `agent-data` branch: the branch of a project's repository used as a file store for everything agents share: tickets, the agent queue, the runs.
 [6] sweep: `agent-runner`'s pass, run on every tick, that records and reclaims the runs of this machine whose process died, and only this machine's.
 [7] run: one agent this tool starts: a detached process of `agent-runner` (`agent-runner run`), a checkout, one prompt to the coding agent, and a run record when it ends. Its id is its start time, `2026-09-16T14-01-00-000Z`.
-[8] cap: how many runs of one command may be in flight at once, as one machine counts, across every machine's runs. The cap in force on a machine is its agents pick [21] for the command, else the number the skill's `schedule` [2] gives as `agents`, 1 when it gives none.
+[8] cap: how many runs of one scheduled command a machine lets be in flight at once: the machine starts another run of the command only while fewer than its number are in flight on any machine that shares the repository. Its number is the agents pick [21] made on it, a person's own number for the command there, else the number the command's skill gives, 1 when the skill gives none.
 [9] quota: the account's subscription allowance, as the coding agent reports it: a session window and a quota week, each with a percentage used.
 [10] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
 [11] run record: the `logs` skill's record of a run on the `agent-data` branch: a card (`<id>.json`: what was asked, the branch, the pull request, how it ended, what it cost) and a diary (`<id>.jsonl`: what the agent said). Written by `agent-runner` twice, over the same file: as a marker before the agent exists, and with how it went when the run ends.
@@ -28,7 +28,7 @@ The `@openagt/agent-scheduler` package: a standalone tool, like `@openagt/agent-
 [18] module: a package's own part of a dashboard: its browser part, named by the package's `exports["./dashboard"]`, which the dashboard loads for every project that depends on the package and which reads and saves through the package's own command.
 [19] pace: how often at most a scheduled command starts, the one in force on a machine: this machine's pace pick [20] for the command, else the interval its skill gives; an interval (a count of minutes, hours, days, weeks of 7 days or months of 30 days), with a time of day when it has one. A command its check alone paces has no pace.
 [20] pace pick: a person's choice, on one machine, of a pace for one scheduled command there: "whenever there is work", or an interval with an optional time of day; kept in the state, not in the skill. A command with no pace pick runs at its skill's pace.
-[21] agents pick: a person's choice, on one machine, of how many runs of one scheduled command may be in flight at once, as that machine counts them: a whole number, 1 or more; kept in the state, not in the skill. A command with no agents pick has its skill's number.
+[21] agents pick: a person's choice, on one machine, of that machine's number for one scheduled command: the machine starts another run of the command only while fewer than that number are in flight on any machine that shares the repository. A whole number from 1 to 99; kept in the state, not in the skill. A command with no agents pick has its skill's number.
 
 ## Business logic — TL;DR
 

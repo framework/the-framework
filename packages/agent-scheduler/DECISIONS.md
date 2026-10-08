@@ -82,11 +82,16 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   looks. This takes back the earlier pick against a clock time (machine-local, and two
   machines fire twice): the pace counts from the last start on any machine, so two machines
   never run the work twice.
+- How many agents of one command work at once is each person's too, in the state file like
+  the pace. The skill's number is where it starts, 1 when the skill gives none. A machine
+  starts another agent only while fewer than its person's number are working, counting the
+  agents of every machine that shares the repository. Picked over the number being the
+  skill's alone, where letting two agents work on one machine meant editing a tracked file.
 - The state, `.agent-scheduler/state.json`, untracked, per user, hidden through git's
   exclude file the way `.branches/` is: on or off, keep-alive, the model, the spend
-  cushion, this machine's switches, paces and publish picks, the scheduler's pid, the last
-  tick and what it decided. Nothing the tool knows is only in memory; a restart loses
-  nothing.
+  cushion, this machine's switches, paces, numbers of agents and publish picks, the
+  scheduler's pid, the last tick and what it decided. Nothing the tool knows is only in
+  memory; a restart loses nothing.
 - Keep-alive, whether the scheduler outlives what started it, is per user, in the state
   file. Picked over a line in the tracked schedule: in the schedule it would switch on the
   next person's machine the first time they pull.
@@ -104,9 +109,10 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   only as far as the week has elapsed, plus the user's cushion, half a day when unset.
   Picked over a plainer line (a window at 100% stands down): nothing would pace the week.
   Copied rather than moved into `agent-driver`, which is not this tool's to change.
-- Two machines may mark for one command at once. The cap is the first `cap` records in
-  time order; a machine whose marker ranks past it withdraws the marker and does not spawn.
-  A push that fails twice is another machine getting there first: withdrawn, no spawn.
+- Two machines may mark for one command at once. Each machine counts by its own number: its
+  marker stands while it ranks within that number among the records in time order, and a
+  machine whose marker ranks past its number withdraws the marker and does not spawn. A
+  push that fails twice is another machine getting there first: withdrawn, no spawn.
 - A running record from another machine counts against its command's cap until that
   machine or a person ends it; a stuck command is fixed by hand.
 - A run counts for the scheduled command its prompt names, and the scheduler decides that
@@ -137,9 +143,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The dashboard part
 - The scheduler brings its own part of a dashboard: an Automations page (one row per
-  scheduled command, with its switch, its pace and its publish pick), a Settings section
-  (the spend cushion) and an Overview card (on or off, the last tick). All read `status`
-  and write through `offset`, `switch`, `pace` and `publish`. Picked over a hook line per
-  setting that a dashboard runs, and over the dashboard reading the state file by name. The
-  rows are on a page of their own, picked over rows inside Settings: Settings keeps only
-  what reaches every project.
+  scheduled command, with its switch, its pace, its number of agents and its publish pick),
+  a Settings section (the spend cushion) and an Overview card (on or off, the last tick).
+  All read `status` and write through `offset`, `switch`, `pace`, `agents` and `publish`.
+  Picked over a hook line per setting that a dashboard runs, and over the dashboard reading
+  the state file by name. The rows are on a page of their own, picked over rows inside
+  Settings: Settings keeps only what reaches every project.

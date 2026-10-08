@@ -348,6 +348,22 @@ describe('EventList session line', () => {
     expect(screen.getByText('“When you finish, if you changed any file, commit your work.”')).toBeTruthy()
   })
 
+  test('a prompt with a text attached shows the person\'s words alone, and "Sent with this message" under them opens to the text as it was sent; a prompt with none has no such line', () => {
+    const found = 'What the check printed is below.\n[{"url":"https://example.test/1"}]'
+    const handed: OpenAgentEvent = { kind: 'driver', event: { type: 'start', prompt: '/answer-comments', attached: found, added: 'When you finish, if you changed any file, commit your work.' } }
+    const { container } = render(<EventList events={[handed, said, { kind: 'driver', event: { type: 'start', prompt: 'And this one' } }]} setup={{ workspace: '/w', branch: 'agent-1' }} stick={false} />)
+    expect(screen.getByText('/answer-comments')).toBeTruthy()
+    expect(container.textContent).not.toContain('What the check printed')
+    const opens = screen.getAllByRole('button', { name: 'Sent with this message' })
+    expect(opens.length).toBe(1)
+    expect(opens[0]!.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(opens[0]!)
+    expect(opens[0]!.getAttribute('aria-expanded')).toBe('true')
+    expect(container.querySelector('pre')?.textContent).toBe(found)
+    fireEvent.click(opens[0]!)
+    expect(container.querySelector('pre')).toBeNull()
+  })
+
   test('it sits right under the first prompt, and opens to what was set up', () => {
     render(<EventList events={[prompt, said, { ...prompt }]} setup={setup} stick={false} />)
     expect(ids()).toEqual(['0', 'setup', '1', '2'])

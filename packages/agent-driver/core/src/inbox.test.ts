@@ -58,6 +58,24 @@ test('a turn ending on a question is reported as one event; the inbox is drained
   }
 })
 
+test('a text attached to a prompt goes with that prompt alone: an inbox line it goes on to send carries the added sentence and no attached text', async () => {
+  const dir = await scratch()
+  try {
+    const inbox = join(dir, 'inbox.jsonl')
+    const events: DriverEvent[] = []
+    const session = await new FakeDriver({ turns: [{ text: 'Done.' }, { text: 'Tested.' }] }).start({ cwd: dir, onEvent: e => events.push(e) })
+    await appendInbox(inbox, { kind: 'message', text: 'Also add a test.' })
+    await session.prompt('/work-queue', { inbox, attached: 'Found:\n["one entry"]', added: 'Commit your work.' })
+    assert.deepEqual(session.prompts, ['/work-queue\n\nFound:\n["one entry"]\n\nCommit your work.', 'Also add a test.\n\nCommit your work.'])
+    assert.deepEqual(events.filter(e => e.type === 'start'), [
+      { type: 'start', prompt: '/work-queue', attached: 'Found:\n["one entry"]', added: 'Commit your work.' },
+      { type: 'start', prompt: 'Also add a test.', added: 'Commit your work.' },
+    ])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('a sentence added after a prompt follows every inbox line that prompt goes on to send', async () => {
   const dir = await scratch()
   try {

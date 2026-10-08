@@ -16,6 +16,7 @@ Runs one turn [1] of a coding agent [2] as one operating-system process, whichev
 [6] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
 [7] stop request: the caller's signal that a driver session, or one turn of it, must end now; the product raises one when the user stops the agent.
 [8] checkout: an agent's own working copy of the project: a git worktree under the project's `.branches/` directory, named as its branch.
+[9] attached text: a text the caller hands the coding agent with one prompt, apart from the prompt: the coding agent reads it after the prompt, and no later prompt carries it.
 
 ## Business logic — TL;DR
 
@@ -38,7 +39,7 @@ See `## Context`.
 
 #### Business logic
 
-A turn [1] spawns the coding agent [2] with the command line the driver [4] built, in the driver session's [3] directory (the agent's [6] checkout [8]) and with the environment the driver chose, as the leader of its own process group so that the whole subtree can be signaled at once. A `start` progress event [5] carrying the prompt, and apart from it the sentence the caller added after it when there is one, announces the turn first. The prompt, with that sentence after an empty line, is written to the process's standard input, which is then closed, unless the driver wraps it in the form its coding agent reads (Claude Code's JSON lines), in which case the wrapped form is written instead; so a long prompt never hits the operating system's command-line length limit.
+A turn [1] spawns the coding agent [2] with the command line the driver [4] built, in the driver session's [3] directory (the agent's [6] checkout [8]) and with the environment the driver chose, as the leader of its own process group so that the whole subtree can be signaled at once. A `start` progress event [5] carrying the prompt, and apart from it the attached text [9] and the sentence the caller added after it, each when there is one, announces the turn first. The prompt, then the attached text, then that sentence, each after an empty line, is written to the process's standard input, which is then closed, unless the driver wraps it in the form its coding agent reads (Claude Code's JSON lines), in which case the wrapped form is written instead; so a long prompt never hits the operating system's command-line length limit.
 
 A coding agent that is talked to rather than handed its prompt (Codex's app server, which answers requests one JSON message per line) gets no prompt written for it: as soon as the process is spawned, the driver's parser is handed a way to write lines to its standard input and to close it, and it holds the whole exchange itself, answering what it reads. Standard input then stays open until the parser closes it; lines the parser writes after that are dropped.
 

@@ -12,6 +12,18 @@ test('FakeDriver replays scripted turns in order and repeats the last', async ()
   assert.deepEqual(session.prompts, ['a', 'b', 'c'])
 })
 
+test('a text attached to a prompt: the agent is sent it after the prompt and before the added sentence, the start event names each apart', async () => {
+  const events: DriverEvent[] = []
+  const session = await new FakeDriver({ turns: [{ text: 'one' }] }).start({ cwd: '/ws', onEvent: e => events.push(e) })
+  await session.prompt('/answer-comments', { attached: 'Found:\n[1, 2]', added: 'Commit your work.' })
+  await session.prompt('/answer-comments', { attached: 'Found:\n[3]' })
+  assert.deepEqual(session.prompts, ['/answer-comments\n\nFound:\n[1, 2]\n\nCommit your work.', '/answer-comments\n\nFound:\n[3]'])
+  assert.deepEqual(events.filter(e => e.type === 'start'), [
+    { type: 'start', prompt: '/answer-comments', attached: 'Found:\n[1, 2]', added: 'Commit your work.' },
+    { type: 'start', prompt: '/answer-comments', attached: 'Found:\n[3]' },
+  ])
+})
+
 test('a sentence added after a prompt: the agent is sent both, the start event names the sentence apart', async () => {
   const events: DriverEvent[] = []
   const session = await new FakeDriver({ turns: [{ text: 'one' }] }).start({ cwd: '/ws', onEvent: e => events.push(e) })

@@ -15,12 +15,13 @@ import { isPublish, PUBLISH_LEVELS } from './records.js'
 
 export const USAGE = `usage: agent-runner <command>
 
-  run <prompt> [--model <id>] [--driver <claude-code|codex>] [--then <prompt>] [--publish <commit|branch|pr|merge>] [--parent <id>] [--base <ref>]
+  run <prompt> [--model <id>] [--driver <claude-code|codex>] [--then <prompt>] [--publish <commit|branch|pr|merge>] [--attach <text>] [--parent <id>] [--base <ref>]
                                 one run of <prompt> in its own checkout, now, recorded; on Claude Code unless --driver says Codex,
                                 on the coding agent's own default model unless --model names one;
                                 with --then, once it ends done with a pull request, a fresh agent on its branch gets that prompt and the run's id, and the merge waits for it;
                                 with --publish, the agent is told, in one sentence after the prompt, how far to take its work when it finishes: commit it, and from there push its branch,
                                 open its pull request, or set the request to merge once its checks pass; without it the prompt goes as written, and nothing is committed or published unless the prompt asks;
+                                with --attach, the agent is handed <text> with the prompt, after it and before the --publish sentence, and with no later message; the run's record keeps it apart from the prompt, which alone names the run;
                                 with --parent, the run <id> is told when this one ends: which run, how it ended, its last words, as its next prompt;
                                 with --base, the run's branch starts from <ref> instead of origin's default branch
   run --detach <prompt>         the same run in its own process, answered at once with its id: what a dashboard's start hook runs
@@ -98,7 +99,7 @@ type Command = (args: string[], io: CliIo, git: GitRunner) => Promise<unknown>
 
 const COMMANDS: Record<string, Command> = {
   async run(args, io, git) {
-    const { positionals, values } = parse(args, { id: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' }, mark: { type: 'boolean' }, driver: { type: 'string' }, then: { type: 'string' }, publish: { type: 'string' }, parent: { type: 'string' }, base: { type: 'string' } }, 0, 1)
+    const { positionals, values } = parse(args, { id: { type: 'string' }, model: { type: 'string' }, resume: { type: 'string' }, answer: { type: 'string' }, detach: { type: 'boolean' }, mark: { type: 'boolean' }, driver: { type: 'string' }, then: { type: 'string' }, publish: { type: 'string' }, attach: { type: 'string' }, parent: { type: 'string' }, base: { type: 'string' } }, 0, 1)
     const repo = await project(io.cwd, git)
     const driver = values.driver
     if (driver !== undefined && !isDriverName(driver)) throw new Usage(`unknown driver "${driver}"; the drivers are ${DRIVER_NAMES.join(' and ')}`)
@@ -109,11 +110,13 @@ const COMMANDS: Record<string, Command> = {
       if (values.id !== undefined) throw new Usage('--resume takes no --id: a run continues under its own')
       if (values.then !== undefined) throw new Usage('--resume takes no --then: a run continues with the follow-up its record names')
       if (publish !== undefined) throw new Usage('--resume takes no --publish: a run continues at the publish level its record names')
+      if (values.attach !== undefined) throw new Usage('--resume takes no --attach: a text is handed over with a run\'s first prompt only')
       if (values.parent !== undefined) throw new Usage('--resume takes no --parent: a run continues for the parent its record names')
       if (values.base !== undefined) throw new Usage('--resume takes no --base: a run continues on its own branch')
       if (positionals[0] === undefined && values.answer === undefined) throw new Usage('a text or --answer is needed to resume a run')
     }
     if (values.then !== undefined && !values.then.trim()) throw new Usage('--then needs a prompt')
+    if (values.attach !== undefined && !values.attach.trim()) throw new Usage('--attach needs a text')
     // A parent this project has no record of is refused while someone is still listening; a run
     // spawned with its id was asked about already.
     if (values.parent !== undefined && values.id === undefined && !(await findRun(repo, values.parent))) {
@@ -125,7 +128,7 @@ const COMMANDS: Record<string, Command> = {
       const ready = await readyToRun(repo, driver ?? 'claude-code')
       if (ready.problems.length > 0) throw new Refused({ ok: false, reason: 'not-ready', ...ready }, ready.problems.join(' '))
     }
-    const named = { ...(values.then !== undefined ? { then: values.then.trim() } : {}), ...(publish !== undefined ? { publish } : {}), ...(values.parent !== undefined ? { parent: values.parent } : {}), ...(values.base !== undefined ? { base: values.base } : {}) }
+    const named = { ...(values.then !== undefined ? { then: values.then.trim() } : {}), ...(publish !== undefined ? { publish } : {}), ...(values.attach !== undefined ? { attached: values.attach } : {}), ...(values.parent !== undefined ? { parent: values.parent } : {}), ...(values.base !== undefined ? { base: values.base } : {}) }
     if (values.detach && values.resume !== undefined) {
       const resumed = await detachResume(repo, {
         id: values.resume,

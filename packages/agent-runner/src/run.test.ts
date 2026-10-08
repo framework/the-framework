@@ -45,7 +45,7 @@ function fakeGitHost(branch: string, hook?: () => Promise<void>): GitHost & { op
 }
 
 
-/** A fake session with something done before each prompt, handed the prompt as the agent is sent it, the added sentence after it: the spread of a class instance loses its methods, so the wrapper is explicit. */
+/** A fake session with something done before each prompt, handed the prompt as the agent is sent it, the attached text and the added sentence after it: the spread of a class instance loses its methods, so the wrapper is explicit. */
 function wrap(fake: FakeDriverSession, before: (text: string) => Promise<void>): DriverSession & { prompts: string[] } {
   return {
     id: fake.id,
@@ -53,7 +53,7 @@ function wrap(fake: FakeDriverSession, before: (text: string) => Promise<void>):
     prompts: fake.prompts,
     ...(fake.log ? { log: fake.log } : {}),
     prompt: async (text, opts) => {
-      await before(promptSent(text, opts?.added))
+      await before(promptSent(text, opts ?? {}))
       return fake.prompt(text, opts)
     },
     dispose: () => fake.dispose(),
@@ -353,12 +353,13 @@ test('a line written after the last turn took the inbox, while the card still sa
     const gitHost = fakeGitHost('none', async () => {
       if (calls++ === 0) await appendInbox(inboxPath(cwd), { kind: 'message', text: 'one more thing' })
     })
-    const outcome = await runCommand(repo, { prompt: '/work-queue', model: 'opus', driver: recording, now: () => NOW, gitHost })
+    const outcome = await runCommand(repo, { prompt: '/work-queue', attached: 'Found:\n["one entry"]', model: 'opus', driver: recording, now: () => NOW, gitHost })
     assert.equal(outcome.status, 'done')
     assert.deepEqual(outcome.checkout, { reclaimed: true })
     const diary = await readUntimedDiary(repo, outcome.id)
     assert.deepEqual(diary.map(l => l.kind), ['start', 'said', 'result', 'ended', 'start', 'said', 'result', 'ended'])
     assert.deepEqual(diary.filter(l => l.kind === 'start').map(l => l['prompt']), ['/work-queue', 'one more thing'])
+    assert.deepEqual(diary.filter(l => l.kind === 'start').map(l => l['attached']), ['Found:\n["one entry"]', undefined], 'what was handed over went with the run\'s own prompt, not with the late line')
     assert.equal((await findRun(repo, outcome.id))?.status, 'done')
   } finally {
     await removeRepo(repo)
@@ -463,6 +464,7 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
     const nextIds: string[] = []
     const outcome = await runCommand(repo, {
       prompt: '/work-queue',
+      attached: 'Found:\n["one entry"]',
       then: '/post-merge-cleanup',
       driver: publishingDriver(gitHost, seen),
       nextDriver: id => (nextIds.push(id), cleanup),
@@ -472,7 +474,7 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
       gitHost,
     })
 
-    assert.equal(seen.prompt, `/work-queue\n\n${HOLD_MERGE_LINE}`, 'the first agent is told not to arm the merge')
+    assert.equal(seen.prompt, `/work-queue\n\nFound:\n["one entry"]\n\n${HOLD_MERGE_LINE}`, 'the first agent is handed what came with its prompt, and told not to arm the merge')
     assert.equal(outcome.status, 'done')
     assert.deepEqual(outcome.pr, { number: 12, url: 'https://example.com/x/y/pull/12' })
     assert.equal((await findRun(repo, outcome.id))?.intent, '/work-queue', 'the record keeps the bare prompt')
@@ -481,7 +483,7 @@ test('a run with a follow-up: its agent is told not to arm the merge, a fresh ag
     const then = outcome.then!
     assert.notEqual(then.id, outcome.id, 'a fresh agent: a run of its own')
     assert.deepEqual(nextIds, [then.id], 'on the coding agent made for its own id')
-    assert.equal(next.prompt, `/post-merge-cleanup ${outcome.id}`, 'the follow-up gets its prompt as written: no publish level')
+    assert.equal(next.prompt, `/post-merge-cleanup ${outcome.id}`, 'the follow-up gets its prompt as written: no publish level, and nothing of what the first run was handed')
     assert.equal(next.cwd, worktreePath(repo, then.id))
     assert.equal(next.branch, 'agent-fix-it', 'on the first run\'s branch')
     assert.equal(next.prompt?.includes(HOLD_MERGE_LINE), false, 'the follow-up is the last: it is not told to hold')
@@ -535,6 +537,30 @@ test('a run with a publish level: its agent is told the sentence, the record kee
     const plain = await runCommand(repo, { prompt: 'Fix the typo', driver: listening('Done.'), host: 'this-box', pid: 4242, now: ticking(), gitHost: noGitHost })
     assert.equal(prompts[2], 'Fix the typo', 'no level: the prompt as written')
     assert.deepEqual((await findRun(repo, plain.id))?.caller?.['runner'], { host: 'this-box', pid: 4242, baseCommit: (await git(['rev-parse', 'origin/main'], repo)).trim() })
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a run with an attached text: its agent is handed the text with the prompt, before the publish sentence; the record keeps the bare prompt and the text apart; a resumed run is not handed it again', async () => {
+  const repo = await testRepo()
+  try {
+    const prompts: string[] = []
+    const listening = (text: string): Driver => ({ id: 'fake', start: async opts => wrap(await new FakeDriver({ turns: [{ text }], sessionId: 's-1' }).start(opts), async prompt => void prompts.push(prompt)) })
+    const found = 'The check printed:\n[{"url":"https://example.test/1"}]'
+    const first = await runCommand(repo, { prompt: '/answer-comments', attached: found, publish: 'commit', driver: listening(QUESTION), host: 'this-box', pid: 4242, now: ticking(), gitHost: noGitHost })
+    assert.equal(first.status, 'waiting')
+    assert.deepEqual(prompts, [`/answer-comments\n\n${found}\n\n${PUBLISH_LINES.commit}`])
+    assert.equal((await findRun(repo, first.id))?.intent, '/answer-comments', 'the record keeps the bare prompt: it is what the run is counted under')
+    const started = (await readDiary(repo, first.id))?.find(line => line.kind === 'start')
+    assert.equal(started?.['prompt'], '/answer-comments', 'the diary keeps the prompt as written')
+    assert.equal(started?.['attached'], found, 'the attached text apart from it')
+    assert.equal(started?.['added'], PUBLISH_LINES.commit, 'and the sentence apart from both')
+
+    const resumed = await resumeRun(repo, { id: first.id, text: 'Go on.', driver: listening('Done.'), host: 'this-box', pid: 4243, now: ticking(), gitHost: noGitHost })
+    assert.equal(resumed.status, 'done')
+    assert.equal(prompts[1], `Go on.\n\n${PUBLISH_LINES.commit}`, 'the text went with the first prompt alone')
+    assert.deepEqual((await readDiary(repo, first.id))?.filter(line => line.kind === 'start').map(line => line['attached']), [found, undefined])
   } finally {
     await removeRepo(repo)
   }

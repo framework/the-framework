@@ -44,5 +44,8 @@ export function isAgents(value: unknown): value is number {
 /** How often a started scheduler ticks. */
 export const TICK_MS = 60_000
 
+/** How much of what a check printed a run is handed, in characters: enough for a list of work, short of a prompt nobody can read. */
+export const FOUND_MAX = 8_000
+
 /** How long a command's check may run before it counts as failed. */
 export const CHECK_TIMEOUT_MS = 60_000

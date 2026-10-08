@@ -5,14 +5,15 @@ import type { RunCard } from '@openagt/skill-logs'
 import { RUN_SKILLS_DIR } from './names.js'
 import { dueFrom, localStamp, paceInForce, paceText } from './pace.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
-import { commandPrompt, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
+import { checkFound, commandPrompt, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
 import { capInForce, isSwitchedOn, publishInForce, type ListedCommand, type State, type TickDecision, type TickRecord } from './state.js'
 
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
  * the cheapest order — can the coding agent run it, is it switched on on this machine, is it due by its pace (this machine's, else its skill's), is its check
  * due, is its cap reached, can the coding agent start at all, is there quota — then mark and spawn one run. Every decision is one line in the state, so a
- * dashboard or a person reads why nothing started without a log.
+ * dashboard or a person reads why nothing started without a log. A run its check started is handed
+ * what the check printed, with its prompt.
  *
  * The quota is read only when everything else says start: a read spawns the agent's CLI and the
  * agent's own usage fetch is refused upstream when asked too often.
@@ -46,8 +47,8 @@ export interface TickDeps {
   mint: () => string
   writeMarker: (card: RunCard) => Promise<FileBranchWrite>
   withdrawMarker: (id: string) => Promise<unknown>
-  /** Start the run's process, detached; resolves once it is spawned. */
-  spawn: (run: { id: string; prompt: string; model: string; publish?: Publish }) => Promise<void>
+  /** Start the run's process, detached; resolves once it is spawned. `attached` is handed to the agent with the prompt. */
+  spawn: (run: { id: string; prompt: string; model: string; publish?: Publish; attached?: string }) => Promise<void>
   /** The driver's id, for the marker's card. */
   driver: string
   /** Whether the scheduler was told to stop while this tick runs: then nothing more is started. */
@@ -92,6 +93,8 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
         continue
       }
     }
+    // What the check printed, handed to the run it starts: a command its pace alone starts has none.
+    let found: string | undefined
     if (command.when !== undefined) {
       const checked = await deps.check(command.when).catch((err): CheckResult => ({ ok: false, stdout: '', stderr: String(err) }))
       if (!checked.ok) {
@@ -102,6 +105,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
         decide('not due')
         continue
       }
+      found = checkFound(checked.stdout)
     }
     // The cap in force: this machine's number for the command, else the skill's, held against every machine's runs.
     const cap = capInForce(deps.state, command)
@@ -150,7 +154,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       continue
     }
     try {
-      await deps.spawn({ id, prompt, model: deps.state.model, ...publish })
+      await deps.spawn({ id, prompt, model: deps.state.model, ...publish, ...(found !== undefined ? { attached: found } : {}) })
       decide(`started ${id}`, id)
     } catch (err) {
       decide(`could not start: ${err instanceof Error ? err.message : String(err)}`)

@@ -68,6 +68,9 @@ test('run --detach on Codex: the spawned run names Codex, no model unless one is
     const levelled: unknown[] = []
     const withLevel = await detachRun(repo, { prompt: 'Fix the typo', publish: 'merge', now: () => new Date(NOW.getTime() + 3000) }, { spawn: async (_repo, run) => { levelled.push(run) } })
     assert.deepEqual(levelled, [{ id: withLevel.id, prompt: 'Fix the typo', mark: true, driver: 'claude-code', publish: 'merge' }], 'the publish level a person picked reaches the run')
+    const handed: unknown[] = []
+    const withText = await detachRun(repo, { prompt: '/answer-comments', attached: 'Found:\n[1]', now: () => new Date(NOW.getTime() + 4000) }, { spawn: async (_repo, run) => { handed.push(run) } })
+    assert.deepEqual(handed, [{ id: withText.id, prompt: '/answer-comments', mark: true, driver: 'claude-code', attached: 'Found:\n[1]' }], 'a text attached to the prompt reaches the run')
   } finally {
     await removeRepo(repo)
   }
@@ -117,6 +120,8 @@ test('a spawned run is told its tool, and its model only when it has one', () =>
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', then: '/post-merge-cleanup' }), ['run', '/work-queue', '--id', 'r1', '--then', '/post-merge-cleanup'])
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', publish: 'merge' }), ['run', '/work-queue', '--id', 'r1', '--publish', 'merge'])
   assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', mark: true }), ['run', '/work-queue', '--id', 'r1', '--mark'])
+  assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', publish: 'commit', attached: 'Found:\n["one entry"]' }), ['run', '/work-queue', '--id', 'r1', '--publish', 'commit', '--attach=Found:\n["one entry"]'])
+  assert.deepEqual(runArgs({ id: 'r1', prompt: '/work-queue', attached: '- one entry' }), ['run', '/work-queue', '--id', 'r1', '--attach=- one entry'], 'a text that opens with a dash stays the flag\'s own text')
   assert.deepEqual(runArgs({ id: 'r1', prompt: 'Do task one', parent: 'p1', base: 'agent-p1' }), ['run', 'Do task one', '--id', 'r1', '--parent', 'p1', '--base', 'agent-p1'])
 })
 

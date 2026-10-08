@@ -296,7 +296,8 @@ function Answer({ question, answer }: { question: string; answer: string }) {
 // always there, so nothing moves when it shows.
 // `queued`: a message the working agent has not read yet. Dimmed, with the word under it where a
 // read message's time shows on hover.
-function Prompt({ text, at, queued = false }: { text: string; at?: string | undefined; queued?: boolean }) {
+// `attached`: what the run handed the agent with this message, folded under the box.
+function Prompt({ text, at, queued = false, attached }: { text: string; at?: string | undefined; queued?: boolean; attached?: string | undefined }) {
   const [open, setOpen] = useState(false)
   const tall = isTall(text)
   return (
@@ -311,6 +312,7 @@ function Prompt({ text, at, queued = false }: { text: string; at?: string | unde
           </button>
         )}
       </div>
+      {attached !== undefined && <Attached text={attached} />}
       {queued ? (
         <span className="h-4 pr-1 text-[10px] text-muted-foreground">Queued</span>
       ) : (
@@ -322,6 +324,21 @@ function Prompt({ text, at, queued = false }: { text: string; at?: string | unde
         {at === undefined ? '' : formatTime(at)}
       </time>
       )}
+    </div>
+  )
+}
+
+// What the run handed the agent with a message, after it: a scheduled run carries what its
+// command's check printed. Folded, since it can be long; opened, the text shows as it was sent.
+function Attached({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-1 flex max-w-[85%] min-w-0 flex-col items-end text-xs text-muted-foreground">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex items-center gap-1 hover:text-foreground">
+        <span>Sent with this message</span>
+        <ChevronRight className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden />
+      </button>
+      {open && <pre className="mt-1 max-h-80 w-full overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border px-3 py-2 text-left font-mono text-foreground">{text}</pre>}
     </div>
   )
 }
@@ -619,7 +636,7 @@ export function EventList({
                   {answer ? (
                     <Answer {...answer} />
                   ) : own && message !== null ? (
-                    <Prompt text={message} at={at} />
+                    <Prompt text={message} at={at} attached={e.kind === 'driver' && e.event.type === 'start' ? e.event.attached : undefined} />
                   ) : end ? (
                     // A subagent ended: which one and how, then what the run was told about it.
                     <div className="flex min-w-0 flex-1 flex-col">

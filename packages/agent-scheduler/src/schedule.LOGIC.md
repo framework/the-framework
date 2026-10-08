@@ -1,4 +1,4 @@
-The schedule [1]: how a skill's `schedule` [9], in the front matter of its `SKILL.md`, is read into commands [2], each with its interval [5], its check [3] or both, one plain line saying what its check waits for, its cap [4], what its skill says it does, and the skills folder its skill was read from; which skills of a project are read; how a skill's `schedule` that cannot be read is named rather than silently skipped; what a check's output must say for a command to be due; and the prompt a command runs with.
+The schedule [1]: how a skill's `schedule` [9], in the front matter of its `SKILL.md`, is read into commands [2], each with its interval [5], its check [3] or both, one plain line saying what its check waits for, its cap [4], what its skill says it does, and the skills folder its skill was read from; which skills of a project are read; how a skill's `schedule` that cannot be read is named rather than silently skipped; what a check's output must say for a command to be due; the prompt a command runs with; and the attached text [12] a run is handed when a check started it.
 
 ## Context
 
@@ -19,6 +19,7 @@ The schedule [1]: how a skill's `schedule` [9], in the front matter of its `SKIL
 [9] the skill's `schedule`, also the `schedule` key: the key `schedule` in the front matter of a skill's `SKILL.md`, where the skill says which commands it schedules. Its value is one row [8], or a list of rows.
 [10] pace pick: a person's choice, on one machine, of a pace for one scheduled command there: "whenever there is work", or an interval with an optional time of day; kept in the state, not in the skill. A command with no pace pick runs at its skill's pace.
 [11] agents pick: a person's choice, on one machine, of that machine's number for one scheduled command: the machine starts another run of the command only while fewer than that number are in flight on any machine that shares the repository. A whole number from 1 to 99; kept in the state, not in the skill. A command with no agents pick has its skill's number.
+[12] attached text: a text handed to a run's agent with the run's first prompt, apart from the prompt (`agent-runner run --attach`): the agent reads it after the prompt, and no later prompt of the run carries it. A run that a check started is handed what the check printed this way.
 
 ## Business logic — TL;DR
 
@@ -27,6 +28,7 @@ The schedule [1]: how a skill's `schedule` [9], in the front matter of its `SKIL
 - **An unreadable `schedule`** - an unknown key, a bad value, a row with neither `every` nor `when`, `waits-for` without `when`, two rows with one name, no row at all, or a front matter that is not YAML and holds a `schedule:` line, makes the skill's whole `schedule` unreadable: the skill gives no command and is kept aside with its name and the reason; the tick names the skill with `unreadable schedule: <reason>`.
 - **Due** - the check's output, parsed as JSON, is something other than empty; output that is not JSON is due when non-blank. The interval [5] is the tick's to apply, from the run records, where no pace pick [10] stands in for it; a row with both keys starts only when both hold.
 - **The prompt** - a command's prompt is its slash command, `/<name>`, the whole name; a run's prompt is counted under the scheduled command it names, else under its first word.
+- **The attached text of a run a check started** - opening words saying that the command's check printed what follows and that it says why the run started, not what the work is; then what the check printed, without NUL characters, cut when it is longer than 8000 characters at the end of the last whole line that fits, a line that ends exactly at the limit kept, with a last line saying how much was printed; the attached text [12] the tick hands the run, the prompt staying the command alone.
 
 ## Business logic
 
@@ -107,4 +109,16 @@ A command is due when its check exited 0 and its output, surrounding whitespace 
 
 #### Business logic
 
-A command's prompt is `/<name>`, the whole name: `triage quick` runs as `/triage quick`, and the harness hands the skill the word. Nothing else is added: no system prompt, no framing. The other way round, a run's prompt, as its run record carries it, is counted under the scheduled command whose name it is without its slash (`/triage quick` → `triage quick`), so a run counts against that command's cap and interval whoever started it (the tick, a dashboard's launcher, `agent-runner run` in a shell; `records.ts`), else under its first word without the slash (`/triage` → `triage`, `/work-queue now` → `work-queue`, `Read the docs` → `Read`); in a project where no skill schedules a command, always the first word.
+A command's prompt is `/<name>`, the whole name: `triage quick` runs as `/triage quick`, and the harness hands the skill the word. The prompt itself is the command alone, with no system prompt and no framing. What else the agent is sent comes with the prompt, apart from it: from the scheduler, what a check printed, as the run's attached text [12] (below); from `agent-runner`, the sentence of the publish level in force, last. The other way round, a run's prompt, as its run record carries it, is counted under the scheduled command whose name it is without its slash (`/triage quick` → `triage quick`), so a run counts against that command's cap and interval whoever started it (the tick, a dashboard's launcher, `agent-runner run` in a shell; `records.ts`), else under its first word without the slash (`/triage` → `triage`, `/work-queue now` → `work-queue`, `Read the docs` → `Read`); in a project where no skill schedules a command, always the first word.
+
+### The attached text of a run a check started
+
+#### Context
+
+**User story**: a command's check prints the new work, the comments nobody answered or the queue's open entries, and the scheduler starts a run of the command. The agent reads with its prompt what the check printed, so a command that asks for the new thing has it.
+
+**Problem**: what the check printed cannot go into the prompt: a run is counted under the scheduled command its prompt names (above), so the prompt stays the command alone. The agent has never seen the check, and a check may print only a sign that there is work (one issue of five that changed), so the text has to say what the output is, and that the command, not the output, says what the work is. And a check may print far more than an agent should be handed with its prompt.
+
+#### Business logic
+
+The attached text [12] of a run that a check [3] started opens with these words: "The scheduler starts this command when its check prints something, and this time the check printed what is below. It says why this run started; what the work is, the command says." On the next line comes the check's standard output, with every NUL character dropped (the text reaches the run as a command-line argument, which can hold none) and its surrounding whitespace removed. Output of at most 8000 characters (`names.ts`) is whole. Longer output is cut at the end of the last whole line within its first 8000 characters (a line that ends exactly at the 8000th character is whole, and is kept), or after 8000 characters, mid-line, when its first line alone is longer than that; one more line then says how much there was: "(cut: the check printed <N> characters, these are the first <M>)", N being the length of the output and M the length of what is shown. The tick (`tick.ts`) hands the text to the run it starts; a command with no check, started by its interval alone, has no such text.

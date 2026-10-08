@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import type { DriverEvent } from './types.js'
+import type { DriverEvent, DriverPromptOptions } from './types.js'
 
 // The pieces every driver session needs but that are not agent-specific: emitting events
 // without letting a listener throw into the agent, folding the session + per-call signals and
@@ -24,14 +24,17 @@ export function makeEmit(onEvent: ((event: DriverEvent) => void) | undefined, dr
   }
 }
 
-/** What the agent is sent: the prompt, and the caller's added sentence after an empty line when there is one. */
-export function promptSent(prompt: string, added: string | undefined): string {
-  return added !== undefined ? `${prompt}\n\n${added}` : prompt
+/** What a caller says around a prompt ({@link DriverPromptOptions}): the text handed over with it, the sentence added after it. */
+export type PromptExtras = Pick<DriverPromptOptions, 'attached' | 'added'>
+
+/** What the agent is sent: the prompt, then the caller's attached text, then its added sentence, each after an empty line when there is one. */
+export function promptSent(prompt: string, extras: PromptExtras): string {
+  return [prompt, extras.attached, extras.added].filter(part => part !== undefined).join('\n\n')
 }
 
-/** The `start` event of a prompt: the prompt as written, the added sentence named apart. */
-export function startEvent(prompt: string, added: string | undefined): Extract<DriverEvent, { type: 'start' }> {
-  return { type: 'start', prompt, ...(added !== undefined ? { added } : {}) }
+/** The `start` event of a prompt: the prompt as written, the attached text and the added sentence named apart. */
+export function startEvent(prompt: string, extras: PromptExtras): Extract<DriverEvent, { type: 'start' }> {
+  return { type: 'start', prompt, ...(extras.attached !== undefined ? { attached: extras.attached } : {}), ...(extras.added !== undefined ? { added: extras.added } : {}) }
 }
 
 /** The live AbortSignals for a prompt — the session's and the per-call one, minus the absent. */

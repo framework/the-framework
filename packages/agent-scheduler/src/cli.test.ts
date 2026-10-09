@@ -334,7 +334,7 @@ test("add saves a person's own automation as a command skill of the project, whi
     assert.equal(await readFile(statePath(repo), 'utf8'), stateBefore)
 
     const again = await run(repo, 'add', 'answer-comments', '--prompt', 'Other words.', '--every', '1d')
-    assert.deepEqual([again.code, again.out, again.err], [1, { ok: false, reason: 'taken', folder: '.claude/skills/answer-comments' }, 'the project already has a skill there: .claude/skills/answer-comments'])
+    assert.deepEqual([again.code, again.out, again.err], [1, { ok: false, reason: 'taken', folder: '.claude/skills/answer-comments' }, 'that name is taken: .claude/skills/answer-comments'])
     const unnamed = await run(repo, 'add', 'Answer Comments', '--prompt', 'p', '--every', '1d')
     assert.deepEqual([unnamed.code, unnamed.err], [1, 'a name is lower-case letters, digits and single or double dashes, and starts with a letter or a digit'])
     const silent = await run(repo, 'add', 'x', '--prompt', '  ', '--every', '1d')
@@ -345,6 +345,61 @@ test("add saves a person's own automation as a command skill of the project, whi
     assert.equal(promptless.code, 2)
     assert.match(promptless.err, /^add needs --prompt, what the agent is told/)
     assert.equal((await run(repo, 'add', '--prompt', 'p', '--every', '1d')).code, 2, 'no name')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('add --private keeps the automation on this machine alone: one file in the tool\'s own folder, nothing in git, a row its switch takes like any other', async () => {
+  const repo = await testRepo()
+  try {
+    const added = await run(repo, 'add', 'watch-competitor', '--prompt', 'Look for new threads.', '--every', '1h', '--private')
+    assert.deepEqual([added.code, added.out, added.err], [0, { ok: true, command: 'watch-competitor', file: '.agent-scheduler/automations/watch-competitor.md', startsFrom: 'origin/main', onThisMachine: true }, ''])
+    assert.equal((await run(repo, 'switch', 'watch-competitor', 'on')).code, 0)
+    assert.equal((await run(repo, 'pace', 'watch-competitor', '2h')).code, 0)
+    const again = await run(repo, 'add', 'watch-competitor', '--prompt', 'Other.', '--every', '1d')
+    assert.deepEqual([again.code, again.err], [1, 'that name is taken: .agent-scheduler/automations/watch-competitor.md'])
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test("an automation kept on this machine that is not listed is refused in its own words; a tick takes back what it was given once its file is gone, so a skill that takes the name starts off", async () => {
+  const repo = await testRepo()
+  try {
+    assert.equal((await run(repo, 'add', 'tidy', '--prompt', 'Tidy up.', '--every', '1d', '--private')).code, 0)
+    assert.equal((await run(repo, 'switch', 'tidy', 'on')).code, 0)
+    assert.equal((await run(repo, 'publish', 'tidy', 'merge')).code, 0)
+    assert.equal((await run(repo, 'agents', 'tidy', '5')).code, 0)
+    assert.equal((await run(repo, 'tick')).code, 0)
+    assert.deepEqual(((await readState(repo)).lastTick?.schedule ?? []).map(c => [c.command, c.onThisMachine]), [['tidy', true]])
+    assert.deepEqual(Object.keys((await readState(repo)).switches ?? {}), ['tidy'], 'a tick leaves the picks of an automation that is there')
+    // A skill of the project gets the name: neither is listed, and the command line says so of the automation.
+    await writeSkill(repo, 'tidy', 'schedule:\n  every: 1h\n')
+    const refused = await run(repo, 'switch', 'tidy', 'on')
+    assert.equal(refused.code, 1)
+    assert.deepEqual(refused.out, { ok: false, reason: 'unlisted-automation', automation: 'tidy', detail: 'a skill of the project has this name too, so neither is listed: rename or remove .agent-scheduler/automations/tidy.md, then switch on what you want' })
+    assert.equal(refused.err, 'the automation tidy, kept on this machine, is not listed: a skill of the project has this name too, so neither is listed: rename or remove .agent-scheduler/automations/tidy.md, then switch on what you want')
+    assert.equal((await run(repo, 'tick')).code, 0)
+    const cleared = await readState(repo)
+    assert.deepEqual([cleared.switches, cleared.publishes, cleared.agents], [undefined, undefined, undefined], 'what the automation was given is taken back')
+    // The person removes their file: the skill's command is listed, and it is off, like any skill that arrives.
+    await rm(join(repo, '.agent-scheduler', 'automations', 'tidy.md'))
+    assert.equal((await run(repo, 'tick')).code, 0)
+    const after = await readState(repo)
+    assert.deepEqual((after.lastTick?.schedule ?? []).map(c => [c.command, c.onThisMachine]), [['tidy', undefined]])
+    assert.equal(after.switches, undefined)
+
+    // Removed with no skill of that name around: the switch does not wait for whatever takes the name next.
+    assert.equal((await run(repo, 'add', 'notes', '--prompt', 'Write notes.', '--every', '1d', '--private')).code, 0)
+    assert.equal((await run(repo, 'switch', 'notes', 'on')).code, 0)
+    assert.equal((await run(repo, 'tick')).code, 0)
+    await rm(join(repo, '.agent-scheduler', 'automations', 'notes.md'))
+    assert.equal((await run(repo, 'tick')).code, 0)
+    assert.equal((await readState(repo)).switches, undefined)
+    // A prompt too long for a run to be handed is refused in a sentence.
+    const long = await run(repo, 'add', 'endless', `--prompt=${'x'.repeat(32_001)}`, '--every', '1d', '--private')
+    assert.deepEqual([long.code, long.err], [1, 'the prompt is 32001 characters, and one kept on this machine has 32000 at most'])
   } finally {
     await removeRepo(repo)
   }

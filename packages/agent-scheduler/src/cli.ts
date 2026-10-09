@@ -33,14 +33,18 @@ export const USAGE = `usage: agent-scheduler <command>
                                 for days, weeks or months (2d 10:00, this machine's time); work for whenever its check finds work; skill for the skill's own pace again, taken for any name
   agents <command> <skill|N>    how many runs of a scheduled command may be in flight at once: this machine starts another only while fewer than N are in flight
                                 on any machine; a whole number from 1 to ${MAX_AGENTS}; skill for the skill's own number again, taken for any name
-  add <name> --prompt <text> [--every <N<m|h|d|w|mo>>] [--when <shell line>] [--waits-for <line>]
+  add <name> --prompt <text> [--every <N<m|h|d|w|mo>>] [--when <shell line>] [--waits-for <line>] [--private]
                                 a person's own automation, saved as a command skill of the project: the prompt is the skill's text, and its schedule a pace (--every),
                                 a check (--when, a shell line that prints what is new; it may read $LAST_RUN), or both; --waits-for says in one plain line what the check
                                 waits for. The file is yours to commit: its command starts no run before it is on the commit a run's checkout starts from.
-                                Refused for a name a skill of the project already has
+                                With --private it is kept on this machine alone, in this tool's own folder: nothing to commit, nobody else gets the row, and it
+                                can start at once: a run is named by the automation's name and handed the prompt. The prompt is in each run's record, which
+                                is shared where the project shares its records.
+                                Refused for a name a skill of the project, or an automation kept on this machine, already has
   try --when <shell line>       run a check once, as a tick would, asking what is new since a day ago: what it printed and whether an agent would start; nothing is saved or started;
                                 it has 20 seconds, less than a tick gives a check
-  cleanup                       remove what this tool left in the project: the state file and the scheduler's log, then .agent-scheduler/ and the rule hiding it from git once it is empty;
+  cleanup                       remove what this tool left in the project: the state file and the scheduler's log, then .agent-scheduler/ and the rule hiding it from git once it is empty
+                                (the automations kept on this machine are your own writing and stay);
                                 refused while the state names a scheduler that is alive; the command a dashboard asks for when a project is removed with its files
 
 JSON on stdout. Exit code 1 for a refusal or a failure (the reason on stderr), 2 for a usage error.`
@@ -212,10 +216,10 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async add(args, io, git) {
-    const { positionals, values } = parse(args, { prompt: { type: 'string' }, every: { type: 'string' }, when: { type: 'string' }, 'waits-for': { type: 'string' } }, 1)
+    const { positionals, values } = parse(args, { prompt: { type: 'string' }, every: { type: 'string' }, when: { type: 'string' }, 'waits-for': { type: 'string' }, private: { type: 'boolean' } }, 1)
     if (values.prompt === undefined) throw new Usage('add needs --prompt, what the agent is told')
     const repo = await project(io.cwd, git)
-    const outcome = await addAutomation(repo, { name: positionals[0]!, prompt: values.prompt, ...(values.every !== undefined ? { every: values.every } : {}), ...(values.when !== undefined ? { when: values.when } : {}), ...(values['waits-for'] !== undefined ? { waitsFor: values['waits-for'] } : {}) }, git)
+    const outcome = await addAutomation(repo, { name: positionals[0]!, prompt: values.prompt, ...(values.every !== undefined ? { every: values.every } : {}), ...(values.when !== undefined ? { when: values.when } : {}), ...(values['waits-for'] !== undefined ? { waitsFor: values['waits-for'] } : {}) }, git, values.private ? { onThisMachine: true } : {})
     if (outcome.ok) {
       // A new command starts off, at its own pace, on this machine: nothing a command of that name left behind here decides for it.
       // Written only when something was left: a save of the page's own may be writing the state at this moment.
@@ -224,7 +228,7 @@ const COMMANDS: Record<string, Command> = {
       return outcome
     }
     const line =
-      outcome.reason === 'taken' ? `the project already has a skill there: ${outcome.folder}` : outcome.reason === 'no-prompt' ? 'the prompt is empty' : outcome.reason === 'bad-name' ? outcome.detail : `it cannot run as written: ${outcome.detail}`
+      outcome.reason === 'taken' ? `that name is taken: ${outcome.folder}` : outcome.reason === 'no-prompt' ? 'the prompt is empty' : outcome.reason === 'bad-name' || outcome.reason === 'long-prompt' ? outcome.detail : `it cannot run as written: ${outcome.detail}`
     throw new Refused(outcome, line)
   },
 
@@ -250,6 +254,7 @@ async function scheduled(repo: string, name: string): Promise<ScheduledCommand> 
   if (command) return command
   const skill = name.split(' ')[0]!
   const unreadable = schedule.unreadable.find(u => u.skill === skill)
+  if (unreadable?.own) throw new Refused({ ok: false, reason: 'unlisted-automation', automation: skill, detail: unreadable.reason }, `the automation ${skill}, kept on this machine, is not listed: ${unreadable.reason}`)
   if (unreadable) throw new Refused({ ok: false, reason: 'unreadable-schedule', skill, detail: unreadable.reason }, `the schedule of ${skill} cannot be read: ${unreadable.reason}`)
   throw new Refused({ ok: false, reason: 'not-scheduled', command: name }, `no skill of this project schedules ${name}`)
 }

@@ -6,6 +6,15 @@ export const STATE_DIR = '.agent-scheduler'
 /** The state the tool writes for this user: on or off, the model, the last tick and what it decided. */
 export const STATE_FILE = 'state.json'
 
+/**
+ * Under the state directory: the automations a person keeps on this machine alone, one file each
+ * (`<name>.md`), written like a skill's file. Never tracked, never in a run's checkout.
+ */
+export const OWN_AUTOMATIONS_DIR = `${STATE_DIR}/automations`
+
+/** The longest text an automation kept on this machine may have, in characters: it travels to its run as one command-line argument. */
+export const OWN_TEXT_MAX = 32_000
+
 /** Under the state directory: the scheduler's own log. */
 export const SCHEDULER_LOG = 'scheduler.log'
 

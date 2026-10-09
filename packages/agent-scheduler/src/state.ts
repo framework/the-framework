@@ -39,6 +39,8 @@ export interface ListedCommand {
   description?: string
   /** How many runs of the command its skill lets be in flight at once, when it is more than one. */
   agents?: number
+  /** Whether the command is an automation a person keeps on this machine alone, not a skill of the project. */
+  onThisMachine?: true
 }
 
 /** One tick as the state remembers it. */
@@ -139,6 +141,31 @@ export function withoutCommand(state: State, command: string): State {
     rest = { ...rest }
     if (Object.keys(others).length) Object.assign(rest, { [key]: others })
     else delete rest[key]
+  }
+  return rest
+}
+
+/**
+ * The names whose picks on this machine go before a tick: an automation kept here that the last
+ * tick listed and whose file is gone now (removed or renamed), and a name a skill and an
+ * automation kept here both have. A switch left under such a name would otherwise start whatever
+ * takes the name next: a skill of the project, which starts no agent before a person switches it on.
+ * An automation whose file is still there keeps its picks, also while a slip in the file keeps it
+ * off the list.
+ */
+export function namesGivenUp(lastTick: TickRecord | undefined, schedule: { commands: { name: string; text?: string }[]; unreadable?: { skill: string; own?: true }[]; clashes?: string[] }): string[] {
+  const kept = new Set([...schedule.commands.filter(c => c.text !== undefined).map(c => c.name), ...(schedule.unreadable ?? []).filter(u => u.own).map(u => u.skill)])
+  const gone = (lastTick?.schedule ?? []).filter(c => c.onThisMachine === true && !kept.has(c.command)).map(c => c.command)
+  return [...new Set([...gone, ...(schedule.clashes ?? [])])]
+}
+
+/** The state with nothing left under a name: the picks of the command of that name, and of every command that is that name and a word (`triage quick`). */
+export function withoutName(state: State, name: string): State {
+  let rest = state
+  for (const key of ['switches', 'publishes', 'paces', 'agents'] as const) {
+    for (const command of Object.keys(state[key] ?? {})) {
+      if (command.split(' ')[0] === name) rest = withoutCommand(rest, command)
+    }
   }
   return rest
 }

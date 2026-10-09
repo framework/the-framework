@@ -9,7 +9,7 @@ import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@ope
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
 import { inFlight, lastStart } from './records.js'
 import { readSchedule } from './schedule.js'
-import { readState, stateDir, updateState, withoutPid, type State, type TickRecord } from './state.js'
+import { namesGivenUp, readState, stateDir, updateState, withoutName, withoutPid, type State, type TickRecord } from './state.js'
 import { atStartOf } from './start-point.js'
 import { runCheck, tick } from './tick.js'
 
@@ -29,8 +29,11 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
   const log = opts.log ?? (() => {})
   const now = opts.now ?? (() => new Date())
   const host = hostname()
-  const state = await readState(repo)
   const schedule = await readSchedule(repo)
+  // What an automation kept on this machine was given goes when it goes, and when a skill has its
+  // name too: a switch left under the name would start the skill's command unasked.
+  const givenUp = namesGivenUp((await readState(repo)).lastTick, schedule)
+  const state = givenUp.length ? await updateState(repo, s => givenUp.reduce(withoutName, s), git) : await readState(repo)
   const record = await tick({
     state,
     schedule,
@@ -40,8 +43,8 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     sweep: () => sweep(repo, { host, isAlive: isPidAlive, now, git, log, resume: resumeDetached(repo) }),
     atStart: atStartOf(repo, git),
     check: (shell, lastRun) => runCheck(repo, shell, CHECK_TIMEOUT_MS, lastRun),
-    lastStart: command => lastStart(repo, command, schedule),
-    inFlight: command => inFlight(repo, command, schedule),
+    lastStart: command => lastStart(repo, command, schedule, host),
+    inFlight: command => inFlight(repo, command, schedule, host),
     ready: () => readyToRun(repo, 'claude-code'),
     quota: () => readClaudeQuota({ cwd: repo }),
     mint: () => runIdFrom(now().toISOString()),

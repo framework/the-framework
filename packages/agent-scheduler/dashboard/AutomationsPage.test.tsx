@@ -147,7 +147,7 @@ describe('the Automations page', () => {
 
   test('Save runs `add` in the project and then says where the file is, that it is the person\'s to commit, and where it has to get to before its row can start; a save that is refused says why and keeps what was typed', async () => {
     const saves: ModuleCommandResult[] = [
-      { ok: false, error: 'the project already has a skill there: .claude/skills/answer-comments' },
+      { ok: false, error: 'that name is taken: .claude/skills/answer-comments' },
       { ok: true, output: { ok: true, command: 'answer-replies', file: '.claude/skills/answer-replies/SKILL.md', startsFrom: 'origin/main' } },
     ]
     const { host, runCommand } = scheduler((_, args) => (args[0] === 'add' ? saves.shift()! : { ok: true, output: { ok: true } }))
@@ -159,7 +159,7 @@ describe('the Automations page', () => {
     fireEvent.click(within(form).getByRole('checkbox', { name: 'Every' }))
     fireEvent.change(within(form).getByLabelText(/A shell line that prints what is new/), { target: { value: 'gh api comments' } })
     fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
-    expect((await within(form).findByRole('alert')).textContent).toBe('Not saved: the project already has a skill there: .claude/skills/answer-comments')
+    expect((await within(form).findByRole('alert')).textContent).toBe('Not saved: that name is taken: .claude/skills/answer-comments')
     expect(runCommand).toHaveBeenCalledWith('p1', ['add', 'answer-comments', '--prompt=- Answer each new comment below.', '--when=gh api comments'])
     expect((within(form).getByLabelText('What the agent is told') as HTMLTextAreaElement).value).toBe('- Answer each new comment below.')
     // Typing again takes the refusal away.
@@ -220,6 +220,66 @@ describe('the Automations page', () => {
     expect(within(form).queryByRole('status', { name: 'What the line answered' })).toBeNull()
     answers[1]!({ ok: true, output: { ok: true, lastRun: '2026-10-08T10:00:00Z', ran: true, due: false, printed: '[]' } })
     expect(await within(form).findByText('It printed nothing to do: no agent would start.')).toBeTruthy()
+  })
+
+  test('"Who gets it": shared with the project by default; "Only on this machine" saves with --private, and the saved panel says nothing is to commit and the row can start at once', async () => {
+    const { host, runCommand } = scheduler((_, args) => (args[0] === 'add' ? { ok: true, output: { ok: true, command: 'watch-competitor', file: '.agent-scheduler/automations/watch-competitor.md', startsFrom: 'origin/main', onThisMachine: true } } : { ok: true, output: { ok: true } }))
+    show(host)
+    fireEvent.click(await screen.findByRole('button', { name: 'New automation in gemstack' }))
+    const form = screen.getByRole('group', { name: 'New automation' })
+    const shared = within(form).getByRole('radio', { name: /Shared with the project/ }) as HTMLInputElement
+    const here = within(form).getByRole('radio', { name: /Only on this machine/ }) as HTMLInputElement
+    expect([shared.checked, here.checked]).toEqual([true, false])
+    expect(within(form).getByText('Saved as a skill file in this project, which you commit. The row starts switched off.')).toBeTruthy()
+    // A shared one is a command to type, shown with its slash before the name; one kept here has none.
+    const slashBefore = (): boolean => within(form).getByLabelText('Name').parentElement!.textContent === '/'
+    expect(slashBefore()).toBe(true)
+    fireEvent.click(here)
+    expect([shared.checked, here.checked]).toEqual([false, true])
+    expect(slashBefore()).toBe(false)
+    expect(within(form).getByText('Give it a name, like answer-comments.')).toBeTruthy()
+    expect(within(form).getByText('Kept on this machine alone, outside git. The row starts switched off, and can start as soon as you switch it on.')).toBeTruthy()
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'watch-competitor' } })
+    fireEvent.change(within(form).getByLabelText('What the agent is told'), { target: { value: 'Look for new threads.' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['add', 'watch-competitor', '--prompt=Look for new threads.', '--every=1d', '--private']))
+    const panel = await screen.findByText('It is kept on this machine alone: nothing to commit, and nobody else gets the row. Its row can start as soon as you switch it on. Its prompt is in the record of each run, which is shared where this project shares its records.')
+    expect(panel.closest('[role="group"]')!.textContent).toContain('Saved watch-competitor as .agent-scheduler/automations/watch-competitor.md.')
+    expect(panel.closest('[role="group"]')!.textContent).not.toContain('commit it and bring it there')
+  })
+
+  test('a row of an automation kept on this machine says so, and is named without a slash in its title, its Edit button and its switch', async () => {
+    const status = { ...STATUS, lastTick: { ...STATUS.lastTick, schedule: [...STATUS.lastTick.schedule, { command: 'watch-competitor', every: '1h', description: 'Look for new threads.', onThisMachine: true }] } }
+    const { host, runCommand } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: status } : { ok: true, output: { ok: true } }))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    const own = row('watch-competitor')
+    expect(within(own).getByText('only on this machine')).toBeTruthy()
+    expect(within(own).getByText('watch-competitor')).toBeTruthy()
+    expect(within(own).queryByText('/watch-competitor')).toBeNull()
+    expect(within(own).getByRole('button', { name: 'Edit watch-competitor' })).toBeTruthy()
+    // Its Edit box speaks of how it was saved, not of a skill.
+    fireEvent.click(within(own).getByRole('button', { name: 'Edit watch-competitor' }))
+    const box = within(own).getByRole('group', { name: 'Editing watch-competitor' })
+    expect(within(box).getAllByText('As it was saved').length).toBe(2)
+    // And of this machine's runs alone, which are the ones it counts.
+    expect(within(box).getByText('Counted from its last start, on this machine.')).toBeTruthy()
+    expect(within(box).getByText(/only while fewer than this are working on this machine\./)).toBeTruthy()
+    expect(within(box).queryByText(/any machine that shares this repository/)).toBeNull()
+    expect(within(box).queryByText('As the skill says')).toBeNull()
+    fireEvent.click(within(box).getByRole('button', { name: 'Cancel' }))
+    within(own).getByRole('checkbox', { name: 'Run watch-competitor by itself' }).click()
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['switch', 'watch-competitor', 'on']))
+    // A skill's row keeps its slash and says no such thing.
+    expect(within(row('/work-queue')).queryByText('only on this machine')).toBeNull()
+  })
+
+  test('an automation kept on this machine that the scheduler does not list is said so in its own words, beside a skill whose schedule cannot be read', async () => {
+    const status = { ...STATUS, lastTick: { ...STATUS.lastTick, decisions: [{ command: 'triage', outcome: 'unreadable schedule: unknown key evry' }, { command: 'tidy', outcome: 'unlisted automation: it has no schedule' }, ...STATUS.lastTick.decisions] } }
+    const { host } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: status } : { ok: true, output: { ok: true } }))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    expect(screen.getAllByRole('alert').map(a => a.textContent)).toEqual(['The schedule of the triage skill cannot be read, so it is not listed: unknown key evry', 'The automation tidy, kept on this machine, is not listed: it has no schedule'])
   })
 
   test('a project whose scheduler could not be read offers no "New automation"', async () => {

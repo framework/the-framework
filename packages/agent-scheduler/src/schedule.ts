@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
-import { DEFAULT_CAP, FOUND_MAX, MAX_AGENTS, RUN_SKILLS_DIR, SKILL_FILE, isAgents } from './names.js'
+import { DEFAULT_CAP, FOUND_MAX, MAX_AGENTS, OWN_AUTOMATIONS_DIR, OWN_TEXT_MAX, RUN_SKILLS_DIR, SKILL_FILE, isAgents } from './names.js'
 import { parseInterval, type Interval } from './pace.js'
 
 /**
@@ -71,13 +71,22 @@ export interface ScheduledCommand {
   dir: string
   /** What the skill does, in its own words: the `description` of its front matter, when it has one. */
   description?: string
+  /**
+   * The text of a command that is no skill: an automation a person keeps on this machine alone.
+   * Its text is in no checkout, so a run of it is handed the text with its prompt, which is the
+   * automation's name. A skill's command has none: its run is sent the command
+   * (`/update-tickets`), and the coding agent reads the skill's text from the checkout.
+   */
+  text?: string
 }
 
 /** The schedule as read. */
 export interface Schedule {
   commands: ScheduledCommand[]
-  /** The skills whose `schedule` could not be read, each with why. */
-  unreadable: { skill: string; reason: string }[]
+  /** The skills whose `schedule` could not be read, each with why; and, marked `own`, the automations kept on this machine that are not listed. */
+  unreadable: { skill: string; reason: string; own?: true }[]
+  /** The names a skill of the project and an automation kept on this machine both have: neither is listed, and this machine's picks under such a name are taken back. */
+  clashes?: string[]
 }
 
 const SKILL = /^[a-z0-9][a-z0-9-]*$/
@@ -155,10 +164,17 @@ function isMap(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * The project's schedule: every skill's commands, the skills in name order. Read from each folder
- * a coding agent reads skills from, the folder of the agent that runs scheduled commands first; a
- * skill in two folders is read once, from the first folder that holds its `SKILL.md`. A project
- * with no skills folder schedules nothing.
+ * The project's schedule: every skill's commands, the skills in name order, then the automations
+ * a person keeps on this machine alone, in name order. Skills are read from each folder a coding
+ * agent reads skills from, the folder of the agent that runs scheduled commands first; a skill in
+ * two folders is read once, from the first folder that holds its `SKILL.md`. A project with no
+ * skills folder and no automation of the person's schedules nothing.
+ *
+ * An automation kept on this machine is one file, written like a skill's: its front matter holds
+ * one row of schedule, and its text is what a run is handed. One that cannot be listed is named
+ * with why. One whose name a skill of the project has too is not listed, and neither are that
+ * skill's commands: a run is counted by its command's name and this machine's picks are kept
+ * under it, so the two cannot be told apart.
  */
 export async function readSchedule(repo: string): Promise<Schedule> {
   const files = new Map<string, { md: string; dir: string }>()
@@ -177,7 +193,49 @@ export async function readSchedule(repo: string): Promise<Schedule> {
     schedule.commands.push(...read.commands)
     schedule.unreadable.push(...read.unreadable)
   }
+  const kept = (await readdir(join(repo, OWN_AUTOMATIONS_DIR)).catch((): string[] => [])).filter(file => file.endsWith('.md')).sort()
+  for (const file of kept) {
+    const name = file.slice(0, -3)
+    const unlisted = (reason: string): void => void schedule.unreadable.push({ skill: name, reason, own: true })
+    if (!SKILL.test(name)) {
+      unlisted('its file is named with something other than lower-case letters, digits and dashes')
+      continue
+    }
+    const md = await readFile(join(repo, OWN_AUTOMATIONS_DIR, file), 'utf8').catch(() => undefined)
+    if (md === undefined) {
+      unlisted('its file cannot be read')
+      continue
+    }
+    if (files.has(name)) {
+      // One name, two things: a run is counted by its command's name, and this machine's picks are
+      // kept under it. Neither is listed, and the picks are taken back, so that the skill's command
+      // does not start on the switch the automation was given, now or once the file is gone.
+      const before = schedule.commands.length
+      schedule.commands = schedule.commands.filter(c => c.name.split(' ')[0] !== name)
+      schedule.clashes = [...(schedule.clashes ?? []), name]
+      unlisted(`a skill of the project has this name too${schedule.commands.length < before ? ', so neither is listed' : ''}: rename or remove ${OWN_AUTOMATIONS_DIR}/${file}, then switch on what you want`)
+      continue
+    }
+    const read = skillSchedule(name, md, OWN_AUTOMATIONS_DIR)
+    const text = skillText(md)
+    if (read.unreadable.length > 0) unlisted(read.unreadable[0]!.reason)
+    else if (read.commands.length === 0) unlisted('it has no schedule')
+    else if (read.commands.length !== 1 || read.commands[0]!.name !== name) unlisted('it has one row, with no word')
+    else if (text === '') unlisted('it has no text after its front matter')
+    else if (text.length > OWN_TEXT_MAX) unlisted(`its text is ${text.length} characters, and ${OWN_TEXT_MAX} is the most`)
+    else schedule.commands.push({ ...read.commands[0]!, text })
+  }
   return schedule
+}
+
+/**
+ * The text of a skill file after its front matter, without its outer blank lines and without NUL
+ * characters: what an agent is told. The front matter ends where the schedule's reader ends it,
+ * at the first line that opens with three dashes, whatever follows them on that line.
+ */
+export function skillText(md: string): string {
+  const front = /^---\r?\n[\s\S]*?\r?\n---[^\n]*(\n|$)/.exec(md)
+  return (front ? md.slice(front[0].length) : md).replaceAll('\0', '').trim()
 }
 
 /** The file a command's skill is, from the repository root: the skills folder it was read from, the command's first word, the skill's file (`.claude/skills/triage/SKILL.md` for `triage quick`). */
@@ -185,10 +243,28 @@ export function skillFile(command: Pick<ScheduledCommand, 'name' | 'dir'>): stri
   return `${command.dir}/${command.name.split(' ')[0]}/${SKILL_FILE}`
 }
 
-/** The prompt a command runs with: its slash command, which the agent's harness expands, the word after it handed to the skill. */
-export function commandPrompt(name: string): string {
-  return `/${name}`
+/**
+ * The prompt a command runs with: its slash command, which the agent's harness expands, the word
+ * after it handed to the skill. An automation kept on this machine is no command in a run's
+ * checkout: its prompt is its name alone, with no slash, and its text is handed over with it
+ * ({@link ownAttached}). Either way the prompt names the command, which is what its runs are
+ * counted by, whatever its text says and however the text changes.
+ */
+export function commandPrompt(command: Pick<ScheduledCommand, 'name' | 'text'>): string {
+  return command.text === undefined ? `/${command.name}` : command.name
 }
+
+/**
+ * What a run of an automation kept on this machine is handed with its prompt: the automation's
+ * text, and after it, when a check started the run, the sentence that says so and what the check
+ * printed.
+ */
+export function ownAttached(text: string, found?: { stdout: string; lastRun: string }): string {
+  return found ? `${text}\n\n${FOUND_OPENING_OWN}\n${foundOutput(found.stdout, found.lastRun)}` : text
+}
+
+/** What is said before a check's output to a run of an automation kept on this machine: its work is said by the text above, not by a command. */
+export const FOUND_OPENING_OWN = 'The scheduler starts this when its check prints something, and this time the check printed what is below. It says why this run started; what the work is, the text above says.'
 
 /**
  * The time a check is given as `$LAST_RUN`: an ISO time in UTC to the whole second
@@ -235,14 +311,23 @@ export const FOUND_OPENING = 'The scheduler starts this command when its check p
 
 /**
  * The command a run's prompt is counted under, so a run a person started counts against that
- * command's cap and interval like a scheduled one: the scheduled command whose name the prompt is, without its
- * slash (`/triage quick` → `triage quick`), else the prompt's first word (`/work-queue now` →
- * `work-queue`; a plain prompt's first word).
+ * command's cap and interval like a scheduled one; nothing for a prompt that names none.
+ *
+ * A prompt that opens with a slash names a skill's command: the scheduled command whose name it
+ * is (`/triage quick` → `triage quick`), else the one its first word is (`/work-queue now` →
+ * `work-queue`). A prompt with no slash names no skill's command: it is a run of an automation
+ * kept on this machine when it is that automation's name and nothing else (`answer-comments`).
+ * The two never cross: a skill's command typed by hand is no run of an automation of that name,
+ * and an automation's run is none of a skill's.
  */
-export function promptCommand(prompt: string, schedule: Schedule): string {
-  const typed = prompt.trim().replace(/^\//, '')
-  if (schedule.commands.some(c => c.name === typed)) return typed
-  return typed.split(/\s+/)[0] || prompt
+export function promptCommand(prompt: string, schedule: Schedule): string | undefined {
+  const typed = prompt.trim()
+  if (!typed.startsWith('/')) return schedule.commands.some(c => c.text !== undefined && c.name === typed) ? typed : undefined
+  const skills = schedule.commands.filter(c => c.text === undefined)
+  const named = typed.slice(1)
+  if (skills.some(c => c.name === named)) return named
+  const first = named.split(/\s+/)[0]!
+  return skills.some(c => c.name === first) ? first : undefined
 }
 
 /**

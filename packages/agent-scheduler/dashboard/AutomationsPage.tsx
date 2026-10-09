@@ -4,7 +4,7 @@ import type { PublishPick } from '../src/state.js'
 import { MAX_AGENTS } from '../src/names.js'
 import { MAX_COUNT, PACE_UNITS, parseInterval, takesTimeOfDay, type PaceUnit } from '../src/pace.js'
 import { NewAutomation } from './NewAutomation.js'
-import { PUBLISH_LABELS, UNIT_WORDS, agentsArgs, agentsDraftOf, atOnce, atOnceWords, decided, saysAtOnce, draftOf, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, schedulerStatus, withAgentsDraft, withDraft, type AgentsDraft, type PaceDraft, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
+import { PUBLISH_LABELS, UNIT_WORDS, rowTitle, unlistedWords, agentsArgs, agentsDraftOf, atOnce, atOnceWords, decided, saysAtOnce, draftOf, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, schedulerStatus, withAgentsDraft, withDraft, type AgentsDraft, type PaceDraft, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
 
 // The Automations page: what starts by itself while nobody is at the keyboard. One group per
 // project the page is given (every project that has this package, or the one picked in the
@@ -121,8 +121,10 @@ export function AutomationsPage({ projects }: ModulePageProps) {
             {row.error !== undefined && <p role="alert" className="py-3 text-sm text-danger">{`The scheduler could not be read: ${row.error}`}</p>}
             {row.error === undefined && !row.on && <p className="py-3 text-sm text-muted-foreground">The scheduler is off in this project, so nothing here starts. It starts with the dashboard once the project has run `npx agent-scheduler init`, or by hand with `npx agent-scheduler start`.</p>}
             {row.error === undefined && row.on && !row.running && <p className="py-3 text-sm text-warning">The scheduler is on but its process is not running, so nothing here starts. `npx agent-scheduler start`, run in the project, starts it.</p>}
-            {row.unreadable.map(({ skill, reason }) => (
-              <p key={skill} role="alert" className="py-3 text-sm text-danger">{`The schedule of the ${skill} skill cannot be read, so it is not listed: ${reason}`}</p>
+            {row.unreadable.map((unreadable, index) => (
+              <p key={`${index}/${unreadable.skill}`} role="alert" className="py-3 text-sm text-danger">
+                {unlistedWords(unreadable)}
+              </p>
             ))}
             {row.error === undefined && row.commands.length === 0 && row.unreadable.length === 0 && (
               <p className="py-3 text-sm text-muted-foreground">{row.lastTick ? 'Nothing here: no skill of this project says it can be scheduled.' : 'Nothing here yet: the scheduler of this project has not looked at its skills.'}</p>
@@ -131,13 +133,17 @@ export function AutomationsPage({ projects }: ModulePageProps) {
               <ul className="divide-y divide-border">
                 {row.commands.map(scheduled => {
                   const id = `${row.project.id}/${scheduled.command}`
+                  const title = rowTitle(scheduled)
                   const saving = busy.includes(id)
                   const open = editing?.id === id ? editing : undefined
                   return (
-                    <li key={id} aria-label={`/${scheduled.command}`} className={cn('py-3', saving && 'opacity-60')}>
+                    <li key={id} aria-label={title} className={cn('py-3', saving && 'opacity-60')}>
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="font-mono text-sm">/{scheduled.command}</p>
+                          <p className="font-mono text-sm">
+                            {title}
+                            {scheduled.onThisMachine && <span className="ml-2 font-sans text-xs text-info">only on this machine</span>}
+                          </p>
                           {scheduled.description && <p className="line-clamp-2 text-sm text-muted-foreground">{scheduled.description}</p>}
                           {!open && <Summary host={host} project={row.project} scheduled={scheduled} />}
                         </div>
@@ -151,7 +157,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                               }}
                               disabled={saving}
                               onClick={() => edit({ id, publish: scheduled.publish, pace: draftOf(scheduled), agents: agentsDraftOf(scheduled) })}
-                              aria-label={`Edit /${scheduled.command}`}
+                              aria-label={`Edit ${title}`}
                               className="text-xs underline disabled:opacity-50"
                             >
                               Edit
@@ -161,14 +167,14 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                             checked={scheduled.on}
                             disabled={saving}
                             onCheckedChange={next => save('switch', id, row.project, ['switch', scheduled.command, next === true ? 'on' : 'off'])}
-                            aria-label={`Run /${scheduled.command} by itself`}
+                            aria-label={`Run ${title} by itself`}
                           />
                         </div>
                       </div>
                       {open && (
                         <div
                           role="group"
-                          aria-label={`Editing /${scheduled.command}`}
+                          aria-label={`Editing ${title}`}
                           onKeyDown={e => {
                             if (e.key === 'Escape' && !saving) close(id)
                           }}
@@ -241,13 +247,13 @@ interface Editing {
 function AgentsFields({ scheduled, draft, disabled, onChange }: { scheduled: SchedulerCommand; draft: AgentsDraft; disabled: boolean; onChange: (next: AgentsDraft) => void }) {
   const skills = scheduled.skillAgents ?? 1
   const typed = draft.kind === 'own' ? draft : { kind: 'own' as const, count: String(skills) }
-  const name = `how many of /${scheduled.command} at once`
+  const name = `how many of ${rowTitle(scheduled)} at once`
   return (
     <fieldset disabled={disabled} className="mt-4 space-y-2">
       <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">How many at once</legend>
       <label className="flex items-center gap-2 text-sm">
         <input type="radio" name={name} checked={draft.kind === 'skill'} onChange={() => onChange({ kind: 'skill' })} />
-        As the skill says
+        {scheduled.onThisMachine ? 'As it was saved' : 'As the skill says'}
         <span className="text-xs text-muted-foreground">{lower(atOnceWords(skills))}</span>
       </label>
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -267,7 +273,9 @@ function AgentsFields({ scheduled, draft, disabled, onChange }: { scheduled: Sch
         />
         <span>{Number(typed.count) === 1 ? 'agent' : 'agents'} at once</span>
       </div>
-      <p className="text-xs text-muted-foreground">A new one starts only when the row is due, and only while fewer than this are working on any machine that shares this repository.</p>
+      <p className="text-xs text-muted-foreground">
+        A new one starts only when the row is due, and only while fewer than this are working {scheduled.onThisMachine ? 'on this machine' : 'on any machine that shares this repository'}.
+      </p>
     </fieldset>
   )
 }
@@ -281,7 +289,7 @@ function PaceFields({ scheduled, draft, disabled, onChange }: { scheduled: Sched
   const skills = scheduled.every === undefined ? undefined : parseInterval(scheduled.every)
   const typed = draft.kind === 'every' ? draft : { kind: 'every' as const, count: String(skills?.count ?? 1), unit: skills?.unit ?? ('d' as PaceUnit), at: '' }
   const timed = takesTimeOfDay({ count: 1, unit: typed.unit, ms: 0, text: '' })
-  const name = `when /${scheduled.command} runs`
+  const name = `when ${rowTitle(scheduled)} runs`
   const field = 'rounded-md border border-border bg-background px-2 py-1 text-sm disabled:opacity-50'
   return (
     <fieldset disabled={disabled} className="space-y-2">
@@ -289,7 +297,7 @@ function PaceFields({ scheduled, draft, disabled, onChange }: { scheduled: Sched
       <label className="flex items-center gap-2 text-sm">
         {/* The keyboard lands where the row opened. */}
         <input type="radio" name={name} autoFocus={draft.kind === 'skill'} checked={draft.kind === 'skill'} onChange={() => onChange({ kind: 'skill' })} />
-        As the skill says
+        {scheduled.onThisMachine ? 'As it was saved' : 'As the skill says'}
         <span className="text-xs text-muted-foreground">{lower(pace(withDraft(scheduled, { kind: 'skill' })))}</span>
       </label>
       {scheduled.when !== undefined && scheduled.every !== undefined && (
@@ -336,7 +344,7 @@ function PaceFields({ scheduled, draft, disabled, onChange }: { scheduled: Sched
           </>
         )}
       </div>
-      <p className="text-xs text-muted-foreground">Counted from its last start, on any machine that shares this repository.</p>
+      <p className="text-xs text-muted-foreground">Counted from its last start, {scheduled.onThisMachine ? 'on this machine' : 'on any machine that shares this repository'}.</p>
     </fieldset>
   )
 }

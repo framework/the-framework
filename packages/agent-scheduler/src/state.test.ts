@@ -4,7 +4,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@openagt/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, switchedOnAt, withoutCommand, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, switchedOnAt, withoutCommand, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents, namesGivenUp, withoutName } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
@@ -141,4 +141,27 @@ test('nothing left of one command: its switch, publish pick, pace and number of 
   assert.deepEqual(withoutCommand(state, 'tidy'), { ...DEFAULT_STATE, switches: { 'work-queue': at }, paces: { 'work-queue': { work: true } } })
   assert.equal(withoutCommand(state, 'never-heard-of'), state)
   assert.equal(withoutCommand(DEFAULT_STATE, 'tidy'), DEFAULT_STATE)
+})
+
+test("what an automation kept on this machine was given goes when it goes, and when a skill has its name too: the names given up, and the state with nothing left under a name, a skill's commands with a word included", () => {
+  const at = '2026-10-09T07:00:00.000Z'
+  const lastTick = { at, decisions: [], schedule: [{ command: 'answer-comments', onThisMachine: true as const }, { command: 'watch-competitor', onThisMachine: true as const }, { command: 'work-queue' }] }
+  const kept = { name: 'watch-competitor', text: 'Look.' }
+  // Its file was removed, or renamed: the last tick listed it, this one does not.
+  assert.deepEqual(namesGivenUp(lastTick, { commands: [kept, { name: 'work-queue' }] }), ['answer-comments'])
+  // Still kept here: nothing is given up. A skill that is gone gives nothing up either: its switch can be taken back by hand.
+  assert.deepEqual(namesGivenUp(lastTick, { commands: [kept, { name: 'answer-comments', text: 'Answer.' }] }), [])
+  // The name went to a skill of the project: given up, so the skill starts off like any that arrives.
+  assert.deepEqual(namesGivenUp(lastTick, { commands: [kept, { name: 'answer-comments' }] }), ['answer-comments'])
+  // Its file is still there, with a slip that keeps it off the list: its picks wait for the fix.
+  assert.deepEqual(namesGivenUp(lastTick, { commands: [kept], unreadable: [{ skill: 'answer-comments', own: true }] }), [])
+  // A skill of that name whose schedule cannot be read is no such file.
+  assert.deepEqual(namesGivenUp(lastTick, { commands: [kept], unreadable: [{ skill: 'answer-comments' }] }), ['answer-comments'])
+  // A name a skill and an automation kept here both have, each named once.
+  assert.deepEqual(namesGivenUp(lastTick, { commands: [kept], clashes: ['answer-comments', 'triage'] }), ['answer-comments', 'triage'])
+  assert.deepEqual(namesGivenUp(undefined, { commands: [kept] }), [])
+
+  const state = { ...DEFAULT_STATE, switches: { triage: at, 'triage quick': at, 'triage-all': at }, publishes: { 'triage quick': 'merge' as const }, paces: { 'triage consensual': { work: true as const } }, agents: { triage: 3, 'work-queue': 2 } }
+  assert.deepEqual(withoutName(state, 'triage'), { ...DEFAULT_STATE, switches: { 'triage-all': at }, agents: { 'work-queue': 2 } })
+  assert.equal(withoutName(state, 'never-heard-of'), state)
 })

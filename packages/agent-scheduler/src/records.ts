@@ -12,28 +12,38 @@ import { promptCommand, type Schedule } from './schedule.js'
  * Only runs `agent-runner` started, which carry its mark, are counted.
  */
 
-/** The command a run counts for, or `undefined` for a run `agent-runner` did not start. */
-export function commandOf(card: RunCard, schedule: Schedule): string | undefined {
-  if (!runnerMark(card) || card.intent === undefined) return undefined
-  return promptCommand(card.intent, schedule)
+/**
+ * The command a run counts for, as the machine `host` counts; `undefined` for a run
+ * `agent-runner` did not start, and for one whose prompt names no command. A run of an automation
+ * kept on a machine counts on that machine alone: another person may keep one of the same name,
+ * and theirs is another automation.
+ */
+export function commandOf(card: RunCard, schedule: Schedule, host: string): string | undefined {
+  const mark = runnerMark(card)
+  if (!mark || card.intent === undefined) return undefined
+  const command = promptCommand(card.intent, schedule)
+  if (command === undefined) return undefined
+  const own = schedule.commands.some(c => c.name === command && c.text !== undefined)
+  return own && mark.host !== host ? undefined : command
 }
 
 /**
- * When one command last started, on any machine, whatever became of the run; nothing when it never
- * did. A scheduled run's start is when its command was asked about, before its check ran: the tick
- * gives the run that moment as its start. A record whose start is not a time is not counted.
+ * When one command last started, whatever became of the run; nothing when it never did. A skill's
+ * command counts every machine's runs; an automation kept on this machine, this machine's. A
+ * scheduled run's start is when its command was asked about, before its check ran: the tick gives
+ * the run that moment as its start. A record whose start is not a time is not counted.
  */
-export async function lastStart(repo: string, command: string, schedule: Schedule, deps: LogsDeps = {}): Promise<string | undefined> {
+export async function lastStart(repo: string, command: string, schedule: Schedule, host: string, deps: LogsDeps = {}): Promise<string | undefined> {
   const cards = await listRuns(repo, {}, deps)
   let latest: string | undefined
   for (const card of cards) {
-    if (commandOf(card, schedule) === command && isTime(card.startedAt) && (latest === undefined || card.startedAt > latest)) latest = card.startedAt
+    if (commandOf(card, schedule, host) === command && isTime(card.startedAt) && (latest === undefined || card.startedAt > latest)) latest = card.startedAt
   }
   return latest
 }
 
-/** The runs of one command still in flight, on any machine. */
-export async function inFlight(repo: string, command: string, schedule: Schedule, deps: LogsDeps = {}): Promise<RunCard[]> {
+/** The runs of one command still in flight: on any machine for a skill's command, on this one for an automation kept here. */
+export async function inFlight(repo: string, command: string, schedule: Schedule, host: string, deps: LogsDeps = {}): Promise<RunCard[]> {
   const cards = await listRuns(repo, {}, deps)
-  return cards.filter(card => card.status === 'running' && commandOf(card, schedule) === command)
+  return cards.filter(card => card.status === 'running' && commandOf(card, schedule, host) === command)
 }

@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { markerCard, recordRun, writeMarker } from '@openagt/agent-runner'
 import { listRuns } from '@openagt/skill-logs'
-import { commandOf, inFlight, lastStart } from './records.js'
+import { commandOf, inFlight, lastFailed, lastStart } from './records.js'
 import { parseInterval } from './pace.js'
 import type { Schedule } from './schedule.js'
 import { removeRepo, testRepo } from './test-repo.js'
@@ -32,6 +32,35 @@ test("a run whose prompt is the name of an automation kept on this machine count
     assert.equal(await lastStart(repo, 'answer-comments', schedule, 'their-box'), '2026-09-16T16:00:00.000Z')
     // Where the name is a skill's command, a run with no slash is no run of it, on any machine.
     assert.equal(await lastStart(repo, 'answer-comments', skills('answer-comments'), 'this-box'), '2026-09-16T15:20:00.000Z', 'only the one typed as a command')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test("the commands whose last run failed, each with that run's id: only the latest run of a command counts, so a later run that is going, ended well, was stopped or waits takes the failure's place; an automation kept on this machine counts this machine's runs alone", async () => {
+  const repo = await testRepo()
+  try {
+    const schedule: Schedule = { commands: [...skills('work-queue', 'update-tickets', 'triage', 'plan-tickets', 'never-ran').commands, { name: 'tidy', text: 'Tidy up.', cap: 1, dir: '.agent-scheduler/automations' }], unreadable: [] }
+    const run = (id: string, startedAt: string, status: 'done' | 'failed' | 'stopped' | 'waiting' | 'running', intent: string, host = 'this-box') => recordRun(repo, { id, startedAt, status, intent, caller: { runner: { host } } }, [])
+    // Failed last, after a good one: said, with the failed run's id.
+    await run('q1', '2026-09-16T09:00:00.000Z', 'done', '/work-queue')
+    await run('q2', '2026-09-16T10:00:00.000Z', 'failed', '/work-queue')
+    // Failed, then a later run of each other kind: no longer the last.
+    await run('u1', '2026-09-16T09:00:00.000Z', 'failed', '/update-tickets')
+    await run('u2', '2026-09-16T10:00:00.000Z', 'done', '/update-tickets')
+    await run('t1', '2026-09-16T09:00:00.000Z', 'failed', '/triage')
+    await run('t2', '2026-09-16T10:00:00.000Z', 'running', '/triage', 'their-box')
+    await run('p1', '2026-09-16T09:00:00.000Z', 'failed', '/plan-tickets')
+    await run('p2', '2026-09-16T10:00:00.000Z', 'stopped', '/plan-tickets')
+    // An automation kept here: its own failed run counts, a teammate's later good run of that name does not.
+    await run('o1', '2026-09-16T09:00:00.000Z', 'failed', 'tidy')
+    await run('o2', '2026-09-16T10:00:00.000Z', 'done', 'tidy', 'their-box')
+    // A failed run of no command, and a record written by hand with no time: neither is anyone's last run.
+    await run('x1', '2026-09-16T11:00:00.000Z', 'failed', 'fix the tests')
+    await run('q3', 'later', 'done', '/work-queue')
+    assert.deepEqual(await lastFailed(repo, schedule, 'this-box'), { 'work-queue': 'q2', tidy: 'o1' })
+    assert.deepEqual(await lastFailed(repo, schedule, 'their-box'), { 'work-queue': 'q2' })
+    assert.deepEqual(await lastFailed(repo, NONE, 'this-box'), {})
   } finally {
     await removeRepo(repo)
   }

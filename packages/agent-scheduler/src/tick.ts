@@ -44,6 +44,8 @@ export interface TickDeps {
   check: (shell: string, lastRun: string) => Promise<CheckResult>
   /** Whether the command is switched on on this machine as of now: a person may have switched it off, or removed it, since the tick read the state. */
   stillOn: (command: string) => Promise<boolean>
+  /** The commands whose last run failed, each with that run's id: read once, after the sweep, which may have recorded one. */
+  lastFailed: () => Promise<Record<string, string>>
   /** When the command last started on any machine, ISO; nothing when it never did. */
   lastStart: (command: string) => Promise<string | undefined>
   inFlight: (command: string) => Promise<RunCard[]>
@@ -66,10 +68,14 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
   const at = deps.now().toISOString()
   // A schedule that cannot be read is named on every tick, on or off: nothing else says why a skill's commands are missing.
   const unreadable = deps.schedule.unreadable.map(({ skill, reason, own }): TickDecision => ({ command: skill, outcome: `${own ? 'unlisted automation' : 'unreadable schedule'}: ${reason}` }))
-  const record: TickRecord = { at, decisions: unreadable, schedule: deps.schedule.commands.map(listed) }
+  const record: TickRecord = { at, decisions: unreadable, schedule: deps.schedule.commands.map(command => listed(command)) }
   const pulled = await deps.pull()
+  if (pulled.ok) await deps.sweep()
+  // Listed with its failure, whatever its switch and whether or not the pull went through: a person
+  // sees that a row's last run failed until a later run of it starts. Read after the sweep, which may have recorded one.
+  const failed = await deps.lastFailed().catch((): Record<string, string> => ({}))
+  record.schedule = deps.schedule.commands.map(command => listed(command, failed[command.name]))
   if (!pulled.ok) return { ...record, note: `agent-data could not be pulled: ${pulled.error}` }
-  await deps.sweep()
   if (!deps.state.on) return { ...record, note: 'off' }
   if (record.decisions.length === 0 && deps.schedule.commands.length === 0) return { ...record, note: 'no skill of this project schedules a command' }
 
@@ -185,6 +191,8 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     try {
       await deps.spawn({ id, prompt, startedAt: now.toISOString(), model: deps.state.model, ...publish, ...(attached !== undefined ? { attached } : {}) })
       decide(`started ${id}`, id)
+      // A later run of the command has started: its last run is this one, not the one that failed.
+      record.schedule = record.schedule.map(({ failed: before, ...rest }) => (rest.command === command.name || before === undefined ? rest : { ...rest, failed: before }))
     } catch (err) {
       decide(`could not start: ${err instanceof Error ? err.message : String(err)}`)
     }
@@ -192,9 +200,9 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
   return record
 }
 
-/** A command as a dashboard lists it: what its skill says, not this machine's switch or publish pick, which the state carries. */
-function listed(command: ScheduledCommand): ListedCommand {
-  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}), ...(command.cap > 1 ? { agents: command.cap } : {}), ...(command.text !== undefined ? { onThisMachine: true as const } : {}), ...(command.editable ? { editable: true as const } : {}) }
+/** A command as a dashboard lists it: what its skill says, and its last run when that failed; not this machine's switch or publish pick, which the state carries. */
+function listed(command: ScheduledCommand, failed?: string): ListedCommand {
+  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}), ...(command.cap > 1 ? { agents: command.cap } : {}), ...(command.text !== undefined ? { onThisMachine: true as const } : {}), ...(command.editable ? { editable: true as const } : {}), ...(failed !== undefined ? { failed } : {}) }
 }
 
 /** An age for a decision line: `less than a minute`, `12m`, `3h`, `2d`, floored. */

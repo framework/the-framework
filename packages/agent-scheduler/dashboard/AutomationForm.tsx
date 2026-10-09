@@ -158,7 +158,7 @@ export function AutomationForm({
               asked.current++
               setTried(undefined)
             }}
-            placeholder={'gh api "repos/{owner}/{repo}/issues/comments?since=$LAST_RUN" --jq \'[.[] | {url: .html_url}]\''}
+            placeholder={'gh api "repos/{owner}/{repo}/issues/comments?since=$LAST_RUN" --jq \'[.[] | select(.body | startswith("🤖") | not) | {url: .html_url}]\''}
             spellCheck={false}
             className={cn(field, 'block w-full font-mono text-xs')}
           />

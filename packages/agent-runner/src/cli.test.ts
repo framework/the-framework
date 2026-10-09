@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runCli } from './cli.js'
+import { runCli, withTextsApart } from './cli.js'
 import { removeRepo, testRepo } from './test-repo.js'
 
 // The contract on top of the functions: JSON on stdout, a line for a person on stderr, and an
@@ -90,6 +90,40 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
     assert.equal(outside.err, 'not inside a git repository')
   } finally {
     await removeRepo(repo)
+    await rm(elsewhere, { recursive: true, force: true })
+  }
+})
+
+test('a text may open with a dash: only one of the command\'s own flags is a flag, a flag that takes a text takes the next argument whole, and everything else is handed over as a text', async () => {
+  const options = { detach: { type: 'boolean' }, model: { type: 'string' }, then: { type: 'string' }, answer: { type: 'string' } } as const
+  // The start line of a project's hook file, with a prompt typed as a list.
+  assert.deepEqual(withTextsApart(['--detach', '- fix the tests', '--model', 'opus', '--then', '- then tidy'], options), ['--detach', '--model=opus', '--then=- then tidy', '--', '- fix the tests'])
+  // A text that opens like a flag and goes on, and a lone dash: texts. One word behind a dash that is no flag of the command stays where the reader refuses it.
+  assert.deepEqual(withTextsApart(['--force push it', '-x y', '-', '--model=fast'], options), ['--model=fast', '--', '--force push it', '-x y', '-'])
+  assert.deepEqual(withTextsApart(['do it', '--help', '-h', '--detatch', '--constructor'], options), ['--help', '-h', '--detatch', '--constructor', '--', 'do it'])
+  // A flag that takes a text does not take another of the command's flags for it: a prompt that is a flag's name starts no run under another prompt.
+  assert.deepEqual(withTextsApart(['fix it', '--model', '--detach'], options), ['--model', '--detach', '--', 'fix it'])
+  assert.deepEqual(withTextsApart(['--detach', '--then', '--model', 'opus'], options), ['--detach', '--then', '--model=opus', '--'])
+  // An answer and a text that both open with a dash stay what they are.
+  assert.deepEqual(withTextsApart(['--detach', '--answer', '- yes', '-- and more'], options), ['--detach', '--answer=- yes', '--', '-- and more'])
+  // After `--` nothing is a flag; a flag written with its value keeps a value that holds `=` and line ends.
+  assert.deepEqual(withTextsApart(['--answer=a=b\nc', '--', '--detach'], options), ['--answer=a=b\nc', '--', '--detach'])
+  // A flag that takes a text and is given none stays as it is, for the reader to refuse.
+  assert.deepEqual(withTextsApart(['x', '--model'], options), ['--model', '--', 'x'])
+
+  // Through the command line: such a prompt is read, and the run is refused for where it was asked, not for how it was typed.
+  const elsewhere = await mkdtemp(join(tmpdir(), 'not-a-repo-'))
+  try {
+    for (const argv of [['run', '--detach', '- fix the tests'], ['run', '--detach', '--resume', 'r1', '--answer', '- yes', '-- and more']]) {
+      const ran = await run(elsewhere, ...argv)
+      assert.deepEqual([ran.code, ran.out], [1, { ok: false, reason: 'not-a-repo' }], argv.join(' '))
+    }
+    // What nobody's prompt is stays a usage error: a flag misspelled, alone or beside a prompt, `--help`, and a flag left with no text.
+    for (const argv of [['run', 'do it', '--modle', 'opus'], ['run', '--help'], ['run', '-h'], ['run', '--resume', 'r1', '--detatch'], ['run', 'fix it', '--model', '--detach'], ['run', '--detach', '--then', '--model', 'opus']]) {
+      const refused = await run(elsewhere, ...argv)
+      assert.deepEqual([refused.code, refused.out], [2, undefined], argv.join(' '))
+    }
+  } finally {
     await rm(elsewhere, { recursive: true, force: true })
   }
 })

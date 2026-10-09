@@ -63,6 +63,11 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   that asks what is new since then goes quiet once a run was started for it. Picked over
   the scheduler remembering what it had already handed over, which it would have to store
   where every machine shares it.
+- A run that fails is not started again by itself: the time a check is given moves with
+  every start, a failed one too. The command's row says that its last run failed, until a
+  later run of the command starts, so a person sees it and can start the work by hand.
+  Picked over the time moving only after a run that ended well: the same failure would
+  start an agent again each time the pace allows, and spend by itself.
 - Every scheduled command starts switched off, on every machine, and runs only where a
   person switched it on. Picked over a command that runs unless a person switched it off: a
   skill that arrives in a project would start agents by itself.

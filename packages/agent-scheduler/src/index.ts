@@ -5,7 +5,7 @@ export { automationOf, automationSkill, type NewAutomation } from './automation-
 export { addAutomation, automationProblem, editAutomation, removeAutomation, savedAutomation, tryCheck, type AutomationChange, type Removed, type SavedAutomation, type Tried, type Written } from './automation.js'
 export { readState, writeState, updateState, statePath, DEFAULT_STATE, type State, type TickRecord, type TickDecision } from './state.js'
 export { quotaBoundaryStatus, quotaHeadroom, parseResetsAt, boundaryFromResetsAt, type QuotaBoundaryStatus, type QuotaDecision } from './quota-boundary.js'
-export { inFlight, lastStart, commandOf } from './records.js'
+export { inFlight, lastFailed, lastStart, commandOf } from './records.js'
 export { MAX_COUNT, parseInterval, parseTimeOfDay, paceInForce, dueFrom, type Interval, type Pace, type PacePick, type PaceUnit } from './pace.js'
 export { tick, runCheck, type TickDeps, type CheckResult } from './tick.js'
 export { tickProject, startScheduler, stopScheduler, schedulerStatus } from './scheduler.js'

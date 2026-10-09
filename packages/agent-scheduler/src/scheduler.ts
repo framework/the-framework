@@ -7,11 +7,11 @@ import { readClaudeQuota } from '@openagt/agent-driver-claude'
 import { isPidAlive, markerCard, readyToRun, resumeDetached, runIdFrom, spawnRun, sweep, withdrawMarker, writeMarker } from '@openagt/agent-runner'
 import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@openagt/agent-data'
 import { CHECK_TIMEOUT_MS, NOW_CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
-import { inFlight, lastRuns, lastStart } from './records.js'
+import { inFlight, lastRuns, lastStart, type LastRun } from './records.js'
 import { readSchedule, type Schedule, type ScheduledCommand } from './schedule.js'
-import { isSwitchedOn, namesGivenUp, readState, stateDir, updateState, withLastRun, withoutListed, withoutName, withoutPid, type State, type TickRecord } from './state.js'
+import { isSwitchedOn, namesGivenUp, readState, stateDir, updateState, withoutListed, withoutName, withoutPid, type ListedCommand, type State, type TickRecord } from './state.js'
 import { atStartOf } from './start-point.js'
-import { runCheck, startNow, tick, type StartedNow, type TickDeps } from './tick.js'
+import { listed, runCheck, startNow, tick, type StartedNow, type TickDeps } from './tick.js'
 
 /**
  * The tool's process side (#1774): a tick wired to the real project, and the scheduler's own small
@@ -37,7 +37,6 @@ function projectDeps(repo: string, state: State, schedule: Schedule, opts: { git
     atStart: atStartOf(repo, git),
     check: (shell, lastRun) => runCheck(repo, shell, opts.checkMs, lastRun),
     stillOn: async command => isSwitchedOn(await readState(repo), command),
-    lastRuns: () => lastRuns(repo, schedule, host),
     lastStart: command => lastStart(repo, command, schedule, host),
     inFlight: command => inFlight(repo, command, schedule, host),
     ready: () => readyToRun(repo, 'claude-code'),
@@ -53,20 +52,13 @@ function projectDeps(repo: string, state: State, schedule: Schedule, opts: { git
 }
 
 /**
- * Start one run of a scheduled command now, for a person who asked ({@link startNow}), and put it
- * on the last tick's record as the command's last run, so whoever lists the record says so at once.
- * It needs no scheduler running: the run is started from here. Its check has less time than a tick
- * gives one: whoever asked waits for the answer.
+ * Start one run of a scheduled command now, for a person who asked ({@link startNow}). It needs no
+ * scheduler running: the run is started from here. Its check has less time than a tick gives one:
+ * whoever asked waits for the answer.
  */
 export async function runNow(repo: string, command: ScheduledCommand, opts: { git?: GitRunner; log?: (line: string) => void; now?: () => Date } = {}): Promise<StartedNow> {
   const git = opts.git ?? nodeGitRunner()
-  const deps = projectDeps(repo, await readState(repo), await readSchedule(repo), { git, log: opts.log ?? (() => {}), now: opts.now ?? (() => new Date()), checkMs: NOW_CHECK_TIMEOUT_MS })
-  const started = await startNow(deps, command)
-  if (started.ok) {
-    const state = await readState(repo)
-    if (withLastRun(state, command.name, started.run) !== state) await updateState(repo, s => withLastRun(s, command.name, started.run), git)
-  }
-  return started
+  return startNow(projectDeps(repo, await readState(repo), await readSchedule(repo), { git, log: opts.log ?? (() => {}), now: opts.now ?? (() => new Date()), checkMs: NOW_CHECK_TIMEOUT_MS }), command)
 }
 
 /** One tick of the real project, and the state written with what it decided. */
@@ -171,10 +163,22 @@ export async function stopScheduler(repo: string, opts: { unlessKeepAlive?: bool
   return { ...stopped, kept: false }
 }
 
-/** `status`: the state, and whether its process is alive. */
-export async function schedulerStatus(repo: string): Promise<State & { running: boolean }> {
-  const state = await readState(repo)
-  return { ...state, running: state.pid !== undefined && isPidAlive(state.pid) }
+/** A command as `status` lists it: what its file says, and its last run when it has one. */
+export type StatusCommand = ListedCommand & { lastRun?: LastRun }
+
+/** What `status` answers: the state, whether its process is alive, and the schedule as the project's files say it now. */
+export type Status = State & { running: boolean; schedule: StatusCommand[]; unreadable: Schedule['unreadable'] }
+
+/**
+ * `status`: the state, whether its process is alive, and the schedule read now, each command with
+ * its last run off the run records. Read from the files and the records, not off the last tick,
+ * so a command saved, changed, removed or started a moment ago is listed as it stands, also where
+ * no scheduler is running. Records that cannot be read list no last run and stop nothing.
+ */
+export async function schedulerStatus(repo: string): Promise<Status> {
+  const [state, schedule] = await Promise.all([readState(repo), readSchedule(repo)])
+  const last = await lastRuns(repo, schedule, hostname()).catch((): Record<string, LastRun> => ({}))
+  return { ...state, running: state.pid !== undefined && isPidAlive(state.pid), schedule: schedule.commands.map((command): StatusCommand => ({ ...listed(command), ...(last[command.name] ? { lastRun: last[command.name]! } : {}) })), unreadable: schedule.unreadable }
 }
 
 function describe(record: TickRecord): string[] {

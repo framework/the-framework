@@ -8,7 +8,7 @@ import { PUBLISH_PICKS, isSwitchedOn, readState, updateState, withAgents, withou
 import { parseInterval, parseTimeOfDay, sinceNow, takesTimeOfDay } from './pace.js'
 import { MAX_AGENTS, isAgents } from './names.js'
 import { readSchedule, type ScheduledCommand } from './schedule.js'
-import { addAutomation, editAutomation, removeAutomation, savedAutomation, tryCheck, type AddRefusal, type NotAnAutomation } from './automation.js'
+import { addAutomation, editAutomation, removeAutomation, savedAutomation, tryCheck, type AddRefusal, type ChangedSince, type NotAnAutomation } from './automation.js'
 import type { NewAutomation } from './automation-file.js'
 
 /**
@@ -23,7 +23,7 @@ export const USAGE = `usage: agent-scheduler <command>
   init                          this tool's lines in the dashboard's .openagent/hooks.yml, so it runs while the dashboard is open; a line already there is kept
   start [--keep-alive]          the scheduler on, ticking every minute in its own process
   stop [--unless-keep-alive]    the scheduler off; runs in flight go to the end; with the flag a keep-alive scheduler is left running
-  status                        the state file, and whether the scheduler's process is alive
+  status                        the state file, whether the scheduler's process is alive, and the schedule as the project's files say it now
   model <id>                    the model every scheduled run starts on (this user)
   offset <points>               how far past the spend boundary a run may still start (this user)
   switch <command> <on|off>     whether a scheduled command runs on this machine, the command as status names it (quoted when it has a word after it); every one starts off, and off is taken for any name
@@ -42,14 +42,16 @@ export const USAGE = `usage: agent-scheduler <command>
                                 can start at once: a run is named by the automation's name and handed the prompt. The prompt is in each run's record, which
                                 is shared where the project shares its records.
                                 Refused for a name a skill of the project, or an automation kept on this machine, already has
-  show <name>                   an automation saved with add, as it stands: its prompt, its pace, its check, its file, and whether it is kept on this machine alone.
+  show <name>                   an automation saved with add, as it stands: its prompt, its pace, its check, its file, whether it is kept on this machine alone,
+                                and its version, a name for what the file says now.
                                 Refused, like edit and remove, for anything whose file does not read as add writes one: a skill of the project,
                                 or an automation changed by hand since; those are edited and removed by hand
-  edit <name> [--prompt <text>] [--every <N<m|h|d|w|mo>>] [--when <shell line>] [--waits-for <line>]
+  edit <name> [--prompt <text>] [--every <N<m|h|d|w|mo>>] [--when <shell line>] [--waits-for <line>] [--was <version>]
                                 save an automation again under its name: what is given takes the place of what its file said, what is left out stays,
                                 and --every, --when or --waits-for given empty (--when=) takes that part out; what a check waits for goes out with the check.
                                 Its past runs, its switch and your picks for it stay. A shared one is a change of yours to commit: a run is told the new
-                                prompt only once the change is on the commit a run's checkout starts from
+                                prompt only once the change is on the commit a run's checkout starts from. With --was, the version show answered, it is
+                                refused when the file was changed since: a form opened a while ago writes over no change made by hand
   remove <name>                 delete an automation's file, and what this machine held for it: its switch, its pace, its number of agents, its publish pick.
                                 Nothing is committed: the deletion of a shared one is yours to commit, and everyone else keeps the command until it reaches them.
                                 What was never committed cannot be brought back: all of one kept on this machine, and a shared one's file or its last changes.
@@ -248,15 +250,15 @@ const COMMANDS: Record<string, Command> = {
     const { positionals } = parse(args, {}, 1)
     const found = await savedAutomation(await project(io.cwd, git), positionals[0]!)
     if ('reason' in found) throw new Refused(found, refusal(found))
-    return { ok: true, ...found.automation, file: found.file, ...(found.onThisMachine ? { onThisMachine: true } : {}) }
+    return { ok: true, ...found.automation, file: found.file, version: found.version, ...(found.onThisMachine ? { onThisMachine: true } : {}) }
   },
 
   async edit(args, io, git) {
-    const { positionals, values } = parse(args, { prompt: { type: 'string' }, every: { type: 'string' }, when: { type: 'string' }, 'waits-for': { type: 'string' } }, 1)
+    const { positionals, values } = parse(args, { prompt: { type: 'string' }, every: { type: 'string' }, when: { type: 'string' }, 'waits-for': { type: 'string' }, was: { type: 'string' } }, 1)
     if (values.prompt === undefined && values.every === undefined && values.when === undefined && values['waits-for'] === undefined) throw new Usage('edit needs what to change: --prompt, --every, --when or --waits-for')
     // A flag left out leaves that part as the file says it; a schedule flag given empty takes its part out.
     const part = (typed: string | undefined): string | null | undefined => (typed === undefined ? undefined : typed.trim() === '' ? null : typed)
-    const outcome = await editAutomation(await project(io.cwd, git), positionals[0]!, { prompt: values.prompt, every: part(values.every), when: part(values.when), waitsFor: part(values['waits-for']) }, git)
+    const outcome = await editAutomation(await project(io.cwd, git), positionals[0]!, { prompt: values.prompt, every: part(values.every), when: part(values.when), waitsFor: part(values['waits-for']) }, git, values.was !== undefined ? { was: values.was } : {})
     if (outcome.ok) return outcome
     throw new Refused(outcome, refusal(outcome))
   },
@@ -307,7 +309,7 @@ function typed(name: string, prompt: string, values: { every?: string | undefine
 }
 
 /** Why an automation was not saved, shown or removed, as one line for a person. */
-function refusal(outcome: AddRefusal | NotAnAutomation): string {
+function refusal(outcome: AddRefusal | NotAnAutomation | ChangedSince): string {
   if (outcome.reason === 'taken') return `that name is taken: ${outcome.folder}`
   if (outcome.reason === 'no-prompt') return 'the prompt is empty'
   if (outcome.reason === 'bad-schedule') return `it cannot run as written: ${outcome.detail}`

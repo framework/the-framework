@@ -37,9 +37,11 @@ export const STATUS = {
       { command: 'post-merge-cleanup', outcome: 'started 2026-10-03T10-00-00-000Z', run: '2026-10-03T10-00-00-000Z' },
       { command: 'work-queue', outcome: 'switched off on this machine' },
     ],
-    schedule: [
-      { command: 'post-merge-cleanup', every: '1d', description: 'Write up merged pull requests.' },
-      { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', description: 'Work one queued task.' },
-    ],
   },
+  // The schedule as the project's files say it at the moment of the answer, and what of it cannot be read: not the last tick's.
+  schedule: [
+    { command: 'post-merge-cleanup', every: '1d', description: 'Write up merged pull requests.' },
+    { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', description: 'Work one queued task.' },
+  ],
+  unreadable: [],
 }

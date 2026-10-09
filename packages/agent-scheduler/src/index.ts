@@ -8,6 +8,6 @@ export { quotaBoundaryStatus, quotaHeadroom, parseResetsAt, boundaryFromResetsAt
 export { inFlight, lastRuns, lastStart, commandOf, type LastRun } from './records.js'
 export { MAX_COUNT, parseInterval, parseTimeOfDay, paceInForce, dueFrom, type Interval, type Pace, type PacePick, type PaceUnit } from './pace.js'
 export { tick, startNow, runCheck, type TickDeps, type CheckResult } from './tick.js'
-export { tickProject, runNow, startScheduler, stopScheduler, schedulerStatus } from './scheduler.js'
+export { tickProject, runNow, startScheduler, stopScheduler, schedulerStatus, type Status, type StatusCommand } from './scheduler.js'
 export { runCli, USAGE, type CliIo, type CliRefusal } from './cli.js'
 export { initHooks, HOOK_LINES, type InitOutcome } from './init.js'

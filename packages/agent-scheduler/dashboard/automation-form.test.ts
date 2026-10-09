@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { EMPTY_DRAFT, TEXT_MAX, addArgs, atRowsPace, draftProblem, draftRow, draftSentence, editArgs, editedWords, isUntouched, keptWhereHint, openedAutomation, ownPaceArgs, paceHint, removeWarning, removedWords, savedFile, savedWords, saysTheSame, showsChangeWhen, showsWhen, startsWhen, triedLine, whereHint, type AutomationDraft, type OwnPace } from './automation-form.js'
+import { EMPTY_DRAFT, TEXT_MAX, addArgs, atRowsPace, draftProblem, draftRow, draftSentence, editArgs, editedWords, isUntouched, keptWhereHint, openedAutomation, ownPaceArgs, paceHint, removeWarning, removedWords, savedFile, savedWords, saysTheSame, startsWhen, triedLine, whereHint, type AutomationDraft, type OwnPace } from './automation-form.js'
 
 // The automation form as data: what keeps a draft from being saved, the command that saves it, the sentence its row would say, what a try answered, an automation opened from its row to be saved again, and what is said of one removed.
 
@@ -94,6 +94,9 @@ describe('a new automation', () => {
   test('what a save answered: the file, and where it has to get to before its row can start', () => {
     expect(savedFile({ ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', startsFrom: 'origin/main' })).toEqual({ file: '.claude/skills/answer-comments/SKILL.md', startsFrom: 'origin/main', onThisMachine: false })
     expect(savedFile({ ok: true })).toEqual({ file: 'a skill file', startsFrom: 'HEAD', onThisMachine: false })
+    // The tool's name for what the file says now, when it gives one: what the next save from the same panel is held against.
+    expect(savedFile({ ok: true, file: 'f', startsFrom: 'HEAD', version: 'abc' })).toEqual({ file: 'f', startsFrom: 'HEAD', onThisMachine: false, version: 'abc' })
+    expect(savedFile({ ok: true, file: 'f', startsFrom: 'HEAD', version: 7 })).toEqual({ file: 'f', startsFrom: 'HEAD', onThisMachine: false })
     expect(savedFile({ ok: true, file: '.agent-scheduler/automations/x.md', startsFrom: 'origin/main', onThisMachine: true })).toEqual({ file: '.agent-scheduler/automations/x.md', startsFrom: 'origin/main', onThisMachine: true })
     // What the person has to do with it: a shared one is theirs to commit and bring where a checkout starts; one kept here needs nothing.
     expect(savedWords({ startsFrom: 'origin/main', onThisMachine: false })).toBe('It is a file of yours, in this project, and nothing was committed for you. Its row cannot start before the file is on origin/main: commit it and bring it there.')
@@ -102,9 +105,6 @@ describe('a new automation', () => {
     expect(whereHint(draft({ onThisMachine: true }))).toBe('Kept on this machine alone, outside git. The row starts switched off, and can start as soon as you switch it on.')
     expect(startsWhen('origin/main')).toBe('Its row cannot start before the file is on origin/main: commit it and bring it there.')
     expect(startsWhen('HEAD')).toBe('Its row cannot start before you commit the file.')
-    // The rows are what the scheduler last read: one that is not running shows no new row.
-    expect(showsWhen(true)).toBe('Its row shows here once the scheduler has looked, within a minute. It starts switched off.')
-    expect(showsWhen(false)).toBe('The scheduler is not running in this project, so its row does not show yet: it shows once the scheduler runs. It starts switched off.')
   })
 })
 
@@ -117,6 +117,10 @@ describe('an automation opened from its row', () => {
     // By its shell line alone: no pace.
     expect(openedAutomation({ name: 'x', prompt: 'p', when: 'true', file: 'f', onThisMachine: true })).toEqual({ draft: { name: 'x', prompt: 'p', when: 'true', waitsFor: '', pace: WORK, onThisMachine: true }, file: 'f' })
     expect(openedAutomation({ name: 'x', prompt: 'p', every: '2w', file: 'f' })?.draft).toMatchObject({ pace: every('2', 'w'), when: '', waitsFor: '' })
+    // The tool's name for what the file said when it was read is kept, for the save to be held against; an answer without one opens all the same.
+    expect(openedAutomation({ ...SHOWN, version: '0123456789abcdef' })).toEqual({ ...openedAutomation(SHOWN)!, version: '0123456789abcdef' })
+    expect('version' in openedAutomation(SHOWN)!).toBe(false)
+    expect('version' in openedAutomation({ ...SHOWN, version: 7 })!).toBe(false)
     // Saving such a form unchanged would write the file as it is.
     expect(editArgs(openedAutomation(SHOWN)!.draft, FILE)).toEqual(['edit', 'answer-comments', '--prompt=Answer each new comment below.', '--every=15m', `--when=${CHECK}`, '--waits-for=when someone commented'])
     // Not what the command promises, or a pace the form has no fields for: nothing opens, so nothing else is saved over the file.
@@ -164,14 +168,11 @@ describe('an automation opened from its row', () => {
     expect(saysTheSame({ ...opened, pace: every('2') }, { ...opened, pace: every('2', 'd', '10:00') })).toBe(true)
   })
 
-  test('what a saved change is: a shared one is a change to commit, and an agent is told the new words only once it is where a checkout starts; one kept on this machine needs nothing', () => {
-    expect(editedWords({ startsFrom: 'origin/main', onThisMachine: false })).toBe(
+  test('what a saved change is: a shared one is a change to commit, and an agent is told the new words only once it is where a checkout starts', () => {
+    expect(editedWords({ startsFrom: 'origin/main' })).toBe(
       'It is a change to a file of yours, in this project, and nothing was committed for you. An agent is told the new words only once the change is on origin/main: commit it and bring it there. The pace and the shell line are read from your file, so the scheduler uses the new ones from its next look. Its past runs, its switch and your picks for it stay.',
     )
-    expect(editedWords({ startsFrom: 'HEAD', onThisMachine: false })).toContain('An agent is told the new words only once you commit the change. ')
-    expect(editedWords({ startsFrom: 'origin/main', onThisMachine: true })).toBe('It is kept on this machine alone: nothing to commit. The scheduler uses the new words from its next look. Its past runs, its switch and your picks for it stay.')
-    expect(showsChangeWhen(true)).toBe('Its row shows the change once the scheduler has looked, within a minute.')
-    expect(showsChangeWhen(false)).toBe('The scheduler is not running in this project, so its row shows the change once the scheduler runs.')
+    expect(editedWords({ startsFrom: 'HEAD' })).toContain('An agent is told the new words only once you commit the change. ')
     expect(keptWhereHint(openedAutomation(SHOWN)!)).toBe(`Its words and its pace are in a skill file of this project, ${FILE}: a change to them is yours to commit. The rest is saved on this machine.`)
     // A skill's row, or one whose file could not be opened: its picks alone are saved, here.
     expect(keptWhereHint(undefined)).toBe('Saved for you, in this project, on this machine. No tracked file changes.')

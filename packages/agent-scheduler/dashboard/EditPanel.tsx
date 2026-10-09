@@ -3,9 +3,9 @@ import { Button, type ModuleCommandResult, type ModuleProject } from '@openagt/d
 import type { PublishPick } from '../src/state.js'
 import { MAX_AGENTS, OWN_AUTOMATIONS_DIR } from '../src/names.js'
 import { parseInterval, parseTimeOfDay } from '../src/pace.js'
-import { atRowsPace, draftProblem, draftRow, editArgs, editedWords, keptWhereHint, ownPaceArgs, paceHint, removeWarning, removedWords, savedFile, saysTheSame, showsChangeWhen, type AutomationDraft, type OpenedAutomation, type OwnPace } from './automation-form.js'
+import { atRowsPace, draftProblem, draftRow, editArgs, editedWords, keptWhereHint, ownPaceArgs, paceHint, removeWarning, removedWords, savedFile, saysTheSame, type AutomationDraft, type OpenedAutomation, type OwnPace } from './automation-form.js'
 import { AgentsFields, PaceFields, PublishField, SaidFields, SaidShown, Section } from './fields.js'
-import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, draftOf, pace, paceArgs, paceProblem, publishes, rowTitle, saysAtOnce, withDraft, type AgentsDraft, type PaceDraft, type SchedulerCommand } from './schedulers.js'
+import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, draftOf, isOwn, pace, paceArgs, paceProblem, publishes, rowTitle, saysAtOnce, withDraft, type AgentsDraft, type PaceDraft, type SchedulerCommand } from './schedulers.js'
 
 // The Edit panel of the Automations page: one panel, with the same parts in the same order, for
 // every row. What it does; when it runs; how many agents at once; what its runs publish.
@@ -46,7 +46,6 @@ export function EditPanel({
   scheduled,
   opened,
   refused,
-  ticking,
   run,
   reload,
   onDirty,
@@ -59,8 +58,6 @@ export function EditPanel({
   opened?: OpenedAutomation | undefined
   /** Why the file of a row a person made could not be opened. */
   refused?: string | undefined
-  /** Whether the project's scheduler is running: the row shows what was saved into its file once it has looked. */
-  ticking: boolean
   /** Run one command of the scheduler in the project, in turn with the page's other saves. */
   run: (args: string[]) => Promise<ModuleCommandResult>
   /** Read the rows again: a save is over once what it saved has been read back. */
@@ -83,6 +80,8 @@ export function EditPanel({
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState<string | undefined>()
   const [asking, setAsking] = useState(false)
+  /** What the file said when the panel last read or wrote it, by the name the tool gives it: a save is held against it, so it writes over no change made to the file by hand since. */
+  const [version, setVersion] = useState<string | undefined>(opened?.version)
   /** The file as a save from here wrote it: said once the save is over, and with a later step that was not taken. */
   const [written, setWritten] = useState<Written | undefined>()
   const [saved, setSaved] = useState<Written | undefined>()
@@ -132,7 +131,7 @@ export function EditPanel({
   const save = async (): Promise<void> => {
     if (problem !== undefined || paced === undefined || count === undefined) return
     const steps: [what: string, args: string[]][] = []
-    if (changes.file && own && opened) steps.push(['It', editArgs(own, opened.file)!])
+    if (changes.file && own && opened) steps.push(['It', [...editArgs(own, opened.file)!, ...(version !== undefined ? [`--was=${version}`] : [])]])
     if (changes.pace) steps.push(['The pace', ['pace', scheduled.command, ...paced]])
     if (changes.agents) steps.push(['The number of agents', ['agents', scheduled.command, count]])
     if (changes.publish) steps.push(['The publish pick', ['publish', scheduled.command, publish]])
@@ -152,12 +151,13 @@ export function EditPanel({
         wrote = savedFile(answer.output)
         setWritten(wrote)
         setFile(own)
+        setVersion(wrote.version)
       }
     }
     await reload().catch(() => {})
     setSaving(false)
-    // A file was written: the panel says what is left for the person to do, and when the row shows it.
-    if (wrote) setSaved(wrote)
+    // A change to a shared file is the person's to commit: the panel says so before it goes. Any other save is on the row already.
+    if (wrote && !wrote.onThisMachine) setSaved(wrote)
     else onClose()
   }
 
@@ -183,7 +183,6 @@ export function EditPanel({
           Saved <span className="font-mono">{title}</span> again, in <span className="font-mono">{saved.file}</span>.
         </p>
         <p className="mt-2">{editedWords(saved)}</p>
-        <p className="mt-2 text-muted-foreground">{showsChangeWhen(ticking)}</p>
         <div className="mt-3 flex justify-end">
           <Button size="sm" autoFocus onClick={onClose}>
             Done
@@ -297,7 +296,7 @@ export function EditPanel({
         />
       </Section>
       <Section title="What its runs publish">
-        <PublishField gitHost={project.gitHost} pick={publish} disabled={saving} onChange={next => (setPublish(next), setFailed(undefined))} />
+        <PublishField gitHost={project.gitHost} own={isOwn(scheduled)} pick={publish} disabled={saving} onChange={next => (setPublish(next), setFailed(undefined))} />
       </Section>
       <p className="rounded-md border border-border bg-background px-3 py-2 text-sm">{problem ?? (dirty ? sentence : `${sentence} Nothing is changed yet.`)}</p>
       {failed !== undefined && (

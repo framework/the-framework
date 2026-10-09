@@ -4,7 +4,7 @@ import type { PublishPick } from '../src/state.js'
 import { MAX_AGENTS } from '../src/names.js'
 import { MAX_COUNT, PACE_UNITS, takesTimeOfDay, type PaceUnit } from '../src/pace.js'
 import { triedLine, type TriedLine } from './automation-form.js'
-import { PUBLISH_LABELS, UNIT_WORDS, publishChoices, type AgentsDraft, type PaceDraft } from './schedulers.js'
+import { UNIT_WORDS, publishChoices, publishLabel, type AgentsDraft, type PaceDraft } from './schedulers.js'
 
 // The fields of the Automations page, shared by the Edit panel of a row and the "New automation"
 // form, so a thing is picked the same way wherever it is picked: what the agent is told and the
@@ -238,12 +238,12 @@ export function AgentsFields({ name, draft, asSaid, start, where, disabled, onCh
 }
 
 /** "What its runs publish": how far a run of the row may go, picked from the levels the project can offer. */
-export function PublishField({ gitHost, pick, disabled, onChange }: { gitHost: boolean; pick: PublishPick; disabled: boolean; onChange: (next: PublishPick) => void }) {
+export function PublishField({ gitHost, own, pick, disabled, onChange }: { gitHost: boolean; /** Whether the row is one a person made: it has no skill to follow. */ own: boolean; pick: PublishPick; disabled: boolean; onChange: (next: PublishPick) => void }) {
   return (
     <select value={pick} disabled={disabled} onChange={e => onChange(e.target.value as PublishPick)} aria-label="What its runs publish" className={field}>
       {publishChoices(gitHost, pick).map(choice => (
         <option key={choice} value={choice}>
-          {PUBLISH_LABELS[choice]}
+          {publishLabel(choice, own)}
         </option>
       ))}
     </select>

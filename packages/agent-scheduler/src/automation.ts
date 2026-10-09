@@ -3,7 +3,8 @@ import { dirname, join } from 'node:path'
 import { excludeFromGit, originDefaultBranch, type GitRunner } from '@openagt/agent-data'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
 import { MAX_NAME, NEVER_STARTED_SINCE_MS, OWN_AUTOMATIONS_DIR, OWN_TEXT_MAX, RUN_SKILLS_DIR, SKILL_FILE, STATE_DIR, TRY_TIMEOUT_MS, isCommandName } from './names.js'
-import { FOLDER_LITTER, automationOf, automationSkill, frontMatterOf, wellFormed, type NewAutomation } from './automation-file.js'
+import { createHash } from 'node:crypto'
+import { FOLDER_LITTER, HALF_SAVED, automationOf, automationSkill, frontMatterOf, wellFormed, type NewAutomation } from './automation-file.js'
 import { foundOutput, isDue, lastRunValue, readSchedule, skillFile, skillSchedule } from './schedule.js'
 import { runCheck } from './tick.js'
 
@@ -62,6 +63,13 @@ export interface Written {
   startsFrom: string
   /** Whether it is kept on this machine alone: it needs no commit, and its command can start at once. */
   onThisMachine?: true
+  /** What the file says now, as {@link SavedAutomation.version} names it, when it was written anew: what the next save from the same place is held against. */
+  version?: string
+}
+
+/** A name for what a file says: the same text has the same name, and any change another. */
+function versionOf(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 16)
 }
 
 /**
@@ -133,10 +141,15 @@ export interface SavedAutomation {
   file: string
   /** Whether it is kept on this machine alone. */
   onThisMachine?: true
+  /** A name for what its file says now: a save may be held against it, so it does not write over a change made since. */
+  version: string
 }
 
 /** Why a name is no automation the tool rewrites or removes. */
 export type NotAnAutomation = { ok: false; reason: 'not-an-automation'; detail: string }
+
+/** Why an automation was not saved again: its file says something else than whoever asked last read. */
+export type ChangedSince = { ok: false; reason: 'changed-since'; detail: string }
 
 /**
  * The automation of that name, where it is saved, or why the tool leaves what has the name alone.
@@ -160,8 +173,9 @@ export async function savedAutomation(repo: string, name: string): Promise<Saved
   const kept = command.text !== undefined
   const file = kept ? `${OWN_AUTOMATIONS_DIR}/${name}.md` : skillFile(command)
   // The schedule says the file is the tool's to rewrite; what it holds is read from it now.
-  const automation = command.editable ? automationOf(name, await readFile(join(repo, file), 'utf8').catch(() => '')) : undefined
-  if (automation) return { automation, file, ...(kept ? { onThisMachine: true as const } : {}) }
+  const text = command.editable ? await readFile(join(repo, file), 'utf8').catch(() => '') : ''
+  const automation = command.editable ? automationOf(name, text) : undefined
+  if (automation) return { automation, file, version: versionOf(text), ...(kept ? { onThisMachine: true as const } : {}) }
   return none(kept ? `${file} is a link, or was changed by hand since it was saved: edit or remove the file itself` : `${dirname(file)} is a skill of the project, or an automation changed by hand since it was saved: edit or remove its files yourself`)
 }
 
@@ -186,11 +200,14 @@ export interface AutomationChange {
  * at once. One kept on this machine has only its file: the next tick reads all of it.
  *
  * Refused for a name that is no automation the tool wrote ({@link savedAutomation}), and for what
- * could not be saved new either ({@link automationProblem}, the length of a text kept here).
+ * could not be saved new either ({@link automationProblem}, the length of a text kept here). With
+ * `was`, the version whoever asks last read, it is refused too when the file says something else
+ * by now: a form opened a while ago does not write over a change made to the file by hand since.
  */
-export async function editAutomation(repo: string, name: string, change: AutomationChange, git: GitRunner, opts: { write?: typeof writeFile } = {}): Promise<Written | AddRefusal | NotAnAutomation> {
+export async function editAutomation(repo: string, name: string, change: AutomationChange, git: GitRunner, opts: { write?: typeof writeFile; was?: string } = {}): Promise<Written | AddRefusal | NotAnAutomation | ChangedSince> {
   const found = await savedAutomation(repo, name)
   if ('reason' in found) return found
+  if (opts.was !== undefined && opts.was !== found.version) return { ok: false, reason: 'changed-since', detail: `${found.file} was changed since it was opened here: open it again to see what it says now` }
   const was = found.automation
   const every = change.every === undefined ? was.every : (change.every ?? undefined)
   const when = change.when === undefined ? was.when : (change.when ?? undefined)
@@ -202,15 +219,16 @@ export async function editAutomation(repo: string, name: string, change: Automat
   if (found.onThisMachine && length > OWN_TEXT_MAX) return { ok: false, reason: 'long-prompt', detail: `the prompt is ${length} characters, and one kept on this machine has ${OWN_TEXT_MAX} at most` }
   // Written beside the file and moved over it: a write that fails midway leaves the automation as it was, not a cut file.
   const path = join(repo, found.file)
+  const text = automationSkill(automation)
   try {
-    await (opts.write ?? writeFile)(`${path}.new`, automationSkill(automation))
+    await (opts.write ?? writeFile)(`${path}.new`, text)
     await rename(`${path}.new`, path)
   } catch (err) {
     await unlink(`${path}.new`).catch(() => {})
     throw err
   }
   const startsFrom = (await originDefaultBranch(repo, git).catch(() => undefined)) ?? 'HEAD'
-  return { ok: true, command: name, file: found.file, startsFrom, ...(found.onThisMachine ? { onThisMachine: true as const } : {}) }
+  return { ok: true, command: name, file: found.file, startsFrom, version: versionOf(text), ...(found.onThisMachine ? { onThisMachine: true as const } : {}) }
 }
 
 /** What removing an automation did, and what whoever asked needs to say about it. */
@@ -255,7 +273,7 @@ export async function removeAutomation(repo: string, name: string, git: GitRunne
   // Git is asked about the file where it really is: the skills folder may be a link to another one.
   const folder = join(await realpath(join(repo, RUN_SKILLS_DIR)), name)
   await unlink(join(folder, SKILL_FILE))
-  await unlink(join(folder, FOLDER_LITTER)).catch(() => {})
+  for (const left of [FOLDER_LITTER, HALF_SAVED]) await unlink(join(folder, left)).catch(() => {})
   await rmdir(folder).catch(() => {})
   // One line for the one file, its first letter what the index holds: `A` for a file added and never committed.
   const held = await git(['status', '--porcelain', '--', join(folder, SKILL_FILE)], repo).catch(() => undefined)

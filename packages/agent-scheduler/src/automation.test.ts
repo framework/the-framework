@@ -12,6 +12,13 @@ import { RETRIED_RM, git, removeRepo, testRepo, writeSkill } from './test-repo.j
 
 // A person's own automation: the skill file it becomes, what is refused, the file written into the project, and a check tried once.
 
+/** An automation where it is saved, or what saving it again answered, with its version checked and taken off: a name for what the file says, which has a test of its own. */
+function unversioned<T extends object>(answer: T): Omit<T, 'version'> {
+  const { version, ...rest } = answer as T & { version?: unknown }
+  assert.equal(typeof version === 'string' && version !== '', true, 'it names a version')
+  return rest
+}
+
 const CHECK = `gh api "repos/{owner}/{repo}/issues/comments?since=$LAST_RUN" --jq '[.[] | select(.body | startswith("🤖") | not) | {url: .html_url}]'`
 const ANSWER: NewAutomation = { name: 'answer-comments', prompt: 'Answer: each new comment below.\n\nBe short.\n', every: '15m', when: CHECK, waitsFor: 'when someone commented: at last' }
 
@@ -202,8 +209,8 @@ test('an automation saved from here is found again, shared or kept on this machi
   try {
     await addAutomation(repo, ANSWER, git)
     await addAutomation(repo, { name: 'tidy', prompt: 'Tidy up.', every: '1d' }, git, { onThisMachine: true })
-    assert.deepEqual(await savedAutomation(repo, 'answer-comments'), { automation: { ...ANSWER, prompt: 'Answer: each new comment below.\n\nBe short.' }, file: '.claude/skills/answer-comments/SKILL.md' })
-    assert.deepEqual(await savedAutomation(repo, 'tidy'), { automation: { name: 'tidy', prompt: 'Tidy up.', every: '1d' }, file: '.agent-scheduler/automations/tidy.md', onThisMachine: true })
+    assert.deepEqual(unversioned(await savedAutomation(repo, 'answer-comments')), { automation: { ...ANSWER, prompt: 'Answer: each new comment below.\n\nBe short.' }, file: '.claude/skills/answer-comments/SKILL.md' })
+    assert.deepEqual(unversioned(await savedAutomation(repo, 'tidy')), { automation: { name: 'tidy', prompt: 'Tidy up.', every: '1d' }, file: '.agent-scheduler/automations/tidy.md', onThisMachine: true })
     assert.deepEqual((await readSchedule(repo)).commands.map(c => [c.name, c.editable]), [['answer-comments', true], ['tidy', true]], 'and the schedule marks both')
 
     /** Why a name is left alone; and the schedule, the one place that says what is the tool's, must not mark it. */
@@ -249,7 +256,7 @@ test('an automation saved from here is found again, shared or kept on this machi
     const kept = join(repo, '.agent-scheduler', 'automations', 'tidy.md')
     const shared = join(repo, '.claude', 'skills', 'answer-comments', 'SKILL.md')
     await writeFile(shared, (await readFile(shared, 'utf8')).replace('\nAnswer: each new comment below.\n', '\nAnswer the newest comment only.\n'))
-    assert.deepEqual(await savedAutomation(repo, 'answer-comments'), { automation: { ...ANSWER, prompt: 'Answer the newest comment only.\n\nBe short.' }, file: '.claude/skills/answer-comments/SKILL.md' })
+    assert.deepEqual(unversioned(await savedAutomation(repo, 'answer-comments')), { automation: { ...ANSWER, prompt: 'Answer the newest comment only.\n\nBe short.' }, file: '.claude/skills/answer-comments/SKILL.md' })
     // Anything the tool does not write, one more key, and it is the person's file to edit.
     await writeFile(shared, (await readFile(shared, 'utf8')).replace('schedule:\n', 'schedule:\n  agents: 3\n'))
     assert.equal(await left('answer-comments'), `.claude/skills/answer-comments ${SKILL}`)
@@ -287,7 +294,7 @@ test('editing saves an automation again under its name, where it is: what is giv
     const shared = join(repo, '.claude', 'skills', 'answer-comments', 'SKILL.md')
     const waitsFor = 'when someone commented: at last'
     // The prompt alone: the pace, the check and its plain words stay.
-    assert.deepEqual(await editAutomation(repo, 'answer-comments', { prompt: 'Answer each new comment, in one line.' }, git), { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', startsFrom: 'origin/main' })
+    assert.deepEqual(unversioned(await editAutomation(repo, 'answer-comments', { prompt: 'Answer each new comment, in one line.' }, git)), { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', startsFrom: 'origin/main' })
     assert.equal(await readFile(shared, 'utf8'), automationSkill({ name: 'answer-comments', prompt: 'Answer each new comment, in one line.', every: '15m', when: CHECK, waitsFor }))
     assert.equal((await git(['status', '--porcelain'], repo)).trim(), 'M .claude/skills/answer-comments/SKILL.md', 'a change of the person\'s to commit: nothing is committed for them')
     // The pace alone, then the pace taken out: the check stays, and is then all that says when.
@@ -315,7 +322,7 @@ test('editing saves an automation again under its name, where it is: what is giv
     // Kept on this machine: the same, and git sees nothing.
     await addAutomation(repo, { name: 'tidy', prompt: 'Tidy up.', every: '1d' }, git, { onThisMachine: true })
     await git(['checkout', '-q', '--', '.'], repo)
-    assert.deepEqual(await editAutomation(repo, 'tidy', { prompt: 'Tidy up, gently.', every: '2d' }, git), { ok: true, command: 'tidy', file: '.agent-scheduler/automations/tidy.md', startsFrom: 'origin/main', onThisMachine: true })
+    assert.deepEqual(unversioned(await editAutomation(repo, 'tidy', { prompt: 'Tidy up, gently.', every: '2d' }, git)), { ok: true, command: 'tidy', file: '.agent-scheduler/automations/tidy.md', startsFrom: 'origin/main', onThisMachine: true })
     assert.equal((await git(['status', '--porcelain'], repo)).trim(), '')
     assert.deepEqual((await readSchedule(repo)).commands.filter(c => c.name === 'tidy').map(c => [c.every?.text, c.text]), [['2d', 'Tidy up, gently.']])
 
@@ -341,6 +348,98 @@ test('editing saves an automation again under its name, where it is: what is giv
     await assert.rejects(editAutomation(repo, 'answer-comments', { prompt: 'Lost?' }, git, { write: cut }), /ENOSPC/)
     assert.deepEqual(await readdir(join(repo, '.claude', 'skills', 'answer-comments')), ['SKILL.md'])
     assert.equal((await savedAutomation(repo, 'answer-comments') as { automation: NewAutomation }).automation.prompt, 'x'.repeat(32_001))
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('an automation has a version, a name for what its file says: the same for the same text, another after any change; a save held against the version last read is refused once the file was changed by hand since, and writes nothing; held against the right one, or against none, it saves and answers the new version', async () => {
+  const repo = await testRepo()
+  try {
+    await addAutomation(repo, ANSWER, git)
+    await addAutomation(repo, { name: 'tidy', prompt: 'Tidy up.', every: '1d' }, git, { onThisMachine: true })
+    const shared = join(repo, '.claude', 'skills', 'answer-comments', 'SKILL.md')
+    const versionOf = async (name: string): Promise<string> => {
+      const found = await savedAutomation(repo, name)
+      return 'reason' in found ? assert.fail(`${name}: ${found.detail}`) : found.version
+    }
+    const opened = await versionOf('answer-comments')
+    assert.equal(await versionOf('answer-comments'), opened, 'read twice, it is the same')
+    assert.notEqual(await versionOf('tidy'), opened, 'another file says something else')
+
+    // Changed by hand since, into what is still an automation the tool reads: a line of the prompt.
+    const asSaved = await readFile(shared, 'utf8')
+    const byHand = asSaved.replace('Be short.', 'Be short, and kind.')
+    assert.notEqual(byHand, asSaved)
+    await writeFile(shared, byHand)
+    const changed = await versionOf('answer-comments')
+    assert.notEqual(changed, opened)
+    // A form opened before the change does not write over it, and leaves nothing beside the file.
+    assert.deepEqual(await editAutomation(repo, 'answer-comments', { prompt: 'From a form opened a while ago.', every: '1h' }, git, { was: opened }), { ok: false, reason: 'changed-since', detail: '.claude/skills/answer-comments/SKILL.md was changed since it was opened here: open it again to see what it says now' })
+    assert.equal(await readFile(shared, 'utf8'), byHand)
+    assert.deepEqual(await readdir(join(repo, '.claude', 'skills', 'answer-comments')), ['SKILL.md'])
+    // Held against what the file says now, it saves, and answers the version of what it wrote: the next save from the same form is held against that.
+    const saved = await editAutomation(repo, 'answer-comments', { every: '1h' }, git, { was: changed })
+    assert.equal(saved.ok, true)
+    const written = (saved as { version?: string }).version
+    assert.equal(written, await versionOf('answer-comments'))
+    assert.notEqual(written, changed)
+    assert.equal((await editAutomation(repo, 'answer-comments', { every: '2h' }, git, { was: changed })).ok, false, 'the version before its own save is an old one too')
+    assert.equal((await editAutomation(repo, 'answer-comments', { every: '2h' }, git, { was: written! })).ok, true)
+    // Held against nothing, as from the command line, it saves whatever the file says.
+    assert.equal((await editAutomation(repo, 'answer-comments', { every: '3h' }, git)).ok, true)
+    // The same text again has the same name, whatever happened in between.
+    await writeFile(shared, asSaved)
+    assert.equal(await versionOf('answer-comments'), opened)
+
+    // One kept on this machine is held the same way.
+    const kept = await versionOf('tidy')
+    await writeFile(join(repo, '.agent-scheduler', 'automations', 'tidy.md'), automationSkill({ name: 'tidy', prompt: 'Tidy up, by hand.', every: '1d' }))
+    assert.deepEqual(await editAutomation(repo, 'tidy', { prompt: 'Tidy up, from the form.' }, git, { was: kept }), { ok: false, reason: 'changed-since', detail: '.agent-scheduler/automations/tidy.md was changed since it was opened here: open it again to see what it says now' })
+    assert.deepEqual((await readSchedule(repo)).commands.filter(c => c.name === 'tidy').map(c => c.text), ['Tidy up, by hand.'])
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test("what a save that was cut short left beside a shared automation's file, `SKILL.md.new`, is the tool's own: the automation is still found and marked as the tool's, the next save leaves none behind, and removing takes it with the folder; any other file beside it still makes it a skill", async () => {
+  const repo = await testRepo()
+  try {
+    await addAutomation(repo, ANSWER, git)
+    const folder = join(repo, '.claude', 'skills', 'answer-comments')
+    const editable = async (): Promise<boolean> => (await readSchedule(repo)).commands.some(c => c.name === 'answer-comments' && c.editable === true)
+    await writeFile(join(folder, 'SKILL.md.new'), '---\nname: answer-comm')
+    assert.equal(await editable(), true)
+    assert.equal('reason' in (await savedAutomation(repo, 'answer-comments')), false)
+    // Saved again: the half-written file is written over and moved onto the file.
+    assert.equal((await editAutomation(repo, 'answer-comments', { prompt: 'Answer in one line.' }, git)).ok, true)
+    assert.deepEqual(await readdir(folder), ['SKILL.md'])
+    assert.equal(await readFile(join(folder, 'SKILL.md'), 'utf8'), automationSkill({ ...ANSWER, prompt: 'Answer in one line.' }))
+    // Removed: it goes with the file and what a file manager left, so the folder goes and the name is free.
+    await writeFile(join(folder, 'SKILL.md.new'), 'half')
+    await writeFile(join(folder, '.DS_Store'), 'x')
+    assert.equal(await editable(), true)
+    assert.equal((await removeAutomation(repo, 'answer-comments', git)).ok, true)
+    assert.deepEqual(await readdir(join(repo, '.claude', 'skills')), ['work-queue'])
+    // Any other file beside it is a person's: a skill with more than its text is no automation.
+    await addAutomation(repo, ANSWER, git)
+    for (const other of ['SKILL.md.bak', 'SKILL.md.new.txt', 'skill.md.new2']) {
+      await writeFile(join(folder, other), 'x')
+      assert.equal(await editable(), false, other)
+      assert.deepEqual(await removeAutomation(repo, 'answer-comments', git), { ok: false, reason: 'not-an-automation', detail: '.claude/skills/answer-comments is a skill of the project, or an automation changed by hand since it was saved: edit or remove its files yourself' })
+      await rm(join(folder, other))
+    }
+    assert.equal(await editable(), true)
+    // A link or a folder of that name is no leftover of a save: writing through a link would reach a file kept elsewhere. Nothing is written or removed.
+    await writeFile(join(repo, 'precious.txt'), 'keep me')
+    await symlink('../../../precious.txt', join(folder, 'SKILL.md.new'))
+    assert.equal(await editable(), false)
+    assert.equal(((await editAutomation(repo, 'answer-comments', { prompt: 'Other words.' }, git)) as { reason?: string }).reason, 'not-an-automation')
+    assert.equal(await readFile(join(repo, 'precious.txt'), 'utf8'), 'keep me')
+    await rm(join(folder, 'SKILL.md.new'))
+    await mkdir(join(folder, 'SKILL.md.new'))
+    assert.equal(await editable(), false)
+    assert.equal(((await removeAutomation(repo, 'answer-comments', git)) as { reason?: string }).reason, 'not-an-automation')
   } finally {
     await removeRepo(repo)
   }

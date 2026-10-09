@@ -4,7 +4,6 @@ import { excludeFromGit, nodeGitRunner, type GitRunner } from '@openagt/agent-da
 import { PUBLISH_LEVELS, type Publish } from '@openagt/agent-runner'
 import { DEFAULT_MODEL, DEFAULT_PUBLISH, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE, isAgents, isTime } from './names.js'
 import type { PacePick } from './pace.js'
-import type { LastRun } from './records.js'
 
 /**
  * The tool's state (#1774): one JSON file under `.agent-scheduler/` at the repository root,
@@ -44,8 +43,6 @@ export interface ListedCommand {
   onThisMachine?: true
   /** Whether the command is a person's own automation as the tool wrote it: `show`, `edit` and `remove` take it. */
   editable?: true
-  /** The command's last run, when it has one: which run, when it started, and whether it failed. A failure is said until a later run of the command starts. */
-  lastRun?: LastRun
 }
 
 /** One tick as the state remembers it. */
@@ -160,17 +157,6 @@ export function withoutListed(state: State, command: string): State {
   const tick = state.lastTick
   if (!tick || !(tick.schedule.some(c => c.command === command) || tick.decisions.some(d => d.command === command))) return state
   return { ...state, lastTick: { ...tick, schedule: tick.schedule.filter(c => c.command !== command), decisions: tick.decisions.filter(d => d.command !== command) } }
-}
-
-/**
- * The state with a run as a command's last on the last tick's record: one started since that
- * tick, by hand, so whoever lists the record's commands says so at once and not a tick later. The
- * state itself is answered when the record does not list the command.
- */
-export function withLastRun(state: State, command: string, run: LastRun): State {
-  const tick = state.lastTick
-  if (!tick || !tick.schedule.some(c => c.command === command)) return state
-  return { ...state, lastTick: { ...tick, schedule: tick.schedule.map(c => (c.command === command ? { ...c, lastRun: run } : c)) } }
 }
 
 /**

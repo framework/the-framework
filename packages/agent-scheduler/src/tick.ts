@@ -45,8 +45,6 @@ export interface TickDeps {
   check: (shell: string, lastRun: string) => Promise<CheckResult>
   /** Whether the command is switched on on this machine as of now: a person may have switched it off, or removed it, since the tick read the state. */
   stillOn: (command: string) => Promise<boolean>
-  /** Each command's last run: read once, after the sweep, which may have recorded that one failed. */
-  lastRuns: () => Promise<Record<string, LastRun>>
   /** When the command last started on any machine, ISO; nothing when it never did. */
   lastStart: (command: string) => Promise<string | undefined>
   inFlight: (command: string) => Promise<RunCard[]>
@@ -69,13 +67,9 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
   const at = deps.now().toISOString()
   // A schedule that cannot be read is named on every tick, on or off: nothing else says why a skill's commands are missing.
   const unreadable = deps.schedule.unreadable.map(({ skill, reason, own }): TickDecision => ({ command: skill, outcome: `${own ? 'unlisted automation' : 'unreadable schedule'}: ${reason}` }))
-  const record: TickRecord = { at, decisions: unreadable, schedule: deps.schedule.commands.map(command => listed(command)) }
+  const record: TickRecord = { at, decisions: unreadable, schedule: deps.schedule.commands.map(listed) }
   const pulled = await deps.pull()
   if (pulled.ok) await deps.sweep()
-  // Listed with its last run, whatever its switch and whether or not the pull went through: a person
-  // sees when a row last ran, and that the run failed until a later run of it starts. Read after the sweep, which may have recorded a failure.
-  const last = await deps.lastRuns().catch((): Record<string, LastRun> => ({}))
-  record.schedule = deps.schedule.commands.map(command => listed(command, last[command.name]))
   if (!pulled.ok) return { ...record, note: `agent-data could not be pulled: ${pulled.error}` }
   if (!deps.state.on) return { ...record, note: 'off' }
   if (record.decisions.length === 0 && deps.schedule.commands.length === 0) return { ...record, note: 'no skill of this project schedules a command' }
@@ -84,8 +78,6 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
   for (const command of deps.schedule.commands) {
     const { outcome, started } = await decide(deps, command, held)
     record.decisions.push({ command: command.name, outcome, ...(started ? { run: started.id } : {}) })
-    // A later run of the command has started: its last run is this one, not the one before it.
-    if (started) record.schedule = record.schedule.map(c => (c.command === command.name ? { ...c, lastRun: started } : c))
   }
   return record
 }
@@ -220,9 +212,9 @@ function latest(a: string | undefined, b: string | undefined): string | undefine
   return Date.parse(a) > Date.parse(b) ? a : b
 }
 
-/** A command as a dashboard lists it: what its skill says, and its last run when it has one; not this machine's switch or publish pick, which the state carries. */
-function listed(command: ScheduledCommand, lastRun?: LastRun): ListedCommand {
-  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}), ...(command.cap > 1 ? { agents: command.cap } : {}), ...(command.text !== undefined ? { onThisMachine: true as const } : {}), ...(command.editable ? { editable: true as const } : {}), ...(lastRun !== undefined ? { lastRun } : {}) }
+/** A command as a dashboard lists it: what its skill says; not this machine's switch or picks, which the state carries, nor its runs, which the records do. */
+export function listed(command: ScheduledCommand): ListedCommand {
+  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}), ...(command.cap > 1 ? { agents: command.cap } : {}), ...(command.text !== undefined ? { onThisMachine: true as const } : {}), ...(command.editable ? { editable: true as const } : {}) }
 }
 
 /** An age for a decision line: `less than a minute`, `12m`, `3h`, `2d`, floored. */

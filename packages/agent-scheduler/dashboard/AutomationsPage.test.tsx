@@ -23,14 +23,11 @@ function scheduler(saved: (projectId: string, args: string[]) => ModuleCommandRe
 /** {@link STATUS} with two rows made with "New automation", both as the tool wrote them: one shared with the project, one kept on this machine. */
 const MINE = {
   ...STATUS,
-  lastTick: {
-    ...STATUS.lastTick,
-    schedule: [
-      ...STATUS.lastTick.schedule,
-      { command: 'answer-comments', every: '15m', when: 'gh api comments', waitsFor: 'when someone commented', description: 'Answer each new comment below.', editable: true },
-      { command: 'tidy', every: '1d', description: 'Tidy up.', onThisMachine: true, editable: true },
-    ],
-  },
+  schedule: [
+    ...STATUS.schedule,
+    { command: 'answer-comments', every: '15m', when: 'gh api comments', waitsFor: 'when someone commented', description: 'Answer each new comment below.', editable: true },
+    { command: 'tidy', every: '1d', description: 'Tidy up.', onThisMachine: true, editable: true },
+  ],
 }
 
 /** What `agent-scheduler show answer-comments` prints for the shared one. */
@@ -87,14 +84,14 @@ describe('the Automations page: its rows', () => {
     expect(within(cleanupRow).getByText('On').className).toMatch(/text-success/)
     expect(within(cleanupRow).getByText('Never ran')).toBeTruthy()
     expect(within(cleanupRow).getByText('Every 1 day')).toBeTruthy()
-    expect(within(cleanupRow).getByText('Commits its work')).toBeTruthy()
+    expect(within(cleanupRow).getByText('May commit, pushes nothing')).toBeTruthy()
     expect(within(cleanupRow).getByRole('switch', { name: 'Run /post-merge-cleanup by itself' }).getAttribute('aria-checked')).toBe('true')
 
     // Nobody switched it on here: Off, whatever its skill says.
     const queueRow = row('/work-queue')
     expect(within(queueRow).getByText('Work one queued task.')).toBeTruthy()
     expect(within(queueRow).getByText('When the queue holds a task')).toBeTruthy()
-    expect(within(queueRow).getByText('Publishes nothing')).toBeTruthy()
+    expect(within(queueRow).getByText('As its skill says')).toBeTruthy()
     expect(within(queueRow).getByText('Off').className).toMatch(/text-muted-foreground/)
     expect(within(queueRow).getByRole('switch', { name: 'Run /work-queue by itself' }).getAttribute('aria-checked')).toBe('false')
     // The same three controls on every row.
@@ -139,7 +136,7 @@ describe('the Automations page: its rows', () => {
   })
 
   test('a project with rows of one kind alone shows that group alone', async () => {
-    const own = { ...MINE, lastTick: { ...MINE.lastTick, schedule: MINE.lastTick.schedule.filter(c => 'editable' in c) } }
+    const own = { ...MINE, schedule: MINE.schedule.filter(c => 'editable' in c) }
     const { host } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: own } : { ok: true, output: { ok: true } }))
     show(host)
     const gemstack = await screen.findByRole('region', { name: 'gemstack' })
@@ -161,15 +158,15 @@ describe('the Automations page: its rows', () => {
           { command: 'check-links', outcome: 'check failed: gh: not found' },
           { command: 'work-queue', outcome: 'switched off on this machine' },
         ],
-        schedule: [
-          { command: 'post-merge-cleanup', every: '1d', lastRun: { id: 'r1', at: '2026-10-03T08:00:00.000Z' } },
-          { command: 'update-tickets', every: '15m', when: 'gh issue list' },
-          { command: 'triage', every: '6h' },
-          { command: 'plan-tickets', every: '2d' },
-          { command: 'check-links', when: 'gh api' },
-          { command: 'work-queue', when: 'npx queue', lastRun: { id: '2026-10-03T09-00-00-000Z', at: '2026-10-03T09:00:00.000Z', failed: true } },
-        ],
       },
+      schedule: [
+        { command: 'post-merge-cleanup', every: '1d', lastRun: { id: 'r1', at: '2026-10-03T08:00:00.000Z' } },
+        { command: 'update-tickets', every: '15m', when: 'gh issue list' },
+        { command: 'triage', every: '6h' },
+        { command: 'plan-tickets', every: '2d' },
+        { command: 'check-links', when: 'gh api' },
+        { command: 'work-queue', when: 'npx queue', lastRun: { id: '2026-10-03T09-00-00-000Z', at: '2026-10-03T09:00:00.000Z', failed: true } },
+      ],
     }
     const { host } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: status } : { ok: true, output: { ok: true } }))
     show(host)
@@ -286,7 +283,7 @@ describe('the Automations page: its rows', () => {
     await waitFor(() => expect(within(queue).getByRole('alert').textContent).toBe('Nothing started. Check failed: gh: not found.'))
     now()
     // The dashboard ended the command before it answered: whether a run started is not known, and the row does not say that none did.
-    await waitFor(() => expect(within(queue).getByRole('alert').textContent).toBe('No answer in time. A run may have started all the same: the row says when it last ran once the scheduler has looked.'))
+    await waitFor(() => expect(within(queue).getByRole('alert').textContent).toBe('No answer in time. A run may have started all the same: if one did, the row says when it last ran.'))
     // A reason that ends with its own full stop gets no second one.
     now()
     await waitFor(() => expect(within(queue).getByRole('alert').textContent).toBe('Nothing started. Not ready: `claude` is not logged in. Run `claude /login`, then start again.'))
@@ -401,7 +398,7 @@ describe('the Automations page: its rows', () => {
   })
 
   test('a skill whose schedule cannot be read is named with the reason, and an automation kept on this machine that the scheduler does not list is said so in its own words', async () => {
-    const status = { ...STATUS, lastTick: { ...STATUS.lastTick, decisions: [{ command: 'triage', outcome: 'unreadable schedule: row 2: unknown key evry' }, { command: 'tidy', outcome: 'unlisted automation: it has no schedule' }, ...STATUS.lastTick.decisions] } }
+    const status = { ...STATUS, unreadable: [{ skill: 'triage', reason: 'row 2: unknown key evry' }, { skill: 'tidy', reason: 'it has no schedule', own: true }] }
     const { host } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: status } : { ok: true, output: { ok: true } }))
     show(host)
     await screen.findByRole('region', { name: 'gemstack' })
@@ -410,22 +407,25 @@ describe('the Automations page: its rows', () => {
     expect(row('/work-queue')).toBeTruthy()
   })
 
-  test('a project with nothing to list says so, in two ways: its scheduler never looked, or no skill of it can be scheduled; one whose scheduler cannot be read says why, and offers no "New automation"', async () => {
+  test('a project with nothing to list says so, the same whether or not its scheduler ever looked: the rows are read from its files; one whose scheduler cannot be read says why, and offers no "New automation"', async () => {
     const answers: Record<string, ModuleCommandResult> = {
-      p1: { ok: true, output: { ok: true, on: true, keepAlive: false, running: true, model: 'opus', spendOffset: 7 } },
+      p1: { ok: true, output: { ok: true, on: true, keepAlive: false, running: true, model: 'opus', spendOffset: 7, schedule: [], unreadable: [] } },
       p2: { ok: false, error: 'not inside a git repository' },
-      p3: { ok: true, output: { ok: true, on: true, keepAlive: false, running: true, model: 'opus', spendOffset: 7, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], schedule: [], note: 'no skill of this project schedules a command' } } },
+      p3: { ok: true, output: { ok: true, on: true, keepAlive: false, running: true, model: 'opus', spendOffset: 7, schedule: [], unreadable: [], lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], schedule: [], note: 'no skill of this project schedules a command' } } },
     }
     const { host } = hostAnswering(projectId => answers[projectId]!)
     show(host, [GEMSTACK, OTHER, { id: 'p3', name: 'third', gitHost: true }])
     const gemstack = await screen.findByRole('region', { name: 'gemstack' })
-    expect(within(gemstack).getByText('Nothing here yet: the scheduler of this project has not looked at its skills.')).toBeTruthy()
+    expect(within(gemstack).getByText('Nothing here: no skill of this project says it can be scheduled.')).toBeTruthy()
+    expect(screen.queryByText(/has not looked at its skills/)).toBeNull()
     expect(within(gemstack).queryByRole('list')).toBeNull()
     expect(within(gemstack).queryByRole('group')).toBeNull()
     const other = screen.getByRole('region', { name: 'other' })
     expect(within(other).getByRole('alert').textContent).toBe('The scheduler could not be read: not inside a git repository')
     expect(within(other).getByText('Scheduler not readable')).toBeTruthy()
     expect(within(other).queryByRole('button', { name: /New automation/ })).toBeNull()
+    // Never read once: the line alone, no row.
+    expect(within(other).queryByRole('list')).toBeNull()
     const third = screen.getByRole('region', { name: 'third' })
     expect(within(third).getByText('Nothing here: no skill of this project says it can be scheduled.')).toBeTruthy()
     // Said once, in the page's words: the tick's own note for it is not repeated in the heading.
@@ -453,21 +453,21 @@ describe("the Edit panel of a skill's row", () => {
     expect(within(does).queryByText('Its shell line')).toBeNull()
     expect(within(editor).queryByRole('button', { name: 'Remove' })).toBeNull()
     // The row's line of picks gives way to the panel, which says them as they would be.
-    expect(within(row('/post-merge-cleanup')).getAllByText(/Commits its work/).length).toBe(1)
+    expect(within(row('/post-merge-cleanup')).getAllByText(/May commit, pushes nothing/).length).toBe(1)
     const menu = within(editor).getByRole('combobox', { name: 'What its runs publish' }) as HTMLSelectElement
-    expect(options(menu)).toEqual(['Nothing', 'Commit', 'Publish branch', 'Open PR', 'Merge on green'])
+    expect(options(menu)).toEqual(['As the skill says', 'Commit', 'Publish branch', 'Open PR', 'Merge on green'])
     expect(menu.value, 'nobody picked here').toBe('commit')
-    expect(within(editor).getByText('Every 1 day. Commits its work. Nothing is changed yet.')).toBeTruthy()
+    expect(within(editor).getByText('Every 1 day. May commit, pushes nothing. Nothing is changed yet.')).toBeTruthy()
     expect(disabled(within(editor).getByRole('button', { name: 'Save' }))).toBe(true)
     expect(within(editor).getByText('Saved for you, in this project, on this machine. No tracked file changes.')).toBeTruthy()
     fireEvent.change(menu, { target: { value: 'pr' } })
-    expect(within(editor).getByText('Every 1 day. Opens a pull request.')).toBeTruthy()
+    expect(within(editor).getByText('Every 1 day. May open a pull request.')).toBeTruthy()
     // Nothing is saved until Save.
     expect(saves(runCommand)).toEqual([])
     fireEvent.click(within(editor).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['publish', 'post-merge-cleanup', 'pr']))
     await gone('/post-merge-cleanup')
-    expect(within(row('/post-merge-cleanup')).getByText('Commits its work')).toBeTruthy()
+    expect(within(row('/post-merge-cleanup')).getByText('May commit, pushes nothing')).toBeTruthy()
 
     // A skill with a shell line shows it, greyed, with what it waits for.
     const second = await edit('/work-queue')
@@ -484,7 +484,7 @@ describe("the Edit panel of a skill's row", () => {
   })
 
   test('a skill that does not say what it does is said so', async () => {
-    const status = { ...STATUS, lastTick: { ...STATUS.lastTick, schedule: [{ command: 'triage', every: '6h' }] } }
+    const status = { ...STATUS, schedule: [{ command: 'triage', every: '6h' }] }
     const { host } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: status } : { ok: true, output: { ok: true } }))
     show(host)
     await screen.findByRole('region', { name: 'gemstack' })
@@ -513,7 +513,7 @@ describe("the Edit panel of a skill's row", () => {
     expect(within(editor).getByText('Counted from its last start, on any machine that shares this repository.')).toBeTruthy()
     fireEvent.change(within(editor).getByLabelText('Time of day'), { target: { value: '10:00' } })
     expect(within(editor).getByText("optional, this machine's time")).toBeTruthy()
-    expect(within(editor).getByText('Every 2 days at 10:00. Commits its work.')).toBeTruthy()
+    expect(within(editor).getByText('Every 2 days at 10:00. May commit, pushes nothing.')).toBeTruthy()
     expect(saves(runCommand)).toEqual([])
     fireEvent.click(within(editor).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['pace', 'post-merge-cleanup', '2d', '10:00']))
@@ -531,7 +531,7 @@ describe("the Edit panel of a skill's row", () => {
     fireEvent.change(within(editor).getByLabelText('Time of day'), { target: { value: '10:00' } })
     fireEvent.change(within(editor).getByLabelText('Unit'), { target: { value: 'h' } })
     expect(within(editor).queryByLabelText('Time of day')).toBeNull()
-    expect(within(editor).getByText('Every 1 hour. Commits its work.')).toBeTruthy()
+    expect(within(editor).getByText('Every 1 hour. May commit, pushes nothing.')).toBeTruthy()
     const save = within(editor).getByRole('button', { name: 'Save' })
     for (const typed of ['', '0', '1.5']) {
       fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: typed } })
@@ -549,7 +549,7 @@ describe("the Edit panel of a skill's row", () => {
     Object.defineProperty(time, 'validity', { configurable: true, value: { badInput: false } })
     fireEvent.change(time, { target: { value: '09:30' } })
     expect(disabled(save)).toBe(false)
-    expect(within(editor).getByText('Every 2 days at 09:30. Commits its work.')).toBeTruthy()
+    expect(within(editor).getByText('Every 2 days at 09:30. May commit, pushes nothing.')).toBeTruthy()
     fireEvent.change(time, { target: { value: '' } })
     expect(within(editor).getByText("optional, this machine's time")).toBeTruthy()
     fireEvent.change(within(editor).getByLabelText('Unit'), { target: { value: 'mo' } })
@@ -573,11 +573,8 @@ describe("the Edit panel of a skill's row", () => {
               ...STATUS,
               switches: { 'post-merge-cleanup': '2026-10-03T08:00:00.000Z', 'update-tickets': '2026-10-03T08:00:00.000Z' },
               paces: { 'post-merge-cleanup': { every: '2d', at: '10:00', since } },
-              lastTick: {
-                ...STATUS.lastTick,
-                decisions: [],
-                schedule: [...STATUS.lastTick.schedule, { command: 'update-tickets', every: '15m', when: 'gh issue list', waitsFor: 'when an issue changed' }],
-              },
+              lastTick: { ...STATUS.lastTick, decisions: [] },
+              schedule: [...STATUS.schedule, { command: 'update-tickets', every: '15m', when: 'gh issue list', waitsFor: 'when an issue changed' }],
             },
           },
     )
@@ -589,9 +586,9 @@ describe("the Edit panel of a skill's row", () => {
     const editor = await edit('/post-merge-cleanup')
     expect((within(part(editor, 'When it runs')).getByRole('radio', { name: 'Every' }) as HTMLInputElement).checked).toBe(true)
     expect([(within(editor).getByLabelText('How many') as HTMLInputElement).value, (within(editor).getByLabelText('Unit') as HTMLSelectElement).value, (within(editor).getByLabelText('Time of day') as HTMLInputElement).value]).toEqual(['2', 'd', '10:00'])
-    expect(within(editor).getByText('Every 2 days at 10:00. Commits its work. Nothing is changed yet.')).toBeTruthy()
+    expect(within(editor).getByText('Every 2 days at 10:00. May commit, pushes nothing. Nothing is changed yet.')).toBeTruthy()
     fireEvent.click(within(part(editor, 'When it runs')).getByRole('radio', { name: /As the skill says/ }))
-    expect(within(editor).getByText('Every 1 day. Commits its work.')).toBeTruthy()
+    expect(within(editor).getByText('Every 1 day. May commit, pushes nothing.')).toBeTruthy()
     fireEvent.click(within(editor).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['pace', 'post-merge-cleanup', 'skill']))
     await gone('/post-merge-cleanup')
@@ -599,7 +596,7 @@ describe("the Edit panel of a skill's row", () => {
     const second = await edit('/update-tickets')
     expect(within(part(second, 'When it runs')).getByText('every 15 minutes at most, when an issue changed')).toBeTruthy()
     fireEvent.click(within(second).getByRole('radio', { name: 'Whenever there is work' }))
-    expect(within(second).getByText('When an issue changed. Commits its work.')).toBeTruthy()
+    expect(within(second).getByText('When an issue changed. May commit, pushes nothing.')).toBeTruthy()
     fireEvent.change(within(second).getByRole('combobox', { name: 'What its runs publish' }), { target: { value: 'pr' } })
     fireEvent.click(within(second).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('p1', ['publish', 'update-tickets', 'pr']))
@@ -634,7 +631,7 @@ describe("the Edit panel of a skill's row", () => {
     const { host, runCommand } = hostAnswering((projectId, args) =>
       args[0] !== 'status'
         ? { ok: true, output: { ok: true } }
-        : { ok: true, output: { ...STATUS, agents: { 'work-queue': 3 }, lastTick: { ...STATUS.lastTick, schedule: [{ command: 'post-merge-cleanup', every: '1d', agents: 2 }, STATUS.lastTick.schedule[1]] } } },
+        : { ok: true, output: { ...STATUS, agents: { 'work-queue': 3 }, schedule: [{ command: 'post-merge-cleanup', every: '1d', agents: 2 }, STATUS.schedule[1]] } },
     )
     show(host)
     await screen.findByRole('region', { name: 'gemstack' })
@@ -649,7 +646,7 @@ describe("the Edit panel of a skill's row", () => {
     expect((within(many).getByRole('radio', { name: /As the skill says/ }) as HTMLInputElement).checked).toBe(true)
     expect(within(many).getByText('up to 2 at once')).toBeTruthy()
     expect(within(many).getByText('A new one starts only when the row is due, and only while fewer than this are working on any machine that shares this repository.')).toBeTruthy()
-    expect(within(editor).getByText('Every 1 day. Up to 2 at once. Commits its work. Nothing is changed yet.')).toBeTruthy()
+    expect(within(editor).getByText('Every 1 day. Up to 2 at once. May commit, pushes nothing. Nothing is changed yet.')).toBeTruthy()
     // Picking a number starts from the skill's.
     fireEvent.click(within(many).getByRole('radio', { name: 'Up to' }))
     const count = within(many).getByLabelText('How many agents') as HTMLInputElement
@@ -663,9 +660,9 @@ describe("the Edit panel of a skill's row", () => {
     // Lowered to one where the skill lets two: the sentence says so, it does not go quiet.
     fireEvent.change(count, { target: { value: '1' } })
     expect(within(many).getByText('agent at once')).toBeTruthy()
-    expect(within(editor).getByText('Every 1 day. One at a time. Commits its work.')).toBeTruthy()
+    expect(within(editor).getByText('Every 1 day. One at a time. May commit, pushes nothing.')).toBeTruthy()
     fireEvent.change(count, { target: { value: '4' } })
-    expect(within(editor).getByText('Every 1 day. Up to 4 at once. Commits its work.')).toBeTruthy()
+    expect(within(editor).getByText('Every 1 day. Up to 4 at once. May commit, pushes nothing.')).toBeTruthy()
     fireEvent.click(within(part(editor, 'When it runs')).getByRole('radio', { name: 'Every' }))
     fireEvent.change(within(editor).getByLabelText('How many'), { target: { value: '3' } })
     fireEvent.change(within(editor).getByRole('combobox', { name: 'What its runs publish' }), { target: { value: 'pr' } })
@@ -721,12 +718,12 @@ describe("the Edit panel of a skill's row", () => {
     ])
   })
 
-  test('a project with no git host package is offered Nothing, Commit and Publish branch only', async () => {
+  test('a project with no git host package is offered no level, Commit and Publish branch only', async () => {
     const { host } = scheduler()
     show(host, [OTHER])
     await screen.findByRole('region', { name: 'other' })
     await edit('/post-merge-cleanup')
-    expect(options(screen.getByRole('combobox', { name: 'What its runs publish' }) as HTMLSelectElement)).toEqual(['Nothing', 'Commit', 'Publish branch'])
+    expect(options(screen.getByRole('combobox', { name: 'What its runs publish' }) as HTMLSelectElement)).toEqual(['As the skill says', 'Commit', 'Publish branch'])
   })
 
   test('while a panel saves it takes no more picks, no second Save and no Cancel, and Escape does not close it; it closes once what it saved has been read back', async () => {
@@ -806,7 +803,7 @@ describe('the Edit panel of a row a person made', () => {
     expect(within(panel).getByRole('button', { name: 'Remove' })).toBeTruthy()
     expect(within(panel).getByText(`Its words and its pace are in a skill file of this project, ${SHOWN.file}: a change to them is yours to commit. The rest is saved on this machine.`)).toBeTruthy()
     // Nothing to save yet.
-    expect(within(panel).getByText('Every 15 minutes at most, when someone commented. Commits its work. Nothing is changed yet.')).toBeTruthy()
+    expect(within(panel).getByText('Every 15 minutes at most, when someone commented. May commit, pushes nothing. Nothing is changed yet.')).toBeTruthy()
     expect(disabled(within(panel).getByRole('button', { name: 'Save' }))).toBe(true)
 
     fireEvent.change(within(does).getByLabelText('What the agent is told'), { target: { value: '- Answer in one line.' } })
@@ -814,7 +811,7 @@ describe('the Edit panel of a row a person made', () => {
     fireEvent.change(within(many).getByLabelText('How many agents'), { target: { value: '2' } })
     expect(within(many).getByText('agents at once')).toBeTruthy()
     fireEvent.change(within(panel).getByRole('combobox', { name: 'What its runs publish' }), { target: { value: 'pr' } })
-    expect(within(panel).getByText('Every 30 minutes at most, when someone commented. Up to 2 at once. Opens a pull request.')).toBeTruthy()
+    expect(within(panel).getByText('Every 30 minutes at most, when someone commented. Up to 2 at once. May open a pull request.')).toBeTruthy()
     const statusReads = runCommand.mock.calls.filter(([, args]) => args[0] === 'status').length
     fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
     const saved = await within(own).findByText(/It is a change to a file of yours, in this project, and nothing was committed for you\./)
@@ -827,7 +824,8 @@ describe('the Edit panel of a row a person made', () => {
     const note = editing('/answer-comments')
     expect(note.textContent).toContain(`Saved /answer-comments again, in ${SHOWN.file}.`)
     expect(saved.textContent).toContain('An agent is told the new words only once the change is on origin/main: commit it and bring it there.')
-    expect(note.textContent).toContain('Its row shows the change once the scheduler has looked, within a minute.')
+    // The row shows the change at once, so the note says nothing of when.
+    expect(note.textContent).not.toMatch(/once the scheduler/)
     expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'status').length).toBeGreaterThan(statusReads)
     // Saved: nothing is held any more, though the note is still up.
     await waitFor(() => expect(disabled(screen.getByRole('button', { name: 'Edit tidy' }))).toBe(false))
@@ -847,15 +845,17 @@ describe('the Edit panel of a row a person made', () => {
     await screen.findByRole('region', { name: 'gemstack' })
     let panel = await edit('tidy')
     expect(runCommand).toHaveBeenCalledWith('p1', ['show', 'tidy'])
+    // It follows no skill: with no level its runs do as its prompt says.
+    expect(options(within(panel).getByRole('combobox', { name: 'What its runs publish' }) as HTMLSelectElement)[0]).toBe('As the prompt says')
     expect(within(panel).getByText('Kept on this machine alone, outside git: .agent-scheduler/automations/tidy.md.')).toBeTruthy()
     // It counts this machine's runs alone.
     expect(within(panel).getByText('Counted from its last start, on this machine.')).toBeTruthy()
     expect(within(panel).getByText(/only while fewer than this are working on this machine\./)).toBeTruthy()
     expect(within(panel).queryByText(/any machine that shares this repository/)).toBeNull()
     expect(within(panel).getByText('by time alone')).toBeTruthy()
-    expect(within(panel).getByText('Every 1 day. Commits its work. Nothing is changed yet.')).toBeTruthy()
+    expect(within(panel).getByText('Every 1 day. May commit, pushes nothing. Nothing is changed yet.')).toBeTruthy()
     fireEvent.change(within(panel).getByLabelText('Time of day'), { target: { value: '10:00' } })
-    expect(within(panel).getByText('Every 1 day at 10:00. Commits its work.')).toBeTruthy()
+    expect(within(panel).getByText('Every 1 day at 10:00. May commit, pushes nothing.')).toBeTruthy()
     fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
     await gone('tidy')
     expect(saves(runCommand)).toEqual([['pace', 'tidy', '1d', '10:00']])
@@ -869,11 +869,9 @@ describe('the Edit panel of a row a person made', () => {
     fireEvent.change(within(panel).getByLabelText('What the agent is told'), { target: { value: 'Tidy up, gently!' } })
     expect(within(panel).queryByRole('alert')).toBeNull()
     fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
-    // Its file was written: the panel says so, that nothing is to commit, and when the row shows the change.
-    const said = await savedAgain('tidy')
-    expect(said).toContain('Saved tidy again, in .agent-scheduler/automations/tidy.md.')
-    expect(said).toContain('It is kept on this machine alone: nothing to commit.')
-    expect(said).toContain('Its row shows the change once the scheduler has looked, within a minute.')
+    // Nothing is left for the person to do, and the row shows the change at once: no note, the panel just closes.
+    await gone('tidy')
+    expect(screen.queryByText(/Saved tidy again/)).toBeNull()
     expect(saves(runCommand).slice(1)).toEqual([
       ['edit', 'tidy', '--prompt=Tidy up, gently.', '--every=1d', '--when=', '--waits-for='],
       ['edit', 'tidy', '--prompt=Tidy up, gently!', '--every=1d', '--when=', '--waits-for='],
@@ -895,7 +893,7 @@ describe('the Edit panel of a row a person made', () => {
     fireEvent.change(within(panel).getByLabelText('How many'), { target: { value: '2' } })
     fireEvent.change(within(panel).getByLabelText('Time of day'), { target: { value: '09:30' } })
     fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
-    await savedAgain('tidy')
+    await gone('tidy')
     expect(saves(runCommand)).toEqual([
       ['edit', 'tidy', '--prompt=Tidy up.', '--every=2d', '--when=', '--waits-for='],
       ['pace', 'tidy', '2d', '09:30'],
@@ -923,7 +921,7 @@ describe('the Edit panel of a row a person made', () => {
     expect(disabled(within(panel).getByLabelText('How many'))).toBe(true)
     expect(disabled(within(panel).getByLabelText('Unit'))).toBe(true)
     expect(within(panel).queryByText('at most, and only when the shell line prints something')).toBeNull()
-    expect(within(panel).getByText('When someone commented. Commits its work.')).toBeTruthy()
+    expect(within(panel).getByText('When someone commented. May commit, pushes nothing.')).toBeTruthy()
     const line = within(panel).getByLabelText(/A shell line that prints what is new/)
     fireEvent.change(line, { target: { value: '' } })
     expect(within(panel).getByText('Say when it runs: on a pace, by a shell line, or both.')).toBeTruthy()
@@ -949,10 +947,10 @@ describe('the Edit panel of a row a person made', () => {
     expect(within(row('tidy')).getByText('Every 1 day at 10:00')).toBeTruthy()
     const panel = await edit('tidy')
     expect([(within(panel).getByLabelText('How many') as HTMLInputElement).value, (within(panel).getByLabelText('Unit') as HTMLSelectElement).value, (within(panel).getByLabelText('Time of day') as HTMLInputElement).value]).toEqual(['1', 'd', '10:00'])
-    expect(within(panel).getByText('Every 1 day at 10:00. Commits its work. Nothing is changed yet.')).toBeTruthy()
+    expect(within(panel).getByText('Every 1 day at 10:00. May commit, pushes nothing. Nothing is changed yet.')).toBeTruthy()
     expect(disabled(within(panel).getByRole('button', { name: 'Save' }))).toBe(true)
     fireEvent.change(within(panel).getByLabelText('Time of day'), { target: { value: '' } })
-    expect(within(panel).getByText('Every 1 day. Commits its work.')).toBeTruthy()
+    expect(within(panel).getByText('Every 1 day. May commit, pushes nothing.')).toBeTruthy()
     fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
     await gone('tidy')
     // The file already says every day: only this machine's pick goes.
@@ -966,12 +964,12 @@ describe('the Edit panel of a row a person made', () => {
     const second = await edit('tidy')
     expect([(within(second).getByLabelText('How many') as HTMLInputElement).value, (within(second).getByLabelText('Unit') as HTMLSelectElement).value, (within(second).getByLabelText('Time of day') as HTMLInputElement).value]).toEqual(['2', 'd', '10:00'])
     // Opened, not changed: nothing is to save, and nothing else is held.
-    expect(within(second).getByText('Every 2 days at 10:00. Commits its work. Nothing is changed yet.')).toBeTruthy()
+    expect(within(second).getByText('Every 2 days at 10:00. May commit, pushes nothing. Nothing is changed yet.')).toBeTruthy()
     expect(disabled(within(second).getByRole('button', { name: 'Save' }))).toBe(true)
     expect(disabled(screen.getByRole('button', { name: 'Edit /work-queue' }))).toBe(false)
     fireEvent.change(within(second).getByLabelText('What the agent is told'), { target: { value: 'Tidy up, twice.' } })
     fireEvent.click(within(second).getByRole('button', { name: 'Save' }))
-    await savedAgain('tidy')
+    await gone('tidy')
     // The interval goes into the file with the words; this machine already holds it with its time.
     expect(saves(again.runCommand)).toEqual([['edit', 'tidy', '--prompt=Tidy up, twice.', '--every=2d', '--when=', '--waits-for=']])
   })
@@ -993,7 +991,8 @@ describe('the Edit panel of a row a person made', () => {
     // Its picks are this machine's, and follow how it was saved: it is no skill.
     expect((within(part(panel, 'When it runs')).getByRole('radio', { name: /As it was saved/ }) as HTMLInputElement).checked).toBe(true)
     expect((within(part(panel, 'How many at once')).getByRole('radio', { name: /As it was saved/ }) as HTMLInputElement).checked).toBe(true)
-    expect(within(panel).queryByText('As the skill says')).toBeNull()
+    // No pace and no number of a skill's to follow: the words are only the publish menu's first label.
+    expect(within(panel).queryByRole('radio', { name: /^As the skill says/ })).toBeNull()
     expect(within(panel).getByText('Saved for you, in this project, on this machine. No tracked file changes.')).toBeTruthy()
     // They can still be set.
     fireEvent.change(within(panel).getByRole('combobox', { name: 'What its runs publish' }), { target: { value: 'pr' } })
@@ -1007,7 +1006,7 @@ describe('the Edit panel of a row a person made', () => {
   })
 
   test('an automation kept on this machine whose file the tool no longer reads as its own opens without asking for it: its picks follow "As it was saved", count this machine\'s runs alone, and it has no Remove', async () => {
-    const status = { ...STATUS, lastTick: { ...STATUS.lastTick, schedule: [...STATUS.lastTick.schedule, { command: 'watch-competitor', every: '1h', description: 'Look for new threads.', onThisMachine: true }] } }
+    const status = { ...STATUS, schedule: [...STATUS.schedule, { command: 'watch-competitor', every: '1h', description: 'Look for new threads.', onThisMachine: true }] }
     const { host, runCommand } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: status } : { ok: true, output: { ok: true } }))
     show(host)
     await screen.findByRole('region', { name: 'gemstack' })
@@ -1016,7 +1015,7 @@ describe('the Edit panel of a row a person made', () => {
     const box = await edit('watch-competitor')
     expect(runCommand.mock.calls.some(([, args]) => args[0] === 'show')).toBe(false)
     expect(within(box).getAllByText('As it was saved').length).toBe(2)
-    expect(within(box).queryByText('As the skill says')).toBeNull()
+    expect(within(box).queryByRole('radio', { name: /^As the skill says/ })).toBeNull()
     expect(within(box).getByText('Counted from its last start, on this machine.')).toBeTruthy()
     expect(within(box).getByText(/only while fewer than this are working on this machine\./)).toBeTruthy()
     expect(within(box).queryByText(/any machine that shares this repository/)).toBeNull()
@@ -1037,7 +1036,7 @@ describe('the Edit panel of a row a person made', () => {
     expect(disabled(screen.getByRole('button', { name: 'Edit tidy' }))).toBe(true)
     expect(disabled(screen.getByRole('button', { name: 'New automation in gemstack' }))).toBe(true)
     // Its file is deleted in a terminal; any save on the page reads the rows again.
-    status = { ...MINE, lastTick: { ...MINE.lastTick, schedule: MINE.lastTick.schedule.filter(c => c.command !== 'answer-comments') } }
+    status = { ...MINE, schedule: MINE.schedule.filter(c => c.command !== 'answer-comments') }
     fireEvent.click(within(row('tidy')).getByRole('switch', { name: 'Run tidy by itself' }))
     await waitFor(() => expect(screen.queryByRole('listitem', { name: '/answer-comments' })).toBeNull())
     await waitFor(() => expect(disabled(screen.getByRole('button', { name: 'New automation in gemstack' }))).toBe(false))
@@ -1076,9 +1075,9 @@ describe('the Edit panel of a row a person made', () => {
   test('"Remove" is in the panel and asks first, saying what is deleted; Cancel and Escape go back to the panel with what was typed, and remove nothing; Remove runs `remove`, the row goes, and the project says what is left for the person to do until they put it away', async () => {
     let status: unknown = MINE
     const { host, runCommand } = hostAnswering((projectId, args) => {
-      if (args[0] === 'status') return { ok: true, output: projectId === 'p1' ? status : { ...STATUS, lastTick: { ...STATUS.lastTick, schedule: [] } } }
+      if (args[0] === 'status') return { ok: true, output: projectId === 'p1' ? status : { ...STATUS, schedule: [] } }
       if (args[0] === 'show') return { ok: true, output: SHOWN }
-      status = { ...MINE, lastTick: { ...MINE.lastTick, schedule: MINE.lastTick.schedule.filter(c => c.command !== args[1]) } }
+      status = { ...MINE, schedule: MINE.schedule.filter(c => c.command !== args[1]) }
       return { ok: true, output: { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', git: 'committed', startsFrom: 'origin/main' } }
     })
     show(host, [GEMSTACK, OTHER])
@@ -1155,7 +1154,7 @@ describe('the Edit panel of a row a person made', () => {
     show(host)
     await screen.findByRole('region', { name: 'gemstack' })
     const panel = await edit('tidy')
-    expect(within(panel).getByText('Every 1 day. Commits its work. Nothing is changed yet.')).toBeTruthy()
+    expect(within(panel).getByText('Every 1 day. May commit, pushes nothing. Nothing is changed yet.')).toBeTruthy()
     fireEvent.change(within(panel).getByRole('combobox', { name: 'What its runs publish' }), { target: { value: 'nothing' } })
     fireEvent.change(within(panel).getByLabelText('Time of day'), { target: { value: '10:00' } })
     expect(disabled(within(panel).getByRole('button', { name: 'Save' }))).toBe(false)
@@ -1194,7 +1193,7 @@ describe('the Edit panel of a row a person made', () => {
 
   test('a pick of "whenever there is work" left on this machine for a row whose file has only a shell line goes once the person picks a pace: it would stand in for the pace in the file', async () => {
     const watch = { command: 'watch', when: 'gh api threads', description: 'Look for new threads.', onThisMachine: true, editable: true }
-    const status = { ...STATUS, paces: { watch: { work: true } }, lastTick: { ...STATUS.lastTick, schedule: [...STATUS.lastTick.schedule, watch] } }
+    const status = { ...STATUS, paces: { watch: { work: true } }, schedule: [...STATUS.schedule, watch] }
     const shown = { ok: true, name: 'watch', prompt: 'Look for new threads.', when: 'gh api threads', file: '.agent-scheduler/automations/watch.md', onThisMachine: true }
     const { host, runCommand } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: status } : args[0] === 'show' ? { ok: true, output: shown } : { ok: true, output: { ok: true, command: 'watch', file: shown.file, startsFrom: 'HEAD', onThisMachine: true } }))
     show(host)
@@ -1203,7 +1202,7 @@ describe('the Edit panel of a row a person made', () => {
     expect((within(panel).getByRole('radio', { name: 'Whenever the shell line prints something' }) as HTMLInputElement).checked).toBe(true)
     fireEvent.click(within(panel).getByRole('radio', { name: 'Every' }))
     fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
-    await savedAgain('watch')
+    await gone('watch')
     expect(saves(runCommand)).toEqual([
       ['edit', 'watch', '--prompt=Look for new threads.', '--every=1d', '--when=gh api threads', '--waits-for='],
       ['pace', 'watch', 'skill'],
@@ -1448,7 +1447,7 @@ describe('the "New automation" form', () => {
     const panel = screen.getByRole('group', { name: 'New automation' })
     expect(panel.textContent).toContain('Saved /answer-replies as .claude/skills/answer-replies/SKILL.md.')
     expect(saved.textContent).toContain('Its row cannot start before the file is on origin/main: commit it and bring it there.')
-    expect(panel.textContent).toContain('Its row shows here once the scheduler has looked, within a minute. It starts switched off.')
+    expect(panel.textContent).toContain('Its row is in the list now, switched off.')
     expect(within(panel).queryByRole('alert')).toBeNull()
     // The rows are read again at once.
     await waitFor(() => expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'status').length).toBeGreaterThan(statusReads))
@@ -1459,7 +1458,7 @@ describe('the "New automation" form', () => {
     expect(screen.getByRole('button', { name: 'New automation in gemstack' })).toBeTruthy()
   })
 
-  test('while a save runs the form takes no more typing and no second Save, and Escape does not close it; in a project whose scheduler is not running the saved panel says the row does not show yet', async () => {
+  test('while a save runs the form takes no more typing and no second Save, and Escape does not close it; in a project whose scheduler is not running the saved panel says the same as in any other: the row is in the list', async () => {
     let answer!: (result: ModuleCommandResult) => void
     const { host, runCommand } = scheduler()
     runCommand.mockImplementation(async (_projectId: string, args: string[]) => (args[0] === 'add' ? new Promise<ModuleCommandResult>(resolve => (answer = resolve)) : { ok: true, output: args[0] === 'status' ? { ...STATUS, running: false } : { ok: true } }))
@@ -1478,7 +1477,8 @@ describe('the "New automation" form', () => {
     answer({ ok: true, output: { ok: true, command: 'daily-notes', file: '.claude/skills/daily-notes/SKILL.md', startsFrom: 'HEAD' } })
     const panel = await screen.findByText(/It is a file of yours/)
     expect(panel.textContent).toContain('Its row cannot start before you commit the file.')
-    expect(screen.getByRole('group', { name: 'New automation' }).textContent).toContain('The scheduler is not running in this project, so its row does not show yet: it shows once the scheduler runs. It starts switched off.')
+    expect(screen.getByRole('group', { name: 'New automation' }).textContent).toContain('Its row is in the list now, switched off.')
+    expect(screen.getByRole('group', { name: 'New automation' }).textContent).not.toMatch(/scheduler is not running/)
   })
 
   test('"Who gets it": shared with the project by default; "Only on this machine" saves with --private, and the saved panel says nothing is to commit and the row can start at once', async () => {
@@ -1541,5 +1541,139 @@ describe('the "New automation" form', () => {
     const panel = note.closest('[role="group"]') as HTMLElement
     expect(panel.textContent).toContain('Saved /daily-notes as .claude/skills/daily-notes/SKILL.md.')
     expect(within(panel).getByRole('alert').textContent).toBe("Its time of day was not kept: no skill of this project schedules daily-notes. Its row's Edit sets it.")
+  })
+})
+
+describe("the rows are the project's files as they stand", () => {
+  test("a new row is in the list the moment Save is pressed, also where no scheduler is running: the rows are read again from the project's files while the saved note is still open", async () => {
+    let added = false
+    const made = { command: 'answer-replies', every: '1d', description: 'Answer each new reply.', editable: true }
+    const { host } = hostAnswering((_, args) => {
+      // No scheduler runs here, and none ever looked: there is no last tick to list anything.
+      if (args[0] === 'status') return { ok: true, output: { ok: true, on: false, keepAlive: false, running: false, model: 'opus', spendOffset: 7, schedule: added ? [...STATUS.schedule, made] : STATUS.schedule, unreadable: [] } }
+      if (args[0] === 'add') added = true
+      return { ok: true, output: args[0] === 'add' ? { ok: true, command: 'answer-replies', file: '.claude/skills/answer-replies/SKILL.md', startsFrom: 'origin/main' } : { ok: true } }
+    })
+    show(host)
+    fireEvent.click(await screen.findByRole('button', { name: 'New automation in gemstack' }))
+    expect(screen.queryByRole('group', { name: 'Your automations' })).toBeNull()
+    const form = screen.getByRole('group', { name: 'New automation' })
+    fireEvent.change(within(form).getByRole('textbox', { name: 'Name' }), { target: { value: 'answer-replies' } })
+    fireEvent.change(within(form).getByLabelText('What the agent is told'), { target: { value: 'Answer each new reply.' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    const yours = await screen.findByRole('group', { name: 'Your automations' })
+    const shown = within(yours).getByRole('listitem', { name: '/answer-replies' })
+    expect(within(shown).getByText('Answer each new reply.')).toBeTruthy()
+    expect(within(shown).getByText('Off')).toBeTruthy()
+    expect(within(shown).getByRole('switch').getAttribute('aria-checked')).toBe('false')
+    // The note is still up, and says where the row is.
+    expect(screen.getByRole('group', { name: 'New automation' }).textContent).toContain('Its row is in the list now, switched off.')
+  })
+
+  test("an edited row says its new words the moment its save is over: what it does and its pace are read again from its file, with no scheduler having looked since", async () => {
+    let edited = false
+    const { host, runCommand } = hostAnswering((_, args) => {
+      if (args[0] === 'status') return { ok: true, output: edited ? { ...MINE, schedule: MINE.schedule.map(c => (c.command === 'tidy' ? { ...c, every: '2d', description: 'Tidy up, gently.' } : c)) } : MINE }
+      if (args[0] === 'show') return { ok: true, output: KEPT }
+      if (args[0] === 'edit') edited = true
+      return { ok: true, output: { ok: true, command: 'tidy', file: KEPT.file, startsFrom: 'HEAD', onThisMachine: true } }
+    })
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    expect(within(row('tidy')).getByText('Tidy up.')).toBeTruthy()
+    expect(within(row('tidy')).getByText('Every 1 day')).toBeTruthy()
+    const panel = await edit('tidy')
+    fireEvent.change(within(panel).getByLabelText('What the agent is told'), { target: { value: 'Tidy up, gently.' } })
+    fireEvent.change(within(panel).getByLabelText('How many'), { target: { value: '2' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
+    await gone('tidy')
+    expect(saves(runCommand)).toEqual([['edit', 'tidy', '--prompt=Tidy up, gently.', '--every=2d', '--when=', '--waits-for=']])
+    // The panel closed only once the rows were read back: the row already says the new words.
+    expect(within(row('tidy')).getByText('Tidy up, gently.')).toBeTruthy()
+    expect(within(row('tidy')).getByText('Every 2 days')).toBeTruthy()
+    expect(within(row('tidy')).queryByText('Tidy up.')).toBeNull()
+  })
+
+  test('a read of the scheduler that fails for a moment keeps the rows as they were last read, under the line that says why: a panel open in one of them stays, with what was typed; the next read that goes through takes the line away', async () => {
+    let failing = false
+    const { host, runCommand } = hostAnswering((_, args) => (args[0] === 'status' ? (failing ? { ok: false, error: 'the state file could not be read' } : { ok: true, output: MINE }) : args[0] === 'show' ? { ok: true, output: KEPT } : { ok: true, output: { ok: true } }))
+    show(host)
+    const gemstack = await screen.findByRole('region', { name: 'gemstack' })
+    const panel = await edit('tidy')
+    fireEvent.change(within(panel).getByLabelText('What the agent is told'), { target: { value: 'Tidy up, and say what moved.' } })
+    // A save of another row reads the rows again, and that read fails.
+    failing = true
+    fireEvent.click(within(row('/work-queue')).getByRole('switch'))
+    expect((await within(gemstack).findByRole('alert')).textContent).toBe('The scheduler could not be read: the state file could not be read')
+    expect(within(gemstack).getByText('Scheduler not readable')).toBeTruthy()
+    expect(runCommand).toHaveBeenCalledWith('p1', ['switch', 'work-queue', 'on'])
+    // The rows stay, in their groups, and so does the panel with what was typed in it.
+    expect(within(screen.getByRole('group', { name: 'Your automations' })).getByRole('listitem', { name: 'tidy' })).toBeTruthy()
+    expect(within(screen.getByRole('group', { name: "From the project's skills" })).getByRole('listitem', { name: '/work-queue' })).toBeTruthy()
+    expect((within(editing('tidy')).getByLabelText('What the agent is told') as HTMLTextAreaElement).value).toBe('Tidy up, and say what moved.')
+    expect(disabled(within(editing('tidy')).getByRole('button', { name: 'Save' }))).toBe(false)
+    // Read again, and it goes through: the line goes, and nothing typed went with it.
+    failing = false
+    fireEvent.click(within(row('/post-merge-cleanup')).getByRole('switch'))
+    await waitFor(() => expect(within(gemstack).queryByRole('alert')).toBeNull())
+    expect(within(gemstack).getByText('Scheduler on')).toBeTruthy()
+    expect((within(editing('tidy')).getByLabelText('What the agent is told') as HTMLTextAreaElement).value).toBe('Tidy up, and say what moved.')
+  })
+})
+
+describe('a save held against what the panel opened', () => {
+  /** What `show` answers for the shared automation, with the tool's name for what its file says. */
+  const VERSIONED = { ...SHOWN, version: 'v1' }
+  const written = (version: string): ModuleCommandResult => ({ ok: true, output: { ok: true, command: 'answer-comments', file: SHOWN.file, startsFrom: 'origin/main', version } })
+  const versioned = (saved: (args: string[]) => ModuleCommandResult) => hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: MINE } : args[0] === 'show' ? { ok: true, output: VERSIONED } : saved(args)))
+
+  test("Save says which version of the file the panel opened, last on the line, so a change made to the file by hand since is not written over; the refusal is said like any other, and the panel stays open with what was typed", async () => {
+    const refusal = '.claude/skills/answer-comments/SKILL.md was changed since it was opened here: open it again to see what it says now'
+    const { host, runCommand } = versioned(() => ({ ok: false, error: refusal }))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    const panel = await edit('/answer-comments')
+    fireEvent.change(within(panel).getByLabelText('What the agent is told'), { target: { value: 'Answer in one line.' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
+    expect((await within(panel).findByRole('alert')).textContent).toBe(`It was not saved: ${refusal}`)
+    expect(saves(runCommand)).toEqual([['edit', 'answer-comments', '--prompt=Answer in one line.', '--every=15m', '--when=gh api comments', '--waits-for=when someone commented', '--was=v1']])
+    expect(editing('/answer-comments')).toBeTruthy()
+    expect((within(panel).getByLabelText('What the agent is told') as HTMLTextAreaElement).value).toBe('Answer in one line.')
+    // Nothing was written, so nothing is said of a file to commit.
+    expect(within(panel).getByRole('alert').textContent).not.toMatch(/are saved/)
+  })
+
+  test("a panel that saved its file once holds the next save against the version that save wrote, not the one it opened: its own save is no change made by hand", async () => {
+    const answers: ModuleCommandResult[] = [written('v2'), { ok: false, error: 'the state could not be written' }, written('v3'), { ok: true, output: { ok: true } }]
+    const { host, runCommand } = versioned(() => answers.shift()!)
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    const panel = await edit('/answer-comments')
+    fireEvent.change(within(panel).getByLabelText('How many'), { target: { value: '2' } })
+    fireEvent.change(within(panel).getByLabelText('Unit'), { target: { value: 'd' } })
+    fireEvent.change(within(panel).getByLabelText('Time of day'), { target: { value: '10:00' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
+    await within(panel).findByRole('alert')
+    // The file is written, the time of day is not: the person changes the words once more and saves again.
+    fireEvent.change(within(panel).getByLabelText('What the agent is told'), { target: { value: 'Answer in one line.' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
+    await savedAgain('/answer-comments')
+    expect(saves(runCommand)).toEqual([
+      ['edit', 'answer-comments', '--prompt=Answer each new comment below.', '--every=2d', '--when=gh api comments', '--waits-for=when someone commented', '--was=v1'],
+      ['pace', 'answer-comments', '2d', '10:00'],
+      ['edit', 'answer-comments', '--prompt=Answer in one line.', '--every=2d', '--when=gh api comments', '--waits-for=when someone commented', '--was=v2'],
+      ['pace', 'answer-comments', '2d', '10:00'],
+    ])
+  })
+
+  test('an answer of `show` that names no version saves as before, held against nothing', async () => {
+    const { host, runCommand } = mine(() => written('v2'))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    const panel = await edit('/answer-comments')
+    fireEvent.change(within(panel).getByLabelText('What the agent is told'), { target: { value: 'Answer in one line.' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
+    await savedAgain('/answer-comments')
+    expect(saves(runCommand)).toEqual([['edit', 'answer-comments', '--prompt=Answer in one line.', '--every=15m', '--when=gh api comments', '--waits-for=when someone commented']])
   })
 })

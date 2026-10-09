@@ -225,11 +225,12 @@ test("the automations a person keeps on this machine are read after the skills, 
     await mkdir(join(own, 'a-folder.md'))
     await symlink('nowhere.md', join(own, 'dangling.md'))
     const schedule = await readSchedule(repo)
+    // Two of them read as the tool writes one, their description a line behind, and are marked as the tool's to save again; the one whose check is written another way is not.
     assert.deepEqual(schedule.commands, [
       { name: 'update-tickets', every: { count: 15, unit: 'm', ms: 900_000, text: '15m' }, cap: 1, dir: '.claude/skills' },
       { name: 'answer-comments', when: 'gh api comments', waitsFor: 'when someone commented', cap: 1, dir: '.agent-scheduler/automations', description: 'What it does.', text: 'Do the job.' },
-      { name: 'longest', every: { count: 1, unit: 'h', ms: 3_600_000, text: '1h' }, cap: 1, dir: '.agent-scheduler/automations', description: 'What it does.', text: 'x'.repeat(32_000) },
-      { name: 'watch-competitor', every: { count: 1, unit: 'h', ms: 3_600_000, text: '1h' }, cap: 1, dir: '.agent-scheduler/automations', description: 'What it does.', text: '/look for threads.\n\n---\n- Tell me.' },
+      { name: 'longest', every: { count: 1, unit: 'h', ms: 3_600_000, text: '1h' }, cap: 1, dir: '.agent-scheduler/automations', description: 'What it does.', text: 'x'.repeat(32_000), editable: true },
+      { name: 'watch-competitor', every: { count: 1, unit: 'h', ms: 3_600_000, text: '1h' }, cap: 1, dir: '.agent-scheduler/automations', description: 'What it does.', text: '/look for threads.\n\n---\n- Tell me.', editable: true },
     ])
     assert.deepEqual(schedule.unreadable, [
       { skill: 'Loud Name', reason: 'its file is named with something other than lower-case letters, digits and dashes', own: true },

@@ -41,6 +41,8 @@ export interface ListedCommand {
   agents?: number
   /** Whether the command is an automation a person keeps on this machine alone, not a skill of the project. */
   onThisMachine?: true
+  /** Whether the command is a person's own automation as the tool wrote it: `show`, `edit` and `remove` take it. */
+  editable?: true
 }
 
 /** One tick as the state remembers it. */
@@ -143,6 +145,18 @@ export function withoutCommand(state: State, command: string): State {
     else delete rest[key]
   }
   return rest
+}
+
+/**
+ * The state with a command off the last tick's record: the schedule it read and what it decided.
+ * For a command removed since that tick, so whoever lists the record's commands, a dashboard,
+ * stops listing it at once and not a tick later. The state itself is answered when the record
+ * names no such command.
+ */
+export function withoutListed(state: State, command: string): State {
+  const tick = state.lastTick
+  if (!tick || !(tick.schedule.some(c => c.command === command) || tick.decisions.some(d => d.command === command))) return state
+  return { ...state, lastTick: { ...tick, schedule: tick.schedule.filter(c => c.command !== command), decisions: tick.decisions.filter(d => d.command !== command) } }
 }
 
 /**

@@ -3,11 +3,12 @@ import { test } from 'node:test'
 import { mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { addAutomation, automationProblem, automationSkill, tryCheck, type NewAutomation } from './automation.js'
+import { addAutomation, automationProblem, editAutomation, removeAutomation, savedAutomation, tryCheck } from './automation.js'
+import { automationOf, automationSkill, type NewAutomation } from './automation-file.js'
 import { FOUND_MAX, MAX_NAME, TRY_TIMEOUT_MS } from './names.js'
 import { readSchedule, skillSchedule } from './schedule.js'
 import { runCheck } from './tick.js'
-import { RETRIED_RM, git, removeRepo, testRepo } from './test-repo.js'
+import { RETRIED_RM, git, removeRepo, testRepo, writeSkill } from './test-repo.js'
 
 // A person's own automation: the skill file it becomes, what is refused, the file written into the project, and a check tried once.
 
@@ -73,6 +74,8 @@ test('whatever a person types changes no other key of the file, and reads the sa
       assert.equal(read.when, automation.when?.trim(), JSON.stringify(automation))
       assert.equal(read.waitsFor, 'waitsFor' in automation ? automation.waitsFor?.trim() : undefined, JSON.stringify(automation))
       assert.ok(file.endsWith(`\n---\n\n${automation.prompt.trim()}\n`), 'the prompt as typed')
+      const back = automationOf('x', file)
+      assert.equal(back && automationSkill(back), file, `the file reads back as the automation it was written from: ${JSON.stringify(automation)}`)
     }
   }
   // Three dashes in the prompt's first line: the description holds them as an escape, and the agent's text still has them.
@@ -191,6 +194,224 @@ test('kept on this machine alone, an automation is one file in the tool\'s own f
     assert.deepEqual((await readdir(join(repo, '.agent-scheduler', 'automations'))).sort(), ['Loud.md', 'answer-comments.md'])
   } finally {
     await removeRepo(repo)
+  }
+})
+
+test('an automation saved from here is found again, shared or kept on this machine, by what the schedule says of it; a skill of the project, a file changed by hand into something the tool does not write, and a name the schedule does not list are left alone, each with why', async () => {
+  const repo = await testRepo()
+  try {
+    await addAutomation(repo, ANSWER, git)
+    await addAutomation(repo, { name: 'tidy', prompt: 'Tidy up.', every: '1d' }, git, { onThisMachine: true })
+    assert.deepEqual(await savedAutomation(repo, 'answer-comments'), { automation: { ...ANSWER, prompt: 'Answer: each new comment below.\n\nBe short.' }, file: '.claude/skills/answer-comments/SKILL.md' })
+    assert.deepEqual(await savedAutomation(repo, 'tidy'), { automation: { name: 'tidy', prompt: 'Tidy up.', every: '1d' }, file: '.agent-scheduler/automations/tidy.md', onThisMachine: true })
+    assert.deepEqual((await readSchedule(repo)).commands.map(c => [c.name, c.editable]), [['answer-comments', true], ['tidy', true]], 'and the schedule marks both')
+
+    /** Why a name is left alone; and the schedule, the one place that says what is the tool's, must not mark it. */
+    const left = async (name: string): Promise<string> => {
+      const found = await savedAutomation(repo, name)
+      assert.equal((await readSchedule(repo)).commands.some(c => c.name === name && c.editable), false, `the schedule marks ${name}`)
+      return 'reason' in found ? found.detail : assert.fail(`${name} was taken for an automation`)
+    }
+    const SKILL = 'is a skill of the project, or an automation changed by hand since it was saved: edit or remove its files yourself'
+    // The project's own skill, with no schedule: the schedule does not list it.
+    assert.equal(await left('work-queue'), 'the schedule lists nothing named work-queue')
+    // A skill that schedules itself, in a file a person wrote.
+    await writeSkill(repo, 'triage', 'disable-model-invocation: true\nschedule:\n  every: 6h\n')
+    assert.equal(await left('triage'), `.claude/skills/triage ${SKILL}`)
+    // A file as the tool writes one, alone in its folder, is one, also with what a file manager leaves beside it.
+    const text = automationSkill({ name: 'with-script', prompt: 'Run it.', every: '1d' })
+    await mkdir(join(repo, '.claude', 'skills', 'with-script'))
+    await writeFile(join(repo, '.claude', 'skills', 'with-script', 'SKILL.md'), text)
+    assert.equal('reason' in (await savedAutomation(repo, 'with-script')), false, 'alone in its folder, it is one')
+    await writeFile(join(repo, '.claude', 'skills', 'with-script', '.DS_Store'), 'x')
+    assert.equal('reason' in (await savedAutomation(repo, 'with-script')), false, 'a .DS_Store beside it changes nothing')
+    // With a script beside it, in a folder that is a link, or as a link itself: a skill, not an automation.
+    await writeFile(join(repo, '.claude', 'skills', 'with-script', 'run.sh'), 'true\n')
+    assert.equal(await left('with-script'), `.claude/skills/with-script ${SKILL}`)
+    await mkdir(join(repo, 'elsewhere', 'linked'), { recursive: true })
+    await writeFile(join(repo, 'elsewhere', 'linked', 'SKILL.md'), automationSkill({ name: 'linked', prompt: 'Run it.', every: '1d' }))
+    await symlink('../../elsewhere/linked', join(repo, '.claude', 'skills', 'linked'))
+    assert.equal(await left('linked'), `.claude/skills/linked ${SKILL}`)
+    await mkdir(join(repo, '.claude', 'skills', 'file-linked'))
+    await writeFile(join(repo, 'elsewhere', 'file-linked.md'), automationSkill({ name: 'file-linked', prompt: 'Run it.', every: '1d' }))
+    await symlink('../../../elsewhere/file-linked.md', join(repo, '.claude', 'skills', 'file-linked', 'SKILL.md'))
+    assert.equal(await left('file-linked'), `.claude/skills/file-linked ${SKILL}`)
+    // A skill only in the folder the coding agent of scheduled runs does not read.
+    await mkdir(join(repo, '.agents', 'skills', 'plan'), { recursive: true })
+    await writeFile(join(repo, '.agents', 'skills', 'plan', 'SKILL.md'), automationSkill({ name: 'plan', prompt: 'Plan.', every: '1d' }))
+    assert.equal(await left('plan'), `.agents/skills/plan ${SKILL}`)
+    // One kept on this machine whose file is a link: writing it would reach a file kept somewhere else.
+    await writeFile(join(repo, 'elsewhere', 'kept.md'), automationSkill({ name: 'kept-link', prompt: 'Run it.', every: '1d' }))
+    await symlink('../../elsewhere/kept.md', join(repo, '.agent-scheduler', 'automations', 'kept-link.md'))
+    assert.equal(await left('kept-link'), '.agent-scheduler/automations/kept-link.md is a link, or was changed by hand since it was saved: edit or remove the file itself')
+
+    // A prompt changed in the file by hand, its first line too, is still an automation: its description, a line behind, is written anew with the next save.
+    const kept = join(repo, '.agent-scheduler', 'automations', 'tidy.md')
+    const shared = join(repo, '.claude', 'skills', 'answer-comments', 'SKILL.md')
+    await writeFile(shared, (await readFile(shared, 'utf8')).replace('\nAnswer: each new comment below.\n', '\nAnswer the newest comment only.\n'))
+    assert.deepEqual(await savedAutomation(repo, 'answer-comments'), { automation: { ...ANSWER, prompt: 'Answer the newest comment only.\n\nBe short.' }, file: '.claude/skills/answer-comments/SKILL.md' })
+    // Anything the tool does not write, one more key, and it is the person's file to edit.
+    await writeFile(shared, (await readFile(shared, 'utf8')).replace('schedule:\n', 'schedule:\n  agents: 3\n'))
+    assert.equal(await left('answer-comments'), `.claude/skills/answer-comments ${SKILL}`)
+    // So is a description a person wrote their own way, or none: saving again would write over a person's words.
+    for (const theirs of ['description: My own words.\n', 'description: "Tidy up." # mine\n', '']) {
+      await writeFile(kept, automationSkill({ name: 'tidy', prompt: 'Tidy up.', every: '1d' }).replace('description: "Tidy up."\n', theirs))
+      assert.equal(await left('tidy'), '.agent-scheduler/automations/tidy.md is a link, or was changed by hand since it was saved: edit or remove the file itself', theirs)
+    }
+    assert.deepEqual((await readSchedule(repo)).commands.filter(c => c.name === 'answer-comments' || c.name === 'tidy').map(c => c.name), ['answer-comments', 'tidy'], 'both are still listed')
+
+    // One name, a skill and an automation kept here: the schedule lists neither, and says so in its own words.
+    await writeFile(join(repo, '.agent-scheduler', 'automations', 'work-queue.md'), automationSkill({ name: 'work-queue', prompt: 'Mine.', every: '1d' }))
+    assert.equal(await left('work-queue'), 'the automation work-queue, kept on this machine, is not listed: a skill of the project has this name too: rename or remove .agent-scheduler/automations/work-queue.md, then switch on what you want')
+    // A folder of that name with no skill in it is no skill: the automation is listed, and found.
+    await mkdir(join(repo, '.claude', 'skills', 'notes'))
+    await writeFile(join(repo, '.agent-scheduler', 'automations', 'notes.md'), automationSkill({ name: 'notes', prompt: 'Write notes.', every: '1d' }))
+    assert.equal('reason' in (await savedAutomation(repo, 'notes')), false)
+    assert.equal((await readSchedule(repo)).commands.find(c => c.name === 'notes')?.editable, true)
+    // A skill whose schedule cannot be read, nothing of that name, and a name that is a path.
+    await writeSkill(repo, 'broken', 'schedule:\n  every: often\n')
+    assert.equal(await left('broken'), 'the schedule of broken cannot be read: every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)')
+    assert.equal(await left('never-saved'), 'the schedule lists nothing named never-saved')
+    assert.equal(await left('../../README'), 'the schedule lists nothing named ../../README')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('editing saves an automation again under its name, where it is: what is given takes the place of what the file said, what is left out stays, and what is taken out goes; a shared one is a change to commit; what is no automation, and what could not be saved new, is refused and the file stays', async () => {
+  const repo = await testRepo()
+  try {
+    await addAutomation(repo, ANSWER, git)
+    await git(['add', '-A'], repo)
+    await git(['commit', '-q', '-m', 'an automation'], repo)
+    const shared = join(repo, '.claude', 'skills', 'answer-comments', 'SKILL.md')
+    const waitsFor = 'when someone commented: at last'
+    // The prompt alone: the pace, the check and its plain words stay.
+    assert.deepEqual(await editAutomation(repo, 'answer-comments', { prompt: 'Answer each new comment, in one line.' }, git), { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', startsFrom: 'origin/main' })
+    assert.equal(await readFile(shared, 'utf8'), automationSkill({ name: 'answer-comments', prompt: 'Answer each new comment, in one line.', every: '15m', when: CHECK, waitsFor }))
+    assert.equal((await git(['status', '--porcelain'], repo)).trim(), 'M .claude/skills/answer-comments/SKILL.md', 'a change of the person\'s to commit: nothing is committed for them')
+    // The pace alone, then the pace taken out: the check stays, and is then all that says when.
+    assert.equal((await editAutomation(repo, 'answer-comments', { every: '1h' }, git)).ok, true)
+    assert.equal(await readFile(shared, 'utf8'), automationSkill({ name: 'answer-comments', prompt: 'Answer each new comment, in one line.', every: '1h', when: CHECK, waitsFor }))
+    assert.equal((await editAutomation(repo, 'answer-comments', { every: null }, git)).ok, true)
+    assert.equal(await readFile(shared, 'utf8'), automationSkill({ name: 'answer-comments', prompt: 'Answer each new comment, in one line.', when: CHECK, waitsFor }))
+    // The check taken out with nothing else to say when: refused, and the file stays.
+    assert.deepEqual(await editAutomation(repo, 'answer-comments', { when: null }, git), { ok: false, reason: 'bad-schedule', detail: 'neither every nor when says when' })
+    assert.equal(await readFile(shared, 'utf8'), automationSkill({ name: 'answer-comments', prompt: 'Answer each new comment, in one line.', when: CHECK, waitsFor }))
+    // The check taken out for a pace: what it waited for goes with it, unless that is given, which no file can hold.
+    assert.deepEqual(await editAutomation(repo, 'answer-comments', { when: null, every: '1d', waitsFor: 'when it rains' }, git), { ok: false, reason: 'bad-schedule', detail: 'waits-for says what when waits for, and there is no when' })
+    assert.equal((await editAutomation(repo, 'answer-comments', { when: null, every: '1d' }, git)).ok, true)
+    assert.equal(await readFile(shared, 'utf8'), automationSkill({ name: 'answer-comments', prompt: 'Answer each new comment, in one line.', every: '1d' }))
+    // A check given again, and its plain words changed and taken out on their own.
+    assert.equal((await editAutomation(repo, 'answer-comments', { when: 'gh api comments', waitsFor: 'when someone commented' }, git)).ok, true)
+    assert.equal((await editAutomation(repo, 'answer-comments', { waitsFor: null }, git)).ok, true)
+    assert.equal(await readFile(shared, 'utf8'), automationSkill({ name: 'answer-comments', prompt: 'Answer each new comment, in one line.', every: '1d', when: 'gh api comments' }))
+    assert.deepEqual((await readSchedule(repo)).commands.map(c => [c.name, c.every?.text, c.when, c.description, c.editable]), [['answer-comments', '1d', 'gh api comments', 'Answer each new comment, in one line.', true]])
+    // A prompt whose first line was changed in the file by hand: saved again, its description follows it.
+    await writeFile(shared, (await readFile(shared, 'utf8')).replace('\nAnswer each new comment, in one line.\n', '\nAnswer the newest comment only.\n'))
+    assert.equal((await editAutomation(repo, 'answer-comments', { every: '2d' }, git)).ok, true)
+    assert.equal(await readFile(shared, 'utf8'), automationSkill({ name: 'answer-comments', prompt: 'Answer the newest comment only.', every: '2d', when: 'gh api comments' }))
+
+    // Kept on this machine: the same, and git sees nothing.
+    await addAutomation(repo, { name: 'tidy', prompt: 'Tidy up.', every: '1d' }, git, { onThisMachine: true })
+    await git(['checkout', '-q', '--', '.'], repo)
+    assert.deepEqual(await editAutomation(repo, 'tidy', { prompt: 'Tidy up, gently.', every: '2d' }, git), { ok: true, command: 'tidy', file: '.agent-scheduler/automations/tidy.md', startsFrom: 'origin/main', onThisMachine: true })
+    assert.equal((await git(['status', '--porcelain'], repo)).trim(), '')
+    assert.deepEqual((await readSchedule(repo)).commands.filter(c => c.name === 'tidy').map(c => [c.every?.text, c.text]), [['2d', 'Tidy up, gently.']])
+
+    // What is no automation saved from here is not written.
+    await writeSkill(repo, 'triage', 'disable-model-invocation: true\nschedule:\n  every: 6h\n')
+    const triage = await readFile(join(repo, '.claude', 'skills', 'triage', 'SKILL.md'), 'utf8')
+    assert.deepEqual(await editAutomation(repo, 'triage', { prompt: 'Mine now.' }, git), { ok: false, reason: 'not-an-automation', detail: '.claude/skills/triage is a skill of the project, or an automation changed by hand since it was saved: edit or remove its files yourself' })
+    assert.equal(await readFile(join(repo, '.claude', 'skills', 'triage', 'SKILL.md'), 'utf8'), triage)
+    assert.deepEqual(await editAutomation(repo, 'never-saved', { prompt: 'p' }, git), { ok: false, reason: 'not-an-automation', detail: 'the schedule lists nothing named never-saved' })
+    // What could not be saved new cannot be saved again, and the file stays as it was.
+    assert.deepEqual(await editAutomation(repo, 'tidy', { prompt: '  ' }, git), { ok: false, reason: 'no-prompt' })
+    assert.deepEqual(await editAutomation(repo, 'tidy', { every: 'often' }, git), { ok: false, reason: 'bad-schedule', detail: 'every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)' })
+    assert.deepEqual(await editAutomation(repo, 'tidy', { prompt: 'x'.repeat(32_001) }, git), { ok: false, reason: 'long-prompt', detail: 'the prompt is 32001 characters, and one kept on this machine has 32000 at most' })
+    assert.equal((await editAutomation(repo, 'answer-comments', { prompt: 'x'.repeat(32_001) }, git)).ok, true, 'a shared one is a skill\'s text and has no such limit')
+    // A write that fails midway, half the text on a full disk: the automation is as it was, and nothing is left beside it.
+    const cut = async (path: Parameters<typeof writeFile>[0], text: Parameters<typeof writeFile>[1]): Promise<void> => {
+      await writeFile(path, String(text).slice(0, 20))
+      throw new Error('ENOSPC: no space left on device')
+    }
+    await assert.rejects(editAutomation(repo, 'tidy', { prompt: 'Lost?' }, git, { write: cut }), /ENOSPC/)
+    assert.deepEqual((await readSchedule(repo)).commands.filter(c => c.name === 'tidy').map(c => [c.every?.text, c.text, c.editable]), [['2d', 'Tidy up, gently.', true]])
+    assert.deepEqual(await readdir(join(repo, '.agent-scheduler', 'automations')), ['tidy.md'])
+    await assert.rejects(editAutomation(repo, 'answer-comments', { prompt: 'Lost?' }, git, { write: cut }), /ENOSPC/)
+    assert.deepEqual(await readdir(join(repo, '.claude', 'skills', 'answer-comments')), ['SKILL.md'])
+    assert.equal((await savedAutomation(repo, 'answer-comments') as { automation: NewAutomation }).automation.prompt, 'x'.repeat(32_001))
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('removing deletes an automation\'s file and the folder that held it alone, commits nothing and changes nothing git holds, and says what git still holds of that one file: nothing, a staged file, or a committed one; what is no automation is left where it is', async () => {
+  const repo = await testRepo()
+  try {
+    // Never committed, while another file of the project is changed: git holds nothing of this one, and it is gone for good.
+    await writeFile(join(repo, 'README.md'), '# changed\n')
+    await addAutomation(repo, ANSWER, git)
+    assert.deepEqual(await removeAutomation(repo, 'answer-comments', git), { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', git: 'nothing', startsFrom: 'origin/main' })
+    assert.deepEqual(await readdir(join(repo, '.claude', 'skills')), ['work-queue'])
+    assert.equal((await git(['status', '--porcelain'], repo)).trim(), 'M README.md')
+    // Staged and never committed: git still holds the staged file, and a commit made now would add it.
+    await addAutomation(repo, ANSWER, git)
+    await git(['add', '.claude'], repo)
+    assert.deepEqual(await removeAutomation(repo, 'answer-comments', git), { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', git: 'staged', startsFrom: 'origin/main' })
+    assert.equal((await git(['status', '--porcelain', '--', '.claude'], repo)).trim(), 'AD .claude/skills/answer-comments/SKILL.md', 'the index is the person\'s: left as it was')
+    await git(['rm', '-q', '--cached', '.claude/skills/answer-comments/SKILL.md'], repo)
+    // Committed, with what a file manager left beside it: the deletion is a change of the person's, and the folder goes.
+    await addAutomation(repo, ANSWER, git)
+    await git(['add', '.claude'], repo)
+    await git(['commit', '-q', '-m', 'an automation'], repo)
+    await writeFile(join(repo, '.claude', 'skills', 'answer-comments', '.DS_Store'), 'x')
+    assert.deepEqual(await removeAutomation(repo, 'answer-comments', git), { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', git: 'committed', startsFrom: 'origin/main' })
+    assert.equal((await git(['status', '--porcelain', '--', '.claude'], repo)).trim(), 'D .claude/skills/answer-comments/SKILL.md')
+    assert.deepEqual(await readdir(join(repo, '.claude', 'skills')), ['work-queue'], 'the folder is gone, so the name is free')
+    assert.deepEqual((await readSchedule(repo)).commands, [], 'and the schedule lists it no more')
+    assert.deepEqual(await removeAutomation(repo, 'answer-comments', git), { ok: false, reason: 'not-an-automation', detail: 'the schedule lists nothing named answer-comments' }, 'twice: nothing is there')
+
+    // Kept on this machine: the file goes, and the folder with the last one.
+    await addAutomation(repo, { name: 'tidy', prompt: 'Tidy up.', every: '1d' }, git, { onThisMachine: true })
+    await addAutomation(repo, { name: 'notes', prompt: 'Write notes.', every: '1d' }, git, { onThisMachine: true })
+    assert.deepEqual(await removeAutomation(repo, 'tidy', git), { ok: true, command: 'tidy', file: '.agent-scheduler/automations/tidy.md', onThisMachine: true })
+    assert.deepEqual(await readdir(join(repo, '.agent-scheduler', 'automations')), ['notes.md'])
+    assert.equal((await removeAutomation(repo, 'notes', git)).ok, true)
+    assert.deepEqual(await readdir(join(repo, '.agent-scheduler')), [], 'the folder made for the first one is not left empty')
+
+    // What is no automation saved from here stays where it is.
+    await writeSkill(repo, 'triage', 'disable-model-invocation: true\nschedule:\n  every: 6h\n')
+    assert.deepEqual(await removeAutomation(repo, 'triage', git), { ok: false, reason: 'not-an-automation', detail: '.claude/skills/triage is a skill of the project, or an automation changed by hand since it was saved: edit or remove its files yourself' })
+    assert.deepEqual(await readdir(join(repo, '.claude', 'skills', 'triage')), ['SKILL.md'])
+    // Git cannot be asked: the file is deleted all the same, and the answer says what git holds is not known.
+    await addAutomation(repo, ANSWER, git)
+    const deaf: typeof git = async (args, cwd) => (args[0] === 'status' ? Promise.reject(new Error('git: not found')) : git(args, cwd))
+    assert.deepEqual(await removeAutomation(repo, 'answer-comments', deaf), { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', git: 'unknown', startsFrom: 'origin/main' })
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a project whose skills folder is a link to another one: a shared automation is found, saved again and removed through the link, and git is asked about the file where it really is', async () => {
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'agent-scheduler-automation-')))
+  try {
+    await git(['init', '-q', '-b', 'main'], repo)
+    await git(['config', 'user.email', 'tester@example.com'], repo)
+    await git(['config', 'user.name', 'tester'], repo)
+    await mkdir(join(repo, '.agents', 'skills'), { recursive: true })
+    await mkdir(join(repo, '.claude'))
+    await symlink('../.agents/skills', join(repo, '.claude', 'skills'))
+    assert.equal((await addAutomation(repo, { name: 'daily', prompt: 'Tidy up.', every: '1d' }, git)).ok, true)
+    await git(['add', '-A'], repo)
+    await git(['commit', '-q', '-m', 'an automation'], repo)
+    assert.deepEqual((await readSchedule(repo)).commands.map(c => [c.name, c.editable]), [['daily', true]])
+    assert.equal((await editAutomation(repo, 'daily', { prompt: 'Tidy more.' }, git)).ok, true)
+    assert.equal(await readFile(join(repo, '.agents', 'skills', 'daily', 'SKILL.md'), 'utf8'), automationSkill({ name: 'daily', prompt: 'Tidy more.', every: '1d' }))
+    assert.deepEqual(await removeAutomation(repo, 'daily', git), { ok: true, command: 'daily', file: '.claude/skills/daily/SKILL.md', git: 'committed', startsFrom: 'HEAD' })
+    assert.equal((await git(['status', '--porcelain'], repo)).trim(), 'D .agents/skills/daily/SKILL.md')
+  } finally {
+    await rm(repo, RETRIED_RM)
   }
 })
 

@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Checkbox, Tooltip, TooltipContent, TooltipTrigger, cn, formatAge, formatDateTime, useModuleHost, usePolled, type ModulePageProps, type ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick } from '../src/state.js'
 import { MAX_AGENTS } from '../src/names.js'
 import { MAX_COUNT, PACE_UNITS, parseInterval, takesTimeOfDay, type PaceUnit } from '../src/pace.js'
-import { NewAutomation } from './NewAutomation.js'
+import { AutomationForm } from './AutomationForm.js'
+import { openedAutomation, removeWarning, removedWords, type OpenedAutomation } from './automation-form.js'
 import { PUBLISH_LABELS, UNIT_WORDS, rowTitle, unlistedWords, agentsArgs, agentsDraftOf, atOnce, atOnceWords, decided, saysAtOnce, draftOf, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, schedulerStatus, withAgentsDraft, withDraft, type AgentsDraft, type PaceDraft, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
 
 // The Automations page: what starts by itself while nobody is at the keyboard. One group per
@@ -15,7 +16,11 @@ import { PUBLISH_LABELS, UNIT_WORDS, rowTitle, unlistedWords, agentsArgs, agents
 // skill says, whenever there is work, or every so many minutes, hours, days, weeks or months, with
 // a time of day for days or more), how many agents may work on it at once, and how far its runs
 // publish; one row is open at a time. "New automation", beside a project's name, opens a form for a
-// prompt of the person's own, saved as a command of the project (`NewAutomation.tsx`). The rest is this machine's, read with
+// prompt of the person's own, saved as a command of the project (`AutomationForm.tsx`). A row made
+// that way, while its file still reads as it was saved, has two more buttons: "Edit prompt" opens
+// the same form in the row, filled in from the file (`agent-scheduler show`), to save it again under
+// its name; "Remove" asks once in the row, then deletes the file (`agent-scheduler remove`). The rows
+// that come from the project's skills have neither. The rest is this machine's, read with
 // `agent-scheduler status` and saved with `switch`, `pace`, `agents` and `publish`: no tracked file
 // changes. A command is off until its switch is flipped here, runs at its skill's pace and with its
 // skill's number of agents until others are picked here, and commits its work until a level is
@@ -42,8 +47,21 @@ export function AutomationsPage({ projects }: ModulePageProps) {
     openId.current = next?.id
     setEditing(next)
   }
-  /** The project whose "New automation" form is open; one at a time. */
-  const [adding, setAdding] = useState<string | undefined>()
+  /** The automation form that is open, one at a time: in a project, for a new automation, or in a row, for the automation it was opened from. */
+  const [form, setForm] = useState<{ project: string; row?: string; opened?: OpenedAutomation } | undefined>()
+  /** The row that asks whether its automation is to be removed. */
+  const [removing, setRemoving] = useState<string | undefined>()
+  /** What the last removal did and what is left for the person to do, under the project it was in, until they put it away. */
+  const [removed, setRemoved] = useState<{ project: string; text: string } | undefined>()
+  // A form, or a question, whose project or row is no longer listed is closed: its row was removed
+  // elsewhere, or another project was picked. Left open it would show nowhere, and keep every
+  // button that opens a form hidden.
+  useEffect(() => {
+    if (!loaded) return
+    const listed = (id: string): boolean => rows.some(row => row.commands.some(c => `${row.project.id}/${c.command}` === id))
+    if (form && !(form.row === undefined ? rows.some(row => row.project.id === form.project) : listed(form.row))) setForm(undefined)
+    if (removing !== undefined && !listed(removing)) setRemoving(undefined)
+  }, [rows, loaded, form, removing])
   const editButtons = useRef(new Map<string, HTMLButtonElement>())
   /** Close the row and hand the keyboard back to its Edit button; nothing when the person has opened another row since. */
   const close = (id: string): void => {
@@ -56,16 +74,28 @@ export function AutomationsPage({ projects }: ModulePageProps) {
   // as if nothing had happened. A command that could not even be asked is a save not taken, and
   // the next save still runs.
   const queue = useRef<Promise<unknown>>(Promise.resolve())
-  const save = (what: string, id: string, project: ModuleProject, args: string[], then?: () => void): void => {
+  const save = (notTaken: string, id: string, project: ModuleProject, args: string[], then?: (output: unknown) => void): void => {
     setBusy(current => [...current, id])
     setFailed(current => (current?.id === id ? undefined : current))
     queue.current = queue.current.then(async () => {
       const answer = await host.runCommand(project.id, args).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }))
       await reload().catch(() => {})
       setBusy(current => current.filter((_, index) => index !== current.indexOf(id)))
-      if (answer.ok) then?.()
-      else setFailed({ id, text: `The ${what} was not saved: ${answer.error}` })
+      if (answer.ok) then?.(answer.output)
+      else setFailed({ id, text: `${notTaken}: ${answer.error}` })
     })
+  }
+
+  /** Open a row's automation in the form, as its file says it now: read with `show`, which refuses a file changed by hand since the scheduler last looked. Nothing opens over a form that is open. */
+  const openPrompt = async (id: string, project: ModuleProject, command: string): Promise<void> => {
+    setBusy(current => [...current, id])
+    setFailed(current => (current?.id === id ? undefined : current))
+    const answer = await host.runCommand(project.id, ['show', command]).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }))
+    setBusy(current => current.filter((_, index) => index !== current.indexOf(id)))
+    const opened = answer.ok ? openedAutomation(answer.output) : undefined
+    if (!opened) return setFailed({ id, text: `It could not be opened: ${answer.ok ? 'its file holds something this form cannot show' : answer.error}` })
+    setRemoving(current => (current === id ? undefined : current))
+    setForm(current => current ?? { project: project.id, row: id, opened })
   }
 
   /** Save what the open row changed, the pace, then the number of agents, then the publish pick, each a command of its own and each only once the one before it is taken; the row closes once the last one is taken, and at once when nothing changed. A save not taken leaves the row open with what was picked. */
@@ -80,7 +110,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
     const step = (index: number): void => {
       const next = saves[index]
       if (!next) return close(id)
-      save(next[0], id, project, next[1], () => step(index + 1))
+      save(`The ${next[0]} was not saved`, id, project, next[1], () => step(index + 1))
     }
     step(0)
   }
@@ -111,13 +141,21 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                 </span>
               )}
               {/* One form at a time, and none offered over an open one: opening another would drop what was typed. */}
-              {row.error === undefined && adding === undefined && (
-                <button type="button" onClick={() => setAdding(row.project.id)} aria-label={`New automation in ${row.project.name}`} className="ml-auto text-xs underline">
+              {row.error === undefined && form === undefined && (
+                <button type="button" onClick={() => setForm({ project: row.project.id })} aria-label={`New automation in ${row.project.name}`} className="ml-auto text-xs underline">
                   New automation
                 </button>
               )}
             </div>
-            {adding === row.project.id && <NewAutomation project={row.project} ticking={row.on && row.running} onClose={() => setAdding(undefined)} onSaved={() => void reload().catch(() => {})} />}
+            {form?.project === row.project.id && form.row === undefined && <AutomationForm project={row.project} ticking={row.on && row.running} onClose={() => setForm(undefined)} onSaved={() => void reload().catch(() => {})} />}
+            {removed?.project === row.project.id && (
+              <div role="status" aria-label="Removed" className="mt-3 flex items-start justify-between gap-3 rounded-md border border-border bg-muted/40 p-3 text-sm">
+                <p>{removed.text}</p>
+                <Button variant="outline" size="sm" onClick={() => setRemoved(undefined)}>
+                  Done
+                </Button>
+              </div>
+            )}
             {row.error !== undefined && <p role="alert" className="py-3 text-sm text-danger">{`The scheduler could not be read: ${row.error}`}</p>}
             {row.error === undefined && !row.on && <p className="py-3 text-sm text-muted-foreground">The scheduler is off in this project, so nothing here starts. It starts with the dashboard once the project has run `npx agent-scheduler init`, or by hand with `npx agent-scheduler start`.</p>}
             {row.error === undefined && row.on && !row.running && <p className="py-3 text-sm text-warning">The scheduler is on but its process is not running, so nothing here starts. `npx agent-scheduler start`, run in the project, starts it.</p>}
@@ -136,6 +174,8 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                   const title = rowTitle(scheduled)
                   const saving = busy.includes(id)
                   const open = editing?.id === id ? editing : undefined
+                  const prompt = form?.row === id ? form.opened : undefined
+                  const asked = removing === id
                   return (
                     <li key={id} aria-label={title} className={cn('py-3', saving && 'opacity-60')}>
                       <div className="flex items-start justify-between gap-4">
@@ -148,7 +188,18 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                           {!open && <Summary host={host} project={row.project} scheduled={scheduled} />}
                         </div>
                         <div className="flex shrink-0 items-center gap-3">
-                          {!open && (
+                          {/* Only a row whose file the tool wrote, and only while no form is open: opening another would drop what was typed. */}
+                          {scheduled.editable && !open && !asked && form === undefined && (
+                            <>
+                              <button type="button" disabled={saving} onClick={() => void openPrompt(id, row.project, scheduled.command)} aria-label={`Edit the prompt of ${title}`} className="text-xs underline disabled:opacity-50">
+                                Edit prompt
+                              </button>
+                              <button type="button" disabled={saving} onClick={() => setRemoving(id)} aria-label={`Remove ${title}`} className="text-xs underline disabled:opacity-50">
+                                Remove
+                              </button>
+                            </>
+                          )}
+                          {!open && !prompt && !asked && (
                             <button
                               type="button"
                               ref={button => {
@@ -166,7 +217,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                           <Checkbox
                             checked={scheduled.on}
                             disabled={saving}
-                            onCheckedChange={next => save('switch', id, row.project, ['switch', scheduled.command, next === true ? 'on' : 'off'])}
+                            onCheckedChange={next => save('The switch was not saved', id, row.project, ['switch', scheduled.command, next === true ? 'on' : 'off'])}
                             aria-label={`Run ${title} by itself`}
                           />
                         </div>
@@ -209,6 +260,50 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                                 Save
                               </Button>
                             </div>
+                          </div>
+                        </div>
+                      )}
+                      {prompt && (
+                        <AutomationForm
+                          project={row.project}
+                          ticking={row.on && row.running}
+                          opened={prompt}
+                          {...(ownPace(scheduled) ? { ownPace: pace(scheduled) } : {})}
+                          onClose={() => setForm(undefined)}
+                          onSaved={() => void reload().catch(() => {})}
+                        />
+                      )}
+                      {asked && (
+                        <div
+                          role="group"
+                          aria-label={`Removing ${title}`}
+                          onKeyDown={e => {
+                            if (e.key === 'Escape' && !saving) setRemoving(undefined)
+                          }}
+                          className="mt-3 rounded-md border border-border bg-muted/40 p-4 text-sm"
+                        >
+                          <p>
+                            Remove <span className="font-mono">{title}</span>?
+                          </p>
+                          <p className="mt-2">{removeWarning(scheduled)}</p>
+                          <div className="mt-3 flex justify-end gap-2">
+                            {/* The keyboard lands on the way out, not on the deletion. */}
+                            <Button variant="outline" size="sm" autoFocus disabled={saving} onClick={() => setRemoving(undefined)}>
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={saving}
+                              onClick={() =>
+                                save('It was not removed', id, row.project, ['remove', scheduled.command], output => {
+                                  setRemoving(undefined)
+                                  setRemoved({ project: row.project.id, text: removedWords(title, output) })
+                                })
+                              }
+                            >
+                              Remove
+                            </Button>
                           </div>
                         </div>
                       )}

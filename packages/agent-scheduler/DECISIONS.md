@@ -104,6 +104,12 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   hidden from git: nobody else gets the row, nothing is to commit, and it can start at
   once. Either way the row starts switched off. Picked over one kind alone: a shared one
   needs a commit and reaches everyone, a private one neither.
+- A row a person made this way can be edited and removed from the Automations page: its
+  prompt, its pace and its check. Its name stays, since a run is counted by the name, so an
+  edited row keeps its past runs, and another name is a new row. Editing or removing a
+  shared one changes its file, which the person commits. The rows the project's skills
+  bring are not edited or removed from the page. Picked over a page that edits any
+  scheduled skill: a skill's file is its author's.
 - The state, `.agent-scheduler/state.json`, untracked, per user, hidden through git's
   exclude file the way `.branches/` is: on or off, keep-alive, the model, the spend
   cushion, this machine's switches, paces, numbers of agents and publish picks, the
@@ -168,8 +174,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The scheduler brings its own part of a dashboard: an Automations page (one row per
   scheduled command, with its switch, its pace, its number of agents and its publish pick),
   a Settings section (the spend cushion) and an Overview card (on or off, the last tick).
-  All read `status` and write through `offset`, `switch`, `pace`, `agents`, `publish` and
-  `add`; a check is tried through `try`.
+  All read `status` and write through `offset`, `switch`, `pace`, `agents`, `publish`,
+  `add`, `edit` and `remove`; an automation is read through `show`, and a check is tried
+  through `try`.
   Picked over a hook line per setting that a dashboard runs, and over the dashboard reading
   the state file by name. The rows are on a page of their own, picked over rows inside
   Settings: Settings keeps only what reaches every project.

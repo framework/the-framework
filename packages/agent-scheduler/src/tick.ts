@@ -42,6 +42,8 @@ export interface TickDeps {
   atStart: (file: string) => Promise<StartPoint & { there: boolean }>
   /** Run a check, which reads `lastRun` as `$LAST_RUN`. */
   check: (shell: string, lastRun: string) => Promise<CheckResult>
+  /** Whether the command is switched on on this machine as of now: a person may have switched it off, or removed it, since the tick read the state. */
+  stillOn: (command: string) => Promise<boolean>
   /** When the command last started on any machine, ISO; nothing when it never did. */
   lastStart: (command: string) => Promise<string | undefined>
   inFlight: (command: string) => Promise<RunCard[]>
@@ -150,6 +152,11 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       decide('not started: the scheduler was stopped')
       continue
     }
+    // So may a person's switch: the check and the readings take seconds, and a command switched off or removed meanwhile starts nothing.
+    if (!(await deps.stillOn(command.name))) {
+      decide('switched off on this machine')
+      continue
+    }
     const id = deps.mint()
     const prompt = commandPrompt(command)
     // A skill's run is handed what its check found; an automation kept on this machine, its text first.
@@ -187,7 +194,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
 
 /** A command as a dashboard lists it: what its skill says, not this machine's switch or publish pick, which the state carries. */
 function listed(command: ScheduledCommand): ListedCommand {
-  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}), ...(command.cap > 1 ? { agents: command.cap } : {}), ...(command.text !== undefined ? { onThisMachine: true as const } : {}) }
+  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}), ...(command.cap > 1 ? { agents: command.cap } : {}), ...(command.text !== undefined ? { onThisMachine: true as const } : {}), ...(command.editable ? { editable: true as const } : {}) }
 }
 
 /** An age for a decision line: `less than a minute`, `12m`, `3h`, `2d`, floored. */

@@ -63,6 +63,8 @@ function deps(over: Partial<TickDeps> & { stateOver?: Partial<State>; commands?:
       seen.since.push(lastRun)
       return { ok: true, stdout: '["one entry"]', stderr: '' }
     },
+    // Nobody touches a switch while a tick runs, unless a test says otherwise.
+    stillOn: async () => true,
     lastStart: async () => undefined,
     // A run counts for the command its prompt names: a skill's with its slash, an automation's kept on this machine without.
     inFlight: async command => [...cards, ...seen.markers].filter(c => c.status === 'running' && (c.intent === `/${command}` || c.intent === command)),
@@ -209,7 +211,7 @@ test("a skill that is missing where a run's checkout starts says how the start p
 test("an automation kept on this machine starts like any command: its run's prompt is its name, and it is handed its text, then what its check printed; no skill folder is asked for, and nothing is asked of where a run's checkout starts; the tick lists it as this machine's", async () => {
   const text = '/answer each new comment below.\n\n- Be short.'
   const own = { dir: '.agent-scheduler/automations', text, description: 'Answer each new comment below.' }
-  const commands = [command('answer-comments', { when: 'gh api comments', ...own }), command('daily-notes', { every: every('1d'), ...own }), command('work-queue')]
+  const commands = [command('answer-comments', { when: 'gh api comments', ...own, editable: true }), command('daily-notes', { every: every('1d'), ...own }), command('work-queue')]
   const { deps: d, seen } = deps({ commands, atStart: async file => (file === '.claude/skills/work-queue/SKILL.md' ? { ref: 'origin/main', reached: true, there: true } : assert.fail(`asked where ${file} is`)) })
   const record = await tick(d)
   assert.deepEqual(record.decisions.map(d => [d.command, d.outcome.replace(/^started .*/, 'started')]), [['answer-comments', 'started'], ['daily-notes', 'started'], ['work-queue', 'started']])
@@ -221,7 +223,8 @@ test("an automation kept on this machine starts like any command: its run's prom
   ])
   assert.equal(seen.markers[0]!.intent, 'answer-comments', 'its record holds its name, which is what its runs are counted by')
   assert.deepEqual(record.schedule, [
-    { command: 'answer-comments', when: 'gh api comments', description: 'Answer each new comment below.', onThisMachine: true },
+    // The one whose file still reads as the tool wrote it is listed as one the tool can save again and remove.
+    { command: 'answer-comments', when: 'gh api comments', description: 'Answer each new comment below.', onThisMachine: true, editable: true },
     { command: 'daily-notes', every: '1d', description: 'Answer each new comment below.', onThisMachine: true },
     { command: 'work-queue', when: 'npx queue' },
   ])
@@ -556,4 +559,24 @@ test('a stop that came in during the tick starts nothing: no marker, no spawn, t
   assert.equal(seen.markers.length, 0)
   assert.equal(seen.spawned.length, 0)
   assert.deepEqual(seen.checks, ['npx queue'], 'the readings before it still ran')
+})
+
+test('a command switched off, or removed, while the tick ran its check and its readings is not started: the switch is asked again last, for that command alone', async () => {
+  const commands = [command('work-queue'), command('update-tickets', { when: 'gh issue list' })]
+  const asked: string[] = []
+  const { deps: d, seen } = deps({
+    commands,
+    stillOn: async name => {
+      asked.push(name)
+      return name !== 'work-queue'
+    },
+  })
+  const record = await tick(d)
+  assert.deepEqual(record.decisions.map(d => [d.command, d.outcome.replace(/^started .*/, 'started')]), [['work-queue', 'switched off on this machine'], ['update-tickets', 'started']])
+  assert.deepEqual(seen.spawned.map(s => s.prompt), ['/update-tickets'])
+  assert.deepEqual(seen.markers.map(m => m.intent), ['/update-tickets'], 'no marker was written for the one that went off')
+  assert.deepEqual(asked, ['work-queue', 'update-tickets'])
+  // Asked only when a run would start: a command that is not due is not asked about.
+  const quiet = deps({ check: async () => ({ ok: true, stdout: '[]', stderr: '' }), stillOn: async () => assert.fail('asked for a command that is not due') })
+  assert.deepEqual((await tick(quiet.deps)).decisions, [{ command: 'work-queue', outcome: 'not due' }])
 })

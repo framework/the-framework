@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runCli } from './cli.js'
@@ -400,6 +400,97 @@ test("an automation kept on this machine that is not listed is refused in its ow
     // A prompt too long for a run to be handed is refused in a sentence.
     const long = await run(repo, 'add', 'endless', `--prompt=${'x'.repeat(32_001)}`, '--every', '1d', '--private')
     assert.deepEqual([long.code, long.err], [1, 'the prompt is 32001 characters, and one kept on this machine has 32000 at most'])
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test("show answers an automation as it stands; edit saves it again under its name and leaves what this machine holds for it; remove deletes it, takes that back, and takes it off the last tick's record; a skill of the project is refused by all three", async () => {
+  const repo = await testRepo()
+  try {
+    assert.equal((await run(repo, 'add', 'answer-comments', '--prompt', 'Answer each new comment below.', '--every', '15m', '--when=gh api comments --jq .', '--waits-for', 'when someone commented')).code, 0)
+    assert.equal((await run(repo, 'add', 'tidy', '--prompt', 'Tidy up.', '--every', '1d', '--private')).code, 0)
+    const shown = await run(repo, 'show', 'answer-comments')
+    assert.deepEqual([shown.code, shown.out, shown.err], [0, { ok: true, name: 'answer-comments', prompt: 'Answer each new comment below.', every: '15m', when: 'gh api comments --jq .', waitsFor: 'when someone commented', file: '.claude/skills/answer-comments/SKILL.md' }, ''])
+    assert.deepEqual((await run(repo, 'show', 'tidy')).out, { ok: true, name: 'tidy', prompt: 'Tidy up.', every: '1d', file: '.agent-scheduler/automations/tidy.md', onThisMachine: true })
+
+    for (const name of ['answer-comments', 'tidy']) {
+      assert.equal((await run(repo, 'switch', name, 'on')).code, 0)
+      assert.equal((await run(repo, 'pace', name, '2h')).code, 0)
+      assert.equal((await run(repo, 'agents', name, '3')).code, 0)
+      assert.equal((await run(repo, 'publish', name, 'branch')).code, 0)
+    }
+    assert.equal((await run(repo, 'tick')).code, 0)
+    const before = await readState(repo)
+    assert.deepEqual((before.lastTick?.schedule ?? []).map(c => [c.command, c.editable]), [['answer-comments', true], ['tidy', true]])
+
+    // Saved again: a text that opens with a dash is the flag's own; the flags left out leave their parts as the file says them, and the state is as it was.
+    const edited = await run(repo, 'edit', 'answer-comments', '--prompt=- Answer in one line.', '--every', '1h')
+    assert.deepEqual([edited.code, edited.out, edited.err], [0, { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', startsFrom: 'origin/main' }, ''])
+    assert.deepEqual((await run(repo, 'show', 'answer-comments')).out, { ok: true, name: 'answer-comments', prompt: '- Answer in one line.', every: '1h', when: 'gh api comments --jq .', waitsFor: 'when someone commented', file: '.claude/skills/answer-comments/SKILL.md' })
+    // A schedule flag given empty takes its part out: the check, and what it waited for with it.
+    assert.equal((await run(repo, 'edit', 'answer-comments', '--when=')).code, 0)
+    assert.deepEqual((await run(repo, 'show', 'answer-comments')).out, { ok: true, name: 'answer-comments', prompt: '- Answer in one line.', every: '1h', file: '.claude/skills/answer-comments/SKILL.md' })
+    assert.deepEqual((await run(repo, 'edit', 'tidy', '--prompt', 'Tidy up, gently.', '--when', 'true', '--every=')).out, { ok: true, command: 'tidy', file: '.agent-scheduler/automations/tidy.md', startsFrom: 'origin/main', onThisMachine: true })
+    assert.deepEqual((await run(repo, 'show', 'tidy')).out, { ok: true, name: 'tidy', prompt: 'Tidy up, gently.', when: 'true', file: '.agent-scheduler/automations/tidy.md', onThisMachine: true })
+    assert.deepEqual(await readState(repo), before, 'its switch, its pace, its number of agents and its publish pick stay its own')
+    const unsaid = await run(repo, 'edit', 'tidy')
+    assert.deepEqual([unsaid.code, unsaid.out], [2, undefined], 'nothing to change: a command line that cannot be read')
+    const never = await run(repo, 'edit', 'tidy', '--when=')
+    assert.deepEqual([never.code, never.err], [1, 'it cannot run as written: neither every nor when says when'])
+    const silent = await run(repo, 'edit', 'tidy', '--prompt', ' ')
+    assert.deepEqual([silent.code, silent.err], [1, 'the prompt is empty'])
+
+    // Removed: the file, what this machine held for it, and its line on the last tick's record; the other one keeps its own.
+    const removed = await run(repo, 'remove', 'tidy')
+    assert.deepEqual([removed.code, removed.out, removed.err], [0, { ok: true, command: 'tidy', file: '.agent-scheduler/automations/tidy.md', onThisMachine: true }, ''])
+    const after = await readState(repo)
+    assert.deepEqual([after.switches, after.paces, after.agents, after.publishes], [{ 'answer-comments': before.switches!['answer-comments'] }, { 'answer-comments': before.paces!['answer-comments'] }, { 'answer-comments': 3 }, { 'answer-comments': 'branch' }])
+    assert.deepEqual((after.lastTick?.schedule ?? []).map(c => c.command), ['answer-comments'])
+    assert.deepEqual((after.lastTick?.decisions ?? []).map(d => d.command), (before.lastTick?.decisions ?? []).map(d => d.command).filter(c => c !== 'tidy'))
+    assert.deepEqual((await run(repo, 'remove', 'answer-comments')).out, { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', git: 'nothing', startsFrom: 'origin/main' })
+    const last = await readState(repo)
+    assert.deepEqual([last.switches, last.paces, last.agents, last.publishes], [undefined, undefined, undefined, undefined])
+    assert.deepEqual((last.lastTick?.schedule ?? []).map(c => c.command), [])
+    assert.deepEqual(await readdir(join(repo, '.claude', 'skills')), ['work-queue'])
+    // A name saved anew after a removal starts off: nothing was left under it.
+    assert.equal((await run(repo, 'add', 'tidy', '--prompt', 'Tidy again.', '--every', '1d', '--private')).code, 0)
+    assert.equal((await run(repo, 'tick')).code, 0)
+    assert.equal((await readState(repo)).switches, undefined)
+
+    // A skill of the project, and a name nothing has: refused by all three, in a sentence, and nothing changes.
+    await writeSkill(repo, 'triage', 'schedule:\n  every: 6h\n')
+    const triage = await readFile(join(repo, '.claude', 'skills', 'triage', 'SKILL.md'), 'utf8')
+    for (const args of [['show', 'triage'], ['edit', 'triage', '--prompt', 'Mine now.'], ['remove', 'triage']]) {
+      const refused = await run(repo, ...args)
+      assert.deepEqual([refused.code, refused.out, refused.err], [1, { ok: false, reason: 'not-an-automation', detail: '.claude/skills/triage is a skill of the project, or an automation changed by hand since it was saved: edit or remove its files yourself' }, '.claude/skills/triage is a skill of the project, or an automation changed by hand since it was saved: edit or remove its files yourself'], args.join(' '))
+    }
+    assert.equal(await readFile(join(repo, '.claude', 'skills', 'triage', 'SKILL.md'), 'utf8'), triage)
+    assert.deepEqual([(await run(repo, 'remove', 'never-saved')).err, (await run(repo, 'show')).code, (await run(repo, 'remove')).code], ['the schedule lists nothing named never-saved', 2, 2])
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a removal that finds nothing of the command in the state writes no state: a project that never had one gets none; and a command removed while a tick runs is not on that tick\'s record', async () => {
+  const repo = await testRepo()
+  try {
+    assert.equal((await run(repo, 'add', 'tidy', '--prompt', 'Tidy up.', '--every', '1d', '--private')).code, 0)
+    assert.equal((await run(repo, 'remove', 'tidy')).code, 0)
+    assert.deepEqual(await readdir(join(repo, '.agent-scheduler')), [], 'no state file was made for nothing')
+
+    // An automation whose check deletes the automation's own file, as its person's `remove` would while the tick runs the check.
+    await writeState(repo, { ...DEFAULT_STATE, on: true })
+    assert.equal((await run(repo, 'add', 'gone-midway', '--prompt', 'p', '--when', 'rm .agent-scheduler/automations/gone-midway.md', '--private')).code, 0)
+    assert.equal((await run(repo, 'add', 'stays', '--prompt', 'p', '--when', 'true', '--private')).code, 0)
+    assert.equal((await run(repo, 'switch', 'gone-midway', 'on')).code, 0)
+    const ticked = await run(repo, 'tick')
+    assert.equal(ticked.code, 0)
+    const state = await readState(repo)
+    assert.deepEqual((ticked.out as { schedule: { command: string }[] }).schedule.map(c => c.command), ['stays'], 'the answer is the record as written')
+    assert.deepEqual((state.lastTick?.schedule ?? []).map(c => c.command), ['stays'], 'what lists the record shows no row for a file that is gone')
+    assert.deepEqual((state.lastTick?.decisions ?? []).map(d => [d.command, d.outcome]), [['stays', 'switched off on this machine']])
+    assert.equal(state.switches, undefined, 'and what it was given is taken back with it: off the record, the next tick would not know to')
   } finally {
     await removeRepo(repo)
   }

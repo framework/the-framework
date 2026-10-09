@@ -4,7 +4,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@openagt/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, switchedOnAt, withoutCommand, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents, namesGivenUp, withoutName } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, switchedOnAt, withoutCommand, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents, namesGivenUp, withoutName, withoutListed } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
@@ -141,6 +141,18 @@ test('nothing left of one command: its switch, publish pick, pace and number of 
   assert.deepEqual(withoutCommand(state, 'tidy'), { ...DEFAULT_STATE, switches: { 'work-queue': at }, paces: { 'work-queue': { work: true } } })
   assert.equal(withoutCommand(state, 'never-heard-of'), state)
   assert.equal(withoutCommand(DEFAULT_STATE, 'tidy'), DEFAULT_STATE)
+})
+
+test("a command removed since the last tick is taken off that tick's record, the schedule it read and what it decided, and nothing else of the state changes", () => {
+  const at = '2026-10-09T07:00:00.000Z'
+  const lastTick = { at, note: 'off', decisions: [{ command: 'tidy', outcome: 'not due' }, { command: 'work-queue', outcome: 'started r1', run: 'r1' }], schedule: [{ command: 'tidy', every: '1d', onThisMachine: true as const, editable: true as const }, { command: 'work-queue', when: 'npx queue' }] }
+  const state = { ...DEFAULT_STATE, switches: { tidy: at }, lastTick }
+  assert.deepEqual(withoutListed(state, 'tidy'), { ...DEFAULT_STATE, switches: { tidy: at }, lastTick: { at, note: 'off', decisions: [{ command: 'work-queue', outcome: 'started r1', run: 'r1' }], schedule: [{ command: 'work-queue', when: 'npx queue' }] } })
+  // A line that says an automation of that name is not listed goes too: its file is gone.
+  assert.deepEqual(withoutListed({ ...DEFAULT_STATE, lastTick: { at, decisions: [{ command: 'tidy', outcome: 'unlisted automation: it has no schedule' }], schedule: [] } }, 'tidy').lastTick, { at, decisions: [], schedule: [] })
+  // Nothing of that name on the record, and no record: the state itself, so a caller can tell there is nothing to write.
+  assert.equal(withoutListed(state, 'never-heard-of'), state)
+  assert.equal(withoutListed(DEFAULT_STATE, 'tidy'), DEFAULT_STATE)
 })
 
 test("what an automation kept on this machine was given goes when it goes, and when a skill has its name too: the names given up, and the state with nothing left under a name, a skill's commands with a word included", () => {

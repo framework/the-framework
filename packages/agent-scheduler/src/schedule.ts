@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
+import { automationOf, isPlainFile, standsAlone } from './automation-file.js'
 import { DEFAULT_CAP, FOUND_MAX, MAX_AGENTS, OWN_AUTOMATIONS_DIR, OWN_TEXT_MAX, RUN_SKILLS_DIR, SKILL_FILE, isAgents } from './names.js'
 import { parseInterval, type Interval } from './pace.js'
 
@@ -78,6 +79,13 @@ export interface ScheduledCommand {
    * (`/update-tickets`), and the coding agent reads the skill's text from the checkout.
    */
   text?: string
+  /**
+   * Whether the command is a person's own automation whose file reads as the tool writes one, and
+   * is no link: the tool can show it, save it again and remove it. Neither a skill a person or a
+   * package wrote, nor an automation changed by hand into something the tool does not write. The
+   * one place that says so: the command line asks the schedule.
+   */
+  editable?: true
 }
 
 /** The schedule as read. */
@@ -190,7 +198,9 @@ export async function readSchedule(repo: string): Promise<Schedule> {
   for (const skill of [...files.keys()].sort()) {
     const { md, dir } = files.get(skill)!
     const read = skillSchedule(skill, md, dir)
-    schedule.commands.push(...read.commands)
+    // A shared automation is a skill the tool wrote: its file reads as the tool writes one, alone in its folder where the tool saves them, a folder that is no link.
+    const editable = automationOf(skill, md) !== undefined && (await standsAlone(repo, skill))
+    schedule.commands.push(...(editable ? read.commands.map(command => ({ ...command, editable: true as const })) : read.commands))
     schedule.unreadable.push(...read.unreadable)
   }
   const kept = (await readdir(join(repo, OWN_AUTOMATIONS_DIR)).catch((): string[] => [])).filter(file => file.endsWith('.md')).sort()
@@ -223,7 +233,7 @@ export async function readSchedule(repo: string): Promise<Schedule> {
     else if (read.commands.length !== 1 || read.commands[0]!.name !== name) unlisted('it has one row, with no word')
     else if (text === '') unlisted('it has no text after its front matter')
     else if (text.length > OWN_TEXT_MAX) unlisted(`its text is ${text.length} characters, and ${OWN_TEXT_MAX} is the most`)
-    else schedule.commands.push({ ...read.commands[0]!, text })
+    else schedule.commands.push({ ...read.commands[0]!, text, ...(automationOf(name, md) !== undefined && (await isPlainFile(join(repo, OWN_AUTOMATIONS_DIR, file))) ? { editable: true as const } : {}) })
   }
   return schedule
 }

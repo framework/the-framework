@@ -41,6 +41,16 @@ describe('a scheduler row, from what status printed', () => {
     ])
   })
 
+  test("a command the tick lists as an automation the tool wrote is one the page can open again and remove; anything else the tick says there is not", () => {
+    const row = schedulerRow(GEMSTACK, { on: true, running: true, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], schedule: [{ command: 'answer-comments', every: '15m', editable: true }, { command: 'tidy', every: '1d', onThisMachine: true, editable: true }, { command: 'work-queue', when: 'npx queue' }, { command: 'triage', every: '6h', editable: 'yes' }] } })
+    expect(row.commands.map(c => [c.command, c.editable])).toEqual([
+      ['answer-comments', true],
+      ['tidy', true],
+      ['work-queue', undefined],
+      ['triage', undefined],
+    ])
+  })
+
   test('what the tick could not list: a skill whose schedule it could not read, and an automation kept on this machine, each said in its own words; such a line is no decision of a command of that name', () => {
     const row = schedulerRow(GEMSTACK, {
       on: true,

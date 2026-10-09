@@ -4,7 +4,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@openagt/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, switchedOnAt, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, switchedOnAt, withoutCommand, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
@@ -133,4 +133,12 @@ test("the cap in force is this machine's number of agents at once, else the skil
   const back = withAgents(withAgents(mine, 'work-queue', undefined), 'triage quick', undefined)
   assert.equal('agents' in back, false)
   assert.deepEqual(withAgents(mine, 'plan-tickets', undefined), mine)
+})
+
+test('nothing left of one command: its switch, publish pick, pace and number of agents go, the others stay; a state that holds nothing of it is answered as it is', () => {
+  const at = '2026-10-09T07:00:00.000Z'
+  const state = { ...DEFAULT_STATE, switches: { tidy: at, 'work-queue': at }, publishes: { tidy: 'merge' as const }, paces: { tidy: { every: '5m', since: at }, 'work-queue': { work: true as const } }, agents: { tidy: 3 } }
+  assert.deepEqual(withoutCommand(state, 'tidy'), { ...DEFAULT_STATE, switches: { 'work-queue': at }, paces: { 'work-queue': { work: true } } })
+  assert.equal(withoutCommand(state, 'never-heard-of'), state)
+  assert.equal(withoutCommand(DEFAULT_STATE, 'tidy'), DEFAULT_STATE)
 })

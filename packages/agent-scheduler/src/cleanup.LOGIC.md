@@ -8,10 +8,14 @@ Removes what this tool left in a project: the state file and the scheduler's log
 
 **Problem**: a scheduler that is still running writes its state back on its next tick, a minute later at most, so removing its files under it removes nothing for long. A dashboard that closes stops the scheduler, except one the user set to keep running. A scheduler that `stop` ended is off the state at once, while its tick in flight may still be ending: that tick records nothing more (`scheduler.ts`), so it does not put the files back.
 
+## Glossary
+
+[1] automation: a person's own prompt saved as a command skill of the project (a skill run as the slash command `/<name>`, never picked up by the coding agent on its own): the file `.claude/skills/<name>/SKILL.md`, whose text is the prompt and whose front matter carries the `schedule` the person picked (the key where a skill says when its command is due), an interval, a check (a shell line whose output says whether the command is due) or both. Written by `agent-scheduler add` or the "New automation" form of the Automations page; from then on a skill like any other, and its command a scheduled command like any other.
+
 ## Business logic — TL;DR
 
 - **Refused while the scheduler runs** - when the state names a pid, a whole number above 0, that is a live process on this machine, the whole clean-up is refused, `{"ok":false,"reason":"running","pid":<pid>}`, with nothing removed. The command says `the scheduler is running here (pid <pid>): stop it first with agent-scheduler stop` and exits 1.
 - **The tool's two files go** - `state.json` and `scheduler.log`, each when it is a regular file git does not track. Anything else in the directory is kept, named with `not made by agent-scheduler`; a file git tracks is kept with `git tracks it`.
 - **The directory and its rule** - `.agent-scheduler/` goes only when nothing was kept, and the line `/.agent-scheduler` leaves the repository's exclude file only when no checkout of the repository still has such a directory (`own-directory.ts` in `@openagt/agent-data`).
-- **The skills stay** - what the project schedules is in its skill files, which are the project's own: never read here, never touched.
+- **The skills stay** - what the project schedules is in its skill files, which are the project's own: never read here, never touched. The skill file of an automation [1] is one of them, though this tool wrote it: from the moment it is saved it is a file of the person's, theirs to commit or to delete, and the clean-up keeps it.
 - **The answer** - `{"ok":true,"removed":[<paths>],"kept":[{"path":…,"reason":…}]}`, paths from the project's root; a second clean-up answers `{"ok":true,"removed":[],"kept":[]}`.

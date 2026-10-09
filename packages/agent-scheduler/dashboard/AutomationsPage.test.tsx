@@ -49,6 +49,186 @@ describe('the Automations page', () => {
     expect(within(queueRow).getByRole('checkbox', { name: 'Run /work-queue by itself' }).getAttribute('aria-checked')).toBe('false')
   })
 
+  test('"New automation" opens a form in its project: a name, what the agent is told, a pace, a shell line; the line under it says what is missing, then when the row would run; Cancel and Escape close it and save nothing', async () => {
+    const { host, runCommand } = scheduler()
+    show(host, [GEMSTACK, OTHER])
+    const gemstack = await screen.findByRole('region', { name: 'gemstack' })
+    expect(screen.queryByRole('group', { name: 'New automation' })).toBeNull()
+    fireEvent.click(within(gemstack).getByRole('button', { name: 'New automation in gemstack' }))
+    const form = within(gemstack).getByRole('group', { name: 'New automation' })
+    // One form at a time, in the project whose button was pressed; no project offers another while it is open, since opening one would drop what was typed.
+    expect(screen.getAllByRole('group', { name: 'New automation' }).length).toBe(1)
+    expect(screen.queryByRole('button', { name: /^New automation in/ })).toBeNull()
+    expect(within(form).getByText('by time alone')).toBeTruthy()
+    expect(within(form).getByText('Give it a name. It becomes the command, like /answer-comments.')).toBeTruthy()
+    expect((within(form).getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((within(form).getByRole('button', { name: 'Try it' }) as HTMLButtonElement).disabled).toBe(true)
+    // The plain words for a shell line show only once there is a line.
+    expect(within(form).queryByLabelText(/What the line waits for/)).toBeNull()
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'answer-comments' } })
+    expect(within(form).getByText('Write what the agent is told.')).toBeTruthy()
+    fireEvent.change(within(form).getByLabelText('What the agent is told'), { target: { value: 'Answer each new comment below.' } })
+    expect(within(form).getByText('Every 1 day.')).toBeTruthy()
+    fireEvent.change(within(form).getByLabelText('How many'), { target: { value: '15' } })
+    fireEvent.change(within(form).getByLabelText('Unit'), { target: { value: 'm' } })
+    fireEvent.change(within(form).getByLabelText(/A shell line that prints what is new/), { target: { value: 'gh api comments' } })
+    fireEvent.change(within(form).getByLabelText(/What the line waits for/), { target: { value: 'when someone commented' } })
+    expect(within(form).getByText('Every 15 minutes at most, when someone commented.')).toBeTruthy()
+    expect(within(form).getByText('at most, and only when the shell line below prints something')).toBeTruthy()
+    // The pace unticked: its count and unit are set aside, and the shell line alone says when.
+    fireEvent.click(within(form).getByRole('checkbox', { name: 'Every' }))
+    expect((within(form).getByLabelText('How many') as HTMLInputElement).disabled).toBe(true)
+    expect((within(form).getByLabelText('Unit') as HTMLSelectElement).disabled).toBe(true)
+    expect(within(form).getByText('not on a pace: the shell line below alone says when')).toBeTruthy()
+    expect(within(form).getByText('When someone commented.')).toBeTruthy()
+    expect((within(form).getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false)
+    // Escape does not close a form that holds text: a slip of a key loses no prompt. Cancel does.
+    fireEvent.keyDown(form, { key: 'Escape' })
+    expect(screen.getByRole('group', { name: 'New automation' })).toBeTruthy()
+    fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('group', { name: 'New automation' })).toBeNull()
+    // Opened again it is empty, and Escape closes an empty one.
+    fireEvent.click(within(gemstack).getByRole('button', { name: 'New automation in gemstack' }))
+    expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('')
+    fireEvent.keyDown(screen.getByRole('group', { name: 'New automation' }), { key: 'Escape' })
+    expect(screen.queryByRole('group', { name: 'New automation' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'New automation in other' })).toBeTruthy()
+    expect(runCommand.mock.calls.every(([, args]) => args[0] === 'status')).toBe(true)
+  })
+
+  test('"Try it" runs the shell line once in the project and shows what it printed and whether an agent would start; the answer goes away when the line changes', async () => {
+    const tries: ModuleCommandResult[] = [
+      { ok: true, output: { ok: true, lastRun: '2026-10-08T10:00:00Z', ran: true, due: true, printed: '[{"url":"https://example.test/1"}]' } },
+      { ok: true, output: { ok: true, lastRun: '2026-10-08T10:00:00Z', ran: false, due: false, printed: '', error: 'gh: command not found' } },
+      { ok: false, error: 'the project is gone' },
+    ]
+    const { host, runCommand } = scheduler((_, args) => (args[0] === 'try' ? tries.shift()! : { ok: true, output: { ok: true } }))
+    show(host)
+    fireEvent.click(await screen.findByRole('button', { name: 'New automation in gemstack' }))
+    const form = screen.getByRole('group', { name: 'New automation' })
+    const line = within(form).getByLabelText(/A shell line that prints what is new/)
+    fireEvent.change(line, { target: { value: '  gh api comments  ' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Try it' }))
+    const answer = await within(form).findByRole('status', { name: 'What the line answered' })
+    expect(runCommand).toHaveBeenCalledWith('p1', ['try', '--when=gh api comments'])
+    expect(within(answer).getByText('It printed something: an agent would start now.').className).toMatch(/text-success/)
+    expect(answer.querySelector('pre')?.textContent).toBe('[{"url":"https://example.test/1"}]')
+    expect(within(answer).getByText('Tried as if the row had last started a day ago: $LAST_RUN was 2026-10-08T10:00:00Z.')).toBeTruthy()
+    // The answer was for that line: another line has none until it is tried.
+    fireEvent.change(line, { target: { value: 'gh api other' } })
+    expect(within(form).queryByRole('status', { name: 'What the line answered' })).toBeNull()
+    fireEvent.click(within(form).getByRole('button', { name: 'Try it' }))
+    expect((await within(form).findByText('The line failed: gh: command not found')).className).toMatch(/text-danger/)
+    fireEvent.change(line, { target: { value: 'gh api third' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Try it' }))
+    expect(await within(form).findByText('The line could not be tried: the project is gone')).toBeTruthy()
+    // Trying saves nothing.
+    expect(runCommand.mock.calls.some(([, args]) => args[0] === 'add')).toBe(false)
+  })
+
+  test('an answer that comes back after the line was changed is not shown under the other line', async () => {
+    const { host, runCommand } = scheduler()
+    let answer!: (result: ModuleCommandResult) => void
+    runCommand.mockImplementation(async (_projectId: string, args: string[]) => (args[0] === 'try' ? new Promise<ModuleCommandResult>(resolve => (answer = resolve)) : { ok: true, output: args[0] === 'status' ? STATUS : { ok: true } }))
+    show(host)
+    fireEvent.click(await screen.findByRole('button', { name: 'New automation in gemstack' }))
+    const form = screen.getByRole('group', { name: 'New automation' })
+    const line = within(form).getByLabelText(/A shell line that prints what is new/)
+    fireEvent.change(line, { target: { value: 'a slow line' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Try it' }))
+    expect((within(form).getByRole('button', { name: 'Trying…' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(line, { target: { value: 'another line' } })
+    answer({ ok: true, output: { ok: true, lastRun: '2026-10-08T10:00:00Z', ran: true, due: true, printed: '[1]' } })
+    await waitFor(() => expect(runCommand.mock.results.some(r => r.type === 'return')).toBe(true))
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(within(form).queryByRole('status', { name: 'What the line answered' })).toBeNull()
+    expect(within(form).queryByText('It printed something: an agent would start now.')).toBeNull()
+  })
+
+  test('Save runs `add` in the project and then says where the file is, that it is the person\'s to commit, and where it has to get to before its row can start; a save that is refused says why and keeps what was typed', async () => {
+    const saves: ModuleCommandResult[] = [
+      { ok: false, error: 'the project already has a skill there: .claude/skills/answer-comments' },
+      { ok: true, output: { ok: true, command: 'answer-replies', file: '.claude/skills/answer-replies/SKILL.md', startsFrom: 'origin/main' } },
+    ]
+    const { host, runCommand } = scheduler((_, args) => (args[0] === 'add' ? saves.shift()! : { ok: true, output: { ok: true } }))
+    show(host)
+    fireEvent.click(await screen.findByRole('button', { name: 'New automation in gemstack' }))
+    const form = screen.getByRole('group', { name: 'New automation' })
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'answer-comments' } })
+    fireEvent.change(within(form).getByLabelText('What the agent is told'), { target: { value: '- Answer each new comment below.' } })
+    fireEvent.click(within(form).getByRole('checkbox', { name: 'Every' }))
+    fireEvent.change(within(form).getByLabelText(/A shell line that prints what is new/), { target: { value: 'gh api comments' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    expect((await within(form).findByRole('alert')).textContent).toBe('Not saved: the project already has a skill there: .claude/skills/answer-comments')
+    expect(runCommand).toHaveBeenCalledWith('p1', ['add', 'answer-comments', '--prompt=- Answer each new comment below.', '--when=gh api comments'])
+    expect((within(form).getByLabelText('What the agent is told') as HTMLTextAreaElement).value).toBe('- Answer each new comment below.')
+    // Typing again takes the refusal away.
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'answer-replies' } })
+    expect(within(form).queryByRole('alert')).toBeNull()
+    const statusReads = runCommand.mock.calls.filter(([, args]) => args[0] === 'status').length
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    const saved = await screen.findByText(/It is a file of yours, in this project, and nothing was committed for you\./)
+    const panel = screen.getByRole('group', { name: 'New automation' })
+    expect(panel.textContent).toContain('Saved /answer-replies as .claude/skills/answer-replies/SKILL.md.')
+    expect(saved.textContent).toContain('Its row cannot start before the file is on origin/main: commit it and bring it there.')
+    expect(panel.textContent).toContain('Its row shows here once the scheduler has looked, within a minute. It starts switched off.')
+    // The rows are read again at once.
+    await waitFor(() => expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'status').length).toBeGreaterThan(statusReads))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('group', { name: 'New automation' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'New automation in gemstack' })).toBeTruthy()
+  })
+
+  test('while a save runs the form takes no more typing and no second Save, and Escape does not close it; in a project whose scheduler is not running the saved panel says the row does not show yet', async () => {
+    let answer!: (result: ModuleCommandResult) => void
+    const { host, runCommand } = scheduler()
+    runCommand.mockImplementation(async (_projectId: string, args: string[]) => (args[0] === 'add' ? new Promise<ModuleCommandResult>(resolve => (answer = resolve)) : { ok: true, output: args[0] === 'status' ? { ...STATUS, running: false } : { ok: true } }))
+    show(host)
+    fireEvent.click(await screen.findByRole('button', { name: 'New automation in gemstack' }))
+    const form = screen.getByRole('group', { name: 'New automation' })
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'daily-notes' } })
+    fireEvent.change(within(form).getByLabelText('What the agent is told'), { target: { value: 'Write the notes.' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect((within(form).getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true))
+    expect((within(form).getByRole('button', { name: 'Cancel' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((within(form).getByLabelText('Name').closest('fieldset') as HTMLFieldSetElement).disabled).toBe(true)
+    fireEvent.keyDown(form, { key: 'Escape' })
+    expect(screen.getByRole('group', { name: 'New automation' })).toBeTruthy()
+    expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'add').length).toBe(1)
+    answer({ ok: true, output: { ok: true, command: 'daily-notes', file: '.claude/skills/daily-notes/SKILL.md', startsFrom: 'HEAD' } })
+    const panel = await screen.findByText(/It is a file of yours/)
+    expect(panel.textContent).toContain('Its row cannot start before you commit the file.')
+    expect(screen.getByRole('group', { name: 'New automation' }).textContent).toContain('The scheduler is not running in this project, so its row does not show yet: it shows once the scheduler runs. It starts switched off.')
+  })
+
+  test('a second try asked while the first is still running: the first one\'s late answer changes nothing, and the button stays held until the second answers', async () => {
+    const answers: ((result: ModuleCommandResult) => void)[] = []
+    const { host, runCommand } = scheduler()
+    runCommand.mockImplementation(async (_projectId: string, args: string[]) => (args[0] === 'try' ? new Promise<ModuleCommandResult>(resolve => answers.push(resolve)) : { ok: true, output: args[0] === 'status' ? STATUS : { ok: true } }))
+    show(host)
+    fireEvent.click(await screen.findByRole('button', { name: 'New automation in gemstack' }))
+    const form = screen.getByRole('group', { name: 'New automation' })
+    const line = within(form).getByLabelText(/A shell line that prints what is new/)
+    fireEvent.change(line, { target: { value: 'first line' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Try it' }))
+    fireEvent.change(line, { target: { value: 'second line' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Try it' }))
+    await waitFor(() => expect(answers.length).toBe(2))
+    answers[0]!({ ok: true, output: { ok: true, lastRun: '2026-10-08T10:00:00Z', ran: true, due: true, printed: '["first"]' } })
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect((within(form).getByRole('button', { name: 'Trying…' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(within(form).queryByRole('status', { name: 'What the line answered' })).toBeNull()
+    answers[1]!({ ok: true, output: { ok: true, lastRun: '2026-10-08T10:00:00Z', ran: true, due: false, printed: '[]' } })
+    expect(await within(form).findByText('It printed nothing to do: no agent would start.')).toBeTruthy()
+  })
+
+  test('a project whose scheduler could not be read offers no "New automation"', async () => {
+    const { host } = hostAnswering(() => ({ ok: false, error: 'no such command' }))
+    show(host)
+    await screen.findByText('The scheduler could not be read: no such command')
+    expect(screen.queryByRole('button', { name: /New automation/ })).toBeNull()
+  })
+
   test('a decision that started a run opens that agent; any other decision is plain words', async () => {
     const { host } = scheduler()
     show(host)

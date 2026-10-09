@@ -2,7 +2,7 @@ The start point [1] of a scheduled run [2], brought up to date the way a run's c
 
 ## Context
 
-**User story**: a person writes a new skill with a `schedule` in their own checkout of the project. Its command is listed on the Automations page at the next tick, and the person switches it on before the skill is on origin's default branch. When the command is next due, no agent starts for it. The page row says "Cannot start yet: its skill is not on origin/main", and the state says `not on origin/main: a run's checkout starts from origin/main, and the command's skill is not there`. Once the skill is on origin's default branch, pushed from this machine or brought there by another one, the command starts like any other.
+**User story**: a person writes a new skill with a `schedule` in their own checkout of the project, or saves an automation [7] there, which writes such a skill for them. Its command is listed on the Automations page at the next tick, and the person switches it on before the skill is on origin's default branch. When the command is next due, no agent starts for it. The page row says "Cannot start yet: its skill is not on origin/main", and the state says `not on origin/main: a run's checkout starts from origin/main, and the command's skill is not there`. Once the skill is on origin's default branch, pushed from this machine or brought there by another one, the command starts like any other.
 
 **Business logic story**: the schedule [6] is read from the skill files as they are on disk in the person's own checkout (`schedule.ts`). A run does not work there: `agent-runner` gives it a fresh checkout [3], made through the `branches` package from origin's default branch, fetched first, or, in a repository with no remote, from the commit the person's own checkout is on. So a skill that is on disk and not on the start point schedules a command that no run's checkout holds. This file reads the start point and says whether a file is on it; when the question is asked, and the line that says why a command did not start, is the tick's (`tick.ts`).
 
@@ -18,6 +18,7 @@ The start point [1] of a scheduled run [2], brought up to date the way a run's c
 [4] tick: one pass of the scheduler: pull the `agent-data` branch, sweep, then one decision per scheduled command, each decision one line in the state.
 [5] command: a scheduled command, one command a skill schedules: the skill's folder name and at most one word the skill takes as its argument (`triage quick`).
 [6] the schedule: all the scheduled commands of a project. A skill of the project brings its own with the `schedule` key in the front matter of its `SKILL.md`, called the skill's `schedule`.
+[7] automation: a person's own prompt saved as a command skill of the project (a skill run as the slash command `/<name>`, never picked up by the coding agent on its own): the file `.claude/skills/<name>/SKILL.md`, whose text is the prompt and whose front matter carries the `schedule` the person picked, an interval, a check (a shell line whose output says whether the command is due) or both. Written by `agent-scheduler add` or the "New automation" form of the Automations page; from then on a skill like any other, and its command a scheduled command [5] like any other.
 
 ## Business logic — TL;DR
 

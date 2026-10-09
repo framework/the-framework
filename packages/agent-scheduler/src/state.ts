@@ -2,7 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { PUBLISH_LEVELS, type Publish } from '@openagt/agent-runner'
-import { DEFAULT_MODEL, DEFAULT_PUBLISH, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE, isAgents, isTime } from './names.js'
+import { DEFAULT_AGENT, DEFAULT_MODEL, DEFAULT_PUBLISH, DEFAULT_SPEND_OFFSET, STATE_DIR, STATE_FILE, isAgent, isAgents, isTime, type AgentName } from './names.js'
+import { homeAgent, type ScheduledCommand } from './schedule.js'
 import type { PacePick } from './pace.js'
 
 /**
@@ -43,6 +44,14 @@ export interface ListedCommand {
   onThisMachine?: true
   /** Whether the command is a person's own automation as the tool wrote it: `show`, `edit` and `remove` take it. */
   editable?: true
+  /** The coding agent the command is made for: the one its skill names, else Claude Code when it can run the command, else the one that can. */
+  agent: AgentName
+  /** The model its skill names, when it names one. */
+  model?: string
+  /** The coding agent that model is a model of: the one the skill names, Claude Code when it names none. Said with the model. */
+  modelAgent?: AgentName
+  /** The coding agents that can run the command: those whose own skills folder holds its skill; every one for an automation kept on this machine. */
+  able: AgentName[]
 }
 
 /** One tick as the state remembers it. */
@@ -61,7 +70,7 @@ export interface State {
   on: boolean
   /** Whether the scheduler's process outlives whatever started it. Read by `stop --unless-keep-alive` only, the line a dashboard runs when it closes. */
   keepAlive: boolean
-  /** The model every scheduled run starts on. */
+  /** The model a scheduled run on Claude Code starts on, where neither its command's skill nor a person names another. */
   model: string
   /** How far past the spend boundary a run may still start, in percentage points. */
   spendOffset: number
@@ -73,6 +82,10 @@ export interface State {
   paces?: Record<string, PacePick>
   /** This machine's number of runs of a command in flight at once, kept only where a person set one: a command without one has its skill's number. */
   agents?: Record<string, number>
+  /** The coding agent this machine's runs of a command are on, kept only where a person picked one: a command without one is on the agent its skill is made for. */
+  runsOn?: Record<string, AgentName>
+  /** The model this machine's runs of a command start on, kept only where a person picked one, with the coding agent it was picked for: a model is one agent's, and the pick holds only while the command runs on that agent. */
+  models?: Record<string, ModelPick>
   /** The scheduler's own process, while `start` has one running. */
   pid?: number
   /** When that process started, ISO. */
@@ -84,6 +97,15 @@ export interface State {
 export type PublishPick = 'nothing' | Publish
 
 export const PUBLISH_PICKS: readonly PublishPick[] = ['nothing', ...PUBLISH_LEVELS]
+
+/** A person's pick of a model for one command: the model's id, and the coding agent it is a model of. */
+export interface ModelPick {
+  agent: AgentName
+  model: string
+}
+
+/** Where the state keeps what a person set for one command on this machine. */
+const PICKS = ['switches', 'publishes', 'paces', 'agents', 'runsOn', 'models'] as const
 
 export const DEFAULT_STATE: State = { on: false, keepAlive: false, model: DEFAULT_MODEL, spendOffset: DEFAULT_SPEND_OFFSET }
 
@@ -129,13 +151,13 @@ export function withoutPid(state: State, pid: number): State {
 }
 
 /**
- * The state with nothing of one command left: its switch, its publish pick, its pace and its
- * number of agents. What a command saved anew under a name starts from: a switch left on for a
+ * The state with nothing of one command left: its switch, its publish pick, its pace, its number
+ * of agents, its coding agent and its model. What a command saved anew under a name starts from: a switch left on for a
  * command of that name that is gone would start the new one unasked.
  */
 export function withoutCommand(state: State, command: string): State {
   let rest = state
-  for (const key of ['switches', 'publishes', 'paces', 'agents'] as const) {
+  for (const key of PICKS) {
     const picks = state[key]
     if (!picks || !Object.hasOwn(picks, command)) continue
     const { [command]: _gone, ...others } = picks as Record<string, unknown>
@@ -176,7 +198,7 @@ export function namesGivenUp(lastTick: TickRecord | undefined, schedule: { comma
 /** The state with nothing left under a name: the picks of the command of that name, and of every command that is that name and a word (`triage quick`). */
 export function withoutName(state: State, name: string): State {
   let rest = state
-  for (const key of ['switches', 'publishes', 'paces', 'agents'] as const) {
+  for (const key of PICKS) {
     for (const command of Object.keys(state[key] ?? {})) {
       if (command.split(' ')[0] === name) rest = withoutCommand(rest, command)
     }
@@ -247,6 +269,47 @@ export function withAgents(state: State, command: string, count: number | undefi
   const agents = count === undefined ? others : { ...others, [command]: count }
   const { agents: _agents, ...rest } = state
   return Object.keys(agents).length ? { ...rest, agents } : rest
+}
+
+/**
+ * The coding agent a run of a command is on, on this machine: the one a person picked here, else
+ * the one the command is made for ({@link homeAgent}). The state is a file a person may edit: a
+ * word that names no agent is no pick.
+ */
+export function agentInForce(state: State, command: Pick<ScheduledCommand, 'name' | 'agent' | 'dirs' | 'text'>): AgentName {
+  const pick = state.runsOn?.[command.name]
+  return isAgent(pick) ? pick : homeAgent(command)
+}
+
+/**
+ * The model a run of a command starts on, on this machine, given the agent it is on: the one a
+ * person picked here for that agent; else the one its skill names for that agent
+ * ({@link ScheduledCommand.model}); else, on Claude Code, the scheduler's own model. Nothing on
+ * any other agent: the run then starts on that agent's own default. A pick made for another agent
+ * is no pick: the agent a command runs on can change without a person's doing, when its skill
+ * comes to name one or reaches another agent's folder.
+ */
+export function modelInForce(state: State, command: Pick<ScheduledCommand, 'name' | 'agent' | 'model'>, agent: AgentName): string | undefined {
+  const pick = state.models?.[command.name]
+  if (pick && typeof pick === 'object' && pick.agent === agent && typeof pick.model === 'string' && pick.model.trim()) return pick.model
+  if (command.model !== undefined && agent === (command.agent ?? DEFAULT_AGENT)) return command.model
+  return agent === DEFAULT_AGENT ? state.model : undefined
+}
+
+/** The state with the coding agent of one command picked, or the pick taken back when there is none. The model picked for the command goes with it either way: a model is one agent's. */
+export function withAgent(state: State, command: string, agent: AgentName | undefined): State {
+  const { [command]: _previous, ...others } = state.runsOn ?? {}
+  const runsOn = agent === undefined ? others : { ...others, [command]: agent }
+  const { runsOn: _runsOn, ...rest } = withModel(state, command, undefined)
+  return Object.keys(runsOn).length ? { ...rest, runsOn } : rest
+}
+
+/** The state with the model of one command picked, for the coding agent it is a model of, or the pick taken back when there is none. */
+export function withModel(state: State, command: string, pick: ModelPick | undefined): State {
+  const { [command]: _previous, ...others } = state.models ?? {}
+  const models = pick === undefined ? others : { ...others, [command]: pick }
+  const { models: _models, ...rest } = state
+  return Object.keys(models).length ? { ...rest, models } : rest
 }
 
 /** Read, change, write: one edit of the state. */

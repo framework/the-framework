@@ -4,10 +4,13 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@openagt/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, switchedOnAt, withoutCommand, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents, namesGivenUp, withoutName, withoutListed } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, type ListedCommand, agentInForce, modelInForce, withAgent, withModel, isSwitchedOn, switchedOnAt, withoutCommand, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents, namesGivenUp, withoutName, withoutListed } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
+
+/** A command as a tick's record lists it: made for Claude Code, which alone can run it, unless said otherwise. */
+const row = <T extends object>(command: string, over?: T) => ({ command, agent: 'claude-code' as const, able: ['claude-code' as const], ...over }) as ListedCommand & T
 
 async function repo(): Promise<string> {
   const path = await realpath(await mkdtemp(join(tmpdir(), 'scheduler-state-')))
@@ -135,19 +138,68 @@ test("the cap in force is this machine's number of agents at once, else the skil
   assert.deepEqual(withAgents(mine, 'plan-tickets', undefined), mine)
 })
 
-test('nothing left of one command: its switch, publish pick, pace and number of agents go, the others stay; a state that holds nothing of it is answered as it is', () => {
+test("the coding agent a run is on is this machine's pick, else the one the command is made for; its model is this machine's pick, else its skill's on the agent the skill is made for, else the scheduler's own on Claude Code, and none on any other agent", () => {
+  const CLAUDE = '.claude/skills'
+  const CODEX = '.agents/skills'
+  const both = { name: 'update-tickets', dirs: [CLAUDE, CODEX] }
+  const state = { ...DEFAULT_STATE, model: 'opus' }
+  // Nobody picked, and the skill names nothing: Claude Code, on the scheduler's model.
+  assert.deepEqual([agentInForce(state, both), modelInForce(state, both, 'claude-code')], ['claude-code', 'opus'])
+  // The skill names its model: it goes with the agent the skill is made for, and with no other.
+  const cheap = { ...both, model: 'haiku' }
+  assert.deepEqual([modelInForce(state, cheap, 'claude-code'), modelInForce(state, cheap, 'codex')], ['haiku', undefined])
+  // The skill names Codex: its runs are on Codex, on Codex's own default unless the skill names a model too.
+  const forCodex = { ...both, agent: 'codex' as const }
+  assert.deepEqual([agentInForce(state, forCodex), modelInForce(state, forCodex, 'codex'), modelInForce(state, { ...forCodex, model: 'gpt-5.5' }, 'codex')], ['codex', undefined, 'gpt-5.5'])
+  // A person switched that row to Claude Code here: the skill's model was for Codex, so the scheduler's own.
+  assert.equal(modelInForce({ ...state, runsOn: { 'update-tickets': 'claude-code' } }, { ...forCodex, model: 'gpt-5.5' }, 'claude-code'), 'opus')
+  // A skill only in Codex's folder is made for Codex; an automation kept on this machine for Claude Code.
+  assert.equal(agentInForce(state, { name: 'review', dirs: [CODEX] }), 'codex')
+  assert.equal(agentInForce(state, { name: 'tidy', dirs: ['.agent-scheduler/automations'], text: 'Tidy up.' }), 'claude-code')
+  // This machine's picks win over what the skill says. The state is a file a person may edit: a word that names no agent, or an empty model, is no pick.
+  const picked = { ...state, runsOn: { 'update-tickets': 'codex' as const }, models: { 'update-tickets': { agent: 'codex' as const, model: 'gpt-5.5' } } }
+  assert.deepEqual([agentInForce(picked, cheap), modelInForce(picked, cheap, 'codex')], ['codex', 'gpt-5.5'])
+  assert.equal(modelInForce({ ...state, models: { 'update-tickets': { agent: 'claude-code', model: 'sonnet' } } }, cheap, 'claude-code'), 'sonnet')
+  // A model is one agent's: a pick made for Codex is none once the command runs on Claude Code, however that came about (the agent pick taken back by hand in the file, the skill reaching another folder).
+  assert.equal(modelInForce({ ...state, models: picked.models }, cheap, 'claude-code'), 'haiku')
+  assert.equal(modelInForce({ ...state, models: { 'update-tickets': { agent: 'claude-code', model: 'sonnet' } } }, cheap, 'codex'), undefined)
+  // A skill's model with no agent named is Claude Code's, wherever the skill lives: a skill only in Codex's folder does not send it to Codex.
+  assert.deepEqual([modelInForce(state, { name: 'review', model: 'haiku' }, 'codex'), modelInForce(state, { name: 'review', model: 'haiku' }, 'claude-code')], [undefined, 'haiku'])
+  const odd = { ...state, runsOn: { 'update-tickets': 'cursor' }, models: { 'update-tickets': ' ' } } as unknown as State
+  assert.deepEqual([agentInForce(odd, cheap), modelInForce(odd, cheap, 'claude-code')], ['claude-code', 'haiku'])
+  const blank = { ...state, models: { 'update-tickets': { agent: 'claude-code', model: ' ' } } } as unknown as State
+  assert.equal(modelInForce(blank, cheap, 'claude-code'), 'haiku')
+})
+
+test("a pick of a coding agent, and of a model, is kept only where a person made one; picking an agent, or taking the pick back, takes the command's model pick with it, since a model is one agent's", () => {
+  const gpt = { agent: 'codex' as const, model: 'gpt-5.5' }
+  const haiku = { agent: 'claude-code' as const, model: 'haiku' }
+  const picked = withModel(withAgent(DEFAULT_STATE, 'update-tickets', 'codex'), 'update-tickets', gpt)
+  assert.deepEqual(picked, { ...DEFAULT_STATE, runsOn: { 'update-tickets': 'codex' }, models: { 'update-tickets': gpt } })
+  // Another agent: the model that was Codex's is no model of its own.
+  assert.deepEqual(withAgent(picked, 'update-tickets', 'claude-code'), { ...DEFAULT_STATE, runsOn: { 'update-tickets': 'claude-code' } })
+  // Taken back: no trace of either.
+  assert.deepEqual(withAgent(picked, 'update-tickets', undefined), DEFAULT_STATE)
+  assert.deepEqual(withModel(picked, 'update-tickets', undefined), { ...DEFAULT_STATE, runsOn: { 'update-tickets': 'codex' } })
+  // Another command's picks stay.
+  const two = withModel(withAgent(picked, 'triage', 'codex'), 'work-queue', haiku)
+  assert.deepEqual(withAgent(two, 'update-tickets', undefined), { ...DEFAULT_STATE, runsOn: { triage: 'codex' }, models: { 'work-queue': haiku } })
+  assert.deepEqual(withModel(two, 'work-queue', { agent: 'claude-code', model: 'sonnet' }).models, { 'update-tickets': gpt, 'work-queue': { agent: 'claude-code', model: 'sonnet' } })
+})
+
+test('nothing left of one command: its switch, publish pick, pace, number of agents, coding agent and model go, the others stay; a state that holds nothing of it is answered as it is', () => {
   const at = '2026-10-09T07:00:00.000Z'
-  const state = { ...DEFAULT_STATE, switches: { tidy: at, 'work-queue': at }, publishes: { tidy: 'merge' as const }, paces: { tidy: { every: '5m', since: at }, 'work-queue': { work: true as const } }, agents: { tidy: 3 } }
-  assert.deepEqual(withoutCommand(state, 'tidy'), { ...DEFAULT_STATE, switches: { 'work-queue': at }, paces: { 'work-queue': { work: true } } })
+  const state = { ...DEFAULT_STATE, switches: { tidy: at, 'work-queue': at }, publishes: { tidy: 'merge' as const }, paces: { tidy: { every: '5m', since: at }, 'work-queue': { work: true as const } }, agents: { tidy: 3 }, runsOn: { tidy: 'codex' as const }, models: { tidy: { agent: 'codex' as const, model: 'gpt-5.5' }, 'work-queue': { agent: 'claude-code' as const, model: 'haiku' } } }
+  assert.deepEqual(withoutCommand(state, 'tidy'), { ...DEFAULT_STATE, switches: { 'work-queue': at }, paces: { 'work-queue': { work: true } }, models: { 'work-queue': { agent: 'claude-code', model: 'haiku' } } })
   assert.equal(withoutCommand(state, 'never-heard-of'), state)
   assert.equal(withoutCommand(DEFAULT_STATE, 'tidy'), DEFAULT_STATE)
 })
 
 test("a command removed since the last tick is taken off that tick's record, the schedule it read and what it decided, and nothing else of the state changes", () => {
   const at = '2026-10-09T07:00:00.000Z'
-  const lastTick = { at, note: 'off', decisions: [{ command: 'tidy', outcome: 'not due' }, { command: 'work-queue', outcome: 'started r1', run: 'r1' }], schedule: [{ command: 'tidy', every: '1d', onThisMachine: true as const, editable: true as const }, { command: 'work-queue', when: 'npx queue' }] }
+  const lastTick = { at, note: 'off', decisions: [{ command: 'tidy', outcome: 'not due' }, { command: 'work-queue', outcome: 'started r1', run: 'r1' }], schedule: [row('tidy', { every: '1d', onThisMachine: true as const, editable: true as const }), row('work-queue', { when: 'npx queue' })] }
   const state = { ...DEFAULT_STATE, switches: { tidy: at }, lastTick }
-  assert.deepEqual(withoutListed(state, 'tidy'), { ...DEFAULT_STATE, switches: { tidy: at }, lastTick: { at, note: 'off', decisions: [{ command: 'work-queue', outcome: 'started r1', run: 'r1' }], schedule: [{ command: 'work-queue', when: 'npx queue' }] } })
+  assert.deepEqual(withoutListed(state, 'tidy'), { ...DEFAULT_STATE, switches: { tidy: at }, lastTick: { at, note: 'off', decisions: [{ command: 'work-queue', outcome: 'started r1', run: 'r1' }], schedule: [row('work-queue', { when: 'npx queue' })] } })
   // A line that says an automation of that name is not listed goes too: its file is gone.
   assert.deepEqual(withoutListed({ ...DEFAULT_STATE, lastTick: { at, decisions: [{ command: 'tidy', outcome: 'unlisted automation: it has no schedule' }], schedule: [] } }, 'tidy').lastTick, { at, decisions: [], schedule: [] })
   // Nothing of that name on the record, and no record: the state itself, so a caller can tell there is nothing to write.
@@ -157,7 +209,7 @@ test("a command removed since the last tick is taken off that tick's record, the
 
 test("what an automation kept on this machine was given goes when it goes, and when a skill has its name too: the names given up, and the state with nothing left under a name, a skill's commands with a word included", () => {
   const at = '2026-10-09T07:00:00.000Z'
-  const lastTick = { at, decisions: [], schedule: [{ command: 'answer-comments', onThisMachine: true as const }, { command: 'watch-competitor', onThisMachine: true as const }, { command: 'work-queue' }] }
+  const lastTick = { at, decisions: [], schedule: [row('answer-comments', { onThisMachine: true as const }), row('watch-competitor', { onThisMachine: true as const }), row('work-queue')] }
   const kept = { name: 'watch-competitor', text: 'Look.' }
   // Its file was removed, or renamed: the last tick listed it, this one does not.
   assert.deepEqual(namesGivenUp(lastTick, { commands: [kept, { name: 'work-queue' }] }), ['answer-comments'])
@@ -173,7 +225,7 @@ test("what an automation kept on this machine was given goes when it goes, and w
   assert.deepEqual(namesGivenUp(lastTick, { commands: [kept], clashes: ['answer-comments', 'triage'] }), ['answer-comments', 'triage'])
   assert.deepEqual(namesGivenUp(undefined, { commands: [kept] }), [])
 
-  const state = { ...DEFAULT_STATE, switches: { triage: at, 'triage quick': at, 'triage-all': at }, publishes: { 'triage quick': 'merge' as const }, paces: { 'triage consensual': { work: true as const } }, agents: { triage: 3, 'work-queue': 2 } }
-  assert.deepEqual(withoutName(state, 'triage'), { ...DEFAULT_STATE, switches: { 'triage-all': at }, agents: { 'work-queue': 2 } })
+  const state = { ...DEFAULT_STATE, switches: { triage: at, 'triage quick': at, 'triage-all': at }, publishes: { 'triage quick': 'merge' as const }, paces: { 'triage consensual': { work: true as const } }, agents: { triage: 3, 'work-queue': 2 }, runsOn: { 'triage quick': 'codex' as const, 'triage-all': 'codex' as const }, models: { 'triage consensual': { agent: 'codex' as const, model: 'haiku' } } }
+  assert.deepEqual(withoutName(state, 'triage'), { ...DEFAULT_STATE, switches: { 'triage-all': at }, agents: { 'work-queue': 2 }, runsOn: { 'triage-all': 'codex' } })
   assert.equal(withoutName(state, 'never-heard-of'), state)
 })

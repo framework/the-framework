@@ -18,11 +18,31 @@ export const OWN_TEXT_MAX = 32_000
 /** Under the state directory: the scheduler's own log. */
 export const SCHEDULER_LOG = 'scheduler.log'
 
+/** The coding agents a scheduled run can be on, by the names `agent-runner` takes. */
+export const AGENTS = ['claude-code', 'codex'] as const
+
+/** One of the coding agents a scheduled run can be on. */
+export type AgentName = (typeof AGENTS)[number]
+
+/** Whether a value names a coding agent a scheduled run can be on. */
+export function isAgent(value: unknown): value is AgentName {
+  return (AGENTS as readonly unknown[]).includes(value)
+}
+
+/** A coding agent's name for a person. */
+export const AGENT_LABELS: Readonly<Record<AgentName, string>> = { 'claude-code': 'Claude Code', codex: 'Codex' }
+
 /**
- * Where the coding agent a scheduled run is on, Claude Code, reads a project's skills. A skill that
- * is only in another folder is no command to it: typed with a slash, it expands to nothing.
+ * Where each coding agent reads a project's skills. A skill that is only in another agent's folder
+ * is no command to it: sent with a slash, it finds nothing to do.
  */
-export const RUN_SKILLS_DIR = '.claude/skills'
+export const AGENT_SKILLS_DIR: Readonly<Record<AgentName, string>> = { 'claude-code': '.claude/skills', codex: '.agents/skills' }
+
+/** The coding agent a scheduled run is on where neither its skill nor a person names one, when it can read the skill. */
+export const DEFAULT_AGENT: AgentName = 'claude-code'
+
+/** Where a shared automation is saved, and the first folder the schedule is read from: the skills folder of the agent a run is on by default. */
+export const RUN_SKILLS_DIR = AGENT_SKILLS_DIR[DEFAULT_AGENT]
 
 /** A skill's file inside its folder: its front matter may hold the skill's `schedule`. */
 export const SKILL_FILE = 'SKILL.md'
@@ -30,7 +50,7 @@ export const SKILL_FILE = 'SKILL.md'
 /** How far a run of a scheduled command publishes on a machine where nobody picked a level for it: it commits its work and pushes nothing. */
 export const DEFAULT_PUBLISH = 'commit'
 
-/** The model a scheduled run starts on when the state names none. */
+/** The model a scheduled run on Claude Code starts on when the state names none. */
 export const DEFAULT_MODEL = 'opus'
 
 /**

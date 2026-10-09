@@ -76,7 +76,7 @@ describe('a new automation', () => {
     // With a time of day, which this machine holds: at that time by time alone, from that time beside a shell line.
     expect(draftSentence(draft({ pace: every('2', 'd', '10:00') }))).toBe('Every 2 days at 10:00')
     expect(draftSentence(draft({ pace: every('1', 'w', '09:30'), when: CHECK, waitsFor: 'when someone commented' }))).toBe('Every 1 week from 09:30, when someone commented')
-    expect(draftRow(draft({ pace: every('2', 'd', '10:00') }))).toEqual({ command: 'answer-comments', on: false, publish: 'commit', every: '2d', pace: { every: '2d', at: '10:00', since: '' } })
+    expect(draftRow(draft({ pace: every('2', 'd', '10:00') }))).toEqual({ command: 'answer-comments', on: false, publish: 'commit', every: '2d', pace: { every: '2d', at: '10:00', since: '' }, home: 'claude-code', able: ['claude-code', 'codex'] })
     expect(draftRow(draft({ pace: WORK }))).toBeUndefined()
     // Before a name is typed the sentence is already there: it does not name the command.
     expect(draftSentence({ ...EMPTY_DRAFT })).toBe('Every 1 day')
@@ -148,7 +148,7 @@ describe('an automation opened from its row', () => {
 
   test("a row has one pace: the panel opens at the pace the row runs at on this machine, and saving writes the interval into the file and leaves this machine only a time of day", () => {
     const opened = openedAutomation(SHOWN)!.draft
-    const row = { command: 'answer-comments', on: true, publish: 'commit' as const, every: '15m', when: CHECK }
+    const row = { command: 'answer-comments', on: true, publish: 'commit' as const, every: '15m', when: CHECK, home: 'claude-code' as const, able: ['claude-code', 'codex'] as const }
     // Nobody picked anything here: as the file says.
     expect(atRowsPace(opened, row)).toBe(opened)
     // A time of day picked here, or another interval picked before: the row runs at it, so the panel shows it.

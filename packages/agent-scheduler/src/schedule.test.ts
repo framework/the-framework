@@ -4,8 +4,8 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseInterval } from './pace.js'
-import { checkFound, commandPrompt, FOUND_OPENING, isDue, lastRunValue, promptCommand, readSchedule, skillSchedule, FOUND_OPENING_OWN, ownAttached, skillText } from './schedule.js'
-import { FOUND_MAX } from './names.js'
+import { ableAgents, checkFound, commandPrompt, FOUND_OPENING, homeAgent, isDue, lastRunValue, promptCommand, readSchedule, skillFile, skillSchedule, FOUND_OPENING_OWN, ownAttached, skillText } from './schedule.js'
+import { AGENTS as AGENT_NAMES, AGENT_LABELS, AGENT_SKILLS_DIR, DEFAULT_AGENT, FOUND_MAX, RUN_SKILLS_DIR, isAgent } from './names.js'
 
 const CLAUDE = '.claude/skills'
 const AGENTS = '.agents/skills'
@@ -20,10 +20,10 @@ function skill(name: string, frontMatter: string): string {
 
 test("a skill's schedule names its command, its check, what the check waits for and how many agents at once; a skill with no schedule has no command", () => {
   assert.deepEqual(read('work-queue', skill('work-queue', 'schedule:\n  when: npx queue\n  waits-for: when the queue holds a task\n  agents: 2\n')), {
-    commands: [{ name: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', cap: 2, dir: CLAUDE }],
+    commands: [{ name: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', cap: 2, dir: CLAUDE, dirs: [CLAUDE] }],
     unreadable: [],
   })
-  assert.deepEqual(read('update-tickets', skill('update-tickets', 'schedule:\n  when: npx tickets due\n')).commands, [{ name: 'update-tickets', when: 'npx tickets due', cap: 1, dir: CLAUDE }])
+  assert.deepEqual(read('update-tickets', skill('update-tickets', 'schedule:\n  when: npx tickets due\n')).commands, [{ name: 'update-tickets', when: 'npx tickets due', cap: 1, dir: CLAUDE, dirs: [CLAUDE] }])
   // What the skill says it does goes with each of its commands; one that says nothing, or nothing a person can read, has none.
   assert.deepEqual(read('triage', skill('triage', 'description: "  Queue the ready tickets.  "\nschedule:\n  - word: quick\n    every: 6h\n  - word: consensual\n    every: 7d\n')).commands.map(c => [c.name, c.description]), [
     ['triage quick', 'Queue the ready tickets.'],
@@ -35,25 +35,49 @@ test("a skill's schedule names its command, its check, what the check waits for 
 })
 
 test('a row paces by time with `every`, alone or beside a check, the keys in any order; a check written as a block, with quotes and commas or over several lines, is the check as written', () => {
-  assert.deepEqual(read('plan-tickets', skill('plan-tickets', 'schedule:\n  every: 6h\n')).commands, [{ name: 'plan-tickets', every: parseInterval('6h')!, cap: 1, dir: CLAUDE }])
+  assert.deepEqual(read('plan-tickets', skill('plan-tickets', 'schedule:\n  every: 6h\n')).commands, [{ name: 'plan-tickets', every: parseInterval('6h')!, cap: 1, dir: CLAUDE, dirs: [CLAUDE] }])
   assert.deepEqual(read('plan-tickets', skill('plan-tickets', 'schedule:\n  agents: 1\n  when: npx tickets list\n  every: 30m\n')).commands, [
-    { name: 'plan-tickets', when: 'npx tickets list', every: parseInterval('30m')!, cap: 1, dir: CLAUDE },
+    { name: 'plan-tickets', when: 'npx tickets list', every: parseInterval('30m')!, cap: 1, dir: CLAUDE, dirs: [CLAUDE] },
   ])
   const check = `gh issue list --search "a, b: c" | jq '[.[] | select(.body | test("(?m)^Closes tickets/\\\\w"))]'`
   assert.deepEqual(read('update-tickets', skill('update-tickets', `schedule:\n  every: 7d\n  when: |-\n    ${check}\n`)).commands, [
-    { name: 'update-tickets', when: check, every: parseInterval('7d')!, cap: 1, dir: CLAUDE },
+    { name: 'update-tickets', when: check, every: parseInterval('7d')!, cap: 1, dir: CLAUDE, dirs: [CLAUDE] },
   ])
   // Several lines, a blank one after them, Windows line ends: the lines as written, nothing around them.
   assert.equal(read('a', skill('a', 'schedule:\n  when: |\n    one &&\n      two\n\n')).commands[0]!.when, 'one &&\n  two')
-  assert.deepEqual(read('a', skill('a', 'schedule:\n  every: 6h\n  when: npx queue\n').replaceAll('\n', '\r\n')).commands, [{ name: 'a', when: 'npx queue', every: parseInterval('6h')!, cap: 1, dir: CLAUDE }])
+  assert.deepEqual(read('a', skill('a', 'schedule:\n  every: 6h\n  when: npx queue\n').replaceAll('\n', '\r\n')).commands, [{ name: 'a', when: 'npx queue', every: parseInterval('6h')!, cap: 1, dir: CLAUDE, dirs: [CLAUDE] }])
+})
+
+test("a row may name the coding agent and the model its skill is made for; which agents can run a command is whose own skills folder holds its skill, and the agent it is made for is the one it names, else Claude Code when it can, else the one that can", () => {
+  assert.deepEqual(read('update-tickets', skill('update-tickets', 'schedule:\n  every: 15m\n  model: haiku\n')).commands, [{ name: 'update-tickets', every: parseInterval('15m')!, cap: 1, dir: CLAUDE, dirs: [CLAUDE], model: 'haiku' }])
+  assert.deepEqual(skillSchedule('review', skill('review', 'schedule:\n  every: 1d\n  agent: codex\n  model: gpt-5.5\n'), AGENTS).commands, [{ name: 'review', every: parseInterval('1d')!, cap: 1, dir: AGENTS, dirs: [AGENTS], agent: 'codex', model: 'gpt-5.5' }])
+  // Each row of a skill with several modes says its own.
+  assert.deepEqual(read('triage', skill('triage', 'schedule:\n  - word: quick\n    every: 6h\n    model: haiku\n  - word: consensual\n    every: 7d\n    agent: claude-code\n')).commands.map(c => [c.name, c.agent, c.model]), [
+    ['triage quick', undefined, 'haiku'],
+    ['triage consensual', 'claude-code', undefined],
+  ])
+  const inClaude = { dirs: [CLAUDE] }
+  const inCodex = { dirs: [AGENTS] }
+  const inBoth = { dirs: [CLAUDE, AGENTS] }
+  assert.deepEqual([ableAgents(inClaude), ableAgents(inCodex), ableAgents(inBoth)], [['claude-code'], ['codex'], ['claude-code', 'codex']])
+  // An automation kept on this machine is no skill: a run is handed its text, so every agent can run it.
+  assert.deepEqual(ableAgents({ dirs: ['.agent-scheduler/automations'], text: 'Tidy up.' }), ['claude-code', 'codex'])
+  assert.deepEqual([homeAgent(inClaude), homeAgent(inCodex), homeAgent(inBoth), homeAgent({ dirs: ['.agent-scheduler/automations'], text: 'Tidy up.' })], ['claude-code', 'codex', 'claude-code', 'claude-code'])
+  // The agent its skill names, also where that agent's folder does not hold it: the tick then says so.
+  assert.deepEqual([homeAgent({ ...inBoth, agent: 'codex' }), homeAgent({ ...inClaude, agent: 'codex' })], ['codex', 'codex'])
+  // A skill's file, in the folder it was read from or in an agent's own.
+  assert.equal(skillFile({ name: 'triage quick', dir: CLAUDE }), '.claude/skills/triage/SKILL.md')
+  assert.equal(skillFile({ name: 'triage quick', dir: CLAUDE }, AGENT_SKILLS_DIR.codex), '.agents/skills/triage/SKILL.md')
+  assert.deepEqual([AGENT_SKILLS_DIR['claude-code'], AGENT_SKILLS_DIR.codex, RUN_SKILLS_DIR, DEFAULT_AGENT, AGENT_LABELS['claude-code'], AGENT_LABELS.codex], [CLAUDE, AGENTS, CLAUDE, 'claude-code', 'Claude Code', 'Codex'])
+  assert.deepEqual([isAgent('codex'), isAgent('claude-code'), isAgent('claude'), isAgent(undefined), [...AGENT_NAMES]], [true, true, false, false, ['claude-code', 'codex']])
 })
 
 test('a skill with several modes lists one row per mode, each with the word the skill gets: the whole name is the command', () => {
   const schedule = read('triage', skill('triage', 'schedule:\n  - word: quick\n    every: 6h\n  - word: consensual\n    every: 7d\n    when: npx tickets list\n'))
   assert.deepEqual(schedule, {
     commands: [
-      { name: 'triage quick', every: parseInterval('6h')!, cap: 1, dir: CLAUDE },
-      { name: 'triage consensual', when: 'npx tickets list', every: parseInterval('7d')!, cap: 1, dir: CLAUDE },
+      { name: 'triage quick', every: parseInterval('6h')!, cap: 1, dir: CLAUDE, dirs: [CLAUDE] },
+      { name: 'triage consensual', when: 'npx tickets list', every: parseInterval('7d')!, cap: 1, dir: CLAUDE, dirs: [CLAUDE] },
     ],
     unreadable: [],
   })
@@ -70,7 +94,7 @@ test('a skill with several modes lists one row per mode, each with the word the 
   assert.equal(promptCommand('/triage quick', { commands: [], unreadable: [] }), undefined)
   assert.equal(promptCommand('Read the docs', schedule), undefined)
   assert.equal(promptCommand('triage quick', schedule), undefined, 'no slash: no skill\'s command')
-  const withQueue = { commands: [...schedule.commands, { name: 'work-queue', cap: 1, dir: '.claude/skills' }], unreadable: [] }
+  const withQueue = { commands: [...schedule.commands, { name: 'work-queue', cap: 1, dir: '.claude/skills', dirs: ['.claude/skills'] }], unreadable: [] }
   assert.equal(promptCommand('/work-queue now', withQueue), 'work-queue')
 })
 
@@ -92,6 +116,11 @@ test('a schedule the reader cannot read gives no command and says why, the row n
   assert.deepEqual(why('schedule:\n  every: 1h\n  agents: 100\n'), refused('agents is a whole number from 1 to 99'))
   assert.equal(read('a', skill('a', 'schedule:\n  every: 1h\n  agents: 99\n')).commands[0]!.cap, 99)
   assert.deepEqual(why('schedule:\n  every: 1h\n  word: Quick Wins\n'), refused('word is one word of lower-case letters, digits and dashes'))
+  assert.deepEqual(why('schedule:\n  every: 1h\n  agent: cursor\n'), refused('agent is one of claude-code, codex'))
+  assert.deepEqual(why('schedule:\n  every: 1h\n  agent: [codex]\n'), refused('agent is one of claude-code, codex'))
+  assert.deepEqual(why('schedule:\n  every: 1h\n  model: opus 5\n'), refused('model is one word, the id its coding agent knows the model by'))
+  assert.deepEqual(why('schedule:\n  every: 1h\n  model: ""\n'), refused('model is one word, the id its coding agent knows the model by'))
+  assert.deepEqual(why('schedule:\n  every: 1h\n  model: 5\n'), refused('model is one word, the id its coding agent knows the model by'))
   assert.deepEqual(why('schedule: daily\n'), refused('a row is a list of keys'))
   assert.deepEqual(why('schedule: []\n'), refused('the schedule lists no row'))
   assert.deepEqual(why('schedule:\n'), refused('the schedule lists no row'))
@@ -135,14 +164,21 @@ test("the schedule is read from both folders a coding agent reads skills from, e
 
     assert.deepEqual(await readSchedule(repo), {
       commands: [
-        { name: 'archive', every: parseInterval('2d')!, cap: 1, dir: AGENTS },
-        { name: 'plan-tickets', every: parseInterval('6h')!, cap: 1, dir: CLAUDE },
-        { name: 'review', every: parseInterval('3d')!, cap: 1, dir: AGENTS },
-        { name: 'update-tickets', every: parseInterval('1h')!, cap: 1, dir: CLAUDE },
-        { name: 'work-queue', when: 'npx queue', cap: 1, dir: CLAUDE },
+        { name: 'archive', every: parseInterval('2d')!, cap: 1, dir: AGENTS, dirs: [AGENTS] },
+        { name: 'plan-tickets', every: parseInterval('6h')!, cap: 1, dir: CLAUDE, dirs: [CLAUDE] },
+        // A folder with no SKILL.md in it holds no skill: Claude Code's `review` is none.
+        { name: 'review', every: parseInterval('3d')!, cap: 1, dir: AGENTS, dirs: [AGENTS] },
+        // Read from Claude Code's folder, and noted in the other one too, as a copy or through a link: each agent whose folder holds it can run it.
+        { name: 'update-tickets', every: parseInterval('1h')!, cap: 1, dir: CLAUDE, dirs: [CLAUDE, AGENTS] },
+        { name: 'work-queue', when: 'npx queue', cap: 1, dir: CLAUDE, dirs: [CLAUDE, AGENTS] },
       ],
       unreadable: [{ skill: 'broken', reason: 'every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)' }],
     })
+    // A link to the skill's file alone counts too; a folder of that name in the other agent's folder does not.
+    await mkdir(join(repo, '.agents', 'skills', 'plan-tickets'))
+    await symlink(join('..', '..', '..', '.claude', 'skills', 'plan-tickets', 'SKILL.md'), join(repo, '.agents', 'skills', 'plan-tickets', 'SKILL.md'))
+    await mkdir(join(repo, '.claude', 'skills', 'archive', 'SKILL.md'), { recursive: true })
+    assert.deepEqual((await readSchedule(repo)).commands.filter(c => c.name === 'plan-tickets' || c.name === 'archive').map(c => [c.name, c.dir, c.dirs]), [['archive', AGENTS, [AGENTS]], ['plan-tickets', CLAUDE, [CLAUDE, AGENTS]]])
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
@@ -165,13 +201,13 @@ test('due is a check whose JSON is not empty; a non-JSON answer is due by its te
 test("a command's prompt is its slash command; an automation kept on this machine has its name as its prompt, with no slash, and its text is handed over with it, before what its check printed", () => {
   assert.equal(commandPrompt({ name: 'work-queue' }), '/work-queue')
   const text = 'Answer each new comment below.\n\n- Be short.'
-  const own = { name: 'answer-comments', text, cap: 1, dir: '.agent-scheduler/automations' }
+  const own = { name: 'answer-comments', text, cap: 1, dir: '.agent-scheduler/automations', dirs: ['.agent-scheduler/automations'] }
   assert.equal(commandPrompt(own), 'answer-comments')
   assert.equal(ownAttached(text), text, 'started by its pace alone: its text, and nothing after it')
   assert.equal(ownAttached(text, { stdout: '\n[{"url":"u"}]\n', lastRun: '2026-10-09T10:00:00Z' }), `${text}\n\n${FOUND_OPENING_OWN}\n[{"url":"u"}]`)
   assert.equal(FOUND_OPENING_OWN, 'The scheduler starts this when its check prints something, and this time the check printed what is below. It says why this run started; what the work is, the text above says.')
   // A run is counted by its prompt, which is the name and nothing else: whatever the text says, and however it changes.
-  const schedule = { commands: [{ name: 'work-queue', cap: 1, dir: '.claude/skills' }, own], unreadable: [] }
+  const schedule = { commands: [{ name: 'work-queue', cap: 1, dir: '.claude/skills', dirs: ['.claude/skills'] }, own], unreadable: [] }
   assert.equal(promptCommand('answer-comments', schedule), 'answer-comments')
   assert.equal(promptCommand(' answer-comments\n', schedule), 'answer-comments')
   assert.equal(promptCommand('/work-queue', schedule), 'work-queue')
@@ -227,10 +263,10 @@ test("the automations a person keeps on this machine are read after the skills, 
     const schedule = await readSchedule(repo)
     // Two of them read as the tool writes one, their description a line behind, and are marked as the tool's to save again; the one whose check is written another way is not.
     assert.deepEqual(schedule.commands, [
-      { name: 'update-tickets', every: { count: 15, unit: 'm', ms: 900_000, text: '15m' }, cap: 1, dir: '.claude/skills' },
-      { name: 'answer-comments', when: 'gh api comments', waitsFor: 'when someone commented', cap: 1, dir: '.agent-scheduler/automations', description: 'What it does.', text: 'Do the job.' },
-      { name: 'longest', every: { count: 1, unit: 'h', ms: 3_600_000, text: '1h' }, cap: 1, dir: '.agent-scheduler/automations', description: 'What it does.', text: 'x'.repeat(32_000), editable: true },
-      { name: 'watch-competitor', every: { count: 1, unit: 'h', ms: 3_600_000, text: '1h' }, cap: 1, dir: '.agent-scheduler/automations', description: 'What it does.', text: '/look for threads.\n\n---\n- Tell me.', editable: true },
+      { name: 'update-tickets', every: { count: 15, unit: 'm', ms: 900_000, text: '15m' }, cap: 1, dir: '.claude/skills', dirs: ['.claude/skills'] },
+      { name: 'answer-comments', when: 'gh api comments', waitsFor: 'when someone commented', cap: 1, dir: '.agent-scheduler/automations', dirs: ['.agent-scheduler/automations'], description: 'What it does.', text: 'Do the job.' },
+      { name: 'longest', every: { count: 1, unit: 'h', ms: 3_600_000, text: '1h' }, cap: 1, dir: '.agent-scheduler/automations', dirs: ['.agent-scheduler/automations'], description: 'What it does.', text: 'x'.repeat(32_000), editable: true },
+      { name: 'watch-competitor', every: { count: 1, unit: 'h', ms: 3_600_000, text: '1h' }, cap: 1, dir: '.agent-scheduler/automations', dirs: ['.agent-scheduler/automations'], description: 'What it does.', text: '/look for threads.\n\n---\n- Tell me.', editable: true },
     ])
     assert.deepEqual(schedule.unreadable, [
       { skill: 'Loud Name', reason: 'its file is named with something other than lower-case letters, digits and dashes', own: true },

@@ -4,10 +4,10 @@ import { projectRoot } from '@openagt/skill-branches'
 import { runNow, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
 import { cleanup } from './cleanup.js'
-import { PUBLISH_PICKS, isSwitchedOn, readState, updateState, withAgents, withoutCommand, withoutListed, withPace, withPublish, withSwitch, type PublishPick, type State } from './state.js'
+import { PUBLISH_PICKS, agentInForce, isSwitchedOn, readState, updateState, withAgent, withAgents, withModel, withoutCommand, withoutListed, withPace, withPublish, withSwitch, type PublishPick, type State } from './state.js'
 import { parseInterval, parseTimeOfDay, sinceNow, takesTimeOfDay } from './pace.js'
-import { MAX_AGENTS, isAgents } from './names.js'
-import { readSchedule, type ScheduledCommand } from './schedule.js'
+import { AGENTS, AGENT_LABELS, AGENT_SKILLS_DIR, MAX_AGENTS, isAgent, isAgents } from './names.js'
+import { ableAgents, homeAgent, readSchedule, type ScheduledCommand } from './schedule.js'
 import { addAutomation, editAutomation, removeAutomation, savedAutomation, tryCheck, type AddRefusal, type ChangedSince, type NotAnAutomation } from './automation.js'
 import type { NewAutomation } from './automation-file.js'
 
@@ -24,7 +24,17 @@ export const USAGE = `usage: agent-scheduler <command>
   start [--keep-alive]          the scheduler on, ticking every minute in its own process
   stop [--unless-keep-alive]    the scheduler off; runs in flight go to the end; with the flag a keep-alive scheduler is left running
   status                        the state file, whether the scheduler's process is alive, and the schedule as the project's files say it now
-  model <id>                    the model every scheduled run starts on (this user)
+  model <id>                    the model a scheduled run on Claude Code starts on, where neither its command's skill nor you name another (this user)
+  model <command> <id|skill>    the model this machine's runs of a scheduled command start on, by the id its coding agent knows it by, the command quoted
+                                when it has a word after it; kept with the agent the command runs on here, and holding only while it runs on that agent;
+                                skill for the model its skill names again, else the scheduler's own on Claude Code and the agent's own default on Codex,
+                                taken for any name
+  agent <command> <claude-code|codex|skill>
+                                the coding agent this machine's runs of a scheduled command are on; refused for an agent whose own skills folder does not
+                                hold the command's skill (.claude/skills for Claude Code, .agents/skills for Codex); skill for the agent its skill is made
+                                for again, taken for any name; the command quoted when it has a word after it. The model picked for the command
+                                goes with either: a model is one agent's.
+                                Only Claude's quota can be read: a run on Codex starts without that question
   offset <points>               how far past the spend boundary a run may still start (this user)
   switch <command> <on|off>     whether a scheduled command runs on this machine, the command as status names it (quoted when it has a word after it); every one starts off, and off is taken for any name
   publish <command> <nothing|commit|branch|pr|merge>
@@ -52,7 +62,7 @@ export const USAGE = `usage: agent-scheduler <command>
                                 Its past runs, its switch and your picks for it stay. A shared one is a change of yours to commit: a run is told the new
                                 prompt only once the change is on the commit a run's checkout starts from. With --was, the version show answered, it is
                                 refused when the file was changed since: a form opened a while ago writes over no change made by hand
-  remove <name>                 delete an automation's file, and what this machine held for it: its switch, its pace, its number of agents, its publish pick.
+  remove <name>                 delete an automation's file, and what this machine held for it: its switch, its pace, its number of agents, its coding agent, its model, its publish pick.
                                 Nothing is committed: the deletion of a shared one is yours to commit, and everyone else keeps the command until it reaches them.
                                 What was never committed cannot be brought back: all of one kept on this machine, and a shared one's file or its last changes.
                                 The records of its past runs stay
@@ -156,9 +166,34 @@ const COMMANDS: Record<string, Command> = {
   },
 
   async model(args, io, git) {
-    const { positionals } = parse(args, {}, 1)
+    const { positionals } = parse(args, {}, 1, 2)
     const repo = await project(io.cwd, git)
-    return { ok: true, ...(await updateState(repo, s => ({ ...s, model: positionals[0]! }), git)) }
+    if (positionals.length === 1) {
+      // One word is the scheduler's own model. A command's name, or `skill`, is a model's id forgotten: taken as an id it would be every row's model.
+      const word = positionals[0]!
+      if (word === 'skill' || (await readSchedule(repo)).commands.some(c => c.name === word || c.name.split(' ')[0] === word)) throw new Usage(`${word} is no model: a command's model is set with model <command> <id|skill>`)
+      return { ok: true, ...(await updateState(repo, s => ({ ...s, model: word }), git)) }
+    }
+    const [name, to] = positionals as [string, string]
+    // Taking a model back needs no scheduled command: one left for a skill that is gone can always be taken back.
+    if (to === 'skill') return { ok: true, ...(await updateState(repo, s => withModel(s, name, undefined), git)) }
+    if (!to.trim()) throw new Usage('a model is the id its coding agent knows it by')
+    const command = await scheduled(repo, name)
+    // A model is one agent's: the pick is kept with the agent the command runs on here, and holds only while it does.
+    return { ok: true, ...(await updateState(repo, s => withModel(s, name, { agent: agentInForce(s, command), model: to }), git)) }
+  },
+
+  async agent(args, io, git) {
+    const { positionals } = parse(args, {}, 2)
+    const [name, to] = positionals as [string, string]
+    if (to !== 'skill' && !isAgent(to)) throw new Usage(`${to} is none of skill, ${AGENTS.join(', ')}`)
+    const repo = await project(io.cwd, git)
+    // Taking an agent back needs no scheduled command: one left for a skill that is gone can always be taken back.
+    if (to === 'skill') return { ok: true, ...(await updateState(repo, s => withAgent(s, name, undefined), git)) }
+    const command = await scheduled(repo, name)
+    if (!ableAgents(command).includes(to)) throw new Refused({ ok: false, reason: 'no-skill-there', command: name, agent: to }, `${AGENT_LABELS[to]} reads a project's skills from ${AGENT_SKILLS_DIR[to]}, and the skill of ${name} is only under ${command.dirs.join(' and ')}`)
+    // The agent the command is made for is no pick to keep: the command then follows its skill again. The model picked for the command goes either way: a model is one agent's.
+    return { ok: true, ...(await updateState(repo, s => withAgent(s, name, to === homeAgent(command) ? undefined : to), git)) }
   },
 
   async offset(args, io, git) {

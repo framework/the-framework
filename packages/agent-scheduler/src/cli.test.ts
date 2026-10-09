@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { recordRun } from '@openagt/agent-runner'
@@ -63,7 +63,7 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
   const repo = await testRepo()
   const elsewhere = await mkdtemp(join(tmpdir(), 'not-a-repo-'))
   try {
-    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['init', 'extra'], ['run', 'Read the docs'], ['check'], ['now'], ['now', 'work-queue', 'twice'], ['switch', 'work-queue'], ['switch', 'work-queue', 'maybe'], ['publish', 'work-queue'], ['publish', 'work-queue', 'push'], ['publish', 'work-queue', 'file']]) {
+    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['init', 'extra'], ['run', 'Read the docs'], ['check'], ['now'], ['now', 'work-queue', 'twice'], ['model', 'work-queue', 'haiku', 'extra'], ['agent'], ['agent', 'work-queue'], ['agent', 'work-queue', 'cursor'], ['agent', 'work-queue', 'codex', 'extra'], ['switch', 'work-queue'], ['switch', 'work-queue', 'maybe'], ['publish', 'work-queue'], ['publish', 'work-queue', 'push'], ['publish', 'work-queue', 'file']]) {
       const bad = await run(repo, ...argv)
       assert.equal(bad.code, 2, argv.join(' '))
       assert.equal(bad.out, undefined)
@@ -314,6 +314,85 @@ test("agents writes this machine's number of agents at once for a scheduled comm
   }
 })
 
+test("model writes the scheduler's own model with one word, and with a command and a word the model this machine's runs of that command start on; agent writes the coding agent they are on, refused for one whose skills folder does not hold the command's skill, and takes the command's model pick back; `skill` takes either back, for any name", async () => {
+  const repo = await testRepo()
+  try {
+    await writeSkill(repo, 'update-tickets', 'schedule:\n  every: 15m\n  model: haiku\n')
+    // In both agents' folders, the way a project shares one copy: either can run it.
+    await writeSkill(repo, 'review', 'schedule:\n  every: 1d\n')
+    await mkdir(join(repo, '.agents', 'skills'), { recursive: true })
+    await symlink(join('..', '..', '.claude', 'skills', 'review'), join(repo, '.agents', 'skills', 'review'))
+    type Rows = { schedule: Record<string, unknown>[] }
+    const listed = async (): Promise<unknown[]> => ((await run(repo, 'status')).out as Rows).schedule.map(c => [c['command'], c['agent'], c['model'], c['able']])
+    // What the skills say: the agent each is made for, its model when it names one, and who can run it.
+    assert.deepEqual(await listed(), [['review', 'claude-code', undefined, ['claude-code', 'codex']], ['update-tickets', 'claude-code', 'haiku', ['claude-code']]])
+
+    // One word: the scheduler's own model, as before. A command and a word: that command's, on this machine.
+    assert.equal(((await run(repo, 'model', 'sonnet')).out as { model: string }).model, 'sonnet')
+    const cheap = await run(repo, 'model', 'review', 'haiku')
+    assert.deepEqual([cheap.code, (cheap.out as { models: unknown; model: string }).models, (cheap.out as { model: string }).model], [0, { review: { agent: 'claude-code', model: 'haiku' } }, 'sonnet'])
+    await run(repo, 'model', 'update-tickets', 'opus')
+    assert.deepEqual((await readState(repo)).models, { review: { agent: 'claude-code', model: 'haiku' }, 'update-tickets': { agent: 'claude-code', model: 'opus' } })
+    await run(repo, 'model', 'update-tickets', 'skill')
+    assert.deepEqual((await readState(repo)).models, { review: { agent: 'claude-code', model: 'haiku' } })
+    // The id forgotten: a command's name, or `skill`, is no model for every row. Refused as a usage error, and the scheduler's model stays.
+    for (const word of ['review', 'update-tickets', 'skill']) assert.equal((await run(repo, 'model', word)).code, 2, word)
+    assert.equal((await readState(repo)).model, 'sonnet')
+    assert.equal((await run(repo, 'model', 'review', ' ')).code, 2)
+    // What the skills say is listed as before: this machine's picks are the state's.
+    assert.deepEqual(await listed(), [['review', 'claude-code', undefined, ['claude-code', 'codex']], ['update-tickets', 'claude-code', 'haiku', ['claude-code']]])
+
+    // An agent picked: the model picked for the command goes with it, since a model is one agent's.
+    const codex = await run(repo, 'agent', 'review', 'codex')
+    assert.deepEqual([codex.code, (codex.out as { runsOn: unknown }).runsOn, (codex.out as { models?: unknown }).models], [0, { review: 'codex' }, undefined])
+    await run(repo, 'model', 'review', 'gpt-5.5')
+    assert.deepEqual([(await readState(repo)).runsOn, (await readState(repo)).models], [{ review: 'codex' }, { review: { agent: 'codex', model: 'gpt-5.5' } }])
+    // The agent the command is made for is no pick to keep: the command follows its skill again, and Codex's model goes.
+    await run(repo, 'agent', 'review', 'claude-code')
+    assert.deepEqual([(await readState(repo)).runsOn, (await readState(repo)).models], [undefined, undefined])
+    await run(repo, 'model', 'review', 'haiku')
+    await run(repo, 'agent', 'review', 'skill')
+    assert.deepEqual([(await readState(repo)).runsOn, (await readState(repo)).models], [undefined, undefined], 'taken back: no trace of either')
+
+    // An agent whose own skills folder does not hold the command's skill cannot run it: refused, in a sentence, and nothing is written.
+    const elsewhere = await run(repo, 'agent', 'update-tickets', 'codex')
+    assert.deepEqual([elsewhere.code, elsewhere.out, elsewhere.err], [1, { ok: false, reason: 'no-skill-there', command: 'update-tickets', agent: 'codex' }, "Codex reads a project's skills from .agents/skills, and the skill of update-tickets is only under .claude/skills"])
+    await mkdir(join(repo, '.agents', 'skills', 'codex-only'), { recursive: true })
+    await writeFile(join(repo, '.agents', 'skills', 'codex-only', 'SKILL.md'), '---\nname: codex-only\nschedule:\n  every: 1d\n---\nDo the job.\n')
+    assert.equal((await run(repo, 'agent', 'codex-only', 'claude-code')).err, "Claude Code reads a project's skills from .claude/skills, and the skill of codex-only is only under .agents/skills")
+    // Codex is the agent it is made for: taken, and nothing is kept, since it follows its skill.
+    assert.equal((await run(repo, 'agent', 'codex-only', 'codex')).code, 0)
+    assert.equal((await readState(repo)).runsOn, undefined)
+    // A model picked for it is kept with the agent it runs on here.
+    assert.equal((await run(repo, 'model', 'codex-only', 'gpt-5.5')).code, 0)
+    assert.deepEqual((await readState(repo)).models, { 'codex-only': { agent: 'codex', model: 'gpt-5.5' } })
+    assert.equal((await run(repo, 'agent', 'review', 'codex')).code, 0)
+    // An automation kept on this machine is no skill: any agent can run it.
+    assert.equal((await run(repo, 'add', 'tidy', '--prompt', 'Tidy up.', '--every', '1d', '--private')).code, 0)
+    assert.equal((await run(repo, 'agent', 'tidy', 'codex')).code, 0)
+    assert.equal((await run(repo, 'model', 'tidy', 'gpt-5.5')).code, 0)
+
+    // A command no skill schedules is refused; a pick left for a skill that is gone can always be taken back.
+    assert.deepEqual((await run(repo, 'model', 'triage', 'haiku')).out, { ok: false, reason: 'not-scheduled', command: 'triage' })
+    assert.deepEqual((await run(repo, 'agent', 'triage', 'codex')).out, { ok: false, reason: 'not-scheduled', command: 'triage' })
+    assert.deepEqual([(await run(repo, 'model', 'never-heard-of', 'skill')).code, (await run(repo, 'agent', 'never-heard-of', 'skill')).code], [0, 0])
+    const before = await readState(repo)
+    assert.match((await run(repo, 'agent', 'review', 'cursor')).err, /^cursor is none of skill, claude-code, codex/)
+    assert.deepEqual(await readState(repo), before, 'a usage error writes nothing')
+
+    // Removed, or saved anew under its name: its coding agent and its model go like its other picks.
+    assert.equal((await run(repo, 'remove', 'tidy')).code, 0)
+    const after = await readState(repo)
+    assert.deepEqual([after.runsOn, after.models], [{ review: 'codex' }, { 'codex-only': { agent: 'codex', model: 'gpt-5.5' } }])
+    await writeState(repo, { ...after, runsOn: { ...after.runsOn, 'new-one': 'codex' }, models: { ...after.models, 'new-one': { agent: 'codex', model: 'gpt-5.5' } } })
+    assert.equal((await run(repo, 'add', 'new-one', '--prompt', 'Do the new thing.', '--every', '1d', '--private')).code, 0)
+    const anew = await readState(repo)
+    assert.deepEqual([anew.runsOn, anew.models], [{ review: 'codex' }, { 'codex-only': { agent: 'codex', model: 'gpt-5.5' } }], 'a name saved anew starts with nothing a command of that name left behind')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
 test("add saves a person's own automation as a command skill of the project, which its switch then takes; what cannot be saved is refused with why, and a text that opens with a dash is the flag's own", async () => {
   const repo = await testRepo()
   try {
@@ -520,12 +599,13 @@ test("status lists the schedule as the project's files say it at that moment, wi
     const added = await status()
     assert.deepEqual([added.running, added.lastTick], [false, undefined])
     assert.deepEqual(added.schedule, [
-      { command: 'answer-comments', every: '15m', when: 'gh api comments', waitsFor: 'when someone commented', description: 'Answer each new comment below.', editable: true },
-      { command: 'tidy', every: '1d', description: 'Tidy up.', onThisMachine: true, editable: true },
+      // Each with the coding agent it is made for and the ones that can run it: a shared one's skill is in Claude Code's folder alone, one kept on this machine is handed to any.
+      { command: 'answer-comments', every: '15m', when: 'gh api comments', waitsFor: 'when someone commented', description: 'Answer each new comment below.', editable: true, agent: 'claude-code', able: ['claude-code'] },
+      { command: 'tidy', every: '1d', description: 'Tidy up.', onThisMachine: true, editable: true, agent: 'claude-code', able: ['claude-code', 'codex'] },
     ])
     // Saved again: its new words and its new pace at once.
     assert.equal((await run(repo, 'edit', 'tidy', '--prompt', 'Tidy up, gently.', '--every', '2d')).code, 0)
-    assert.deepEqual((await status()).schedule[1], { command: 'tidy', every: '2d', description: 'Tidy up, gently.', onThisMachine: true, editable: true })
+    assert.deepEqual((await status()).schedule[1], { command: 'tidy', every: '2d', description: 'Tidy up, gently.', onThisMachine: true, editable: true, agent: 'claude-code', able: ['claude-code', 'codex'] })
     // A skill of the project counts the same, with how many at once when its skill says more than one.
     await writeSkill(repo, 'triage', 'description: Put the ready tickets on the queue.\nschedule:\n  every: 6h\n  agents: 2\n')
     assert.deepEqual((await status()).schedule.map(c => [c['command'], c['agents'], c['editable']]), [['answer-comments', undefined, true], ['triage', 2, undefined], ['tidy', undefined, true]])
@@ -616,16 +696,20 @@ test('try runs a check once in the project and answers what it printed and wheth
   }
 })
 
-test('now starts nothing for a command no skill schedules, or one the coding agent cannot run, and says why: a refusal, with the decision in the tick\'s words', async () => {
+test('now starts nothing for a command no skill schedules, or one its coding agent cannot run, and says why: a refusal, with the decision in the tick\'s words', async () => {
   const repo = await testRepo()
   try {
     const unknown = await run(repo, 'now', 'nope')
     assert.deepEqual([unknown.code, unknown.out], [1, { ok: false, reason: 'not-scheduled', command: 'nope' }])
+    // Made for Codex, as its skill says, and only in Claude Code's folder: Codex would find no skill of that name.
+    await writeSkill(repo, 'for-codex', 'schedule:\n  every: 1d\n  agent: codex\n')
+    const elsewhere = await run(repo, 'now', 'for-codex')
+    const outcome = 'not a command of Codex: its skill is only under .claude/skills, not .agents/skills'
+    assert.deepEqual([elsewhere.code, elsewhere.out, elsewhere.err.split('\n').at(-1)], [1, { ok: false, reason: 'not-started', command: 'for-codex', outcome }, outcome])
+    // A skill that is only in Codex's folder is Codex's to run: it gets as far as where a run's checkout starts, where nobody published it.
     await mkdir(join(repo, '.agents', 'skills', 'codex-only'), { recursive: true })
     await writeFile(join(repo, '.agents', 'skills', 'codex-only', 'SKILL.md'), '---\nname: codex-only\nschedule:\n  every: 1d\n---\nDo the job.\n')
-    const elsewhere = await run(repo, 'now', 'codex-only')
-    const outcome = 'not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills'
-    assert.deepEqual([elsewhere.code, elsewhere.out, elsewhere.err.split('\n').at(-1)], [1, { ok: false, reason: 'not-started', command: 'codex-only', outcome }, outcome])
+    assert.equal(((await run(repo, 'now', 'codex-only')).out as { outcome: string }).outcome, "not on origin/main: a run's checkout starts from origin/main, and the command's skill is not there")
     // Nothing was written for a run that never was.
     assert.equal((await readState(repo)).lastTick, undefined)
   } finally {
@@ -643,7 +727,7 @@ test('tick on a project with the scheduler off: the branch is pulled, nothing is
     assert.equal(out.note, 'off')
     assert.deepEqual(out.decisions, [])
     // The tick lists the commands the project's skills schedule, on or off: what a dashboard draws.
-    assert.deepEqual(out.schedule, [{ command: 'work-queue', when: 'echo []', waitsFor: 'when the queue holds a task' }])
+    assert.deepEqual(out.schedule, [{ command: 'work-queue', when: 'echo []', waitsFor: 'when the queue holds a task', agent: 'claude-code', able: ['claude-code'] }])
     assert.equal((await readState(repo)).lastTick?.note, 'off')
   } finally {
     await removeRepo(repo)

@@ -6,12 +6,12 @@ import { fileURLToPath } from 'node:url'
 import { readClaudeQuota } from '@openagt/agent-driver-claude'
 import { isPidAlive, markerCard, readyToRun, resumeDetached, runIdFrom, spawnRun, sweep, withdrawMarker, writeMarker } from '@openagt/agent-runner'
 import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@openagt/agent-data'
-import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
-import { inFlight, lastFailed, lastStart } from './records.js'
-import { readSchedule } from './schedule.js'
-import { isSwitchedOn, namesGivenUp, readState, stateDir, updateState, withoutListed, withoutName, withoutPid, type State, type TickRecord } from './state.js'
+import { CHECK_TIMEOUT_MS, NOW_CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
+import { inFlight, lastRuns, lastStart } from './records.js'
+import { readSchedule, type Schedule, type ScheduledCommand } from './schedule.js'
+import { isSwitchedOn, namesGivenUp, readState, stateDir, updateState, withLastRun, withoutListed, withoutName, withoutPid, type State, type TickRecord } from './state.js'
 import { atStartOf } from './start-point.js'
-import { runCheck, tick } from './tick.js'
+import { runCheck, startNow, tick, type StartedNow, type TickDeps } from './tick.js'
 
 /**
  * The tool's process side (#1774): a tick wired to the real project, and the scheduler's own small
@@ -23,18 +23,11 @@ import { runCheck, tick } from './tick.js'
 /** This package's executable, for the scheduler's own process: the bin beside `dist/`. */
 const BIN = fileURLToPath(new URL('../bin/agent-scheduler', import.meta.url))
 
-/** One tick of the real project, and the state written with what it decided. */
-export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (line: string) => void; now?: () => Date; stopped?: () => boolean } = {}): Promise<TickRecord> {
-  const git = opts.git ?? nodeGitRunner()
-  const log = opts.log ?? (() => {})
-  const now = opts.now ?? (() => new Date())
+/** A tick's hands on the real project: its records, its checks, the coding agent, and a run of `agent-runner` per start. */
+function projectDeps(repo: string, state: State, schedule: Schedule, opts: { git: GitRunner; log: (line: string) => void; now: () => Date; checkMs: number; stopped?: () => boolean }): TickDeps {
+  const { git, log, now } = opts
   const host = hostname()
-  const schedule = await readSchedule(repo)
-  // What an automation kept on this machine was given goes when it goes, and when a skill has its
-  // name too: a switch left under the name would start the skill's command unasked.
-  const givenUp = namesGivenUp((await readState(repo)).lastTick, schedule)
-  const state = givenUp.length ? await updateState(repo, s => givenUp.reduce(withoutName, s), git) : await readState(repo)
-  const decided = await tick({
+  return {
     state,
     schedule,
     host,
@@ -42,9 +35,9 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     pull: () => pullFileBranch(repo, DATA_BRANCH, { git, log }),
     sweep: () => sweep(repo, { host, isAlive: isPidAlive, now, git, log, resume: resumeDetached(repo) }),
     atStart: atStartOf(repo, git),
-    check: (shell, lastRun) => runCheck(repo, shell, CHECK_TIMEOUT_MS, lastRun),
+    check: (shell, lastRun) => runCheck(repo, shell, opts.checkMs, lastRun),
     stillOn: async command => isSwitchedOn(await readState(repo), command),
-    lastFailed: () => lastFailed(repo, schedule, host),
+    lastRuns: () => lastRuns(repo, schedule, host),
     lastStart: command => lastStart(repo, command, schedule, host),
     inFlight: command => inFlight(repo, command, schedule, host),
     ready: () => readyToRun(repo, 'claude-code'),
@@ -56,7 +49,37 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     driver: 'claude-code',
     ...(opts.stopped ? { stopped: opts.stopped } : {}),
     log,
-  })
+  }
+}
+
+/**
+ * Start one run of a scheduled command now, for a person who asked ({@link startNow}), and put it
+ * on the last tick's record as the command's last run, so whoever lists the record says so at once.
+ * It needs no scheduler running: the run is started from here. Its check has less time than a tick
+ * gives one: whoever asked waits for the answer.
+ */
+export async function runNow(repo: string, command: ScheduledCommand, opts: { git?: GitRunner; log?: (line: string) => void; now?: () => Date } = {}): Promise<StartedNow> {
+  const git = opts.git ?? nodeGitRunner()
+  const deps = projectDeps(repo, await readState(repo), await readSchedule(repo), { git, log: opts.log ?? (() => {}), now: opts.now ?? (() => new Date()), checkMs: NOW_CHECK_TIMEOUT_MS })
+  const started = await startNow(deps, command)
+  if (started.ok) {
+    const state = await readState(repo)
+    if (withLastRun(state, command.name, started.run) !== state) await updateState(repo, s => withLastRun(s, command.name, started.run), git)
+  }
+  return started
+}
+
+/** One tick of the real project, and the state written with what it decided. */
+export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (line: string) => void; now?: () => Date; stopped?: () => boolean } = {}): Promise<TickRecord> {
+  const git = opts.git ?? nodeGitRunner()
+  const log = opts.log ?? (() => {})
+  const now = opts.now ?? (() => new Date())
+  const schedule = await readSchedule(repo)
+  // What an automation kept on this machine was given goes when it goes, and when a skill has its
+  // name too: a switch left under the name would start the skill's command unasked.
+  const givenUp = namesGivenUp((await readState(repo)).lastTick, schedule)
+  const state = givenUp.length ? await updateState(repo, s => givenUp.reduce(withoutName, s), git) : await readState(repo)
+  const decided = await tick(projectDeps(repo, state, schedule, { git, log, now, checkMs: CHECK_TIMEOUT_MS, ...(opts.stopped ? { stopped: opts.stopped } : {}) }))
   let record = decided
   // A tick cut short by a stop records nothing: `stop` already took this scheduler off the state,
   // and a write now would put the state file back after a clean-up removed it.

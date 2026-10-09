@@ -48,10 +48,33 @@ export interface SchedulerCommand {
   onThisMachine?: true
   /** Whether the command is a person's own automation as the tool wrote it: the page can open it to be saved again, and remove it. */
   editable?: true
-  /** The id of the command's last run, when that run failed and no later run of it has started. */
-  failed?: string
+  /** The command's last run, when it has one: which run, when it started, and whether it failed. */
+  lastRun?: LastRun
   /** What the scheduler's last tick decided for the command, when it decided anything. */
   decision?: TickDecision
+}
+
+/** A command's last run as the scheduler lists it: the run's id, when it started (ISO), and whether it failed. */
+export interface LastRun {
+  id: string
+  at: string
+  failed?: true
+}
+
+/** A row's last run out of what `status` printed; nothing when it is not what the command promises. */
+function lastRunOf(value: unknown): LastRun | undefined {
+  const run = record(value)
+  if (typeof run['id'] !== 'string' || run['id'] === '' || !isTime(run['at'])) return undefined
+  return { id: run['id'], at: run['at'], ...(run['failed'] === true ? { failed: true as const } : {}) }
+}
+
+/**
+ * Whether a row is one a person made with "New automation", and no skill of the project: its file
+ * reads as the tool writes one, or it is kept on this machine alone. The page lists the two kinds
+ * apart.
+ */
+export function isOwn(command: Pick<SchedulerCommand, 'editable' | 'onThisMachine'>): boolean {
+  return command.editable === true || command.onThisMachine === true
 }
 
 /** A row's name as the page writes it: the command with its slash, as a person types it; an automation kept on this machine is no command to type, so its name alone. */
@@ -149,7 +172,7 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
       ...(typeof row['description'] === 'string' ? { description: row['description'] } : {}),
       ...(row['onThisMachine'] === true ? { onThisMachine: true as const } : {}),
       ...(row['editable'] === true ? { editable: true as const } : {}),
-      ...(typeof row['failed'] === 'string' && row['failed'] !== '' ? { failed: row['failed'] } : {}),
+      ...(lastRunOf(row['lastRun']) ? { lastRun: lastRunOf(row['lastRun'])! } : {}),
       ...(decision ? { decision } : {}),
     })
   }
@@ -351,25 +374,36 @@ export function publishes(command: SchedulerCommand): string {
 
 /**
  * What the scheduler last decided for a scheduled command, for a person. A command the coding
- * agent cannot run says so whatever its switch: switching it on would start nothing. Then "Off"
- * for a command switched off here, and nothing for one switched on that no tick has decided yet.
- * A decision is said in plain words where the tool's own are a rule's shorthand ("No work", "One
- * is already running"), and in the tool's words with a capital where they carry a reason only the
- * tool knows (`Quota: …`, `Check failed: …`). A command waiting for its time of day says when it
- * is next due: "Next: Saturday 10:00".
+ * agent cannot run says so whatever its switch: switching it on would start nothing. Then nothing
+ * for a command switched off here, whose row says "Off", for one switched on that no tick has
+ * decided yet, and for one the tick started, whose row says when it last ran. A decision is said in
+ * plain words where the tool's own are a rule's shorthand ("No work", "Not due yet", "One is
+ * already running"), and in the tool's words with a capital where they carry a reason only the tool
+ * knows (`Quota: …`, `Check failed: …`). A command waiting for its time of day says when it is
+ * next due: "Next: Saturday 10:00".
  */
 export function decided(command: SchedulerCommand, now: Date = new Date()): string | undefined {
-  const outcome = command.decision?.outcome
-  const elsewhere = /^not a command of the coding agent: its skill is only under (\S+),/.exec(outcome ?? '')
-  if (elsewhere) return `Cannot start: its skill is only in ${elsewhere[1]}, which Claude Code does not read`
-  if (!command.on) return 'Off'
-  if (outcome === undefined || outcome === 'switched off on this machine') return undefined
+  const elsewhere = cannotRun(command)
+  if (elsewhere) return elsewhere
+  if (!command.on) return undefined
+  return outcomeWords(command.decision?.outcome, now)
+}
+
+/** That the coding agent cannot run a command at all, as the last tick found, for a person; nothing for a command it can run. */
+export function cannotRun(command: Pick<SchedulerCommand, 'decision'>): string | undefined {
+  const elsewhere = /^not a command of the coding agent: its skill is only under (\S+),/.exec(command.decision?.outcome ?? '')
+  return elsewhere ? `Cannot start: its skill is only in ${elsewhere[1]}, which Claude Code does not read` : undefined
+}
+
+/** One decision of the scheduler, a tick's or the answer to "Run now", for a person; nothing for one the row already says in another place: that it is switched off, that it started. */
+export function outcomeWords(outcome: string | undefined, now: Date = new Date()): string | undefined {
+  if (outcome === undefined || outcome === 'switched off on this machine' || outcome.startsWith('started ')) return undefined
+  const elsewhere = cannotRun({ decision: { command: '', outcome } })
+  if (elsewhere) return elsewhere
   if (outcome === 'not due') return 'No work'
   const unpublished = /^not on (\S+?)( as this clone last saw it)?: /.exec(outcome)
   if (unpublished) return unpublished[1] === 'HEAD' ? 'Cannot start yet: its skill is not committed' : `Cannot start yet: its skill is not on ${unpublished[1]}${unpublished[2] ? ', as this machine last saw it' : ''}`
-  if (outcome.startsWith('started ')) return 'Started a run'
-  const paced = /^not due \(last start (.+) ago, /.exec(outcome)
-  if (paced) return `Started ${paced[1]} ago, not due yet`
+  if (/^not due \(last start /.test(outcome)) return 'Not due yet'
   const next = /^not due \(next start from (\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d),/.exec(outcome)
   if (next) return `Next: ${nextWords(new Date(Number(next[1]), Number(next[2]) - 1, Number(next[3]), Number(next[4]), Number(next[5])), now)}`
   const capped = /^cap reached \((\d+) in flight/.exec(outcome)

@@ -1,14 +1,17 @@
 import { describe, expect, test } from 'vitest'
-import { EMPTY_DRAFT, TEXT_MAX, addArgs, draftProblem, draftSentence, editArgs, editedWords, isUntouched, keptWhereHint, openedAutomation, paceHint, removeWarning, removedWords, savedFile, savedWords, saysTheSame, showsChangeWhen, showsWhen, startsWhen, triedLine, whereHint, type AutomationDraft } from './automation-form.js'
+import { EMPTY_DRAFT, TEXT_MAX, addArgs, atRowsPace, draftProblem, draftRow, draftSentence, editArgs, editedWords, isUntouched, keptWhereHint, openedAutomation, ownPaceArgs, paceHint, removeWarning, removedWords, savedFile, savedWords, saysTheSame, showsChangeWhen, showsWhen, startsWhen, triedLine, whereHint, type AutomationDraft, type OwnPace } from './automation-form.js'
 
 // The automation form as data: what keeps a draft from being saved, the command that saves it, the sentence its row would say, what a try answered, an automation opened from its row to be saved again, and what is said of one removed.
 
 const draft = (over: Partial<AutomationDraft> = {}): AutomationDraft => ({ ...EMPTY_DRAFT, name: 'answer-comments', prompt: 'Answer each new comment below.', ...over })
+/** A pace of every so many of a unit, as typed, with a time of day when one is given. */
+const every = (count: string, unit: 'm' | 'h' | 'd' | 'w' | 'mo' = 'd', at = ''): Extract<OwnPace, { kind: 'every' }> => ({ kind: 'every', count, unit, at })
+const WORK: OwnPace = { kind: 'work' }
 const CHECK = `gh api "repos/{owner}/{repo}/issues/comments?since=$LAST_RUN" --jq '[.[] | {url: .html_url}]'`
 
 describe('a new automation', () => {
   test('the form opens on a pace of one day and no shell line, and says what is missing, the first thing first', () => {
-    expect(EMPTY_DRAFT).toEqual({ name: '', prompt: '', paced: true, count: '1', unit: 'd', when: '', waitsFor: '', onThisMachine: false })
+    expect(EMPTY_DRAFT).toEqual({ name: '', prompt: '', when: '', waitsFor: '', pace: { kind: 'every', count: '1', unit: 'd', at: '' }, onThisMachine: false })
     expect(draftProblem(EMPTY_DRAFT)).toBe('Give it a name. It becomes the command, like /answer-comments.')
     // One kept on this machine is no command a person types.
     expect(draftProblem({ ...EMPTY_DRAFT, onThisMachine: true })).toBe('Give it a name, like answer-comments.')
@@ -16,12 +19,14 @@ describe('a new automation', () => {
     expect(draftProblem(draft({ name: 'a'.repeat(65) }))).toBe('A name is 64 characters at most.')
     expect(draftProblem(draft({ name: 'a'.repeat(64) }))).toBeUndefined()
     expect(draftProblem(draft({ prompt: ' \n' }))).toBe('Write what the agent is told.')
-    expect(draftProblem(draft({ count: '' }))).toBe('Type a whole number, from 1 to 9999.')
-    expect(draftProblem(draft({ count: '1.5' }))).toBe('Type a whole number, from 1 to 9999.')
-    expect(draftProblem(draft({ count: '0' }))).toBe('Type a whole number, from 1 to 9999.')
-    expect(draftProblem(draft({ paced: false }))).toBe('Say when it runs: on a pace, by a shell line, or both.')
-    // A count left half typed does not matter once the pace is unticked and a shell line says when.
-    expect(draftProblem(draft({ paced: false, count: '', when: CHECK }))).toBeUndefined()
+    expect(draftProblem(draft({ pace: every('') }))).toBe('Type a whole number, from 1 to 9999.')
+    expect(draftProblem(draft({ pace: every('1.5') }))).toBe('Type a whole number, from 1 to 9999.')
+    expect(draftProblem(draft({ pace: every('0') }))).toBe('Type a whole number, from 1 to 9999.')
+    expect(draftProblem(draft({ pace: WORK }))).toBe('Say when it runs: on a pace, by a shell line, or both.')
+    expect(draftProblem(draft({ pace: WORK, when: CHECK }))).toBeUndefined()
+    // A time of day goes with days or more, and one left half typed is no pace yet.
+    expect(draftProblem(draft({ pace: every('2', 'd', '10:00') }))).toBeUndefined()
+    expect(draftProblem(draft({ pace: { ...every('2'), atHalfTyped: true } }))).toBe('Finish the time, like 10:00, or clear it.')
     expect(draftProblem(draft())).toBeUndefined()
     expect(draftProblem(draft({ name: '  answer-comments  ' }))).toBeUndefined()
     // A text longer than the dashboard hands a command is said before Save, not refused after it.
@@ -35,38 +40,44 @@ describe('a new automation', () => {
 
   test('a form nothing was typed into, which Escape may close; and the words beside the pace, which say how the pace and the shell line decide together', () => {
     expect(isUntouched(EMPTY_DRAFT)).toBe(true)
-    expect(isUntouched({ ...EMPTY_DRAFT, paced: false, count: '15', unit: 'm' })).toBe(true)
+    expect(isUntouched({ ...EMPTY_DRAFT, pace: every('15', 'm') })).toBe(true)
     for (const typed of [{ name: 'a' }, { prompt: 'p' }, { when: 'w' }, { waitsFor: 'x' }]) expect(isUntouched({ ...EMPTY_DRAFT, ...typed })).toBe(false)
     expect(isUntouched({ ...EMPTY_DRAFT, onThisMachine: true })).toBe(true)
     expect(paceHint(draft())).toBe('by time alone')
-    expect(paceHint(draft({ when: CHECK }))).toBe('at most, and only when the shell line below prints something')
-    expect(paceHint(draft({ paced: false, when: CHECK }))).toBe('not on a pace: the shell line below alone says when')
-    expect(paceHint(draft({ paced: false, when: '  ' }))).toBe('not on a pace')
+    expect(paceHint(draft({ when: CHECK }))).toBe('at most, and only when the shell line prints something')
+    expect(paceHint(draft({ when: '  ' }))).toBe('by time alone')
   })
 
   test('the command that saves it: each text one argument with its flag, a pace only when ticked, the plain words only with a shell line; none while something is missing', () => {
     expect(addArgs(draft())).toEqual(['add', 'answer-comments', '--prompt=Answer each new comment below.', '--every=1d'])
-    expect(addArgs(draft({ count: ' 15 ', unit: 'm', when: `  ${CHECK}\n`, waitsFor: ' when someone commented ' }))).toEqual(['add', 'answer-comments', '--prompt=Answer each new comment below.', '--every=15m', `--when=${CHECK}`, '--waits-for=when someone commented'])
-    expect(addArgs(draft({ paced: false, when: CHECK }))).toEqual(['add', 'answer-comments', '--prompt=Answer each new comment below.', `--when=${CHECK}`])
+    expect(addArgs(draft({ pace: every(' 15 ', 'm'), when: `  ${CHECK}\n`, waitsFor: ' when someone commented ' }))).toEqual(['add', 'answer-comments', '--prompt=Answer each new comment below.', '--every=15m', `--when=${CHECK}`, '--waits-for=when someone commented'])
+    expect(addArgs(draft({ pace: WORK, when: CHECK }))).toEqual(['add', 'answer-comments', '--prompt=Answer each new comment below.', `--when=${CHECK}`])
     // Plain words typed, then the shell line cleared: they say what a line waits for, and there is none.
     expect(addArgs(draft({ waitsFor: 'when someone commented' }))).toEqual(['add', 'answer-comments', '--prompt=Answer each new comment below.', '--every=1d'])
     // A prompt that opens with a dash stays the flag's own text.
     expect(addArgs(draft({ prompt: '- Answer.\n- Be short.' }))![2]).toBe('--prompt=- Answer.\n- Be short.')
     expect(addArgs(draft({ name: '' }))).toBeUndefined()
-    expect(addArgs(draft({ paced: false }))).toBeUndefined()
+    expect(addArgs(draft({ pace: WORK }))).toBeUndefined()
+    // A time of day is this machine's: the file gets the interval alone.
+    expect(addArgs(draft({ pace: every('2', 'd', '10:00') }))).toEqual(['add', 'answer-comments', '--prompt=Answer each new comment below.', '--every=2d'])
     // Kept on this machine alone: the same command, with its flag last.
     expect(addArgs(draft({ onThisMachine: true }))).toEqual(['add', 'answer-comments', '--prompt=Answer each new comment below.', '--every=1d', '--private'])
-    expect(addArgs(draft({ onThisMachine: true, paced: false, when: CHECK, waitsFor: 'when someone commented' }))).toEqual(['add', 'answer-comments', '--prompt=Answer each new comment below.', `--when=${CHECK}`, '--waits-for=when someone commented', '--private'])
+    expect(addArgs(draft({ onThisMachine: true, pace: WORK, when: CHECK, waitsFor: 'when someone commented' }))).toEqual(['add', 'answer-comments', '--prompt=Answer each new comment below.', `--when=${CHECK}`, '--waits-for=when someone commented', '--private'])
   })
 
   test('when it would run, as its row would say it; nothing while nothing says when', () => {
     expect(draftSentence(draft())).toBe('Every 1 day')
-    expect(draftSentence(draft({ count: '15', unit: 'm', when: CHECK }))).toBe('Every 15 minutes at most, when its shell line prints something')
-    expect(draftSentence(draft({ count: '15', unit: 'm', when: CHECK, waitsFor: 'when someone commented' }))).toBe('Every 15 minutes at most, when someone commented')
-    expect(draftSentence(draft({ paced: false, when: CHECK, waitsFor: 'when someone commented' }))).toBe('When someone commented')
-    expect(draftSentence(draft({ paced: false, when: CHECK }))).toBe('When its shell line prints something')
-    expect(draftSentence(draft({ paced: false }))).toBeUndefined()
-    expect(draftSentence(draft({ count: '', when: CHECK }))).toBeUndefined()
+    expect(draftSentence(draft({ pace: every('15', 'm'), when: CHECK }))).toBe('Every 15 minutes at most, when its shell line prints something')
+    expect(draftSentence(draft({ pace: every('15', 'm'), when: CHECK, waitsFor: 'when someone commented' }))).toBe('Every 15 minutes at most, when someone commented')
+    expect(draftSentence(draft({ pace: WORK, when: CHECK, waitsFor: 'when someone commented' }))).toBe('When someone commented')
+    expect(draftSentence(draft({ pace: WORK, when: CHECK }))).toBe('When its shell line prints something')
+    expect(draftSentence(draft({ pace: WORK }))).toBeUndefined()
+    expect(draftSentence(draft({ pace: every(''), when: CHECK }))).toBeUndefined()
+    // With a time of day, which this machine holds: at that time by time alone, from that time beside a shell line.
+    expect(draftSentence(draft({ pace: every('2', 'd', '10:00') }))).toBe('Every 2 days at 10:00')
+    expect(draftSentence(draft({ pace: every('1', 'w', '09:30'), when: CHECK, waitsFor: 'when someone commented' }))).toBe('Every 1 week from 09:30, when someone commented')
+    expect(draftRow(draft({ pace: every('2', 'd', '10:00') }))).toEqual({ command: 'answer-comments', on: false, publish: 'commit', every: '2d', pace: { every: '2d', at: '10:00', since: '' } })
+    expect(draftRow(draft({ pace: WORK }))).toBeUndefined()
     // Before a name is typed the sentence is already there: it does not name the command.
     expect(draftSentence({ ...EMPTY_DRAFT })).toBe('Every 1 day')
   })
@@ -102,10 +113,10 @@ describe('an automation opened from its row', () => {
   const SHOWN = { ok: true, name: 'answer-comments', prompt: 'Answer each new comment below.', every: '15m', when: CHECK, waitsFor: 'when someone commented', file: FILE }
 
   test('what `show` answered opens the form as the file says it: the pace as a count and a unit, no pace unticked, and where it is kept; an answer the form cannot show opens nothing', () => {
-    expect(openedAutomation(SHOWN)).toEqual({ draft: { name: 'answer-comments', prompt: 'Answer each new comment below.', paced: true, count: '15', unit: 'm', when: CHECK, waitsFor: 'when someone commented', onThisMachine: false }, file: FILE })
-    // By its shell line alone: the pace is unticked, on the count and the unit a new form opens with.
-    expect(openedAutomation({ name: 'x', prompt: 'p', when: 'true', file: 'f', onThisMachine: true })).toEqual({ draft: { name: 'x', prompt: 'p', paced: false, count: '1', unit: 'd', when: 'true', waitsFor: '', onThisMachine: true }, file: 'f' })
-    expect(openedAutomation({ name: 'x', prompt: 'p', every: '2w', file: 'f' })?.draft).toMatchObject({ paced: true, count: '2', unit: 'w', when: '', waitsFor: '' })
+    expect(openedAutomation(SHOWN)).toEqual({ draft: { name: 'answer-comments', prompt: 'Answer each new comment below.', when: CHECK, waitsFor: 'when someone commented', pace: every('15', 'm'), onThisMachine: false }, file: FILE })
+    // By its shell line alone: no pace.
+    expect(openedAutomation({ name: 'x', prompt: 'p', when: 'true', file: 'f', onThisMachine: true })).toEqual({ draft: { name: 'x', prompt: 'p', when: 'true', waitsFor: '', pace: WORK, onThisMachine: true }, file: 'f' })
+    expect(openedAutomation({ name: 'x', prompt: 'p', every: '2w', file: 'f' })?.draft).toMatchObject({ pace: every('2', 'w'), when: '', waitsFor: '' })
     // Saving such a form unchanged would write the file as it is.
     expect(editArgs(openedAutomation(SHOWN)!.draft, FILE)).toEqual(['edit', 'answer-comments', '--prompt=Answer each new comment below.', '--every=15m', `--when=${CHECK}`, '--waits-for=when someone commented'])
     // Not what the command promises, or a pace the form has no fields for: nothing opens, so nothing else is saved over the file.
@@ -114,8 +125,8 @@ describe('an automation opened from its row', () => {
 
   test('saving it again runs `edit` with its name and every part the form has, a part it does not have as an empty flag that takes it out of the file, never where it is kept; nothing is to save until the form says something else', () => {
     const opened = openedAutomation(SHOWN)!.draft
-    // The pace unticked: taken out, not left as the file says it.
-    expect(editArgs({ ...opened, prompt: '- Answer in one line.', paced: false }, FILE)).toEqual(['edit', 'answer-comments', '--prompt=- Answer in one line.', '--every=', `--when=${CHECK}`, '--waits-for=when someone commented'])
+    // By the shell line alone: the pace is taken out, not left as the file says it.
+    expect(editArgs({ ...opened, prompt: '- Answer in one line.', pace: WORK }, FILE)).toEqual(['edit', 'answer-comments', '--prompt=- Answer in one line.', '--every=', `--when=${CHECK}`, '--waits-for=when someone commented'])
     // The shell line emptied: taken out, and what it waited for with it, whatever that field still holds.
     expect(editArgs({ ...opened, when: ' ' }, FILE)).toEqual(['edit', 'answer-comments', '--prompt=Answer each new comment below.', '--every=15m', '--when=', '--waits-for='])
     expect(editArgs({ ...opened, waitsFor: '' }, FILE)).toEqual(['edit', 'answer-comments', '--prompt=Answer each new comment below.', '--every=15m', `--when=${CHECK}`, '--waits-for='])
@@ -128,7 +139,29 @@ describe('an automation opened from its row', () => {
     expect(saysTheSame(opened, { ...opened })).toBe(true)
     // Blanks around a text are not part of what is saved.
     expect(saysTheSame(opened, { ...opened, prompt: `  ${opened.prompt}\n` })).toBe(true)
-    for (const change of [{ prompt: 'Other.' }, { count: '30' }, { unit: 'h' as const }, { paced: false }, { when: 'true' }, { waitsFor: 'when it rains' }]) expect(saysTheSame(opened, { ...opened, ...change }), JSON.stringify(change)).toBe(false)
+    for (const change of [{ prompt: 'Other.' }, { pace: every('30', 'm') }, { pace: every('15', 'h') }, { pace: WORK }, { when: 'true' }, { waitsFor: 'when it rains' }]) expect(saysTheSame(opened, { ...opened, ...change }), JSON.stringify(change)).toBe(false)
+  })
+
+  test("a row has one pace: the panel opens at the pace the row runs at on this machine, and saving writes the interval into the file and leaves this machine only a time of day", () => {
+    const opened = openedAutomation(SHOWN)!.draft
+    const row = { command: 'answer-comments', on: true, publish: 'commit' as const, every: '15m', when: CHECK }
+    // Nobody picked anything here: as the file says.
+    expect(atRowsPace(opened, row)).toBe(opened)
+    // A time of day picked here, or another interval picked before: the row runs at it, so the panel shows it.
+    expect(atRowsPace(opened, { ...row, pace: { every: '2d', at: '10:00', since: '' } }).pace).toEqual(every('2', 'd', '10:00'))
+    expect(atRowsPace(opened, { ...row, pace: { every: '1h', since: '' } }).pace).toEqual(every('1', 'h'))
+    expect(atRowsPace(opened, { ...row, pace: { work: true } }).pace).toEqual(WORK)
+    // What is left for this machine to hold: the time of day with its interval, else nothing of its own.
+    expect(ownPaceArgs({ ...opened, pace: every('2', 'd', '10:00') })).toEqual(['2d', '10:00'])
+    expect(ownPaceArgs({ ...opened, pace: every('2', 'd') })).toEqual(['skill'])
+    expect(ownPaceArgs({ ...opened, pace: every('15', 'm', '10:00') })).toEqual(['skill'])
+    expect(ownPaceArgs({ ...opened, pace: WORK })).toEqual(['skill'])
+    expect(ownPaceArgs({ ...opened, pace: every('') })).toBeUndefined()
+    // The interval typed goes into the file, in place of the file's.
+    expect(editArgs({ ...opened, pace: every('2', 'd', '10:00') }, FILE)![3]).toBe('--every=2d')
+    // A time of day alone changes nothing of the file.
+    expect(saysTheSame(opened, { ...opened, pace: every('15', 'm') })).toBe(true)
+    expect(saysTheSame({ ...opened, pace: every('2') }, { ...opened, pace: every('2', 'd', '10:00') })).toBe(true)
   })
 
   test('what a saved change is: a shared one is a change to commit, and an agent is told the new words only once it is where a checkout starts; one kept on this machine needs nothing', () => {
@@ -139,7 +172,9 @@ describe('an automation opened from its row', () => {
     expect(editedWords({ startsFrom: 'origin/main', onThisMachine: true })).toBe('It is kept on this machine alone: nothing to commit. The scheduler uses the new words from its next look. Its past runs, its switch and your picks for it stay.')
     expect(showsChangeWhen(true)).toBe('Its row shows the change once the scheduler has looked, within a minute.')
     expect(showsChangeWhen(false)).toBe('The scheduler is not running in this project, so its row shows the change once the scheduler runs.')
-    expect(keptWhereHint(openedAutomation(SHOWN)!)).toBe(`A skill file in this project, ${FILE}: the change is yours to commit.`)
+    expect(keptWhereHint(openedAutomation(SHOWN)!)).toBe(`Its words and its pace are in a skill file of this project, ${FILE}: a change to them is yours to commit. The rest is saved on this machine.`)
+    // A skill's row, or one whose file could not be opened: its picks alone are saved, here.
+    expect(keptWhereHint(undefined)).toBe('Saved for you, in this project, on this machine. No tracked file changes.')
     expect(keptWhereHint(openedAutomation({ ...SHOWN, file: '.agent-scheduler/automations/answer-comments.md', onThisMachine: true })!)).toBe('Kept on this machine alone, outside git: .agent-scheduler/automations/answer-comments.md.')
   })
 

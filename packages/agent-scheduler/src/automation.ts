@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile, realpath, rename, rmdir, unlink, writeFile } 
 import { dirname, join } from 'node:path'
 import { excludeFromGit, originDefaultBranch, type GitRunner } from '@openagt/agent-data'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
-import { MAX_NAME, OWN_AUTOMATIONS_DIR, OWN_TEXT_MAX, RUN_SKILLS_DIR, SKILL_FILE, STATE_DIR, TRY_TIMEOUT_MS, isCommandName } from './names.js'
+import { MAX_NAME, NEVER_STARTED_SINCE_MS, OWN_AUTOMATIONS_DIR, OWN_TEXT_MAX, RUN_SKILLS_DIR, SKILL_FILE, STATE_DIR, TRY_TIMEOUT_MS, isCommandName } from './names.js'
 import { FOLDER_LITTER, automationOf, automationSkill, frontMatterOf, wellFormed, type NewAutomation } from './automation-file.js'
 import { foundOutput, isDue, lastRunValue, readSchedule, skillFile, skillSchedule } from './schedule.js'
 import { runCheck } from './tick.js'
@@ -263,8 +263,6 @@ export async function removeAutomation(repo: string, name: string, git: GitRunne
   return { ok: true, command: name, file: found.file, git: held === undefined ? 'unknown' : held.trim() === '' ? 'nothing' : held.startsWith('A') ? 'staged' : 'committed', startsFrom }
 }
 
-/** How far back a check that is only being tried asks from: a command that does not exist yet has no last start, and "since now" would never show a person anything. */
-export const TRY_SINCE_MS = 24 * 60 * 60 * 1000
 
 /** How much of a failed check's last line of error is answered, in characters. */
 const ERROR_MAX = 500
@@ -290,7 +288,7 @@ export interface Tried {
  * the answer, and gives up before a tick would.
  */
 export async function tryCheck(repo: string, shell: string, now: Date, check: typeof runCheck = runCheck, budgetMs: number = TRY_TIMEOUT_MS): Promise<Tried> {
-  const lastRun = lastRunValue(new Date(now.getTime() - TRY_SINCE_MS).toISOString())
+  const lastRun = lastRunValue(new Date(now.getTime() - NEVER_STARTED_SINCE_MS).toISOString())
   const started = Date.now()
   const checked = await check(repo, shell, budgetMs, lastRun)
   const printed = foundOutput(checked.stdout, lastRun)

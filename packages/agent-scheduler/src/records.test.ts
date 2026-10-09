@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { markerCard, recordRun, writeMarker } from '@openagt/agent-runner'
 import { listRuns } from '@openagt/skill-logs'
-import { commandOf, inFlight, lastFailed, lastStart } from './records.js'
+import { commandOf, inFlight, lastRuns, lastStart } from './records.js'
 import { parseInterval } from './pace.js'
 import type { Schedule } from './schedule.js'
 import { removeRepo, testRepo } from './test-repo.js'
@@ -37,7 +37,7 @@ test("a run whose prompt is the name of an automation kept on this machine count
   }
 })
 
-test("the commands whose last run failed, each with that run's id: only the latest run of a command counts, so a later run that is going, ended well, was stopped or waits takes the failure's place; an automation kept on this machine counts this machine's runs alone", async () => {
+test("each command's last run, with its id and its start: the latest run of a command, and it says failed only when that run failed, so a later run that is going, ended well, was stopped or waits takes the failure's place; an automation kept on this machine counts this machine's runs alone", async () => {
   const repo = await testRepo()
   try {
     const schedule: Schedule = { commands: [...skills('work-queue', 'update-tickets', 'triage', 'plan-tickets', 'never-ran').commands, { name: 'tidy', text: 'Tidy up.', cap: 1, dir: '.agent-scheduler/automations' }], unreadable: [] }
@@ -58,9 +58,11 @@ test("the commands whose last run failed, each with that run's id: only the late
     // A failed run of no command, and a record written by hand with no time: neither is anyone's last run.
     await run('x1', '2026-09-16T11:00:00.000Z', 'failed', 'fix the tests')
     await run('q3', 'later', 'done', '/work-queue')
-    assert.deepEqual(await lastFailed(repo, schedule, 'this-box'), { 'work-queue': 'q2', tidy: 'o1' })
-    assert.deepEqual(await lastFailed(repo, schedule, 'their-box'), { 'work-queue': 'q2' })
-    assert.deepEqual(await lastFailed(repo, NONE, 'this-box'), {})
+    const at = '2026-09-16T10:00:00.000Z'
+    const shared = { 'work-queue': { id: 'q2', at, failed: true }, 'update-tickets': { id: 'u2', at }, triage: { id: 't2', at }, 'plan-tickets': { id: 'p2', at } }
+    assert.deepEqual(await lastRuns(repo, schedule, 'this-box'), { ...shared, tidy: { id: 'o1', at: '2026-09-16T09:00:00.000Z', failed: true } })
+    assert.deepEqual(await lastRuns(repo, schedule, 'their-box'), { ...shared, tidy: { id: 'o2', at } })
+    assert.deepEqual(await lastRuns(repo, NONE, 'this-box'), {})
   } finally {
     await removeRepo(repo)
   }

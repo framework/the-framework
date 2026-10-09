@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runCli } from './cli.js'
@@ -55,7 +55,7 @@ test('usage errors exit 2 with the usage on stderr and nothing on stdout; outsid
   const repo = await testRepo()
   const elsewhere = await mkdtemp(join(tmpdir(), 'not-a-repo-'))
   try {
-    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['init', 'extra'], ['run', 'Read the docs'], ['check'], ['switch', 'work-queue'], ['switch', 'work-queue', 'maybe'], ['publish', 'work-queue'], ['publish', 'work-queue', 'push'], ['publish', 'work-queue', 'file']]) {
+    for (const argv of [[], ['nope'], ['model'], ['offset', 'many'], ['status', 'extra'], ['init', 'extra'], ['run', 'Read the docs'], ['check'], ['now'], ['now', 'work-queue', 'twice'], ['switch', 'work-queue'], ['switch', 'work-queue', 'maybe'], ['publish', 'work-queue'], ['publish', 'work-queue', 'push'], ['publish', 'work-queue', 'file']]) {
       const bad = await run(repo, ...argv)
       assert.equal(bad.code, 2, argv.join(' '))
       assert.equal(bad.out, undefined)
@@ -512,6 +512,23 @@ test('try runs a check once in the project and answers what it printed and wheth
     assert.equal((await run(repo, 'try')).code, 2)
     assert.equal((await run(repo, 'try', '--when', '  ')).code, 2)
     assert.equal(await readFile(statePath(repo), 'utf8').catch(() => 'no state'), before)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('now starts nothing for a command no skill schedules, or one the coding agent cannot run, and says why: a refusal, with the decision in the tick\'s words', async () => {
+  const repo = await testRepo()
+  try {
+    const unknown = await run(repo, 'now', 'nope')
+    assert.deepEqual([unknown.code, unknown.out], [1, { ok: false, reason: 'not-scheduled', command: 'nope' }])
+    await mkdir(join(repo, '.agents', 'skills', 'codex-only'), { recursive: true })
+    await writeFile(join(repo, '.agents', 'skills', 'codex-only', 'SKILL.md'), '---\nname: codex-only\nschedule:\n  every: 1d\n---\nDo the job.\n')
+    const elsewhere = await run(repo, 'now', 'codex-only')
+    const outcome = 'not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills'
+    assert.deepEqual([elsewhere.code, elsewhere.out, elsewhere.err.split('\n').at(-1)], [1, { ok: false, reason: 'not-started', command: 'codex-only', outcome }, outcome])
+    // Nothing was written for a run that never was.
+    assert.equal((await readState(repo)).lastTick, undefined)
   } finally {
     await removeRepo(repo)
   }

@@ -97,6 +97,10 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   starts another agent only while fewer than its person's number are working, counting the
   agents of every machine that shares the repository. Picked over the number being the
   skill's alone, where letting two agents work on one machine meant editing a tracked file.
+- A person may save a prompt of their own from the Automations page. It becomes a command
+  skill of the project, a file the person commits, with a row like any skill's that starts
+  switched off. Picked over a kind of row of its own that the tool would keep: the tool
+  still names no command, and what runs still comes from the project's skills.
 - The state, `.agent-scheduler/state.json`, untracked, per user, hidden through git's
   exclude file the way `.branches/` is: on or off, keep-alive, the model, the spend
   cushion, this machine's switches, paces, numbers of agents and publish picks, the
@@ -161,7 +165,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 - The scheduler brings its own part of a dashboard: an Automations page (one row per
   scheduled command, with its switch, its pace, its number of agents and its publish pick),
   a Settings section (the spend cushion) and an Overview card (on or off, the last tick).
-  All read `status` and write through `offset`, `switch`, `pace`, `agents` and `publish`.
+  All read `status` and write through `offset`, `switch`, `pace`, `agents`, `publish` and
+  `add`; a check is tried through `try`.
   Picked over a hook line per setting that a dashboard runs, and over the dashboard reading
   the state file by name. The rows are on a page of their own, picked over rows inside
   Settings: Settings keeps only what reaches every project.

@@ -21,7 +21,8 @@ const commit = async (repo: string, message: string): Promise<void> => {
 /** A second clone of the project's origin, with its own author. */
 async function otherClone(repo: string): Promise<string> {
   const other = `${repo}-other`
-  await git(['clone', '-q', join(repo, '..', 'origin.git'), other], join(repo, '..'))
+  // The branch by name: a bare origin's own HEAD may name a branch that does not exist, and the clone would then be empty.
+  await git(['clone', '-q', '-b', 'main', join(repo, '..', 'origin.git'), other], join(repo, '..'))
   await git(['config', 'user.email', 'other@example.com'], other)
   await git(['config', 'user.name', 'other'], other)
   return other

@@ -45,7 +45,7 @@ test('an automation becomes a command skill: the prompt is its text, its first l
     ].join('\n'),
   )
   assert.deepEqual(skillSchedule('answer-comments', text, '.claude/skills'), {
-    commands: [{ name: 'answer-comments', when: CHECK, every: { count: 15, unit: 'm', ms: 15 * 60_000, text: '15m' }, waitsFor: 'when someone commented: at last', cap: 1, dir: '.claude/skills', description: 'Answer: each new comment below.' }],
+    commands: [{ name: 'answer-comments', when: CHECK, every: { count: 15, unit: 'm', ms: 15 * 60_000, text: '15m' }, waitsFor: 'when someone commented: at last', cap: 1, dir: '.claude/skills', dirs: ['.claude/skills'], description: 'Answer: each new comment below.' }],
     unreadable: [],
   })
   // A check of several lines, and a prompt whose own text holds a line of dashes.
@@ -54,7 +54,7 @@ test('an automation becomes a command skill: the prompt is its text, its first l
   assert.equal(skillSchedule('m', several, '.claude/skills').commands[0]!.when, lines)
   assert.ok(several.endsWith('---\n\nFirst.\n---\nLast.\n'))
   // By a pace alone: no check, and no line saying what one waits for.
-  assert.deepEqual(skillSchedule('daily', automationSkill({ name: 'daily', prompt: 'Tidy up.', every: '1d' }), '.claude/skills').commands, [{ name: 'daily', every: { count: 1, unit: 'd', ms: 86_400_000, text: '1d' }, cap: 1, dir: '.claude/skills', description: 'Tidy up.' }])
+  assert.deepEqual(skillSchedule('daily', automationSkill({ name: 'daily', prompt: 'Tidy up.', every: '1d' }), '.claude/skills').commands, [{ name: 'daily', every: { count: 1, unit: 'd', ms: 86_400_000, text: '1d' }, cap: 1, dir: '.claude/skills', dirs: ['.claude/skills'], description: 'Tidy up.' }])
   // A long first line is cut for the description, never for the prompt.
   const long = 'x'.repeat(400)
   const cut = automationSkill({ name: 'long', prompt: long, every: '1d' })

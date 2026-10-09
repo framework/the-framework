@@ -13,12 +13,12 @@ const mark = { host: 'this-box', pid: 4242 }
 const NONE: Schedule = { commands: [], unreadable: [] }
 
 /** A schedule of skills' commands, by name. */
-const skills = (...names: string[]): Schedule => ({ commands: names.map(name => ({ name, cap: 1, dir: '.claude/skills' })), unreadable: [] })
+const skills = (...names: string[]): Schedule => ({ commands: names.map(name => ({ name, cap: 1, dir: '.claude/skills', dirs: ['.claude/skills'] })), unreadable: [] })
 
 test("a run whose prompt is the name of an automation kept on this machine counts for that automation, whatever its text was when it ran, and on this machine alone: another person's automation of the same name is another one", async () => {
   const repo = await testRepo()
   try {
-    const schedule: Schedule = { commands: [{ name: 'answer-comments', text: 'Answer each new comment below, in two lines.', cap: 1, dir: '.agent-scheduler/automations' }], unreadable: [] }
+    const schedule: Schedule = { commands: [{ name: 'answer-comments', text: 'Answer each new comment below, in two lines.', cap: 1, dir: '.agent-scheduler/automations', dirs: ['.agent-scheduler/automations'] }], unreadable: [] }
     await writeMarker(repo, markerCard({ id: 'o1', startedAt: '2026-09-16T14:01:00.000Z', prompt: 'answer-comments', driver: 'claude-code', model: 'opus', mark }))
     await recordRun(repo, { id: 'o0', startedAt: '2026-09-16T09:00:00.000Z', status: 'done', intent: 'answer-comments', caller: { runner: { host: 'this-box' } } }, [])
     // A plain prompt that happens to be the automation's text, one that starts with its name, and the name typed as a command, are other runs.
@@ -40,7 +40,7 @@ test("a run whose prompt is the name of an automation kept on this machine count
 test("each command's last run, with its id and its start: the latest run of a command, and it says failed only when that run failed, so a later run that is going, ended well, was stopped or waits takes the failure's place; an automation kept on this machine counts this machine's runs alone", async () => {
   const repo = await testRepo()
   try {
-    const schedule: Schedule = { commands: [...skills('work-queue', 'update-tickets', 'triage', 'plan-tickets', 'never-ran').commands, { name: 'tidy', text: 'Tidy up.', cap: 1, dir: '.agent-scheduler/automations' }], unreadable: [] }
+    const schedule: Schedule = { commands: [...skills('work-queue', 'update-tickets', 'triage', 'plan-tickets', 'never-ran').commands, { name: 'tidy', text: 'Tidy up.', cap: 1, dir: '.agent-scheduler/automations', dirs: ['.agent-scheduler/automations'] }], unreadable: [] }
     const run = (id: string, startedAt: string, status: 'done' | 'failed' | 'stopped' | 'waiting' | 'running', intent: string, host = 'this-box') => recordRun(repo, { id, startedAt, status, intent, caller: { runner: { host } } }, [])
     // Failed last, after a good one: said, with the failed run's id.
     await run('q1', '2026-09-16T09:00:00.000Z', 'done', '/work-queue')
@@ -110,7 +110,7 @@ test("in flight counts the running cards of one skill's command, whatever the ma
 })
 
 test("a run counts for the skill's command its prompt names with a slash, else for the one its first word is; a prompt that names no scheduled command, a prompt with no slash, and a run agent-runner did not start count for none", () => {
-  const schedule: Schedule = { commands: [{ name: 'triage quick', every: parseInterval('6h')!, cap: 1, dir: '.claude/skills' }, { name: 'triage', every: parseInterval('7d')!, cap: 1, dir: '.claude/skills' }, { name: 'work-queue', when: 'npx queue', cap: 1, dir: '.claude/skills' }, { name: 'post-merge-cleanup', every: parseInterval('1h')!, cap: 1, dir: '.claude/skills' }], unreadable: [] }
+  const schedule: Schedule = { commands: [{ name: 'triage quick', every: parseInterval('6h')!, cap: 1, dir: '.claude/skills', dirs: ['.claude/skills'] }, { name: 'triage', every: parseInterval('7d')!, cap: 1, dir: '.claude/skills', dirs: ['.claude/skills'] }, { name: 'work-queue', when: 'npx queue', cap: 1, dir: '.claude/skills', dirs: ['.claude/skills'] }, { name: 'post-merge-cleanup', every: parseInterval('1h')!, cap: 1, dir: '.claude/skills', dirs: ['.claude/skills'] }], unreadable: [] }
   const card = (intent: string) => markerCard({ id: 'x', startedAt: '2026-09-16T14:01:00.000Z', prompt: intent, driver: 'claude-code', mark })
   const of = (intent: string, among: Schedule = schedule) => commandOf(card(intent), among, 'this-box')
   assert.equal(of('/triage quick'), 'triage quick')

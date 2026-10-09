@@ -1,15 +1,16 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { Button, cn, useModuleHost, type ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick } from '../src/state.js'
-import { MAX_AGENTS } from '../src/names.js'
+import { AGENTS, AGENT_LABELS, AGENT_SKILLS_DIR, DEFAULT_AGENT, MAX_AGENTS, type AgentName } from '../src/names.js'
 import { MAX_COUNT, PACE_UNITS, takesTimeOfDay, type PaceUnit } from '../src/pace.js'
 import { triedLine, type TriedLine } from './automation-form.js'
-import { UNIT_WORDS, publishChoices, publishLabel, type AgentsDraft, type PaceDraft } from './schedulers.js'
+import { UNIT_WORDS, modelLabel, publishChoices, publishLabel, type AgentModels, type AgentsDraft, type PaceDraft, type SchedulerCommand } from './schedulers.js'
 
 // The fields of the Automations page, shared by the Edit panel of a row and the "New automation"
 // form, so a thing is picked the same way wherever it is picked: what the agent is told and the
 // shell line that says there is work, with "Try it"; when a row runs, the one pace control; how
-// many agents may work on it at once; and how far its runs publish.
+// many agents may work on it at once; which coding agent and which model its runs are on; and how
+// far its runs publish.
 
 const field = 'rounded-md border border-border bg-background px-2 py-1 text-sm disabled:opacity-50'
 
@@ -247,5 +248,79 @@ export function PublishField({ gitHost, own, pick, disabled, onChange }: { gitHo
         </option>
       ))}
     </select>
+  )
+}
+
+/** The model a row's runs start on, while a person picks: the one that follows from its skill and the scheduler (`skill`), or a model's id. */
+export type ModelDraft = 'skill' | (string & {})
+
+/**
+ * "Which agent" and "Which model": the coding agent a row's runs are on, and the model they start
+ * on. An agent whose own skills folder does not hold the row's skill cannot run it, and is
+ * offered greyed with why. The models are the picked agent's own list; the first choice is the
+ * one that follows when nobody picks: what the skill names, else the scheduler's model on Claude
+ * Code, else the agent's own default. Picking another agent starts its model from that choice.
+ */
+export function RunsOnFields({
+  command,
+  schedulerModel,
+  agents,
+  agent,
+  model,
+  disabled,
+  onChange,
+}: {
+  command: Pick<SchedulerCommand, 'skillModel' | 'skillModelAgent' | 'able'>
+  /** The scheduler's own model, which a run on Claude Code starts on when nothing else names one. */
+  schedulerModel: string | undefined
+  /** Every coding agent with the models it lists. */
+  agents: readonly AgentModels[]
+  agent: AgentName
+  model: ModelDraft
+  disabled: boolean
+  onChange: (next: { agent: AgentName; model: ModelDraft }) => void
+}) {
+  const lists = agents.find(a => a.value === agent)
+  const listed = lists?.models ?? []
+  const follows = agent === command.skillModelAgent && command.skillModel !== undefined ? `As the skill says (${modelLabel(agents, agent, command.skillModel)})` : agent === DEFAULT_AGENT ? `The scheduler's model${schedulerModel !== undefined ? ` (${modelLabel(agents, agent, schedulerModel)})` : ''}` : `${AGENT_LABELS[agent]}'s own default`
+  const unable = AGENTS.filter(a => !command.able.includes(a))
+  return (
+    <fieldset disabled={disabled} className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <label htmlFor="automation-agent" className="w-14">
+          Agent
+        </label>
+        <select id="automation-agent" value={agent} onChange={e => onChange({ agent: e.target.value as AgentName, model: 'skill' })} className={field}>
+          {AGENTS.map(a => (
+            <option key={a} value={a} disabled={!command.able.includes(a) && a !== agent}>
+              {AGENT_LABELS[a]}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <label htmlFor="automation-model" className="w-14">
+          Model
+        </label>
+        <select id="automation-model" value={model} onChange={e => onChange({ agent, model: e.target.value })} className={field}>
+          <option value="skill">{follows}</option>
+          {listed.map(m => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+          {/* A model picked before that the agent does not list, or has not listed yet, is still the pick. */}
+          {model !== 'skill' && !listed.some(m => m.value === model) && <option value={model}>{model}</option>}
+        </select>
+      </div>
+      {/* Why the agent's own models are not offered: it is still being asked, or could not say. A model can still be picked by its id from the command line. */}
+      {listed.length === 0 && lists?.modelsNote !== undefined && <p className="text-xs text-muted-foreground">{lists.modelsNote}</p>}
+      {unable.map(a => (
+        <p key={a} className="text-xs text-muted-foreground">
+          {AGENT_LABELS[a]} cannot run this row: it reads the project's skills from <span className="font-mono">{AGENT_SKILLS_DIR[a]}</span>, and this row's skill is not there.
+        </p>
+      ))}
+      {agent !== DEFAULT_AGENT && <p className="text-xs text-muted-foreground">How much of {AGENT_LABELS[agent]}'s quota is left cannot be read, so its runs start without that check, and their cost is not recorded.</p>}
+    </fieldset>
   )
 }

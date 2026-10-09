@@ -2,13 +2,13 @@ import type { DriverQuota, DriverReadiness } from '@openagt/agent-driver'
 import { markerCard, runnerMark, type Publish, type RunnerMark } from '@openagt/agent-runner'
 import type { FileBranchWrite } from '@openagt/agent-data'
 import type { RunCard } from '@openagt/skill-logs'
-import { LAST_RUN_ENV, NEVER_STARTED_SINCE_MS, NOW_READY_MS, RUN_SKILLS_DIR } from './names.js'
+import { AGENT_LABELS, AGENT_SKILLS_DIR, DEFAULT_AGENT, LAST_RUN_ENV, NEVER_STARTED_SINCE_MS, NOW_READY_MS, type AgentName } from './names.js'
 import type { LastRun } from './records.js'
 import { dueFrom, localStamp, paceInForce, paceText } from './pace.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
-import { checkFound, commandPrompt, isDue, lastRunValue, ownAttached, skillFile, type Schedule, type ScheduledCommand } from './schedule.js'
+import { ableAgents, checkFound, commandPrompt, homeAgent, isDue, lastRunValue, ownAttached, skillFile, type Schedule, type ScheduledCommand } from './schedule.js'
 import type { StartPoint } from './start-point.js'
-import { capInForce, publishInForce, switchedOnAt, type ListedCommand, type State, type TickDecision, type TickRecord } from './state.js'
+import { agentInForce, capInForce, modelInForce, publishInForce, switchedOnAt, type ListedCommand, type State, type TickDecision, type TickRecord } from './state.js'
 
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
@@ -48,16 +48,15 @@ export interface TickDeps {
   /** When the command last started on any machine, ISO; nothing when it never did. */
   lastStart: (command: string) => Promise<string | undefined>
   inFlight: (command: string) => Promise<RunCard[]>
-  /** Whether the coding agent's CLI can start a session: a missing or logged-out one starts nothing. */
-  ready: () => Promise<DriverReadiness>
+  /** Whether a coding agent's CLI can start a session: a missing or logged-out one starts nothing. */
+  ready: (agent: AgentName) => Promise<DriverReadiness>
+  /** How much of Claude's quota is used: the one agent whose quota can be read. */
   quota: () => Promise<DriverQuota>
   mint: () => string
   writeMarker: (card: RunCard) => Promise<FileBranchWrite>
   withdrawMarker: (id: string) => Promise<unknown>
   /** Start the run's process, detached; resolves once it is spawned. `startedAt` is the start its record keeps, `attached` what the agent is handed with the prompt. */
-  spawn: (run: { id: string; prompt: string; startedAt: string; model: string; publish?: Publish; attached?: string }) => Promise<void>
-  /** The driver's id, for the marker's card. */
-  driver: string
+  spawn: (run: { id: string; prompt: string; startedAt: string; driver: AgentName; model?: string; publish?: Publish; attached?: string }) => Promise<void>
   /** Whether the scheduler was told to stop while this tick runs: then nothing more is started. */
   stopped?: () => boolean
   log?: (line: string) => void
@@ -74,7 +73,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
   if (!deps.state.on) return { ...record, note: 'off' }
   if (record.decisions.length === 0 && deps.schedule.commands.length === 0) return { ...record, note: 'no skill of this project schedules a command' }
 
-  const held: Readings = {}
+  const held: Readings = { readiness: {} }
   for (const command of deps.schedule.commands) {
     const { outcome, started } = await decide(deps, command, held)
     record.decisions.push({ command: command.name, outcome, ...(started ? { run: started.id } : {}) })
@@ -102,14 +101,16 @@ export async function startNow(deps: TickDeps, command: ScheduledCommand, clock:
   const giveUpAt = clock() + NOW_READY_MS
   const pulled = await deps.pull()
   if (!pulled.ok) return { ok: false, outcome: `agent-data could not be pulled: ${pulled.error}` }
-  const decision = await decide(deps, command, {}, { late: () => clock() > giveUpAt })
+  const decision = await decide(deps, command, { readiness: {} }, { late: () => clock() > giveUpAt })
   return decision.started ? { ok: true, run: decision.started } : { ok: false, outcome: decision.outcome }
 }
 
 /** What a tick reads once and holds for every command it decides: each reading spawns the agent's CLI. */
 interface Readings {
-  readiness?: DriverReadiness
-  quota?: ReturnType<typeof quotaHeadroom>
+  /** Per coding agent. */
+  readiness: Partial<Record<AgentName, DriverReadiness>>
+  /** Claude's usage, the one quota that can be read; the headroom it leaves is worked out per model. */
+  quota?: DriverQuota
 }
 
 /**
@@ -120,8 +121,11 @@ interface Readings {
  * written is given up.
  */
 async function decide(deps: TickDeps, command: ScheduledCommand, held: Readings, byHand?: { late: () => boolean }): Promise<{ outcome: string; started?: LastRun }> {
+  // The coding agent the run would be on, and its model: this machine's picks, else what the command's skill is made for.
+  const agent = agentInForce(deps.state, command)
+  const model = modelInForce(deps.state, command, agent)
   // An automation kept on this machine is no skill: a run is handed its text, so no folder and no commit has to hold it.
-  if (command.text === undefined && command.dir !== RUN_SKILLS_DIR) return { outcome: `not a command of the coding agent: its skill is only under ${command.dir}, not ${RUN_SKILLS_DIR}` }
+  if (!ableAgents(command).includes(agent)) return { outcome: `not a command of ${AGENT_LABELS[agent]}: its skill is only under ${command.dirs.join(' and ')}, not ${AGENT_SKILLS_DIR[agent]}` }
   const switchedOn = switchedOnAt(deps.state, command.name)
   if (switchedOn === undefined && !byHand) return { outcome: 'switched off on this machine' }
   // When the command is asked about: the start of a run started now. The next check's "since the
@@ -153,15 +157,19 @@ async function decide(deps: TickDeps, command: ScheduledCommand, held: Readings,
   // A run's checkout starts from the project's published commit, not from the files here: a skill
   // that is not there is no command to the agent. Asked only now, when a run would start: it fetches.
   if (command.text === undefined) {
-    const start = await deps.atStart(skillFile(command))
+    const start = await deps.atStart(skillFile(command, AGENT_SKILLS_DIR[agent]))
     if (!start.there) return { outcome: `not on ${start.ref}${start.reached ? '' : ' as this clone last saw it'}: a run's checkout starts from ${start.ref}, and the command's skill is not there` }
   }
   // Both read once per tick, and only now: each spawns the agent's CLI.
-  held.readiness ??= await deps.ready()
-  if (held.readiness.problems.length > 0) return { outcome: `not ready: ${held.readiness.problems.join(' ')}` }
+  const readiness = (held.readiness[agent] ??= await deps.ready(agent))
+  if (readiness.problems.length > 0) return { outcome: `not ready: ${readiness.problems.join(' ')}` }
   if (!byHand) {
-    held.quota ??= quotaHeadroom(await boundary(deps))
-    if (!held.quota.start) return { outcome: `quota: ${held.quota.reason}` }
+    // Only Claude's quota can be read: a run on any other agent starts without the question, and that agent says so itself when it has none left.
+    if (agent === 'claude-code') {
+      held.quota ??= await deps.quota().catch((): DriverQuota => ({ available: false, reason: 'fetch-failed' }))
+      const headroom = quotaHeadroom(held.quota.available ? quotaBoundaryStatus({ windows: held.quota.windows, now: deps.now().getTime(), ...(model !== undefined ? { model } : {}), limitOffset: deps.state.spendOffset }) : undefined)
+      if (!headroom.start) return { outcome: `quota: ${headroom.reason}` }
+    }
     // The stop may have come in during the readings above: a stopped scheduler starts nothing.
     if (deps.stopped?.()) return { outcome: 'not started: the scheduler was stopped' }
     // So may a person's switch: the check and the readings take seconds, and a command switched off or removed meanwhile starts nothing.
@@ -176,7 +184,7 @@ async function decide(deps: TickDeps, command: ScheduledCommand, held: Readings,
   const level = publishInForce(deps.state, command.name)
   const publish = level !== undefined ? { publish: level } : {}
   const mark: RunnerMark = { host: deps.host, ...publish }
-  const marked = await deps.writeMarker(markerCard({ id, startedAt: now.toISOString(), prompt, driver: deps.driver, model: deps.state.model, mark }))
+  const marked = await deps.writeMarker(markerCard({ id, startedAt: now.toISOString(), prompt, driver: agent, ...(model !== undefined ? { model } : {}), mark }))
   if (!marked.ok) {
     // The commit stayed local and would ride a later push: taken back, so no record says running for a run that never was.
     await deps.withdrawMarker(id)
@@ -197,7 +205,7 @@ async function decide(deps: TickDeps, command: ScheduledCommand, held: Readings,
     return { outcome: `cap reached (${others.length} in flight: ${others.map(describe).join(', ')})` }
   }
   try {
-    await deps.spawn({ id, prompt, startedAt: now.toISOString(), model: deps.state.model, ...publish, ...(attached !== undefined ? { attached } : {}) })
+    await deps.spawn({ id, prompt, startedAt: now.toISOString(), driver: agent, ...(model !== undefined ? { model } : {}), ...publish, ...(attached !== undefined ? { attached } : {}) })
     return { outcome: `started ${id}`, started: { id, at: now.toISOString() } }
   } catch (err) {
     // No record says running for a run that never was.
@@ -214,7 +222,7 @@ function latest(a: string | undefined, b: string | undefined): string | undefine
 
 /** A command as a dashboard lists it: what its skill says; not this machine's switch or picks, which the state carries, nor its runs, which the records do. */
 export function listed(command: ScheduledCommand): ListedCommand {
-  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}), ...(command.cap > 1 ? { agents: command.cap } : {}), ...(command.text !== undefined ? { onThisMachine: true as const } : {}), ...(command.editable ? { editable: true as const } : {}) }
+  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}), ...(command.cap > 1 ? { agents: command.cap } : {}), ...(command.text !== undefined ? { onThisMachine: true as const } : {}), ...(command.editable ? { editable: true as const } : {}), agent: homeAgent(command), ...(command.model !== undefined ? { model: command.model, modelAgent: command.agent ?? DEFAULT_AGENT } : {}), able: ableAgents(command) }
 }
 
 /** An age for a decision line: `less than a minute`, `12m`, `3h`, `2d`, floored. */
@@ -230,12 +238,6 @@ function age(ms: number): string {
 function describe(card: RunCard): string {
   const host = runnerMark(card)?.host
   return host ? `${card.id} on ${host}` : card.id
-}
-
-async function boundary(deps: TickDeps) {
-  const reading = await deps.quota().catch((): DriverQuota => ({ available: false, reason: 'fetch-failed' }))
-  if (!reading.available) return undefined
-  return quotaBoundaryStatus({ windows: reading.windows, now: deps.now().getTime(), model: deps.state.model, limitOffset: deps.state.spendOffset })
 }
 
 /** Run a check at the repository root through the shell, within its budget; the check reads `lastRun` as `$LAST_RUN`. */

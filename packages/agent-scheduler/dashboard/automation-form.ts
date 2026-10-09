@@ -1,4 +1,4 @@
-import { MAX_NAME, isCommandName } from '../src/names.js'
+import { AGENTS, DEFAULT_AGENT, MAX_NAME, isCommandName } from '../src/names.js'
 import { parseInterval } from '../src/pace.js'
 import { draftOf, pace, paceArgs, paceProblem, type PaceDraft, type SchedulerCommand } from './schedulers.js'
 
@@ -155,7 +155,7 @@ export function draftRow(draft: AutomationDraft): SchedulerCommand | undefined {
   const when = draft.when.trim()
   if (!args || (every === undefined && when === '')) return undefined
   const waitsFor = draft.waitsFor.trim()
-  return { command: draft.name.trim(), on: false, publish: 'commit', ...(every !== undefined ? { every } : {}), ...(when !== '' ? { when, ...(waitsFor !== '' ? { waitsFor } : {}) } : {}), ...(every !== undefined && args[1] !== undefined ? { pace: { every, at: args[1], since: '' } } : {}) }
+  return { command: draft.name.trim(), on: false, publish: 'commit', home: DEFAULT_AGENT, able: AGENTS, ...(every !== undefined ? { every } : {}), ...(when !== '' ? { when, ...(waitsFor !== '' ? { waitsFor } : {}) } : {}), ...(every !== undefined && args[1] !== undefined ? { pace: { every, at: args[1], since: '' } } : {}) }
 }
 
 /** When a draft would run, as the sentence its row would say; nothing while it has no pace and no shell line that could say. */

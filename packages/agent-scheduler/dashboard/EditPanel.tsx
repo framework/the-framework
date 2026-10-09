@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Button, type ModuleCommandResult, type ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick } from '../src/state.js'
-import { MAX_AGENTS, OWN_AUTOMATIONS_DIR } from '../src/names.js'
+import { MAX_AGENTS, OWN_AUTOMATIONS_DIR, type AgentName } from '../src/names.js'
 import { parseInterval, parseTimeOfDay } from '../src/pace.js'
 import { atRowsPace, draftProblem, draftRow, editArgs, editedWords, keptWhereHint, ownPaceArgs, paceHint, removeWarning, removedWords, savedFile, saysTheSame, type AutomationDraft, type OpenedAutomation, type OwnPace } from './automation-form.js'
-import { AgentsFields, PaceFields, PublishField, SaidFields, SaidShown, Section } from './fields.js'
-import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, draftOf, isOwn, pace, paceArgs, paceProblem, publishes, rowTitle, saysAtOnce, withDraft, type AgentsDraft, type PaceDraft, type SchedulerCommand } from './schedulers.js'
+import { AgentsFields, PaceFields, PublishField, RunsOnFields, SaidFields, SaidShown, Section, type ModelDraft } from './fields.js'
+import { agentOf, agentsArgs, agentsDraftOf, atOnce, atOnceWords, draftOf, isOwn, pace, runsOnWords, paceArgs, paceProblem, publishes, rowTitle, saysAtOnce, withDraft, type AgentModels, type AgentsDraft, type PaceDraft, type SchedulerCommand } from './schedulers.js'
 
 // The Edit panel of the Automations page: one panel, with the same parts in the same order, for
-// every row. What it does; when it runs; how many agents at once; what its runs publish.
+// every row. What it does; when it runs; how many agents at once; what it runs on, a coding agent
+// and a model; what its runs publish.
 //
 // A row that comes from a skill of the project shows what it does greyed, since its words are the
-// skill's, and its three picks are this machine's: `agent-scheduler pace`, `agents` and `publish`,
-// and no tracked file changes. Its pace may follow the skill.
+// skill's, and its picks are this machine's: `agent-scheduler pace`, `agents`, `agent`, `model` and
+// `publish`, and no tracked file changes. Its pace may follow the skill.
 //
 // A row a person made with "New automation" opens with its own words to change: what the agent is
 // told, and its shell line. Its pace is picked in the same place and is the automation's own,
@@ -46,6 +47,8 @@ export function EditPanel({
   scheduled,
   opened,
   refused,
+  schedulerModel,
+  agents: codingAgents,
   run,
   reload,
   onDirty,
@@ -58,6 +61,10 @@ export function EditPanel({
   opened?: OpenedAutomation | undefined
   /** Why the file of a row a person made could not be opened. */
   refused?: string | undefined
+  /** The scheduler's own model: what a run on Claude Code starts on when neither its skill nor a person names another. */
+  schedulerModel: string | undefined
+  /** Every coding agent with the models it lists. */
+  agents: readonly AgentModels[]
   /** Run one command of the scheduler in the project, in turn with the page's other saves. */
   run: (args: string[]) => Promise<ModuleCommandResult>
   /** Read the rows again: a save is over once what it saved has been read back. */
@@ -76,6 +83,7 @@ export function EditPanel({
   const [own, setOwn] = useState<AutomationDraft | undefined>(base)
   const [paceDraft, setPaceDraft] = useState<PaceDraft>(() => draftOf(scheduled))
   const [agents, setAgents] = useState<AgentsDraft>(() => (opened ? { kind: 'own', count: String(atOnce(scheduled)) } : agentsDraftOf(scheduled)))
+  const [runsOn, setRunsOn] = useState<{ agent: AgentName; model: ModelDraft }>(() => ({ agent: agentOf(scheduled), model: scheduled.model ?? 'skill' }))
   const [publish, setPublish] = useState<PublishPick>(scheduled.publish)
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState<string | undefined>()
@@ -100,9 +108,12 @@ export function EditPanel({
     // A row a person made keeps only a time of day here: whatever else this machine holds for it goes once its pace is in its file.
     pace: paced !== undefined && (own ? touched && paced.join(' ') !== heldPace(scheduled).join(' ') : paced.join(' ') !== paceArgs(draftOf(scheduled))!.join(' ')),
     agents: count !== undefined && count !== ownCount(agentsArgs(agentsDraftOf(scheduled))![0]!),
+    agent: runsOn.agent !== agentOf(scheduled),
+    // Picking an agent takes the model picked for the row back, so a model picked with another agent is always sent after it.
+    model: runsOn.model !== (scheduled.model ?? 'skill') || (runsOn.agent !== agentOf(scheduled) && runsOn.model !== 'skill'),
     publish: publish !== scheduled.publish,
   }
-  const dirty = touched || changes.pace || changes.agents || changes.publish
+  const dirty = touched || changes.pace || changes.agents || changes.agent || changes.model || changes.publish
   // Words that are not sent are not held against the form's limits: a prompt made longer by hand, in its file, still lets the row's picks be saved.
   const problem = (own && opened ? (changes.file ? draftProblem(own, opened.file) : paceProblem(own.pace)) : paceProblem(paceDraft)) ?? (counted ? undefined : `Type a whole number of agents, from 1 to ${MAX_AGENTS}.`)
   useEffect(() => onDirty(dirty && !saved), [dirty, saved])
@@ -124,9 +135,10 @@ export function EditPanel({
       row = withDraft(scheduled, paceDraft)
     }
     const { agents: _agents, ...rest } = row
-    return { ...rest, ...(count !== 'skill' ? { agents: Number(count) } : {}), publish }
+    const { runsOn: _runsOn, model: _model, ...unpicked } = { ...rest, ...(count !== 'skill' ? { agents: Number(count) } : {}), publish }
+    return { ...unpicked, ...(runsOn.agent !== scheduled.home ? { runsOn: runsOn.agent } : {}), ...(runsOn.model !== 'skill' ? { model: runsOn.model } : {}) }
   })()
-  const sentence = would && `${pace(would)}. ${saysAtOnce(would) ? `${atOnceWords(atOnce(would))}. ` : ''}${publishes(would)}.`
+  const sentence = would && `${pace(would)}. ${saysAtOnce(would) ? `${atOnceWords(atOnce(would))}. ` : ''}${runsOnWords(would, schedulerModel, codingAgents)}. ${publishes(would)}.`
 
   const save = async (): Promise<void> => {
     if (problem !== undefined || paced === undefined || count === undefined) return
@@ -134,6 +146,8 @@ export function EditPanel({
     if (changes.file && own && opened) steps.push(['It', [...editArgs(own, opened.file)!, ...(version !== undefined ? [`--was=${version}`] : [])]])
     if (changes.pace) steps.push(['The pace', ['pace', scheduled.command, ...paced]])
     if (changes.agents) steps.push(['The number of agents', ['agents', scheduled.command, count]])
+    if (changes.agent) steps.push(['The agent', ['agent', scheduled.command, runsOn.agent === scheduled.home ? 'skill' : runsOn.agent]])
+    if (changes.model && !(changes.agent && runsOn.model === 'skill')) steps.push(['The model', ['model', scheduled.command, runsOn.model]])
     if (changes.publish) steps.push(['The publish pick', ['publish', scheduled.command, publish]])
     setSaving(true)
     setFailed(undefined)
@@ -294,6 +308,9 @@ export function EditPanel({
           disabled={saving}
           onChange={next => (setAgents(next), setFailed(undefined))}
         />
+      </Section>
+      <Section title="What it runs on">
+        <RunsOnFields command={scheduled} schedulerModel={schedulerModel} agents={codingAgents} agent={runsOn.agent} model={runsOn.model} disabled={saving} onChange={next => (setRunsOn(next), setFailed(undefined))} />
       </Section>
       <Section title="What its runs publish">
         <PublishField gitHost={project.gitHost} own={isOwn(scheduled)} pick={publish} disabled={saving} onChange={next => (setPublish(next), setFailed(undefined))} />

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Switch, Tooltip, TooltipContent, TooltipTrigger, Button, buttonVariants, cn, formatAge, formatDateTime, useModuleHost, usePolled, type ModuleCommandResult, type ModuleHost, type ModuleProject } from '@openagt/dashboard/module'
+import { Switch, Tooltip, TooltipContent, TooltipTrigger, Button, buttonVariants, cn, formatAge, formatDateTime, useCodingAgents, useModuleHost, usePolled, type ModuleCommandResult, type ModuleHost, type ModuleProject } from '@openagt/dashboard/module'
 import type { ModulePageProps } from '@openagt/dashboard/module'
 import { AutomationForm } from './AutomationForm.js'
 import { EditPanel } from './EditPanel.js'
 import { openedAutomation, type OpenedAutomation } from './automation-form.js'
-import { atOnce, atOnceWords, cannotRun, decided, isOwn, outcomeWords, ownPace, pace, publishes, readSchedulers, rowTitle, saysAtOnce, schedulerStatus, unlistedWords, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
+import { atOnce, atOnceWords, cannotRun, decided, isOwn, outcomeWords, ownPace, pace, publishes, readSchedulers, rowTitle, runsOnWords, saysAtOnce, schedulerStatus, unlistedWords, type AgentModels, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
 
 // The Automations page: what starts by itself while nobody is at the keyboard. One part per
 // project the page is given (every project that has this package, or the one picked in the
@@ -14,8 +14,8 @@ import { atOnce, atOnceWords, cannotRun, decided, isOwn, outcomeWords, ownPace, 
 //
 // A row is the same whichever group it is in: its name, what it says it does, one line of where it
 // stands (on or off, when it last ran or that its last run failed, and what the scheduler last
-// decided for it), one line of its picks (when it runs, how many agents at once, how far its runs
-// publish), and three controls: "Run now" starts one run of it at once (`agent-scheduler now`),
+// decided for it), one line of its picks (when it runs, how many agents at once, which coding agent
+// and model its runs are on, how far its runs publish), and three controls: "Run now" starts one run of it at once (`agent-scheduler now`),
 // "Edit" opens its panel in place (`EditPanel.tsx`), and its switch says whether it runs by itself
 // (`switch`). One panel or form is open at a time, and nothing opens over one that holds a change
 // not saved yet.
@@ -31,6 +31,8 @@ const NOTHING_SCHEDULED = 'no skill of this project schedules a command'
 
 export function AutomationsPage({ projects }: ModulePageProps) {
   const host = useModuleHost()
+  /** Every coding agent with the models it lists: what a row's agent and model are picked from, and named by. */
+  const agents = useCodingAgents()
   const key = projects.map(p => p.id).join(',')
   const { value: read, loaded, reload } = usePolled(() => readSchedulers(host, projects), EMPTY, 10_000, [key])
   // A read that fails for a moment keeps the project's rows as they were last read, under the line
@@ -207,7 +209,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                                 </p>
                                 {scheduled.description && <p className="line-clamp-2 text-sm text-muted-foreground">{scheduled.description}</p>}
                                 <Stands host={host} project={row.project} scheduled={scheduled} />
-                                {!shown && <Picks scheduled={scheduled} />}
+                                {!shown && <Picks scheduled={scheduled} schedulerModel={row.model} agents={agents} />}
                               </div>
                               <div className="flex shrink-0 items-center gap-2">
                                 <Button
@@ -246,6 +248,8 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                                 scheduled={scheduled}
                                 opened={shown.opened}
                                 refused={shown.refused}
+                                schedulerModel={row.model}
+                                agents={agents}
                                 run={args => run(row.project, args)}
                                 reload={reload}
                                 onDirty={setDirty}
@@ -357,8 +361,8 @@ function Stands({ host, project, scheduled }: { host: ModuleHost; project: Modul
   )
 }
 
-/** A row's picks, in one line: when it runs, how many agents at once when that is worth saying, and how far its runs publish. A pick of the person's own, on a row that could follow its skill, says so. */
-function Picks({ scheduled }: { scheduled: SchedulerCommand }) {
+/** A row's picks, in one line: when it runs, how many agents at once when that is worth saying, which coding agent and model its runs are on, and how far they publish. A pick of the person's own, on a row that could follow its skill, says so. */
+function Picks({ scheduled, schedulerModel, agents }: { scheduled: SchedulerCommand; schedulerModel: string | undefined; agents: readonly AgentModels[] }) {
   const follows = !isOwn(scheduled)
   return (
     <p className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
@@ -379,6 +383,14 @@ function Picks({ scheduled }: { scheduled: SchedulerCommand }) {
               <span className="text-info">your pick</span>
             </>
           )}
+        </>
+      )}
+      <span aria-hidden>·</span>
+      <span>{runsOnWords(scheduled, schedulerModel, agents)}</span>
+      {follows && (scheduled.runsOn !== undefined || scheduled.model !== undefined) && (
+        <>
+          <span aria-hidden>·</span>
+          <span className="text-info">your pick</span>
         </>
       )}
       <span aria-hidden>·</span>

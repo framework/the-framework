@@ -1,6 +1,6 @@
 import type { ModuleHost, ModuleProject } from '@openagt/dashboard/module'
 import type { PublishPick, TickDecision } from '../src/state.js'
-import { DEFAULT_PUBLISH, isAgents, isTime } from '../src/names.js'
+import { AGENTS, AGENT_LABELS, AGENT_SKILLS_DIR, DEFAULT_AGENT, DEFAULT_PUBLISH, isAgent, isAgents, isTime, type AgentName } from '../src/names.js'
 import { MAX_COUNT, paceInForce, parseInterval, parseTimeOfDay, takesTimeOfDay, type PacePick, type PaceUnit } from '../src/pace.js'
 
 // What the module shows of each project's scheduler: the answer of `agent-scheduler status`, the
@@ -58,6 +58,55 @@ export interface SchedulerCommand {
   lastRun?: LastRun
   /** What the scheduler's last tick decided for the command, when it decided anything. */
   decision?: TickDecision
+  /** The coding agent the command is made for: where its runs are on until a person picks another here. */
+  home: AgentName
+  /** The model its skill names, when it names one. */
+  skillModel?: string
+  /** The coding agent that model is a model of: the runs start on it only while they are on that agent. */
+  skillModelAgent?: AgentName
+  /** The coding agents that can run the command: those whose own skills folder holds its skill. */
+  able: readonly AgentName[]
+  /** The coding agent this machine's runs of the command are on, where a person picked another than the one it is made for. */
+  runsOn?: AgentName
+  /** The model this machine's runs of the command start on, where a person picked one for the agent its runs are on. A pick made for another agent is none. */
+  model?: string
+}
+
+/** The coding agent a row's runs are on, on this machine: the one picked here, else the one the row is made for. */
+export function agentOf(command: Pick<SchedulerCommand, 'home' | 'runsOn'>): AgentName {
+  return command.runsOn ?? command.home
+}
+
+/**
+ * The model a row's runs start on, on this machine, given the agent they are on: the one picked
+ * here for that agent; else the one its skill names for that agent; else, on Claude Code, the
+ * scheduler's own. Nothing on another agent: its runs start on that agent's own default. The same
+ * rule the scheduler follows. `agent` may be one being tried in the panel: the pick, made for the
+ * agent the runs are on now, does not go with another.
+ */
+export function modelOf(command: Pick<SchedulerCommand, 'home' | 'runsOn' | 'model' | 'skillModel' | 'skillModelAgent'>, schedulerModel: string | undefined, agent: AgentName = agentOf(command)): string | undefined {
+  return (agent === agentOf(command) ? command.model : undefined) ?? (agent === command.skillModelAgent ? command.skillModel : undefined) ?? (agent === DEFAULT_AGENT ? schedulerModel : undefined)
+}
+
+/** A coding agent as the page is given it: its name for a run, its label, and the models it lists. */
+export interface AgentModels {
+  value: string
+  label: string
+  models: readonly { value: string; label: string }[]
+  /** Why it lists no model, in words: it is still being asked, or could not say. */
+  modelsNote?: string
+}
+
+/** A model's name as its agent lists it, the id itself for one it does not list. */
+export function modelLabel(agents: readonly AgentModels[], agent: AgentName, id: string): string {
+  return agents.find(a => a.value === agent)?.models.find(m => m.value === id)?.label ?? id
+}
+
+/** What a row's runs are on, for its line: the agent, and the model when one is named ("Claude Code, Opus 5.5"; "Codex"). */
+export function runsOnWords(command: SchedulerCommand, schedulerModel: string | undefined, agents: readonly AgentModels[]): string {
+  const agent = agentOf(command)
+  const model = modelOf(command, schedulerModel, agent)
+  return model === undefined ? AGENT_LABELS[agent] : `${AGENT_LABELS[agent]}, ${modelLabel(agents, agent, model)}`
 }
 
 /** A command's last run as the scheduler lists it: the run's id, when it started (ISO), and whether it failed. */
@@ -151,6 +200,8 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
   const publishes = record(state['publishes'])
   const paces = record(state['paces'])
   const agents = record(state['agents'])
+  const runsOn = record(state['runsOn'])
+  const models = record(state['models'])
   const decisions: TickDecision[] = []
   for (const item of Array.isArray(tick['decisions']) ? (tick['decisions'] as unknown[]) : []) {
     const d = record(item)
@@ -163,6 +214,9 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
     const command = row['command']
     if (typeof command !== 'string') continue
     const picked = publishes[command]
+    const home = isAgent(row['agent']) ? row['agent'] : DEFAULT_AGENT
+    const on = isAgent(runsOn[command]) ? runsOn[command] : home
+    const modelPick = record(models[command])
     // A line that says something is not listed is no decision of a command, though it may carry a command's name.
     const decision = decisions.find(d => d.command === command && !d.outcome.startsWith(UNREADABLE) && !d.outcome.startsWith(UNLISTED))
     commands.push({
@@ -175,6 +229,12 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
       ...(isPace(paces[command]) ? { pace: paces[command] as PacePick } : {}),
       ...(isAgents(row['agents']) && row['agents'] > 1 ? { skillAgents: row['agents'] } : {}),
       ...(isAgents(agents[command]) ? { agents: agents[command] } : {}),
+      home,
+      ...(typeof row['model'] === 'string' && row['model'] !== '' ? { skillModel: row['model'], skillModelAgent: isAgent(row['modelAgent']) ? row['modelAgent'] : DEFAULT_AGENT } : {}),
+      able: Array.isArray(row['able']) ? AGENTS.filter(agent => (row['able'] as unknown[]).includes(agent)) : AGENTS,
+      // The agent the row is made for is no pick, whatever the state still holds; and a model picked for another agent than the one its runs are on is none.
+      ...(on !== home ? { runsOn: on } : {}),
+      ...(modelPick['agent'] === on && typeof modelPick['model'] === 'string' && modelPick['model'].trim() !== '' ? { model: modelPick['model'] } : {}),
       ...(typeof row['description'] === 'string' ? { description: row['description'] } : {}),
       ...(row['onThisMachine'] === true ? { onThisMachine: true as const } : {}),
       ...(row['editable'] === true ? { editable: true as const } : {}),
@@ -398,21 +458,24 @@ export function publishes(command: SchedulerCommand): string {
 export function decided(command: SchedulerCommand, now: Date = new Date()): string | undefined {
   const elsewhere = cannotRun(command)
   if (elsewhere) return elsewhere
-  if (!command.on) return undefined
+  // Whether the row's agent can read its skill is said off the files, as of now: the last look's word on it may be about another agent, picked away since.
+  if (!command.on || command.decision?.outcome.startsWith('not a command of ')) return undefined
   return outcomeWords(command.decision?.outcome, now)
 }
 
-/** That the coding agent cannot run a command at all, as the last tick found, for a person; nothing for a command it can run. */
-export function cannotRun(command: Pick<SchedulerCommand, 'decision'>): string | undefined {
-  const elsewhere = /^not a command of the coding agent: its skill is only under (\S+),/.exec(command.decision?.outcome ?? '')
-  return elsewhere ? `Cannot start: its skill is only in ${elsewhere[1]}, which Claude Code does not read` : undefined
+/** That the coding agent a row's runs are on cannot run it at all, for a person: its skill is not in that agent's own skills folder. Nothing for a row it can run. */
+export function cannotRun(command: Pick<SchedulerCommand, 'home' | 'runsOn' | 'able'>): string | undefined {
+  const agent = agentOf(command)
+  return command.able.includes(agent) ? undefined : notThere(AGENT_LABELS[agent], AGENT_SKILLS_DIR[agent])
 }
+
+const notThere = (agent: string, dir: string): string => `Cannot start on ${agent}: its skill is not in ${dir}`
 
 /** One decision of the scheduler, a tick's or the answer to "Run now", for a person; nothing for one the row already says in another place: that it is switched off, that it started. */
 export function outcomeWords(outcome: string | undefined, now: Date = new Date()): string | undefined {
   if (outcome === undefined || outcome === 'switched off on this machine' || outcome.startsWith('started ')) return undefined
-  const elsewhere = cannotRun({ decision: { command: '', outcome } })
-  if (elsewhere) return elsewhere
+  const elsewhere = /^not a command of (.+?): its skill is only under .+, not (\S+)$/.exec(outcome)
+  if (elsewhere) return notThere(elsewhere[1]!, elsewhere[2]!)
   if (outcome === 'not due') return 'No work'
   const unpublished = /^not on (\S+?)( as this clone last saw it)?: /.exec(outcome)
   if (unpublished) return unpublished[1] === 'HEAD' ? 'Cannot start yet: its skill is not committed' : `Cannot start yet: its skill is not on ${unpublished[1]}${unpublished[2] ? ', as this machine last saw it' : ''}`

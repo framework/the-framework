@@ -73,10 +73,23 @@ it in its pull request; for anything else it proposes and asks.
   person switched it on. Picked over a command that runs unless a person switched it off: a
   skill that arrives in a project would start agents by itself.
 - The schedule is read from both folders a coding agent reads skills from, `.claude/skills`
-  first. A command whose skill is only in `.agents/skills` is listed and never started, and
-  the tick says so: a scheduled run is on Claude Code, which reads `.claude/skills` only.
-  Picked over reading `.claude/skills` alone, where such a skill would have no row and
-  nothing would say why.
+  first. A coding agent runs a command only when the command's skill is in that agent's own
+  folder, `.claude/skills` for Claude Code and `.agents/skills` for Codex: sent to the other
+  agent, the command finds no skill. A command whose skill is only in one folder runs on
+  that folder's agent unless its skill or a person names the other, and a row set to an
+  agent that cannot read its skill is listed, not started, and says so. Picked over reading `.claude/skills` alone, where such a skill
+  would have no row and nothing would say why.
+- A row has its own coding agent and its own model, picked like its pace: its skill may
+  name the ones it is made for (`agent`, `model`), and each person may pick their own for
+  their machine, in the state file. With no pick a run is on Claude Code, on the
+  scheduler's model. A model is one agent's: a person's model is kept with the agent it
+  was picked for and holds only while the row runs on that agent, and a skill's model is a
+  model of the agent the skill names, of Claude Code when it names none.
+  Picked over one model and one agent for every row of a project, where a simple copying
+  job that may run every 15 minutes cost as much a turn as real coding.
+- Only Claude's quota can be read. A run on Codex starts without the quota question, and
+  the page says so; its cost is not recorded either, since Codex prices no turn. Picked
+  over holding Codex rows back until a reading exists: nothing would start them.
 - How far a scheduled command's runs publish is each person's pick on their own machine, in
   the state file like the switch; the scheduler's own Automations page shows the pick and
   changes it. Until a person picks, a run commits its work and pushes nothing. Picked over
@@ -141,15 +154,15 @@ it in its pull request; for anything else it proposes and asks.
 - Keep-alive, whether the scheduler outlives what started it, is per user, in the state
   file. Picked over a line in the tracked schedule: in the schedule it would switch on the
   next person's machine the first time they pull.
-- The model every scheduled run starts on is per user, in the state file, set with `model
-  <id>`, `opus` when unset. Picked over a line in the tracked schedule, so each person
-  controls what their own machine spends their quota on. The state's model is a Claude
-  model: a scheduled run is on Claude Code.
+- The scheduler's own model is per user, in the state file, set with `model <id>`, `opus`
+  when unset: what a run on Claude Code starts on where neither its row's skill nor its
+  person names another. Picked over a line in the tracked schedule alone, so each person
+  controls what their own machine spends their quota on.
 
 ## The tick
 - The checks in the cheapest order: the coding agent can run the command, it is switched
   on, it is due by its pace, the check says due, the cap, its skill is where a run's
-  checkout starts, then the quota. The quota is read
+  checkout starts, then the quota, for a run on Claude Code. The quota is read
   only when everything else says start, because the reading spawns the agent's CLI and its
   usage fetch is refused upstream when asked too often.
 - A command whose skill is not on the commit a run's checkout starts from is not started,
@@ -197,7 +210,7 @@ it in its pull request; for anything else it proposes and asks.
 - The scheduler brings its own part of a dashboard: an Automations page (one row per
   scheduled command, with its switch, its pace, its number of agents and its publish pick),
   a Settings section (the spend cushion) and an Overview card (on or off, the last tick).
-  All read `status` and write through `offset`, `switch`, `pace`, `agents`, `publish`,
+  All read `status` and write through `offset`, `switch`, `pace`, `agents`, `agent`, `model`, `publish`,
   `add`, `edit` and `remove`; an automation is read through `show`, a check is tried
   through `try`, and a row is started at once through `now`.
   Picked over a hook line per setting that a dashboard runs, and over the dashboard reading

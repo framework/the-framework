@@ -20,6 +20,12 @@ export function hostAnswering(answer: (projectId: string, args: string[]) => Mod
   return { host, runCommand }
 }
 
+/** What `status` lists of a row beside what its file says, for a skill that is in Claude Code's folder alone: the coding agent it is made for, and the ones that can run it. */
+export const ON_CLAUDE = { agent: 'claude-code', able: ['claude-code'] }
+
+/** The same for an automation kept on this machine, which is no skill: made for Claude Code, and any agent can run it. */
+export const ANY_AGENT = { agent: 'claude-code', able: ['claude-code', 'codex'] }
+
 /** What `agent-scheduler status` prints for a scheduler that ticked once in a project whose skills schedule two commands: one switched on here, one with a publish pick made here. */
 export const STATUS = {
   ok: true,
@@ -40,8 +46,8 @@ export const STATUS = {
   },
   // The schedule as the project's files say it at the moment of the answer, and what of it cannot be read: not the last tick's.
   schedule: [
-    { command: 'post-merge-cleanup', every: '1d', description: 'Write up merged pull requests.' },
-    { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', description: 'Work one queued task.' },
+    { command: 'post-merge-cleanup', every: '1d', description: 'Write up merged pull requests.', ...ON_CLAUDE },
+    { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', description: 'Work one queued task.', ...ON_CLAUDE },
   ],
   unreadable: [],
 }

@@ -1,9 +1,9 @@
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
 import { automationOf, isPlainFile, standsAlone } from './automation-file.js'
-import { DEFAULT_CAP, FOUND_MAX, MAX_AGENTS, OWN_AUTOMATIONS_DIR, OWN_TEXT_MAX, RUN_SKILLS_DIR, SKILL_FILE, isAgents } from './names.js'
+import { AGENTS, AGENT_SKILLS_DIR, DEFAULT_AGENT, DEFAULT_CAP, FOUND_MAX, MAX_AGENTS, OWN_AUTOMATIONS_DIR, OWN_TEXT_MAX, RUN_SKILLS_DIR, SKILL_FILE, isAgent, isAgents, type AgentName } from './names.js'
 import { parseInterval, type Interval } from './pace.js'
 
 /**
@@ -70,6 +70,12 @@ export interface ScheduledCommand {
   cap: number
   /** The skills folder the skill was read from (`.claude/skills`). */
   dir: string
+  /** Every skills folder that holds the skill: a coding agent can run the command only when its own folder is among them. */
+  dirs: string[]
+  /** The coding agent the skill is made for, when it names one: a run is on it where no person picked another. */
+  agent?: AgentName
+  /** The model the skill is made for, when it names one: a model of the agent the skill names, of Claude Code when it names none. A run on that agent starts on it where no person picked another; a run on another agent does not. */
+  model?: string
   /** What the skill does, in its own words: the `description` of its front matter, when it has one. */
   description?: string
   /**
@@ -99,7 +105,7 @@ export interface Schedule {
 
 const SKILL = /^[a-z0-9][a-z0-9-]*$/
 const WORD = SKILL
-const ROW_KEYS = ['word', 'every', 'when', 'waits-for', 'agents']
+const ROW_KEYS = ['word', 'every', 'when', 'waits-for', 'agents', 'agent', 'model']
 
 /**
  * The commands a skill schedules, out of its `SKILL.md` in the skills folder `dir`: none when the
@@ -147,7 +153,7 @@ function parseRow(skill: string, row: unknown, dir: string): ScheduledCommand | 
   if (!isMap(row)) return 'a row is a list of keys'
   const unknown = Object.keys(row).find(key => !ROW_KEYS.includes(key))
   if (unknown !== undefined) return `unknown key ${unknown}`
-  const { word, every, when, agents } = row
+  const { word, every, when, agents, agent, model } = row
   const waitsFor = row['waits-for']
   if (word !== undefined && !(typeof word === 'string' && WORD.test(word))) return 'word is one word of lower-case letters, digits and dashes'
   const asEvery = every === undefined ? undefined : parseInterval(String(every))
@@ -155,6 +161,8 @@ function parseRow(skill: string, row: unknown, dir: string): ScheduledCommand | 
   if (when !== undefined && !(typeof when === 'string' && when.trim())) return 'when is a shell command line'
   if (waitsFor !== undefined && !(typeof waitsFor === 'string' && waitsFor.trim() && !waitsFor.trim().includes('\n'))) return 'waits-for is one line of text'
   if (agents !== undefined && !isAgents(agents)) return `agents is a whole number from 1 to ${MAX_AGENTS}`
+  if (agent !== undefined && !isAgent(agent)) return `agent is one of ${AGENTS.join(', ')}`
+  if (model !== undefined && !(typeof model === 'string' && /^\S+$/.test(model))) return 'model is one word, the id its coding agent knows the model by'
   if (when === undefined && every === undefined) return 'neither every nor when says when'
   if (waitsFor !== undefined && when === undefined) return 'waits-for says what when waits for, and there is no when'
   return {
@@ -164,6 +172,9 @@ function parseRow(skill: string, row: unknown, dir: string): ScheduledCommand | 
     ...(typeof waitsFor === 'string' ? { waitsFor: waitsFor.trim() } : {}),
     cap: isAgents(agents) ? agents : DEFAULT_CAP,
     dir,
+    dirs: [dir],
+    ...(isAgent(agent) ? { agent } : {}),
+    ...(typeof model === 'string' ? { model } : {}),
   }
 }
 
@@ -185,22 +196,26 @@ function isMap(value: unknown): value is Record<string, unknown> {
  * under it, so the two cannot be told apart.
  */
 export async function readSchedule(repo: string): Promise<Schedule> {
-  const files = new Map<string, { md: string; dir: string }>()
+  const files = new Map<string, { md: string; dir: string; dirs: string[] }>()
   for (const dir of [RUN_SKILLS_DIR, ...HARNESS_SKILL_DIRS.filter(d => d !== RUN_SKILLS_DIR)]) {
     const entries = await readdir(join(repo, dir)).catch(() => [])
     for (const skill of entries) {
-      if (files.has(skill) || !SKILL.test(skill)) continue
-      const md = await readFile(join(repo, dir, skill, SKILL_FILE), 'utf8').catch(() => undefined)
-      if (md !== undefined) files.set(skill, { md, dir })
+      if (!SKILL.test(skill)) continue
+      const known = files.get(skill)
+      // A skill in two folders is read once, from the first; the other folder is only noted, by whether the skill's file is there.
+      const md = known ? ((await isFile(join(repo, dir, skill, SKILL_FILE))) ? known.md : undefined) : await readFile(join(repo, dir, skill, SKILL_FILE), 'utf8').catch(() => undefined)
+      if (md === undefined) continue
+      if (known) known.dirs.push(dir)
+      else files.set(skill, { md, dir, dirs: [dir] })
     }
   }
   const schedule: Schedule = { commands: [], unreadable: [] }
   for (const skill of [...files.keys()].sort()) {
-    const { md, dir } = files.get(skill)!
+    const { md, dir, dirs } = files.get(skill)!
     const read = skillSchedule(skill, md, dir)
     // A shared automation is a skill the tool wrote: its file reads as the tool writes one, alone in its folder where the tool saves them, a folder that is no link.
     const editable = automationOf(skill, md) !== undefined && (await standsAlone(repo, skill))
-    schedule.commands.push(...(editable ? read.commands.map(command => ({ ...command, editable: true as const })) : read.commands))
+    schedule.commands.push(...read.commands.map(command => ({ ...command, dirs, ...(editable ? { editable: true as const } : {}) })))
     schedule.unreadable.push(...read.unreadable)
   }
   const kept = (await readdir(join(repo, OWN_AUTOMATIONS_DIR)).catch((): string[] => [])).filter(file => file.endsWith('.md')).sort()
@@ -238,6 +253,14 @@ export async function readSchedule(repo: string): Promise<Schedule> {
   return schedule
 }
 
+/** Whether a path is a file, a link to one included: a skill linked into an agent's folder is a skill there. */
+function isFile(path: string): Promise<boolean> {
+  return stat(path).then(
+    found => found.isFile(),
+    () => false,
+  )
+}
+
 /**
  * The text of a skill file after its front matter, without its outer blank lines and without NUL
  * characters: what an agent is told. The front matter ends where the schedule's reader ends it,
@@ -248,9 +271,28 @@ export function skillText(md: string): string {
   return (front ? md.slice(front[0].length) : md).replaceAll('\0', '').trim()
 }
 
-/** The file a command's skill is, from the repository root: the skills folder it was read from, the command's first word, the skill's file (`.claude/skills/triage/SKILL.md` for `triage quick`). */
-export function skillFile(command: Pick<ScheduledCommand, 'name' | 'dir'>): string {
-  return `${command.dir}/${command.name.split(' ')[0]}/${SKILL_FILE}`
+/** The file a command's skill is, from the repository root: the skills folder it was read from, or the one given, the command's first word, the skill's file (`.claude/skills/triage/SKILL.md` for `triage quick`). */
+export function skillFile(command: Pick<ScheduledCommand, 'name' | 'dir'>, dir: string = command.dir): string {
+  return `${dir}/${command.name.split(' ')[0]}/${SKILL_FILE}`
+}
+
+/**
+ * The coding agents that can run a command: those whose own skills folder holds its skill. An
+ * automation kept on this machine is no skill: a run is handed its text, so any agent can.
+ */
+export function ableAgents(command: Pick<ScheduledCommand, 'dirs' | 'text'>): AgentName[] {
+  return AGENTS.filter(agent => command.text !== undefined || command.dirs.includes(AGENT_SKILLS_DIR[agent]))
+}
+
+/**
+ * The coding agent a command is made for: the one its skill names, else Claude Code when it can
+ * run the command, else the one that can. Where a run is on when no person picked another, and
+ * the agent the skill's own model goes with.
+ */
+export function homeAgent(command: Pick<ScheduledCommand, 'agent' | 'dirs' | 'text'>): AgentName {
+  if (command.agent !== undefined) return command.agent
+  const able = ableAgents(command)
+  return able.includes(DEFAULT_AGENT) ? DEFAULT_AGENT : (able[0] ?? DEFAULT_AGENT)
 }
 
 /**

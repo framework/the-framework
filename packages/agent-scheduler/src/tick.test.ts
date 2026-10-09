@@ -29,15 +29,25 @@ function running(id: string, command: string, host = 'other-box'): RunCard {
 /** An interval as a skill writes it: `6h`. */
 const every = (text: string): Interval => parseInterval(text)!
 
-/** A scheduled command with a check and a cap of one, its skill in Claude Code's folder, unless said otherwise. */
+/** A scheduled command with a check and a cap of one, its skill in Claude Code's folder alone, unless said otherwise. */
 function command(name: string, over: Partial<ScheduledCommand> = { when: 'npx queue' }): ScheduledCommand {
-  return { name, cap: 1, dir: '.claude/skills', ...over }
+  const dir = over.dir ?? CLAUDE
+  return { name, cap: 1, dir, dirs: [dir], ...over }
 }
+
+const CLAUDE = '.claude/skills'
+const CODEX = '.agents/skills'
+
+/** What the tick lists of a skill in Claude Code's folder alone beside what the skill says: the agent it is made for, and the agents that can run it. */
+const ON_CLAUDE = { agent: 'claude-code', able: ['claude-code'] } as const
+
+/** The same for an automation kept on this machine: made for Claude Code, and any agent can run it. */
+const ANY_AGENT = { agent: 'claude-code', able: ['claude-code', 'codex'] } as const
 
 interface Seen {
   markers: RunCard[]
   withdrawn: string[]
-  spawned: { id: string; prompt: string; startedAt: string; model: string; publish?: string; attached?: string }[]
+  spawned: { id: string; prompt: string; startedAt: string; driver: string; model?: string; publish?: string; attached?: string }[]
   checks: string[]
   /** What each check was given as `$LAST_RUN`, in the order of `checks`. */
   since: string[]
@@ -82,7 +92,6 @@ function deps(over: Partial<TickDeps> & { stateOver?: Partial<State>; commands?:
     spawn: async run => {
       seen.spawned.push(run)
     },
-    driver: 'fake',
     ...over,
   }
   return { deps: d, seen }
@@ -160,11 +169,12 @@ test('a due command under its cap with quota to spare is marked on the branch, t
   const marker = seen.markers[0]!
   assert.equal(marker.status, 'running')
   assert.equal(marker.intent, '/work-queue')
-  assert.equal(marker.model, 'opus')
+  // On Claude Code, on the scheduler's own model: neither its skill nor a person names another.
+  assert.deepEqual([marker.driver, marker.model], ['claude-code', 'opus'])
   // Nobody picked a publish level on this machine: the run commits its work.
   assert.deepEqual(marker.caller, { runner: { host: 'this-box', publish: 'commit' }, host: 'this-box' })
   // The run is handed what its check printed; its prompt stays the command alone, as the marker's does.
-  assert.deepEqual(seen.spawned, [{ id: marker.id, prompt: '/work-queue', startedAt: NOW.toISOString(), model: 'opus', publish: 'commit', attached: `${FOUND_OPENING}\n["one entry"]` }])
+  assert.deepEqual(seen.spawned, [{ id: marker.id, prompt: '/work-queue', startedAt: NOW.toISOString(), driver: 'claude-code', model: 'opus', publish: 'commit', attached: `${FOUND_OPENING}\n["one entry"]` }])
 })
 
 test("a command that would start and whose skill is not where a run's checkout starts is not started, and says where it is missing; it is asked only then, after the check and the cap, before the coding agent and the quota are read", async () => {
@@ -210,7 +220,7 @@ test("a skill that is missing where a run's checkout starts says how the start p
 
 test("an automation kept on this machine starts like any command: its run's prompt is its name, and it is handed its text, then what its check printed; no skill folder is asked for, and nothing is asked of where a run's checkout starts; the tick lists it as this machine's", async () => {
   const text = '/answer each new comment below.\n\n- Be short.'
-  const own = { dir: '.agent-scheduler/automations', text, description: 'Answer each new comment below.' }
+  const own = { dir: '.agent-scheduler/automations', dirs: ['.agent-scheduler/automations'], text, description: 'Answer each new comment below.' }
   const commands = [command('answer-comments', { when: 'gh api comments', ...own, editable: true }), command('daily-notes', { every: every('1d'), ...own }), command('work-queue')]
   const { deps: d, seen } = deps({ commands, atStart: async file => (file === '.claude/skills/work-queue/SKILL.md' ? { ref: 'origin/main', reached: true, there: true } : assert.fail(`asked where ${file} is`)) })
   const record = await tick(d)
@@ -224,9 +234,9 @@ test("an automation kept on this machine starts like any command: its run's prom
   assert.equal(seen.markers[0]!.intent, 'answer-comments', 'its record holds its name, which is what its runs are counted by')
   assert.deepEqual(record.schedule, [
     // The one whose file still reads as the tool wrote it is listed as one the tool can save again and remove.
-    { command: 'answer-comments', when: 'gh api comments', description: 'Answer each new comment below.', onThisMachine: true, editable: true },
-    { command: 'daily-notes', every: '1d', description: 'Answer each new comment below.', onThisMachine: true },
-    { command: 'work-queue', when: 'npx queue' },
+    { command: 'answer-comments', when: 'gh api comments', description: 'Answer each new comment below.', onThisMachine: true, editable: true, ...ANY_AGENT },
+    { command: 'daily-notes', every: '1d', description: 'Answer each new comment below.', onThisMachine: true, ...ANY_AGENT },
+    { command: 'work-queue', when: 'npx queue', ...ON_CLAUDE },
   ])
   // Its own run in flight counts against its number at once, like a skill's.
   const again = await tick({ ...d, mint: () => '2026-09-16T14-02-00-000Z' })
@@ -308,9 +318,9 @@ test("this machine's publish pick goes on the marker and to the spawned run: com
   ])
   assert.deepEqual(seen.spawned.map(s => [s.prompt, s.publish]), [['/work-queue', undefined], ['/triage quick', 'merge'], ['/plan-tickets', 'commit']])
   assert.deepEqual(record.schedule, [
-    { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', description: 'Work one queued task.' },
-    { command: 'triage quick', every: '6h' },
-    { command: 'plan-tickets', every: '6h' },
+    { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', description: 'Work one queued task.', ...ON_CLAUDE },
+    { command: 'triage quick', every: '6h', ...ON_CLAUDE },
+    { command: 'plan-tickets', every: '6h', ...ON_CLAUDE },
   ])
 })
 
@@ -324,10 +334,10 @@ test('a command with a word after its folder name: the whole name is what the sw
     { command: 'triage consensual', outcome: 'switched off on this machine' },
   ])
   assert.equal(seen.markers[0]!.intent, '/triage quick')
-  assert.deepEqual(seen.spawned, [{ id: '2026-09-16T14-01-00-000Z', prompt: '/triage quick', startedAt: NOW.toISOString(), model: 'opus', publish: 'commit' }])
+  assert.deepEqual(seen.spawned, [{ id: '2026-09-16T14-01-00-000Z', prompt: '/triage quick', startedAt: NOW.toISOString(), driver: 'claude-code', model: 'opus', publish: 'commit' }])
   assert.deepEqual(record.schedule, [
-    { command: 'triage quick', every: '6h' },
-    { command: 'triage consensual', every: '7d' },
+    { command: 'triage quick', every: '6h', ...ON_CLAUDE },
+    { command: 'triage consensual', every: '7d', ...ON_CLAUDE },
   ])
 
   // The interval is the whole name's: the consensual start is not the quick one's.
@@ -358,8 +368,8 @@ test('every command starts switched off: it is not started, and says so, until a
   assert.deepEqual(nobody.seen.checks, [])
   // The tick lists what the skills say, whatever this machine switched.
   assert.deepEqual(record.schedule, [
-    { command: 'work-queue', when: 'npx queue' },
-    { command: 'post-merge-cleanup', every: '1d' },
+    { command: 'work-queue', when: 'npx queue', ...ON_CLAUDE },
+    { command: 'post-merge-cleanup', every: '1d', ...ON_CLAUDE },
   ])
 
   const switched = deps({ commands, stateOver: { switches: { 'post-merge-cleanup': ON } } })
@@ -386,15 +396,19 @@ test('no skill schedules a command: no decisions, and the note says so', async (
   assert.deepEqual(record.schedule, [])
 })
 
-test('the checks in order: not a command of the coding agent, check failed, not due, cap reached, quota', async () => {
-  // Its skill is only in the folder another coding agent reads: Claude Code would be handed a command it cannot expand.
-  const elsewhere = deps({ commands: [command('work-queue', { when: 'npx queue', dir: '.agents/skills' })] })
-  assert.deepEqual((await tick(elsewhere.deps)).decisions, [{ command: 'work-queue', outcome: 'not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills' }])
+test('the checks in order: not a command of its coding agent, check failed, not due, cap reached, quota', async () => {
+  // Its skill is only in the folder another coding agent reads, and a person picked Claude Code for it here: Claude Code would be handed a command it finds no skill for.
+  const picked = { switches: { 'work-queue': ON }, runsOn: { 'work-queue': 'claude-code' as const } }
+  const elsewhere = deps({ commands: [command('work-queue', { when: 'npx queue', dir: CODEX })], stateOver: picked })
+  assert.deepEqual((await tick(elsewhere.deps)).decisions, [{ command: 'work-queue', outcome: 'not a command of Claude Code: its skill is only under .agents/skills, not .claude/skills' }])
   assert.deepEqual(elsewhere.seen.checks, [], 'a command that cannot run is not checked')
   assert.deepEqual(elsewhere.seen.spawned, [])
   // Said before the switch: a person reads why switching it on would start nothing.
-  const unswitched = deps({ commands: elsewhere.deps.schedule.commands, stateOver: { switches: {} } })
-  assert.match((await tick(unswitched.deps)).decisions[0]!.outcome, /^not a command of the coding agent/)
+  const unswitched = deps({ commands: elsewhere.deps.schedule.commands, stateOver: { ...picked, switches: {} } })
+  assert.match((await tick(unswitched.deps)).decisions[0]!.outcome, /^not a command of Claude Code/)
+  // The other way round, by what its skill says: made for Codex, and only in Claude Code's folder. Every folder that holds it is named.
+  const forCodex = deps({ commands: [command('work-queue', { when: 'npx queue', agent: 'codex' }), command('review', { when: 'x', agent: 'codex', dirs: [CLAUDE, '.cursor/skills'] })] })
+  assert.deepEqual((await tick(forCodex.deps)).decisions.map(d => d.outcome), ['not a command of Codex: its skill is only under .claude/skills, not .agents/skills', 'not a command of Codex: its skill is only under .claude/skills and .cursor/skills, not .agents/skills'])
 
   const failed = deps({ check: async () => ({ ok: false, stdout: '', stderr: 'npm ERR! missing script\nnot found: queue' }) })
   assert.deepEqual((await tick(failed.deps)).decisions, [{ command: 'work-queue', outcome: 'check failed: not found: queue' }])
@@ -485,8 +499,8 @@ test("this machine's number of agents at once stands in for the skill's, against
   assert.match((await tick(fewer.deps)).decisions[0]!.outcome, /^cap reached \(1 in flight/)
   assert.deepEqual(fewer.seen.markers, [])
   // The recorded schedule says the skill's number, and only when it is more than one.
-  assert.deepEqual((await tick(fewer.deps)).schedule, [{ command: 'work-queue', when: 'npx queue', agents: 2 }])
-  assert.deepEqual((await tick(more.deps)).schedule, [{ command: 'work-queue', when: 'npx queue' }])
+  assert.deepEqual((await tick(fewer.deps)).schedule, [{ command: 'work-queue', when: 'npx queue', agents: 2, ...ON_CLAUDE }])
+  assert.deepEqual((await tick(more.deps)).schedule, [{ command: 'work-queue', when: 'npx queue', ...ON_CLAUDE }])
 
   // Another machine's marker lands first: under this machine's number of two its own marker ranks second and stays.
   const cards: RunCard[] = []
@@ -547,6 +561,98 @@ test("a skill's unreadable schedule is named in the state and the readable comma
   assert.deepEqual((await tick(stale.deps)).decisions, alone.decisions)
 })
 
+test("a row on Codex, by this machine's pick or because its skill says so: its run is on Codex with no model named, its skill is asked for in Codex's own folder, Codex is asked whether it can start, and Claude's quota is never read", async () => {
+  const both = [CLAUDE, CODEX]
+  const commands = [command('update-tickets', { when: 'gh issue list', dirs: both }), command('review', { every: every('1d'), dirs: both, agent: 'codex' }), command('work-queue', { dirs: both })]
+  const asked: string[] = []
+  const probed: string[] = []
+  let quotaReads = 0
+  const { deps: d, seen } = deps({
+    commands,
+    stateOver: { switches: { 'update-tickets': ON, review: ON }, runsOn: { 'update-tickets': 'codex' } },
+    atStart: async file => (asked.push(file), { ref: 'origin/main', reached: true, there: true }),
+    ready: async agent => (probed.push(agent), { problems: [], warnings: [] }),
+    // No quota left at all: a run on Claude Code would stand down.
+    quota: async () => (quotaReads++, quota(100)),
+  })
+  const record = await tick(d)
+  assert.deepEqual(record.decisions.map(x => x.outcome.replace(/^started .*/, 'started')), ['started', 'started', 'switched off on this machine'])
+  assert.deepEqual(seen.spawned.map(({ prompt, driver, model }) => [prompt, driver, model]), [['/update-tickets', 'codex', undefined], ['/review', 'codex', undefined]])
+  // No model is named to Codex: the scheduler's own is a Claude model, and Codex starts on its own default.
+  assert.deepEqual(seen.spawned.map(run => 'model' in run), [false, false])
+  assert.deepEqual(seen.markers.map(m => [m.driver, 'model' in m]), [['codex', false], ['codex', false]])
+  assert.deepEqual(asked, ['.agents/skills/update-tickets/SKILL.md', '.agents/skills/review/SKILL.md'])
+  assert.deepEqual(probed, ['codex'], 'each agent is asked once per tick, and only the ones a run would be on')
+  assert.equal(quotaReads, 0)
+  // What the skills say is listed, not this machine's picks: the agent each is made for, its model when it names one, and who can run it.
+  assert.deepEqual(record.schedule.map(c => [c.command, c.agent, c.model, c.able]), [['update-tickets', 'claude-code', undefined, ['claude-code', 'codex']], ['review', 'codex', undefined, ['claude-code', 'codex']], ['work-queue', 'claude-code', undefined, ['claude-code', 'codex']]])
+
+  // A model for Codex, named by the skill or picked here, goes with the run.
+  const named = deps({ commands: [command('review', { every: every('1d'), dirs: both, agent: 'codex', model: 'gpt-5.5' }), command('audit', { every: every('1d'), dirs: both, agent: 'codex', model: 'gpt-5.5' })], stateOver: { switches: { review: ON, audit: ON }, models: { audit: { agent: 'codex', model: 'gpt-5.6-luna' } } } })
+  await tick(named.deps)
+  assert.deepEqual(named.seen.spawned.map(({ driver, model }) => [driver, model]), [['codex', 'gpt-5.5'], ['codex', 'gpt-5.6-luna']])
+  assert.deepEqual(named.seen.markers.map(m => [m.driver, m.model]), [['codex', 'gpt-5.5'], ['codex', 'gpt-5.6-luna']])
+})
+
+test("a skill that is only in Codex's folder runs on Codex where nobody says otherwise; one Codex cannot start on says so like any agent, and a row on Claude Code beside it still starts", async () => {
+  const commands = [command('codex-only', { when: 'x', dir: CODEX }), command('work-queue')]
+  const { deps: d, seen } = deps({ commands })
+  await tick(d)
+  assert.deepEqual(seen.spawned.map(({ prompt, driver, model }) => [prompt, driver, model]), [['/codex-only', 'codex', undefined], ['/work-queue', 'claude-code', 'opus']])
+  assert.deepEqual((await tick(d)).schedule.map(c => [c.command, c.agent, c.able]), [['codex-only', 'codex', ['codex']], ['work-queue', 'claude-code', ['claude-code']]])
+
+  const probed: string[] = []
+  const loggedOut = deps({ commands: [...commands, command('review', { when: 'y', dir: CODEX })], ready: async agent => (probed.push(agent), { problems: agent === 'codex' ? ['`codex` is not logged in.'] : [], warnings: [] }) })
+  assert.deepEqual((await tick(loggedOut.deps)).decisions.map(x => x.outcome.replace(/^started .*/, 'started')), ['not ready: `codex` is not logged in.', 'started', 'not ready: `codex` is not logged in.'])
+  assert.deepEqual(probed, ['codex', 'claude-code'], 'each agent once, however many of its rows would start')
+})
+
+test("the model a run on Claude Code starts on: this machine's pick, else the one its skill names, else the scheduler's own; a skill's model is for the agent the skill is made for, and for no other", async () => {
+  const both = [CLAUDE, CODEX]
+  const commands = [
+    command('update-tickets', { when: 'a', model: 'haiku' }),
+    command('plan-tickets', { when: 'b', model: 'haiku' }),
+    command('work-queue', { when: 'c' }),
+    // Made for Codex with a Codex model, and switched to Claude Code here: the skill's model is not Claude's.
+    command('review', { when: 'd', dirs: both, agent: 'codex', model: 'gpt-5.5' }),
+    // Made for Claude Code with a Claude model, and switched to Codex here: no model is named to Codex.
+    command('audit', { when: 'e', dirs: both, model: 'haiku' }),
+  ]
+  const { deps: d, seen } = deps({ commands, stateOver: { model: 'sonnet', switches: Object.fromEntries(commands.map(c => [c.name, ON])), models: { 'plan-tickets': { agent: 'claude-code', model: 'opus' } }, runsOn: { review: 'claude-code', audit: 'codex' } } })
+  const record = await tick(d)
+  assert.deepEqual(seen.spawned.map(({ prompt, driver, model }) => [prompt, driver, model]), [
+    ['/update-tickets', 'claude-code', 'haiku'],
+    ['/plan-tickets', 'claude-code', 'opus'],
+    ['/work-queue', 'claude-code', 'sonnet'],
+    ['/review', 'claude-code', 'sonnet'],
+    ['/audit', 'codex', undefined],
+  ])
+  assert.deepEqual(seen.markers.map(m => m.model), ['haiku', 'opus', 'sonnet', 'sonnet', undefined])
+  assert.deepEqual(record.schedule.map(c => [c.command, c.model]), [['update-tickets', 'haiku'], ['plan-tickets', 'haiku'], ['work-queue', undefined], ['review', 'gpt-5.5'], ['audit', 'haiku']])
+})
+
+test('a model picked while a command ran on another agent is not sent to the agent it runs on now: a skill that reached Claude Code\'s folder since starts on the scheduler\'s model, and one that came to name Codex on Codex\'s own', async () => {
+  const both = ['.claude/skills', '.agents/skills']
+  // Picked for Codex when the skill was only in Codex's folder; picked for Claude Code before the skill named Codex.
+  const commands = [command('review', { every: every('1d'), dirs: both }), command('audit', { every: every('1d'), dirs: both, agent: 'codex' })]
+  const { deps: d, seen } = deps({ commands, stateOver: { model: 'sonnet', switches: { review: ON, audit: ON }, models: { review: { agent: 'codex', model: 'gpt-5.5' }, audit: { agent: 'claude-code', model: 'opus' } } } })
+  await tick(d)
+  assert.deepEqual(seen.spawned.map(run => [run.prompt, run.driver, run.model]), [['/review', 'claude-code', 'sonnet'], ['/audit', 'codex', undefined]])
+  assert.deepEqual(seen.markers.map(card => [card.driver, card.model]), [['claude-code', 'sonnet'], ['codex', undefined]])
+})
+
+test("Claude's quota is read once per tick however many models its rows start on, and each row is held by its own model's week beside the account's", async () => {
+  let reads = 0
+  const week = quota(10)
+  const withSonnet: DriverQuota = { available: true, windows: [...(week.available ? week.windows : []), { label: 'Current week (Sonnet)', kind: 'week-model', percentUsed: 99 }] }
+  const commands = [command('a', { when: 'x', model: 'opus' }), command('b', { when: 'y', model: 'sonnet' }), command('c', { when: 'z', model: 'haiku' })]
+  const { deps: d, seen } = deps({ commands, quota: async () => (reads++, withSonnet) })
+  const record = await tick(d)
+  assert.deepEqual(record.decisions.map(x => x.outcome.replace(/^started .*/, 'started').replace(/^(quota: Current week \(Sonnet\) is 99% used).*/, '$1')), ['started', 'quota: Current week (Sonnet) is 99% used', 'started'])
+  assert.deepEqual(seen.spawned.map(run => run.model), ['opus', 'haiku'])
+  assert.equal(reads, 1)
+})
+
 test('the quota is read once per tick, however many commands start', async () => {
   let reads = 0
   const { deps: d, seen } = deps({ commands: [command('a', { when: 'x' }), command('b', { when: 'y' })], quota: async () => { reads++; return quota(1) } })
@@ -557,7 +663,7 @@ test('the quota is read once per tick, however many commands start', async () =>
 
 test('the schedule is listed as the skills say it, switched on or off, with the scheduler off and when the pull failed; nothing is swept then', async () => {
   const commands = [command('work-queue'), command('update-tickets', { when: 'gh issue list' })]
-  const said = [{ command: 'work-queue', when: 'npx queue' }, { command: 'update-tickets', when: 'gh issue list' }]
+  const said = [{ command: 'work-queue', when: 'npx queue', ...ON_CLAUDE }, { command: 'update-tickets', when: 'gh issue list', ...ON_CLAUDE }]
   const off = deps({ commands, stateOver: { switches: {} } })
   assert.deepEqual((await tick(off.deps)).schedule, said)
   const stopped = await tick({ ...off.deps, state: { ...off.deps.state, on: false } })
@@ -613,8 +719,8 @@ test('a run asked for by hand is held by what holds a tick apart from the switch
   const offline = deps({ ...off, pull: async () => ({ ok: false, error: 'offline' }), sweep: async () => void swept.push('sweep') })
   assert.deepEqual(await startNow(offline.deps, queue), { ok: false, outcome: 'agent-data could not be pulled: offline' })
   assert.deepEqual(offline.seen.checks, [])
-  const elsewhere = command('codex-only', { dir: '.agents/skills' })
-  assert.deepEqual(await startNow(deps(off).deps, elsewhere), { ok: false, outcome: 'not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills' })
+  const elsewhere = command('codex-only', { dir: CODEX })
+  assert.deepEqual(await startNow(deps({ stateOver: { switches: {}, runsOn: { 'codex-only': 'claude-code' } } }).deps, elsewhere), { ok: false, outcome: 'not a command of Claude Code: its skill is only under .agents/skills, not .claude/skills' })
   const fine = deps({ ...off, sweep: async () => void swept.push('sweep') })
   assert.equal((await startNow(fine.deps, queue)).ok, true)
   assert.deepEqual(swept, [])
@@ -634,6 +740,13 @@ test('a run asked for by hand is held by what holds a tick apart from the switch
   const closed = await startNow({ ...sweptAway.deps, inFlight: async () => [] }, queue)
   assert.deepEqual(closed, { ok: false, outcome: 'not started: its record was closed before the run began' })
   assert.deepEqual([sweptAway.seen.spawned.length, sweptAway.seen.withdrawn.length], [0, 1])
+  // By hand the row's agent and model are the tick's: this machine's picks, else what its skill says.
+  const onCodex = deps({ stateOver: { switches: {}, runsOn: { review: 'codex' }, models: { review: { agent: 'codex', model: 'gpt-5.5' } } }, atStart: async file => ({ ref: 'origin/main', reached: true, there: file === '.agents/skills/review/SKILL.md' }) })
+  assert.equal((await startNow(onCodex.deps, command('review', { every: every('1d'), dirs: [CLAUDE, CODEX] }))).ok, true)
+  assert.deepEqual(onCodex.seen.spawned.map(({ prompt, driver, model }) => [prompt, driver, model]), [['/review', 'codex', 'gpt-5.5']])
+  const cheap = deps(off)
+  await startNow(cheap.deps, command('update-tickets', { when: 'x', model: 'haiku' }))
+  assert.deepEqual(cheap.seen.spawned.map(({ driver, model }) => [driver, model]), [['claude-code', 'haiku']])
   // The quota is not even read, and the publish pick of this machine goes with the run as on a tick.
   let reads = 0
   const picked = deps({ stateOver: { switches: {}, publishes: { 'work-queue': 'pr' } }, quota: async () => (reads++, quota(100)) })

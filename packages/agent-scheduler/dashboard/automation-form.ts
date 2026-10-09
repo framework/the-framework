@@ -48,6 +48,8 @@ export interface OpenedAutomation {
   draft: AutomationDraft
   /** Its file, from the project's root. */
   file: string
+  /** The tool's name for what the file said when it was read: saving is held against it, when the answer gives one. */
+  version?: string
 }
 
 /**
@@ -64,6 +66,7 @@ export function openedAutomation(output: unknown): OpenedAutomation | undefined 
   return {
     draft: { name, prompt, when: typeof when === 'string' ? when : '', waitsFor: typeof waitsFor === 'string' ? waitsFor : '', pace: read ? { kind: 'every', count: String(read.count), unit: read.unit, at: '' } : { kind: 'work' }, onThisMachine: answer['onThisMachine'] === true },
     file,
+    ...(typeof answer['version'] === 'string' ? { version: answer['version'] } : {}),
   }
 }
 
@@ -191,10 +194,10 @@ export function triedLine(output: unknown): TriedLine {
   return answer['due'] === true ? { ...lastRun, printed, verdict: 'It printed something: an agent would start now.', tone: 'start' } : { ...lastRun, printed, verdict: 'It printed nothing to do: no agent would start.', tone: 'quiet' }
 }
 
-/** Read what `agent-scheduler add` or `edit` printed: the file it wrote, where a run's checkout starts, and whether it is kept on this machine alone. */
-export function savedFile(output: unknown): { file: string; startsFrom: string; onThisMachine: boolean } {
+/** Read what `agent-scheduler add` or `edit` printed: the file it wrote, where a run's checkout starts, whether it is kept on this machine alone, and the tool's name for what the file says now, when it gives one. */
+export function savedFile(output: unknown): { file: string; startsFrom: string; onThisMachine: boolean; version?: string } {
   const answer = typeof output === 'object' && output !== null ? (output as Record<string, unknown>) : {}
-  return { file: typeof answer['file'] === 'string' ? answer['file'] : 'a skill file', startsFrom: typeof answer['startsFrom'] === 'string' ? answer['startsFrom'] : 'HEAD', onThisMachine: answer['onThisMachine'] === true }
+  return { file: typeof answer['file'] === 'string' ? answer['file'] : 'a skill file', startsFrom: typeof answer['startsFrom'] === 'string' ? answer['startsFrom'] : 'HEAD', onThisMachine: answer['onThisMachine'] === true, ...(typeof answer['version'] === 'string' ? { version: answer['version'] } : {}) }
 }
 
 /** What a saved automation is and what the person has to do with it, in a sentence: a shared one is a file to commit that must reach where a run's checkout starts; one kept on this machine needs nothing. */
@@ -204,21 +207,15 @@ export function savedWords(saved: { startsFrom: string; onThisMachine: boolean }
 }
 
 /**
- * What an automation saved again is and what the person has to do with it, in a sentence. A
- * shared one is a change to a file of theirs: an agent works in its own copy of the project, so
- * it is told the new words only once the change is where that copy starts, while the scheduler
- * reads the pace and the shell line from the person's own files. One kept on this machine needs
- * nothing.
+ * What a shared automation saved again is and what the person has to do with it, in a sentence:
+ * a change to a file of theirs. An agent works in its own copy of the project, so it is told the
+ * new words only once the change is where that copy starts, while the scheduler reads the pace and
+ * the shell line from the person's own files. One kept on this machine needs nothing said: its row
+ * shows the change.
  */
-export function editedWords(saved: { startsFrom: string; onThisMachine: boolean }): string {
-  if (saved.onThisMachine) return 'It is kept on this machine alone: nothing to commit. The scheduler uses the new words from its next look. Its past runs, its switch and your picks for it stay.'
+export function editedWords(saved: { startsFrom: string }): string {
   const once = saved.startsFrom === 'HEAD' ? 'once you commit the change' : `once the change is on ${saved.startsFrom}: commit it and bring it there`
   return `It is a change to a file of yours, in this project, and nothing was committed for you. An agent is told the new words only ${once}. The pace and the shell line are read from your file, so the scheduler uses the new ones from its next look. Its past runs, its switch and your picks for it stay.`
-}
-
-/** When a row shows what was saved again, in a sentence: the rows are what the project's scheduler last read. */
-export function showsChangeWhen(ticking: boolean): string {
-  return ticking ? 'Its row shows the change once the scheduler has looked, within a minute.' : 'The scheduler is not running in this project, so its row shows the change once the scheduler runs.'
 }
 
 /**
@@ -257,11 +254,6 @@ export function removedWords(title: string, output: unknown): string {
 /** What the form says of where a draft will be saved, under its two choices. */
 export function whereHint(draft: AutomationDraft): string {
   return draft.onThisMachine ? 'Kept on this machine alone, outside git. The row starts switched off, and can start as soon as you switch it on.' : 'Saved as a skill file in this project, which you commit. The row starts switched off.'
-}
-
-/** When a saved automation's row shows on the page, in a sentence: the rows are what the project's scheduler last read, so a scheduler that is not running shows none. */
-export function showsWhen(ticking: boolean): string {
-  return ticking ? 'Its row shows here once the scheduler has looked, within a minute. It starts switched off.' : "The scheduler is not running in this project, so its row does not show yet: it shows once the scheduler runs. It starts switched off."
 }
 
 /** Where a saved automation's file has to get to before its row can start, in a sentence. */

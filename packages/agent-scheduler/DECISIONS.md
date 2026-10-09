@@ -2,9 +2,10 @@ Non-obvious decisions only, grouped by business-logic flow. Anything not listed 
 to the implementer's judgment. Flag conflicts instead of silently deviating. Keep
 outdated decisions (no history).
 
-A bullet is a person's pick, and says what it was picked over. What the code does belongs
-in LOGIC.md; a choice made while implementing is the implementer's judgment, not a
-decision. An AI proposes a bullet and asks; it never adds or rewrites one.
+A bullet is a person's pick, and says what it was picked over. What the code does
+belongs in LOGIC.md; a choice made while implementing is the implementer's judgment,
+not a decision. An AI writes a bullet only for a pick a person already made, and lists
+it in its pull request; for anything else it proposes and asks.
 
 ## The tool
 - A tool, a package with a command line, like `agent-driver`; not a skill. It owns one
@@ -80,7 +81,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   the state file like the switch; the scheduler's own Automations page shows the pick and
   changes it. Until a person picks, a run commits its work and pushes nothing. Picked over
   a level written beside the command for the whole team, which a person could only
-  override: nothing leaves a machine before its own person said so.
+  override: nothing leaves a machine before its own person said so. The page says a level
+  as what a run may do ("May commit, pushes nothing"), not as what it will do: a run that
+  has nothing to commit commits nothing.
 - A skill paces its scheduled command two ways, alone or together: `when` says there is
   work (the check's output), `every` says how often at most (the least time since the
   command's last recorded start, read off the run records on the branch, so every machine
@@ -114,7 +117,9 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   edited row keeps its past runs, and another name is a new row. Editing or removing a
   shared one changes its file, which the person commits. The rows the project's skills
   bring are not edited or removed from the page. Picked over a page that edits any
-  scheduled skill: a skill's file is its author's.
+  scheduled skill: a skill's file is its author's. A save from the page is refused when
+  the row's file was changed since the page read it: it writes over no change made by
+  hand.
 - A row has one place for its pace on the Automations page, whoever made it: its Edit
   panel, the same for every row. For a row a person made, the pace picked there is the
   automation's own, saved into its file with its prompt and its check, and their machine
@@ -198,3 +203,7 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   Picked over a hook line per setting that a dashboard runs, and over the dashboard reading
   the state file by name. The rows are on a page of their own, picked over rows inside
   Settings: Settings keeps only what reaches every project.
+- The rows of the Automations page are the schedule as the project's files say it at that
+  moment, which `status` reads: a row saved, changed or removed shows at once, also where
+  no scheduler is running. Picked over listing what the scheduler last read, where a new
+  row showed up to a minute later, and never without a scheduler.

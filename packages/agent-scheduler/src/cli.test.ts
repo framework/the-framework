@@ -1,8 +1,9 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { recordRun } from '@openagt/agent-runner'
 import { runCli } from './cli.js'
 import { DEFAULT_STATE, readState, statePath, writeState } from './state.js'
 import { removeRepo, testRepo, writeSkill } from './test-repo.js'
@@ -17,6 +18,13 @@ interface Ran {
   err: string
 }
 
+/** An answer that names an automation's version, with the version checked and taken off: it has a test of its own. */
+function unversioned(out: unknown): unknown {
+  const { version, ...rest } = out as { version?: unknown }
+  assert.equal(typeof version === 'string' && version !== '', true, 'it names a version')
+  return rest
+}
+
 async function run(cwd: string, ...argv: string[]): Promise<Ran> {
   const outLines: string[] = []
   const errLines: string[] = []
@@ -29,7 +37,7 @@ test('status reads the state; model and offset write it; stop turns it off; ever
   try {
     const fresh = await run(repo, 'status')
     assert.equal(fresh.code, 0)
-    assert.deepEqual(fresh.out, { ok: true, on: false, keepAlive: false, model: 'opus', spendOffset: 100 / 14, running: false })
+    assert.deepEqual(fresh.out, { ok: true, on: false, keepAlive: false, model: 'opus', spendOffset: 100 / 14, running: false, schedule: [], unreadable: [] })
 
     const model = await run(repo, 'model', 'sonnet')
     assert.equal(model.code, 0)
@@ -411,8 +419,8 @@ test("show answers an automation as it stands; edit saves it again under its nam
     assert.equal((await run(repo, 'add', 'answer-comments', '--prompt', 'Answer each new comment below.', '--every', '15m', '--when=gh api comments --jq .', '--waits-for', 'when someone commented')).code, 0)
     assert.equal((await run(repo, 'add', 'tidy', '--prompt', 'Tidy up.', '--every', '1d', '--private')).code, 0)
     const shown = await run(repo, 'show', 'answer-comments')
-    assert.deepEqual([shown.code, shown.out, shown.err], [0, { ok: true, name: 'answer-comments', prompt: 'Answer each new comment below.', every: '15m', when: 'gh api comments --jq .', waitsFor: 'when someone commented', file: '.claude/skills/answer-comments/SKILL.md' }, ''])
-    assert.deepEqual((await run(repo, 'show', 'tidy')).out, { ok: true, name: 'tidy', prompt: 'Tidy up.', every: '1d', file: '.agent-scheduler/automations/tidy.md', onThisMachine: true })
+    assert.deepEqual([shown.code, unversioned(shown.out), shown.err], [0, { ok: true, name: 'answer-comments', prompt: 'Answer each new comment below.', every: '15m', when: 'gh api comments --jq .', waitsFor: 'when someone commented', file: '.claude/skills/answer-comments/SKILL.md' }, ''])
+    assert.deepEqual(unversioned((await run(repo, 'show', 'tidy')).out), { ok: true, name: 'tidy', prompt: 'Tidy up.', every: '1d', file: '.agent-scheduler/automations/tidy.md', onThisMachine: true })
 
     for (const name of ['answer-comments', 'tidy']) {
       assert.equal((await run(repo, 'switch', name, 'on')).code, 0)
@@ -426,13 +434,13 @@ test("show answers an automation as it stands; edit saves it again under its nam
 
     // Saved again: a text that opens with a dash is the flag's own; the flags left out leave their parts as the file says them, and the state is as it was.
     const edited = await run(repo, 'edit', 'answer-comments', '--prompt=- Answer in one line.', '--every', '1h')
-    assert.deepEqual([edited.code, edited.out, edited.err], [0, { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', startsFrom: 'origin/main' }, ''])
-    assert.deepEqual((await run(repo, 'show', 'answer-comments')).out, { ok: true, name: 'answer-comments', prompt: '- Answer in one line.', every: '1h', when: 'gh api comments --jq .', waitsFor: 'when someone commented', file: '.claude/skills/answer-comments/SKILL.md' })
+    assert.deepEqual([edited.code, unversioned(edited.out), edited.err], [0, { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', startsFrom: 'origin/main' }, ''])
+    assert.deepEqual(unversioned((await run(repo, 'show', 'answer-comments')).out), { ok: true, name: 'answer-comments', prompt: '- Answer in one line.', every: '1h', when: 'gh api comments --jq .', waitsFor: 'when someone commented', file: '.claude/skills/answer-comments/SKILL.md' })
     // A schedule flag given empty takes its part out: the check, and what it waited for with it.
     assert.equal((await run(repo, 'edit', 'answer-comments', '--when=')).code, 0)
-    assert.deepEqual((await run(repo, 'show', 'answer-comments')).out, { ok: true, name: 'answer-comments', prompt: '- Answer in one line.', every: '1h', file: '.claude/skills/answer-comments/SKILL.md' })
-    assert.deepEqual((await run(repo, 'edit', 'tidy', '--prompt', 'Tidy up, gently.', '--when', 'true', '--every=')).out, { ok: true, command: 'tidy', file: '.agent-scheduler/automations/tidy.md', startsFrom: 'origin/main', onThisMachine: true })
-    assert.deepEqual((await run(repo, 'show', 'tidy')).out, { ok: true, name: 'tidy', prompt: 'Tidy up, gently.', when: 'true', file: '.agent-scheduler/automations/tidy.md', onThisMachine: true })
+    assert.deepEqual(unversioned((await run(repo, 'show', 'answer-comments')).out), { ok: true, name: 'answer-comments', prompt: '- Answer in one line.', every: '1h', file: '.claude/skills/answer-comments/SKILL.md' })
+    assert.deepEqual(unversioned((await run(repo, 'edit', 'tidy', '--prompt', 'Tidy up, gently.', '--when', 'true', '--every=')).out), { ok: true, command: 'tidy', file: '.agent-scheduler/automations/tidy.md', startsFrom: 'origin/main', onThisMachine: true })
+    assert.deepEqual(unversioned((await run(repo, 'show', 'tidy')).out), { ok: true, name: 'tidy', prompt: 'Tidy up, gently.', when: 'true', file: '.agent-scheduler/automations/tidy.md', onThisMachine: true })
     assert.deepEqual(await readState(repo), before, 'its switch, its pace, its number of agents and its publish pick stay its own')
     const unsaid = await run(repo, 'edit', 'tidy')
     assert.deepEqual([unsaid.code, unsaid.out], [2, undefined], 'nothing to change: a command line that cannot be read')
@@ -491,6 +499,97 @@ test('a removal that finds nothing of the command in the state writes no state: 
     assert.deepEqual((state.lastTick?.schedule ?? []).map(c => c.command), ['stays'], 'what lists the record shows no row for a file that is gone')
     assert.deepEqual((state.lastTick?.decisions ?? []).map(d => [d.command, d.outcome]), [['stays', 'switched off on this machine']])
     assert.equal(state.switches, undefined, 'and what it was given is taken back with it: off the record, the next tick would not know to')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test("status lists the schedule as the project's files say it at that moment, with no tick and no scheduler: a command saved a moment ago, its new words once saved again, and none once removed; what cannot be listed is named with why; each command's last run is the one the last tick recorded", async () => {
+  const repo = await testRepo()
+  try {
+    type Listed = { schedule: Record<string, unknown>[]; unreadable: unknown[]; lastTick?: unknown; running: boolean }
+    const status = async (): Promise<Listed> => {
+      const answered = await run(repo, 'status')
+      assert.equal(answered.code, 0)
+      return answered.out as Listed
+    }
+    assert.deepEqual([(await status()).schedule, (await status()).unreadable], [[], []])
+    // Saved a moment ago: listed, though nothing ever ticked here and no scheduler runs.
+    assert.equal((await run(repo, 'add', 'answer-comments', '--prompt', 'Answer each new comment below.', '--every', '15m', '--when=gh api comments', '--waits-for', 'when someone commented')).code, 0)
+    assert.equal((await run(repo, 'add', 'tidy', '--prompt', 'Tidy up.', '--every', '1d', '--private')).code, 0)
+    const added = await status()
+    assert.deepEqual([added.running, added.lastTick], [false, undefined])
+    assert.deepEqual(added.schedule, [
+      { command: 'answer-comments', every: '15m', when: 'gh api comments', waitsFor: 'when someone commented', description: 'Answer each new comment below.', editable: true },
+      { command: 'tidy', every: '1d', description: 'Tidy up.', onThisMachine: true, editable: true },
+    ])
+    // Saved again: its new words and its new pace at once.
+    assert.equal((await run(repo, 'edit', 'tidy', '--prompt', 'Tidy up, gently.', '--every', '2d')).code, 0)
+    assert.deepEqual((await status()).schedule[1], { command: 'tidy', every: '2d', description: 'Tidy up, gently.', onThisMachine: true, editable: true })
+    // A skill of the project counts the same, with how many at once when its skill says more than one.
+    await writeSkill(repo, 'triage', 'description: Put the ready tickets on the queue.\nschedule:\n  every: 6h\n  agents: 2\n')
+    assert.deepEqual((await status()).schedule.map(c => [c['command'], c['agents'], c['editable']]), [['answer-comments', undefined, true], ['triage', 2, undefined], ['tidy', undefined, true]])
+
+    // What cannot be listed, read now: a skill whose schedule cannot be read, and an automation kept on this machine that has none.
+    await writeSkill(repo, 'plan', 'schedule:\n  evry: 6h\n')
+    await writeFile(join(repo, '.agent-scheduler', 'automations', 'notes.md'), '---\nname: notes\n---\nWrite notes.\n')
+    const partly = await status()
+    assert.deepEqual(partly.schedule.map(c => c['command']), ['answer-comments', 'triage', 'tidy'])
+    assert.equal(partly.unreadable.length, 2)
+    assert.deepEqual(partly.unreadable.map(u => [(u as { skill: string }).skill, (u as { own?: true }).own, typeof (u as { reason: unknown }).reason]), [['plan', undefined, 'string'], ['notes', true, 'string']])
+    assert.deepEqual((partly.unreadable[1] as { reason: string }).reason, 'it has no schedule')
+    // Mended: named no more, with no tick in between.
+    await rm(join(repo, '.claude', 'skills', 'plan'), { recursive: true })
+    await rm(join(repo, '.agent-scheduler', 'automations', 'notes.md'))
+    assert.deepEqual((await status()).unreadable, [])
+
+    // The last run of each command is read off the run records, with no tick: a skill's command counts every machine's runs, an automation kept here this machine's.
+    const at = '2026-10-09T10:00:00.000Z'
+    await recordRun(repo, { id: 'r1', startedAt: at, status: 'failed', intent: 'tidy', caller: { runner: { host: hostname() } } }, [])
+    await recordRun(repo, { id: 'r2', startedAt: at, status: 'done', intent: '/triage', caller: { runner: { host: 'another-box' } } }, [])
+    await recordRun(repo, { id: 'r0', startedAt: at, status: 'done', intent: '/gone', caller: { runner: { host: hostname() } } }, [])
+    const ran = await status()
+    assert.deepEqual(ran.schedule.map(c => [c['command'], c['every'], c['lastRun']]), [['answer-comments', '15m', undefined], ['triage', '6h', { id: 'r2', at }], ['tidy', '2d', { id: 'r1', at, failed: true }]])
+    assert.equal((await readState(repo)).lastTick, undefined)
+    // Removed: gone at once, whatever the last tick's record still says.
+    assert.equal((await run(repo, 'remove', 'answer-comments')).code, 0)
+    assert.equal((await run(repo, 'remove', 'tidy')).code, 0)
+    assert.deepEqual((await status()).schedule.map(c => c['command']), ['triage'])
+    // Reading it wrote nothing.
+    const before = await readFile(statePath(repo), 'utf8').catch(() => 'no state')
+    await status()
+    assert.equal(await readFile(statePath(repo), 'utf8').catch(() => 'no state'), before)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('show names the version of what the file says, and edit --was is held against it: a file changed by hand since is not written over, in a sentence; the version an edit answers is the one the next edit is held against', async () => {
+  const repo = await testRepo()
+  try {
+    assert.equal((await run(repo, 'add', 'answer-comments', '--prompt', 'Answer each new comment below.\n\nBe short.', '--every', '15m')).code, 0)
+    const file = join(repo, '.claude', 'skills', 'answer-comments', 'SKILL.md')
+    const version = async (): Promise<string> => ((await run(repo, 'show', 'answer-comments')).out as { version: string }).version
+    const opened = await version()
+    assert.match(opened, /^\S+$/)
+    assert.equal(await version(), opened)
+    const byHand = (await readFile(file, 'utf8')).replace('Be short.', 'Be short, and kind.')
+    await writeFile(file, byHand)
+    assert.notEqual(await version(), opened)
+    const refused = await run(repo, 'edit', 'answer-comments', '--prompt=From a form opened a while ago.', '--every=1h', '--when=', '--waits-for=', `--was=${opened}`)
+    const why = '.claude/skills/answer-comments/SKILL.md was changed since it was opened here: open it again to see what it says now'
+    assert.deepEqual([refused.code, refused.out, refused.err], [1, { ok: false, reason: 'changed-since', detail: why }, why])
+    assert.equal(await readFile(file, 'utf8'), byHand)
+    // Held against what it says now, it is saved, and the answer names what was written.
+    const saved = await run(repo, 'edit', 'answer-comments', '--every=1h', `--was=${await version()}`)
+    assert.equal(saved.code, 0)
+    const written = (saved.out as { version: string }).version
+    assert.equal(written, await version())
+    assert.equal((await run(repo, 'edit', 'answer-comments', '--every=2h', '--was', written)).code, 0)
+    assert.equal((await run(repo, 'edit', 'answer-comments', '--every=3h', '--was', written)).code, 1, 'its own earlier save changed the file too')
+    // With no --was it is held against nothing.
+    assert.equal((await run(repo, 'edit', 'answer-comments', '--every=4h')).code, 0)
+    assert.match(await readFile(file, 'utf8'), /every: 4h/)
   } finally {
     await removeRepo(repo)
   }

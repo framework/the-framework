@@ -161,17 +161,22 @@ function isMap(value: unknown): value is Record<string, unknown> {
 /** What a file manager leaves in a folder a person only looked at: no part of a skill, and it goes with the folder. */
 export const FOLDER_LITTER = '.DS_Store'
 
+/** What saving an automation again writes beside its file before moving it over the file: left behind only by a save that was cut short, it is the tool's own, no part of a skill, and it goes with the next save or with the folder. */
+export const HALF_SAVED = `${SKILL_FILE}.new`
+
 /**
  * Whether a skill's folder in the project is what saving a shared automation makes: a folder that
  * is no link, holding the skill's file, no link either, and nothing else but what a file manager
- * leaves behind. A skill that comes from a package is a link, and a skill with scripts beside its
+ * leaves behind and what a save of the tool's own that was cut short left. A skill that comes from a package is a link, and a skill with scripts beside its
  * file holds more: neither is an automation, whatever its file says.
  */
 export async function standsAlone(repo: string, name: string): Promise<boolean> {
   const folder = join(repo, RUN_SKILLS_DIR, name)
   try {
     const [dir, entries] = await Promise.all([lstat(folder), readdir(folder)])
-    return dir.isDirectory() && entries.every(entry => entry === SKILL_FILE || entry === FOLDER_LITTER) && (await isPlainFile(join(folder, SKILL_FILE)))
+    // The leftover of a save is a file: a link or a folder of that name is somebody's, and writing through it would reach something kept elsewhere.
+    const halfSaved = !entries.includes(HALF_SAVED) || (await isPlainFile(join(folder, HALF_SAVED)))
+    return dir.isDirectory() && halfSaved && entries.every(entry => entry === SKILL_FILE || entry === FOLDER_LITTER || entry === HALF_SAVED) && (await isPlainFile(join(folder, SKILL_FILE)))
   } catch {
     return false
   }

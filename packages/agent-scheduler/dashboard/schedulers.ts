@@ -4,17 +4,23 @@ import { DEFAULT_PUBLISH, isAgents, isTime } from '../src/names.js'
 import { MAX_COUNT, paceInForce, parseInterval, parseTimeOfDay, takesTimeOfDay, type PacePick, type PaceUnit } from '../src/pace.js'
 
 // What the module shows of each project's scheduler: the answer of `agent-scheduler status`, the
-// state file as it stands plus whether the scheduler's process is alive. Forgiving: a field that is
+// state file as it stands, whether the scheduler's process is alive, and the schedule as the
+// project's files say it at that moment. Forgiving: a field that is
 // not what the command promises reads as absent, and a project whose command fails is a row that
 // says why.
 
-/** The publish picks a person can make for a scheduled command, in the menu's order, with their labels. */
+/** The publish picks a person can make for a scheduled command, in the menu's order, with their labels. No level is the first: the run is told none, and does what its skill says. */
 export const PUBLISH_LABELS: Readonly<Record<PublishPick, string>> = {
-  nothing: 'Nothing',
+  nothing: 'As the skill says',
   commit: 'Commit',
   branch: 'Publish branch',
   pr: 'Open PR',
   merge: 'Merge on green',
+}
+
+/** A publish pick's label in a row's menu: a row a person made has no skill to follow, so no level is "As the prompt says" there. */
+export function publishLabel(pick: PublishPick, own: boolean): string {
+  return pick === 'nothing' && own ? 'As the prompt says' : PUBLISH_LABELS[pick]
 }
 
 const PUBLISH_PICKS = Object.keys(PUBLISH_LABELS) as PublishPick[]
@@ -23,7 +29,7 @@ const PUBLISH_PICKS = Object.keys(PUBLISH_LABELS) as PublishPick[]
 import { MAX_SPEND_OFFSET } from '@openagt/dashboard/module'
 export { MAX_SPEND_OFFSET }
 
-/** One command the project's skills schedule, as the scheduler's last tick read it, with this machine's switch and publish pick. */
+/** One command the project's skills schedule, as its file says it now, with this machine's switch and publish pick. */
 export interface SchedulerCommand {
   command: string
   /** How often at most, as written (`1d`). */
@@ -110,9 +116,9 @@ export interface SchedulerRow {
   /** How far past the quota boundary the project's scheduled runs may still start, in percentage points. */
   spendOffset?: number
   lastTick?: { at: string; decisions: TickDecision[]; note?: string }
-  /** The scheduled commands; empty until the scheduler has ticked once, and where no skill of the project schedules one. */
+  /** The scheduled commands; empty where no skill of the project schedules one. */
   commands: SchedulerCommand[]
-  /** The skills whose `schedule` the last tick could not read. */
+  /** The skills whose `schedule` cannot be read, and the automations kept on this machine that are not listed. */
   unreadable: UnreadableSchedule[]
 }
 
@@ -137,7 +143,7 @@ const UNREADABLE = 'unreadable schedule: '
 /** What a tick says of an automation kept on this machine that it does not list, before the reason. */
 const UNLISTED = 'unlisted automation: '
 
-/** A project's row from what `status` printed: each scheduled command with this machine's switch and publish pick and the last tick's decision folded in, and the skills the tick could not read. */
+/** A project's row from what `status` printed: each scheduled command as the project's files say it now, with this machine's switch and picks and the last tick's decision folded in, and the skills whose schedule cannot be read. */
 export function schedulerRow(project: ModuleProject, output: unknown): SchedulerRow {
   const state = record(output)
   const tick = record(state['lastTick'])
@@ -152,7 +158,7 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
     decisions.push({ command: d['command'], outcome: d['outcome'], ...(typeof d['run'] === 'string' ? { run: d['run'] } : {}) })
   }
   const commands: SchedulerCommand[] = []
-  for (const item of Array.isArray(tick['schedule']) ? (tick['schedule'] as unknown[]) : []) {
+  for (const item of Array.isArray(state['schedule']) ? (state['schedule'] as unknown[]) : []) {
     const row = record(item)
     const command = row['command']
     if (typeof command !== 'string') continue
@@ -186,7 +192,10 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
     ...(typeof offset === 'number' && Number.isFinite(offset) ? { spendOffset: offset } : {}),
     ...(typeof tick['at'] === 'string' ? { lastTick: { at: tick['at'], decisions, ...(typeof tick['note'] === 'string' ? { note: tick['note'] } : {}) } } : {}),
     commands,
-    unreadable: decisions.flatMap((d): UnreadableSchedule[] => (d.outcome.startsWith(UNREADABLE) ? [{ skill: d.command, reason: d.outcome.slice(UNREADABLE.length) }] : d.outcome.startsWith(UNLISTED) ? [{ skill: d.command, reason: d.outcome.slice(UNLISTED.length), own: true }] : [])),
+    unreadable: (Array.isArray(state['unreadable']) ? (state['unreadable'] as unknown[]) : []).flatMap((item): UnreadableSchedule[] => {
+      const said = record(item)
+      return typeof said['skill'] === 'string' && typeof said['reason'] === 'string' ? [{ skill: said['skill'], reason: said['reason'], ...(said['own'] === true ? { own: true as const } : {}) }] : []
+    }),
   }
 }
 
@@ -231,7 +240,7 @@ export async function saveSpendOffset(host: ModuleHost, projects: readonly Modul
   return failed.length ? { ok: false, error: failed.join('; ') } : { ok: true }
 }
 
-/** The picks a scheduled command's publish menu lists: every one where the project has a git host package, else Nothing, Commit and Publish branch, since no pull request can be opened; and the pick in force when the project is not offered it. */
+/** The picks a scheduled command's publish menu lists: every one where the project has a git host package, else no level, Commit and Publish branch, since no pull request can be opened; and the pick in force when the project is not offered it. */
 export function publishChoices(gitHost: boolean, saved: PublishPick): readonly PublishPick[] {
   const offered: readonly PublishPick[] = gitHost ? PUBLISH_PICKS : ['nothing', 'commit', 'branch']
   return offered.includes(saved) ? offered : [...offered, saved]
@@ -363,13 +372,17 @@ export function withAgentsDraft(command: SchedulerCommand, draft: AgentsDraft): 
   return args[0] === 'skill' ? rest : { ...rest, agents: Number(args[0]) }
 }
 
-/** How far a scheduled command's runs publish on this machine, as a sentence. */
+/**
+ * How far a scheduled command's runs may publish on this machine, as a sentence. It says a limit,
+ * not what a run will do: a run with nothing to commit commits nothing. With no level picked the
+ * run is told none, and does what its skill says, or its prompt for a row a person made.
+ */
 export function publishes(command: SchedulerCommand): string {
-  if (command.publish === 'commit') return 'Commits its work'
-  if (command.publish === 'branch') return 'Publishes its branch'
-  if (command.publish === 'pr') return 'Opens a pull request'
-  if (command.publish === 'merge') return 'Opens a pull request that merges on green'
-  return 'Publishes nothing'
+  if (command.publish === 'commit') return 'May commit, pushes nothing'
+  if (command.publish === 'branch') return 'May publish its branch'
+  if (command.publish === 'pr') return 'May open a pull request'
+  if (command.publish === 'merge') return 'May open a pull request that merges on green'
+  return isOwn(command) ? 'As its prompt says' : 'As its skill says'
 }
 
 /**

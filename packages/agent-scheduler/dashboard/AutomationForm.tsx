@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, cn, type ModuleCommandResult, type ModuleProject } from '@openagt/dashboard/module'
-import { EMPTY_DRAFT, addArgs, draftProblem, draftSentence, isUntouched, ownPaceArgs, paceHint, savedFile, savedWords, showsWhen, whereHint, type AutomationDraft, type OwnPace } from './automation-form.js'
+import { EMPTY_DRAFT, addArgs, draftProblem, draftSentence, isUntouched, ownPaceArgs, paceHint, savedFile, savedWords, whereHint, type AutomationDraft, type OwnPace } from './automation-form.js'
 import { PaceFields, SaidFields, Section } from './fields.js'
 
 // The "New automation" form of the Automations page: a person's own prompt, saved as a command of
@@ -18,15 +18,12 @@ const field = 'rounded-md border border-border bg-background px-2 py-1 text-sm d
 
 export function AutomationForm({
   project,
-  ticking,
   run,
   onDirty,
   onClose,
   onSaved,
 }: {
   project: ModuleProject
-  /** Whether the project's scheduler is running: the row shows what was saved once it has looked. */
-  ticking: boolean
   /** Run one command of the scheduler in the project, in turn with the page's other saves. */
   run: (args: string[]) => Promise<ModuleCommandResult>
   /** Whether something is typed and not saved: closing the form then would lose it. */
@@ -80,7 +77,7 @@ export function AutomationForm({
             Its time of day was not kept: {saved.timeNotKept}. Its row's Edit sets it.
           </p>
         )}
-        <p className="mt-2 text-muted-foreground">{showsWhen(ticking)}</p>
+        <p className="mt-2 text-muted-foreground">Its row is in the list now, switched off.</p>
         <div className="mt-3 flex justify-end">
           <Button size="sm" autoFocus onClick={onClose}>
             Done

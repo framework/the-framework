@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { STATUS, hostAnswering } from './fixtures.js'
-import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, saysAtOnce, cannotRun, decided, draftOf, isOwn, outcomeWords, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withAgentsDraft, withDraft, rowTitle, unlistedWords } from './schedulers.js'
+import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, saysAtOnce, cannotRun, decided, draftOf, isOwn, outcomeWords, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishLabel, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withAgentsDraft, withDraft, rowTitle, unlistedWords } from './schedulers.js'
 
 const GEMSTACK = { id: 'p1', name: 'gemstack', gitHost: true }
 const OTHER = { id: 'p2', name: 'other', gitHost: false }
@@ -24,17 +24,29 @@ describe('a scheduler row, from what status printed', () => {
     expect(row.commands.map(c => [c.command, c.pace])).toEqual([['post-merge-cleanup', { every: '2d', at: '10:00', since }], ['work-queue', { work: true }]])
   })
 
-  test("a skill whose schedule the tick could not read is named with the reason, and is no command's decision", () => {
+  test("a skill whose schedule cannot be read is named with the reason, as the answer lists it now; the last tick's line about it is no command's decision, and is not what names it", () => {
     const row = schedulerRow(GEMSTACK, {
       ...STATUS,
+      unreadable: [{ skill: 'triage', reason: 'row 2: unknown key evry' }],
       lastTick: { ...STATUS.lastTick, decisions: [{ command: 'triage', outcome: 'unreadable schedule: row 2: unknown key evry' }, ...STATUS.lastTick.decisions] },
     })
     expect(row.unreadable).toEqual([{ skill: 'triage', reason: 'row 2: unknown key evry' }])
     expect(row.commands.map(c => c.decision?.outcome)).toEqual(['started 2026-10-03T10-00-00-000Z', 'switched off on this machine'])
+    // Mended since the last tick: the tick's old line names nothing.
+    expect(schedulerRow(GEMSTACK, { ...STATUS, lastTick: { ...STATUS.lastTick, decisions: [{ command: 'triage', outcome: 'unreadable schedule: row 2: unknown key evry' }] } }).unreadable).toEqual([])
+  })
+
+  test("the rows are the schedule the answer reads from the project's files, not what the last tick listed: a command saved since that tick is a row, one removed since is none, and a project no scheduler ever looked at has its rows", () => {
+    const tick = { at: '2026-10-03T10:00:00.000Z', decisions: [{ command: 'gone', outcome: 'not due' }], schedule: [{ command: 'gone', every: '1d' }, { command: 'work-queue', when: 'npx queue' }] }
+    const row = schedulerRow(GEMSTACK, { on: true, running: true, lastTick: tick, schedule: [{ command: 'work-queue', when: 'npx queue' }, { command: 'answer-comments', every: '15m', editable: true }] })
+    expect(row.commands.map(c => c.command)).toEqual(['work-queue', 'answer-comments'])
+    expect(schedulerRow(GEMSTACK, { on: false, running: false, schedule: [{ command: 'tidy', every: '1d', onThisMachine: true, editable: true }] }).commands).toEqual([{ command: 'tidy', every: '1d', on: false, publish: 'commit', onThisMachine: true, editable: true }])
+    // What only the last tick lists is no row.
+    expect(schedulerRow(GEMSTACK, { on: true, running: true, lastTick: tick }).commands).toEqual([])
   })
 
   test("a command the tick lists as this machine's is an automation kept here: its row is named without a slash, since nobody types it as a command", () => {
-    const row = schedulerRow(GEMSTACK, { on: true, running: true, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], schedule: [{ command: 'answer-comments', when: 'gh api comments', onThisMachine: true }, { command: 'work-queue', when: 'npx queue', onThisMachine: 'yes' }] } })
+    const row = schedulerRow(GEMSTACK, { on: true, running: true, schedule: [{ command: 'answer-comments', when: 'gh api comments', onThisMachine: true }, { command: 'work-queue', when: 'npx queue', onThisMachine: 'yes' }] })
     expect(row.commands.map(c => [c.command, c.onThisMachine, rowTitle(c)])).toEqual([
       ['answer-comments', true, 'answer-comments'],
       ['work-queue', undefined, '/work-queue'],
@@ -51,7 +63,7 @@ describe('a scheduler row, from what status printed', () => {
       { command: 'sweep', every: '1d', lastRun: 'r5' },
       { command: 'never', every: '1d' },
     ]
-    const row = schedulerRow(GEMSTACK, { on: true, running: true, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], schedule } })
+    const row = schedulerRow(GEMSTACK, { on: true, running: true, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [] }, schedule })
     expect(row.commands.map(c => [c.command, c.lastRun])).toEqual([
       ['work-queue', { id: 'r1', at, failed: true }],
       ['triage', { id: 'r2', at }],
@@ -67,7 +79,7 @@ describe('a scheduler row, from what status printed', () => {
   })
 
   test("a command the tick lists as an automation the tool wrote is one the page can open again and remove; anything else the tick says there is not", () => {
-    const row = schedulerRow(GEMSTACK, { on: true, running: true, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], schedule: [{ command: 'answer-comments', every: '15m', editable: true }, { command: 'tidy', every: '1d', onThisMachine: true, editable: true }, { command: 'work-queue', when: 'npx queue' }, { command: 'triage', every: '6h', editable: 'yes' }] } })
+    const row = schedulerRow(GEMSTACK, { on: true, running: true, schedule: [{ command: 'answer-comments', every: '15m', editable: true }, { command: 'tidy', every: '1d', onThisMachine: true, editable: true }, { command: 'work-queue', when: 'npx queue' }, { command: 'triage', every: '6h', editable: 'yes' }] })
     expect(row.commands.map(c => [c.command, c.editable])).toEqual([
       ['answer-comments', true],
       ['tidy', true],
@@ -76,7 +88,7 @@ describe('a scheduler row, from what status printed', () => {
     ])
   })
 
-  test('what the tick could not list: a skill whose schedule it could not read, and an automation kept on this machine, each said in its own words; such a line is no decision of a command of that name', () => {
+  test("what is not listed: a skill whose schedule cannot be read, and an automation kept on this machine, each said in its own words; the last tick's line about one is no decision of a command of that name; an entry that is not what the command promises is none", () => {
     const row = schedulerRow(GEMSTACK, {
       on: true,
       running: true,
@@ -87,8 +99,17 @@ describe('a scheduler row, from what status printed', () => {
           { command: 'plan', outcome: 'unlisted automation: a skill of the project has this name too: rename or remove .agent-scheduler/automations/plan.md, then switch on what you want' },
           { command: 'plan', outcome: 'started 2026-10-03T10-00-00-000Z', run: '2026-10-03T10-00-00-000Z' },
         ],
-        schedule: [{ command: 'plan', every: '1d' }],
       },
+      schedule: [{ command: 'plan', every: '1d' }],
+      unreadable: [
+        { skill: 'triage', reason: 'unknown key evry' },
+        { skill: 'plan', reason: 'a skill of the project has this name too: rename or remove .agent-scheduler/automations/plan.md, then switch on what you want', own: true },
+        { skill: 'half' },
+        { reason: 'no name' },
+        { skill: 'odd', reason: 7 },
+        'triage',
+        null,
+      ],
     })
     expect(row.unreadable).toEqual([
       { skill: 'triage', reason: 'unknown key evry' },
@@ -101,7 +122,7 @@ describe('a scheduler row, from what status printed', () => {
     expect(row.commands[0]!.decision).toEqual({ command: 'plan', outcome: 'started 2026-10-03T10-00-00-000Z', run: '2026-10-03T10-00-00-000Z' })
   })
 
-  test('a scheduler that never ticked lists no command; a field that is not what the command promises reads as absent', () => {
+  test('an answer with no schedule lists no command; a field that is not what the command promises reads as absent', () => {
     expect(schedulerRow(GEMSTACK, { ok: true, on: false, keepAlive: false, model: 'opus', spendOffset: 7.14, running: false })).toEqual({ project: GEMSTACK, on: false, keepAlive: false, running: false, model: 'opus', spendOffset: 7.14, commands: [], unreadable: [] })
     const odd = schedulerRow(GEMSTACK, {
       on: 'yes',
@@ -110,8 +131,11 @@ describe('a scheduler row, from what status printed', () => {
       switches: { a: 'yes' },
       publishes: { a: 'push' },
       paces: { a: { every: 'often' } },
-      lastTick: { at: '2026-10-03T10:00:00.000Z', note: 'off', decisions: [{ command: 'a' }, 'x'], schedule: [{ command: 'a', every: 6, waitsFor: ['x'], description: 7 }, { every: '1d' }, null] },
+      lastTick: { at: '2026-10-03T10:00:00.000Z', note: 'off', decisions: [{ command: 'a' }, 'x'] },
+      schedule: [{ command: 'a', every: 6, waitsFor: ['x'], description: 7 }, { every: '1d' }, null],
+      unreadable: 'none',
     })
+    expect(schedulerRow(GEMSTACK, { on: true, running: true, schedule: 'all' }).commands).toEqual([])
     expect(odd).toEqual({ project: GEMSTACK, on: false, keepAlive: false, running: false, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], note: 'off' }, commands: [{ command: 'a', on: false, publish: 'commit' }], unreadable: [] })
     expect(schedulerRow(GEMSTACK, null).commands).toEqual([])
   })
@@ -277,18 +301,21 @@ describe('in words', () => {
     const row = schedulerRow(GEMSTACK, {
       ...STATUS,
       agents: { 'post-merge-cleanup': 3, 'work-queue': 0, gone: 2 },
-      lastTick: { ...STATUS.lastTick, schedule: [{ command: 'post-merge-cleanup', every: '1d', agents: 2 }, { command: 'work-queue', when: 'npx queue', agents: 1 }] },
+      schedule: [{ command: 'post-merge-cleanup', every: '1d', agents: 2 }, { command: 'work-queue', when: 'npx queue', agents: 1 }],
     })
     expect(row.commands.map(c => [c.command, c.skillAgents, c.agents])).toEqual([['post-merge-cleanup', 2, 3], ['work-queue', undefined, undefined]])
   })
 
   test("how far a scheduled command publishes, by this machine's pick", () => {
     const base = { command: 'a', on: true }
-    expect(publishes({ ...base, publish: 'nothing' })).toBe('Publishes nothing')
-    expect(publishes({ ...base, publish: 'commit' })).toBe('Commits its work')
-    expect(publishes({ ...base, publish: 'branch' })).toBe('Publishes its branch')
-    expect(publishes({ ...base, publish: 'pr' })).toBe('Opens a pull request')
-    expect(publishes({ ...base, publish: 'merge' })).toBe('Opens a pull request that merges on green')
+    expect(publishes({ ...base, publish: 'nothing' })).toBe('As its skill says')
+    // A row a person made has no skill to follow: its prompt says.
+    expect([publishes({ ...base, publish: 'nothing', editable: true }), publishes({ ...base, publish: 'nothing', onThisMachine: true }), publishes({ ...base, publish: 'commit', editable: true })]).toEqual(['As its prompt says', 'As its prompt says', 'May commit, pushes nothing'])
+    expect([publishLabel('nothing', false), publishLabel('nothing', true), publishLabel('pr', true)]).toEqual(['As the skill says', 'As the prompt says', 'Open PR'])
+    expect(publishes({ ...base, publish: 'commit' })).toBe('May commit, pushes nothing')
+    expect(publishes({ ...base, publish: 'branch' })).toBe('May publish its branch')
+    expect(publishes({ ...base, publish: 'pr' })).toBe('May open a pull request')
+    expect(publishes({ ...base, publish: 'merge' })).toBe('May open a pull request that merges on green')
   })
 
   test("what the scheduler last decided for a command, for a person: No work, Not due yet, how many are running, else the tool's own words; nothing where the row says it in another place, switched off or just started", () => {
@@ -327,7 +354,7 @@ describe('in words', () => {
     expect([outcomeWords('not due'), outcomeWords(unpublished), outcomeWords(elsewhere), outcomeWords('agent-data could not be pulled: offline'), outcomeWords(undefined)]).toEqual(['No work', 'Cannot start yet: its skill is not on origin/main', 'Cannot start: its skill is only in .agents/skills, which Claude Code does not read', 'Agent-data could not be pulled: offline', undefined])
   })
 
-  test('the publish menu: every pick with a git host package, Nothing, Commit and Publish branch without; the pick in force is listed even when not offered', () => {
+  test('the publish menu: every pick with a git host package, no level, Commit and Publish branch without; the pick in force is listed even when not offered', () => {
     expect(publishChoices(true, 'pr')).toEqual(['nothing', 'commit', 'branch', 'pr', 'merge'])
     expect(publishChoices(false, 'commit')).toEqual(['nothing', 'commit', 'branch'])
     expect(publishChoices(false, 'pr')).toEqual(['nothing', 'commit', 'branch', 'pr'])

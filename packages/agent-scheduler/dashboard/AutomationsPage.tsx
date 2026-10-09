@@ -10,7 +10,7 @@ import { atOnce, atOnceWords, cannotRun, decided, isOwn, outcomeWords, ownPace, 
 // project the page is given (every project that has this package, or the one picked in the
 // dashboard), under its name and its scheduler's status. A project's rows come in two groups: the
 // automations a person made with "New automation", and the commands the project's skills schedule,
-// as the project's scheduler last read them.
+// as the project's files say them now.
 //
 // A row is the same whichever group it is in: its name, what it says it does, one line of where it
 // stands (on or off, when it last ran or that its last run failed, and what the scheduler last
@@ -32,7 +32,15 @@ const NOTHING_SCHEDULED = 'no skill of this project schedules a command'
 export function AutomationsPage({ projects }: ModulePageProps) {
   const host = useModuleHost()
   const key = projects.map(p => p.id).join(',')
-  const { value: rows, loaded, reload } = usePolled(() => readSchedulers(host, projects), EMPTY, 10_000, [key])
+  const { value: read, loaded, reload } = usePolled(() => readSchedulers(host, projects), EMPTY, 10_000, [key])
+  // A read that fails for a moment keeps the project's rows as they were last read, under the line
+  // that says why: a panel open in one of them, and what was typed there, stays.
+  const lastRead = useRef(new Map<string, SchedulerRow>())
+  const rows = read.map(row => {
+    if (row.error === undefined) lastRead.current.set(row.project.id, row)
+    const before = lastRead.current.get(row.project.id)
+    return row.error !== undefined && before ? { ...before, error: row.error } : row
+  })
   /** The rows with a save waiting or in flight, each as often as it has one. */
   const [busy, setBusy] = useState<readonly string[]>([])
   /** What the last save or start on a row answered, said on that row. */
@@ -119,7 +127,6 @@ export function AutomationsPage({ projects }: ModulePageProps) {
       {rows.map(row => {
         const status = schedulerStatus(row)
         const note = row.lastTick?.note
-        const ticking = row.on && row.running
         const groups: [title: string, commands: SchedulerCommand[]][] = [
           ['Your automations', row.commands.filter(isOwn)],
           ["From the project's skills", row.commands.filter(c => !isOwn(c))],
@@ -158,7 +165,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                 </Button>
               )}
             </div>
-            {creating === row.project.id && <AutomationForm project={row.project} ticking={ticking} run={args => run(row.project, args)} onDirty={setDirty} onClose={() => setCreating(undefined)} onSaved={() => void reload().catch(() => {})} />}
+            {creating === row.project.id && <AutomationForm project={row.project} run={args => run(row.project, args)} onDirty={setDirty} onClose={() => setCreating(undefined)} onSaved={() => void reload().catch(() => {})} />}
             {removed?.project === row.project.id && (
               <div role="status" aria-label="Removed" className="mt-3 flex items-start justify-between gap-3 rounded-md border border-border bg-muted/40 p-3 text-sm">
                 <p>{removed.text}</p>
@@ -176,7 +183,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
               </p>
             ))}
             {row.error === undefined && row.commands.length === 0 && row.unreadable.length === 0 && (
-              <p className="py-3 text-sm text-muted-foreground">{row.lastTick ? 'Nothing here: no skill of this project says it can be scheduled.' : 'Nothing here yet: the scheduler of this project has not looked at its skills.'}</p>
+              <p className="py-3 text-sm text-muted-foreground">Nothing here: no skill of this project says it can be scheduled.</p>
             )}
             {groups.map(
               ([group, commands]) =>
@@ -239,7 +246,6 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                                 scheduled={scheduled}
                                 opened={shown.opened}
                                 refused={shown.refused}
-                                ticking={ticking}
                                 run={args => run(row.project, args)}
                                 reload={reload}
                                 onDirty={setDirty}
@@ -247,6 +253,9 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                                 onRemoved={text => {
                                   setPanel(undefined)
                                   setRemoved({ project: row.project.id, text })
+                                  // Gone from what is kept of the last read too: a read that fails right now does not bring the row back.
+                                  const before = lastRead.current.get(row.project.id)
+                                  if (before) lastRead.current.set(row.project.id, { ...before, commands: before.commands.filter(c => c.command !== scheduled.command) })
                                 }}
                               />
                             )}
@@ -304,7 +313,7 @@ function startedNow(answer: ModuleCommandResult): Answered {
   if (answer.error === 'not due') return { note: 'Nothing started. No work: its shell line printed nothing.' }
   if (answer.error.startsWith('cap reached ')) return { note: `Nothing started. ${outcomeWords(answer.error)}.` }
   // The dashboard ended the command before it answered: whether it had started the run by then is not known here.
-  if (answer.error.endsWith(' took too long')) return { failed: 'No answer in time. A run may have started all the same: the row says when it last ran once the scheduler has looked.' }
+  if (answer.error.endsWith(' took too long')) return { failed: 'No answer in time. A run may have started all the same: if one did, the row says when it last ran.' }
   const why = outcomeWords(answer.error) ?? answer.error
   return { failed: `Nothing started. ${/[.!?]$/.test(why) ? why : `${why}.`}` }
 }

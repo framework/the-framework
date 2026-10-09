@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { STATUS, hostAnswering } from './fixtures.js'
-import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, saysAtOnce, decided, draftOf, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withAgentsDraft, withDraft, rowTitle, unlistedWords } from './schedulers.js'
+import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, saysAtOnce, cannotRun, decided, draftOf, isOwn, outcomeWords, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withAgentsDraft, withDraft, rowTitle, unlistedWords } from './schedulers.js'
 
 const GEMSTACK = { id: 'p1', name: 'gemstack', gitHost: true }
 const OTHER = { id: 'p2', name: 'other', gitHost: false }
@@ -41,14 +41,29 @@ describe('a scheduler row, from what status printed', () => {
     ])
   })
 
-  test("a command the tick lists with a failed last run carries that run's id; anything else said there is no run", () => {
-    const row = schedulerRow(GEMSTACK, { on: true, running: true, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], schedule: [{ command: 'work-queue', when: 'npx queue', failed: '2026-10-03T09-00-00-000Z' }, { command: 'triage', every: '6h', failed: true }, { command: 'plan', every: '6h', failed: '' }, { command: 'tidy', every: '1d' }] } })
-    expect(row.commands.map(c => [c.command, c.failed])).toEqual([
-      ['work-queue', '2026-10-03T09-00-00-000Z'],
-      ['triage', undefined],
+  test("a command the tick lists with its last run carries that run's id, its start and whether it failed; anything else said there is no run", () => {
+    const at = '2026-10-03T09:00:00.000Z'
+    const schedule = [
+      { command: 'work-queue', when: 'npx queue', lastRun: { id: 'r1', at, failed: true } },
+      { command: 'triage', every: '6h', lastRun: { id: 'r2', at, failed: 'yes' } },
+      { command: 'plan', every: '6h', lastRun: { id: '', at } },
+      { command: 'tidy', every: '1d', lastRun: { id: 'r4', at: 'yesterday' } },
+      { command: 'sweep', every: '1d', lastRun: 'r5' },
+      { command: 'never', every: '1d' },
+    ]
+    const row = schedulerRow(GEMSTACK, { on: true, running: true, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], schedule } })
+    expect(row.commands.map(c => [c.command, c.lastRun])).toEqual([
+      ['work-queue', { id: 'r1', at, failed: true }],
+      ['triage', { id: 'r2', at }],
       ['plan', undefined],
       ['tidy', undefined],
+      ['sweep', undefined],
+      ['never', undefined],
     ])
+  })
+
+  test('a row a person made with "New automation" is told from a skill of the project: its file reads as the tool writes one, or it is kept on this machine alone', () => {
+    expect([isOwn({}), isOwn({ editable: true }), isOwn({ onThisMachine: true }), isOwn({ editable: true, onThisMachine: true })]).toEqual([false, true, true, true])
   })
 
   test("a command the tick lists as an automation the tool wrote is one the page can open again and remove; anything else the tick says there is not", () => {
@@ -233,7 +248,7 @@ describe('in words', () => {
     expect(nextWords(new Date(2026, 9, 3, 10, 0), now)).toBe('as soon as the scheduler looks')
     const waiting = { command: 'a', on: true, publish: 'commit' as const, decision: { command: 'a', outcome: 'not due (next start from 2026-10-10 10:00, every 2d at 10:00)' } }
     expect(decided(waiting, now)).toBe('Next: Saturday 10:00')
-    expect(decided({ ...waiting, on: false }, now)).toBe('Off')
+    expect(decided({ ...waiting, on: false }, now)).toBeUndefined()
   })
 
   test("how many agents at once: this machine's number, else the skill's, one when it says none; the Edit box's draft reads as the words of the `agents` command", () => {
@@ -276,35 +291,40 @@ describe('in words', () => {
     expect(publishes({ ...base, publish: 'merge' })).toBe('Opens a pull request that merges on green')
   })
 
-  test("what the scheduler last decided for a command, for a person: Off, No work, Started a run, a pace in words, how many are running, else the tool's own words", () => {
+  test("what the scheduler last decided for a command, for a person: No work, Not due yet, how many are running, else the tool's own words; nothing where the row says it in another place, switched off or just started", () => {
     const on = { command: 'a', on: true, publish: 'commit' as const }
     const said = (outcome: string, over: object = {}) => decided({ ...on, ...over, decision: { command: 'a', outcome } })
     expect(said('not due')).toBe('No work')
-    expect(said('started 2026-10-03T10-00-00-000Z')).toBe('Started a run')
-    expect(said('not due (last start 2h ago, every 6h)')).toBe('Started 2h ago, not due yet')
-    expect(said('not due (last start less than a minute ago, every 15m)')).toBe('Started less than a minute ago, not due yet')
+    expect(said('not due (last start 2h ago, every 6h)')).toBe('Not due yet')
+    expect(said('not due (last start less than a minute ago, every 15m)')).toBe('Not due yet')
     expect(said('cap reached (1 in flight: 2026-10-03T10-00-00-000Z on other-box)')).toBe('One is already running')
     expect(said('cap reached (3 in flight: a on x, b on y, c on z)')).toBe('3 are already running')
     // A reason only the tool knows stays in the tool's words.
     expect(said('quota: the week is 90% used')).toBe('Quota: the week is 90% used')
     expect(said('check failed: not found: queue')).toBe('Check failed: not found: queue')
     expect(said('not ready: `claude` is not logged in.')).toBe('Not ready: `claude` is not logged in.')
+    // The row says when it last ran: a start is not said twice.
+    expect(said('started 2026-10-03T10-00-00-000Z')).toBeUndefined()
     // Switched on a moment ago: the last tick still said off, and no tick has decided yet.
     expect(said('switched off on this machine')).toBeUndefined()
     expect(decided(on)).toBeUndefined()
-    // Switched off here, whatever the last tick said.
-    expect(said('not due', { on: false })).toBe('Off')
-    expect(decided({ ...on, on: false })).toBe('Off')
+    // Switched off here, whatever the last tick said: the row says Off itself.
+    expect(said('not due', { on: false })).toBeUndefined()
+    expect(decided({ ...on, on: false })).toBeUndefined()
     // A command the coding agent cannot run says so whatever its switch: switching it on would start nothing.
     const elsewhere = 'not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills'
     expect(said(elsewhere, { on: false })).toBe('Cannot start: its skill is only in .agents/skills, which Claude Code does not read')
     expect(said(elsewhere)).toBe('Cannot start: its skill is only in .agents/skills, which Claude Code does not read')
-    // A command that was due and whose skill is not yet where a run's checkout starts: in the remote's words, saying when origin was not reached, or, with no remote, as not committed. Switched off, it is Off like any other.
+    expect(cannotRun({ decision: { command: 'a', outcome: elsewhere } })).toBe('Cannot start: its skill is only in .agents/skills, which Claude Code does not read')
+    expect([cannotRun({}), cannotRun({ decision: { command: 'a', outcome: 'not due' } })]).toEqual([undefined, undefined])
+    // A command that was due and whose skill is not yet where a run's checkout starts: in the remote's words, saying when origin was not reached, or, with no remote, as not committed. Switched off, nothing.
     const unpublished = "not on origin/main: a run's checkout starts from origin/main, and the command's skill is not there"
     expect(said(unpublished)).toBe('Cannot start yet: its skill is not on origin/main')
-    expect(said(unpublished, { on: false })).toBe('Off')
+    expect(said(unpublished, { on: false })).toBeUndefined()
     expect(said("not on origin/main as this clone last saw it: a run's checkout starts from origin/main, and the command's skill is not there")).toBe('Cannot start yet: its skill is not on origin/main, as this machine last saw it')
     expect(said("not on HEAD: a run's checkout starts from HEAD, and the command's skill is not there")).toBe('Cannot start yet: its skill is not committed')
+    // The same words for what "Run now" answered, which is a decision with no row's switch to read.
+    expect([outcomeWords('not due'), outcomeWords(unpublished), outcomeWords(elsewhere), outcomeWords('agent-data could not be pulled: offline'), outcomeWords(undefined)]).toEqual(['No work', 'Cannot start yet: its skill is not on origin/main', 'Cannot start: its skill is only in .agents/skills, which Claude Code does not read', 'Agent-data could not be pulled: offline', undefined])
   })
 
   test('the publish menu: every pick with a git host package, Nothing, Commit and Publish branch without; the pick in force is listed even when not offered', () => {

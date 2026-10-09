@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { projectRoot } from '@openagt/skill-branches'
-import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
+import { runNow, schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
 import { cleanup } from './cleanup.js'
 import { PUBLISH_PICKS, isSwitchedOn, readState, updateState, withAgents, withoutCommand, withoutListed, withPace, withPublish, withSwitch, type PublishPick, type State } from './state.js'
@@ -54,6 +54,9 @@ export const USAGE = `usage: agent-scheduler <command>
                                 Nothing is committed: the deletion of a shared one is yours to commit, and everyone else keeps the command until it reaches them.
                                 What was never committed cannot be brought back: all of one kept on this machine, and a shared one's file or its last changes.
                                 The records of its past runs stay
+  now <command>                 start one run of a scheduled command now, whatever its switch, its pace and the quota left: a person asked for it. A command with a check
+                                starts only when the check finds work (it has 10 seconds); how many at once, where a run's checkout starts and whether the
+                                coding agent can start hold as on a tick. It needs no scheduler running. Not ready within 20 seconds, it starts nothing
   try --when <shell line>       run a check once, as a tick would, asking what is new since a day ago: what it printed and whether an agent would start; nothing is saved or started;
                                 it has 20 seconds, less than a tick gives a check
   cleanup                       remove what this tool left in the project: the state file and the scheduler's log, then .agent-scheduler/ and the rule hiding it from git once it is empty
@@ -266,6 +269,15 @@ const COMMANDS: Record<string, Command> = {
     // What this machine held for the command goes with it, and the last tick's record stops naming it, so a dashboard stops listing it at once.
     await forget(repo, s => withoutListed(withoutCommand(s, outcome.command), outcome.command), git)
     return outcome
+  },
+
+  async now(args, io, git) {
+    const { positionals } = parse(args, {}, 1)
+    const repo = await project(io.cwd, git)
+    const command = await scheduled(repo, positionals[0]!)
+    const started = await runNow(repo, command, { git, log: io.stderr })
+    if (started.ok) return { ok: true, command: command.name, run: started.run.id }
+    throw new Refused({ ok: false, reason: 'not-started', command: command.name, outcome: started.outcome }, started.outcome)
   },
 
   async try(args, io, git) {

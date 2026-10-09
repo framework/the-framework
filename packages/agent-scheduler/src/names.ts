@@ -79,8 +79,17 @@ export const TICK_MS = 60_000
 /** How much of what a check printed a run is handed, in characters: enough for a list of work, short of a prompt nobody can read. */
 export const FOUND_MAX = 8_000
 
+/** How far back a check asks from when nothing says since when: a line that is only being tried, and a command started by hand that never started and is switched off. "Since now" would never find anything. */
+export const NEVER_STARTED_SINCE_MS = 24 * 60 * 60 * 1000
+
 /** How long a check that is only being tried may run: less than a tick gives one, and less than a dashboard waits for a command's answer. */
 export const TRY_TIMEOUT_MS = 20_000
+
+/** How long a command started by hand may take to get ready, its pull, its check and its readings: past it nothing is written and nothing starts, since a dashboard ends a command at 30 seconds and the marker and the start are still to come. */
+export const NOW_READY_MS = 20_000
+
+/** How long the check of a command started by hand may run: whoever asked, a dashboard, waits for the whole answer, the pull and the start with it. */
+export const NOW_CHECK_TIMEOUT_MS = 10_000
 
 /** How long a command's check may run before it counts as failed. */
 export const CHECK_TIMEOUT_MS = 60_000

@@ -4,7 +4,7 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { nodeGitRunner } from '@openagt/agent-data'
-import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, switchedOnAt, withoutCommand, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents, namesGivenUp, withoutName, withoutListed } from './state.js'
+import { DEFAULT_STATE, readState, statePath, updateState, writeState, type State, isSwitchedOn, switchedOnAt, withoutCommand, withSwitch, publishInForce, withPace, withPublish, capInForce, withAgents, namesGivenUp, withoutName, withoutListed, withLastRun } from './state.js'
 import { STATE_DIR } from './names.js'
 
 const git = nodeGitRunner()
@@ -153,6 +153,17 @@ test("a command removed since the last tick is taken off that tick's record, the
   // Nothing of that name on the record, and no record: the state itself, so a caller can tell there is nothing to write.
   assert.equal(withoutListed(state, 'never-heard-of'), state)
   assert.equal(withoutListed(DEFAULT_STATE, 'tidy'), DEFAULT_STATE)
+})
+
+test("a run started by hand since the last tick is that command's last run on the tick's record, in place of the one before it; a command the record does not list changes nothing", () => {
+  const at = '2026-10-09T07:00:00.000Z'
+  const lastTick = { at, decisions: [], schedule: [{ command: 'tidy', every: '1d', lastRun: { id: 'r1', at, failed: true as const } }, { command: 'work-queue', when: 'npx queue' }] }
+  const state = { ...DEFAULT_STATE, lastTick }
+  const run = { id: 'r2', at: '2026-10-09T08:00:00.000Z' }
+  assert.deepEqual(withLastRun(state, 'tidy', run).lastTick?.schedule, [{ command: 'tidy', every: '1d', lastRun: run }, { command: 'work-queue', when: 'npx queue' }])
+  assert.deepEqual(withLastRun(state, 'work-queue', run).lastTick?.schedule[1], { command: 'work-queue', when: 'npx queue', lastRun: run })
+  assert.equal(withLastRun(state, 'never-heard-of', run), state)
+  assert.equal(withLastRun(DEFAULT_STATE, 'tidy', run), DEFAULT_STATE)
 })
 
 test("what an automation kept on this machine was given goes when it goes, and when a skill has its name too: the names given up, and the state with nothing left under a name, a skill's commands with a word included", () => {

@@ -5,7 +5,7 @@ import type { RunCard } from '@openagt/skill-logs'
 import { DEFAULT_STATE, type State } from './state.js'
 import { parseInterval, type Interval } from './pace.js'
 import { FOUND_OPENING, FOUND_OPENING_OWN, type ScheduledCommand } from './schedule.js'
-import { runCheck, tick, type TickDeps } from './tick.js'
+import { runCheck, startNow, tick, type TickDeps } from './tick.js'
 
 // The tick's decisions with every reading injected: what it reads, in which order, and the one
 // line each outcome leaves in the state. The wiring to a real project is scheduler.ts's.
@@ -65,8 +65,8 @@ function deps(over: Partial<TickDeps> & { stateOver?: Partial<State>; commands?:
     },
     // Nobody touches a switch while a tick runs, unless a test says otherwise.
     stillOn: async () => true,
-    // No command's last run failed, unless a test says otherwise.
-    lastFailed: async () => ({}),
+    // No command ever ran, unless a test says otherwise.
+    lastRuns: async () => ({}),
     lastStart: async () => undefined,
     // A run counts for the command its prompt names: a skill's with its slash, an automation's kept on this machine without.
     inFlight: async command => [...cards, ...seen.markers].filter(c => c.status === 'running' && (c.intent === `/${command}` || c.intent === command)),
@@ -224,7 +224,7 @@ test("an automation kept on this machine starts like any command: its run's prom
     ['/work-queue', `${FOUND_OPENING}\n["one entry"]`],
   ])
   assert.equal(seen.markers[0]!.intent, 'answer-comments', 'its record holds its name, which is what its runs are counted by')
-  assert.deepEqual(record.schedule, [
+  assert.deepEqual(record.schedule.map(({ lastRun: _started, ...said }) => said), [
     // The one whose file still reads as the tool wrote it is listed as one the tool can save again and remove.
     { command: 'answer-comments', when: 'gh api comments', description: 'Answer each new comment below.', onThisMachine: true, editable: true },
     { command: 'daily-notes', every: '1d', description: 'Answer each new comment below.', onThisMachine: true },
@@ -282,6 +282,9 @@ test('a check reads the time it is given as $LAST_RUN, run through the shell at 
   const printed = await runCheck(process.cwd(), 'printf "%s|%s|%s" "$LAST_RUN" "$(basename "$PWD")" "$HOME"', 10_000, '2026-10-09T10:00:00Z')
   // The rest of the environment comes along: a check needs its PATH, its HOME and its logins.
   assert.deepEqual(printed, { ok: true, stdout: `2026-10-09T10:00:00Z|${process.cwd().split('/').at(-1)}|${process.env['HOME']}`, stderr: '' })
+  // One that runs out of its time says so, whatever it had printed; one that fails says its own error.
+  assert.deepEqual(await runCheck(process.cwd(), 'echo half; echo oops >&2; sleep 5', 300, 'x'), { ok: false, stdout: 'half\n', stderr: 'it took longer than 0.3 seconds' })
+  assert.deepEqual(await runCheck(process.cwd(), 'echo oops >&2; exit 3', 10_000, 'x'), { ok: false, stdout: '', stderr: 'oops\n' })
 })
 
 test('a run is handed what its check printed, and only a run a check started: a command its pace alone starts is handed nothing', async () => {
@@ -306,7 +309,7 @@ test("this machine's publish pick goes on the marker and to the spawned run: com
     { runner: { host: 'this-box', publish: 'commit' }, host: 'this-box' },
   ])
   assert.deepEqual(seen.spawned.map(s => [s.prompt, s.publish]), [['/work-queue', undefined], ['/triage quick', 'merge'], ['/plan-tickets', 'commit']])
-  assert.deepEqual(record.schedule, [
+  assert.deepEqual(record.schedule.map(({ lastRun: _started, ...said }) => said), [
     { command: 'work-queue', when: 'npx queue', waitsFor: 'when the queue holds a task', description: 'Work one queued task.' },
     { command: 'triage quick', every: '6h' },
     { command: 'plan-tickets', every: '6h' },
@@ -324,7 +327,7 @@ test('a command with a word after its folder name: the whole name is what the sw
   ])
   assert.equal(seen.markers[0]!.intent, '/triage quick')
   assert.deepEqual(seen.spawned, [{ id: '2026-09-16T14-01-00-000Z', prompt: '/triage quick', startedAt: NOW.toISOString(), model: 'opus', publish: 'commit' }])
-  assert.deepEqual(record.schedule, [
+  assert.deepEqual(record.schedule.map(({ lastRun: _started, ...said }) => said), [
     { command: 'triage quick', every: '6h' },
     { command: 'triage consensual', every: '7d' },
   ])
@@ -554,35 +557,107 @@ test('the quota is read once per tick, however many commands start', async () =>
   assert.equal(reads, 1)
 })
 
-test("a command whose last run failed is listed with that run's id, switched on or off and with the scheduler off; a reading that fails lists none and stops nothing", async () => {
+test('a command is listed with its last run, switched on or off and with the scheduler off: which run, when it started, and whether it failed; a reading that fails lists none and stops nothing', async () => {
   const commands = [command('work-queue'), command('update-tickets', { when: 'gh issue list' })]
-  const failing = deps({ commands, stateOver: { switches: {} }, lastFailed: async () => ({ 'update-tickets': '2026-09-16T10-00-00-000Z', 'gone-skill': 'x' }) })
-  const record = await tick(failing.deps)
+  const failedRun = { id: '2026-09-16T10-00-00-000Z', at: '2026-09-16T10:00:00.000Z', failed: true as const }
+  const goodRun = { id: 'r1', at: '2026-09-16T09:00:00.000Z' }
+  const ran = deps({ commands, stateOver: { switches: {} }, lastRuns: async () => ({ 'work-queue': goodRun, 'update-tickets': failedRun, 'gone-skill': goodRun }) })
+  const record = await tick(ran.deps)
   assert.deepEqual(record.schedule, [
-    { command: 'work-queue', when: 'npx queue' },
-    { command: 'update-tickets', when: 'gh issue list', failed: '2026-09-16T10-00-00-000Z' },
+    { command: 'work-queue', when: 'npx queue', lastRun: goodRun },
+    { command: 'update-tickets', when: 'gh issue list', lastRun: failedRun },
   ])
-  const off = await tick({ ...failing.deps, state: { ...failing.deps.state, on: false } })
-  assert.deepEqual([off.note, off.schedule[1]!.failed], ['off', '2026-09-16T10-00-00-000Z'])
+  const off = await tick({ ...ran.deps, state: { ...ran.deps.state, on: false } })
+  assert.deepEqual([off.note, off.schedule[1]!.lastRun], ['off', failedRun])
   // A pull that failed lists it all the same, off the records this machine has; nothing is swept then.
   const order: string[] = []
-  const stale = deps({ commands, pull: async () => ({ ok: false, error: 'offline' }), sweep: async () => void order.push('sweep'), lastFailed: async () => (order.push('failed'), { 'update-tickets': 'r9' }) })
+  const stale = deps({ commands, pull: async () => ({ ok: false, error: 'offline' }), sweep: async () => void order.push('sweep'), lastRuns: async () => (order.push('last'), { 'update-tickets': failedRun }) })
   const unpulled = await tick(stale.deps)
-  assert.deepEqual([unpulled.note, unpulled.schedule[1]!.failed, order], ['agent-data could not be pulled: offline', 'r9', ['failed']])
+  assert.deepEqual([unpulled.note, unpulled.schedule[1]!.lastRun, order], ['agent-data could not be pulled: offline', failedRun, ['last']])
   // Read after the sweep, which may have just recorded a run of this machine as failed.
   order.length = 0
-  const swept = deps({ commands, stateOver: { switches: {} }, sweep: async () => void order.push('sweep'), lastFailed: async () => (order.push('failed'), {}) })
+  const swept = deps({ commands, stateOver: { switches: {} }, sweep: async () => void order.push('sweep'), lastRuns: async () => (order.push('last'), {}) })
   await tick(swept.deps)
-  assert.deepEqual(order, ['sweep', 'failed'])
-  // The tick that starts the command again lists the failure no more: its last run is the one just started. A command that did not start keeps its own.
-  const again = deps({ commands, stateOver: { switches: { 'work-queue': ON } }, lastFailed: async () => ({ 'work-queue': 'r1', 'update-tickets': 'r2' }) })
+  assert.deepEqual(order, ['sweep', 'last'])
+  // The tick that starts the command again lists the run it started, and the failure no more. A command that did not start keeps its own.
+  const again = deps({ commands, stateOver: { switches: { 'work-queue': ON } }, lastRuns: async () => ({ 'work-queue': failedRun, 'update-tickets': failedRun }) })
   const restarted = await tick(again.deps)
   assert.deepEqual(restarted.decisions.map(d => d.outcome.replace(/^started .*/, 'started')), ['started', 'switched off on this machine'])
-  assert.deepEqual(restarted.schedule.map(c => c.failed), [undefined, 'r2'])
-  const unread = deps({ commands, lastFailed: async () => Promise.reject(new Error('the branch cannot be read')) })
+  assert.deepEqual(restarted.schedule.map(c => c.lastRun), [{ id: again.seen.spawned[0]!.id, at: NOW.toISOString() }, failedRun])
+  const unread = deps({ commands, lastRuns: async () => Promise.reject(new Error('the branch cannot be read')) })
   const still = await tick(unread.deps)
-  assert.deepEqual(still.schedule.map(c => c.failed), [undefined, undefined])
   assert.deepEqual(still.decisions.map(d => d.outcome.replace(/^started .*/, 'started')), ['started', 'started'])
+  assert.deepEqual(still.schedule.map(c => c.lastRun?.at), [NOW.toISOString(), NOW.toISOString()])
+})
+
+test('a run asked for by hand starts whatever the switch, the pace and the quota: the check still decides, and the run is handed what it printed', async () => {
+  const paced = command('update-tickets', { every: every('1h'), when: 'gh issue list' })
+  // Switched off, started a minute ago, and no quota left: a tick would start nothing.
+  const over = { commands: [paced], stateOver: { switches: {} }, lastStart: async () => '2026-09-16T13:59:00.000Z', quota: async () => quota(100), stillOn: async () => false, stopped: () => true }
+  const asked = deps(over)
+  const started = await startNow(asked.deps, paced)
+  assert.deepEqual(started, { ok: true, run: { id: asked.seen.spawned[0]!.id, at: NOW.toISOString() } })
+  assert.deepEqual(asked.seen.checks, ['gh issue list'])
+  // What is new for the check: since the command last started.
+  assert.deepEqual(asked.seen.since, ['2026-09-16T13:59:00Z'])
+  assert.match(asked.seen.spawned[0]!.attached ?? '', /one entry/)
+  assert.equal(asked.seen.markers.length, 1)
+
+  // A check that finds nothing starts nothing, in the tick's own words.
+  const quiet = deps({ ...over, check: async () => ({ ok: true, stdout: '[]', stderr: '' }) })
+  assert.deepEqual(await startNow(quiet.deps, paced), { ok: false, outcome: 'not due' })
+  assert.equal(quiet.seen.markers.length, 0)
+  const broken = deps({ ...over, check: async () => ({ ok: false, stdout: '', stderr: 'gh: not found' }) })
+  assert.deepEqual(await startNow(broken.deps, paced), { ok: false, outcome: 'check failed: gh: not found' })
+
+  // Never started and switched off: the check asks what is new since a day ago. Switched on later than the last start: since then.
+  const never = deps({ ...over, lastStart: async () => undefined })
+  await startNow(never.deps, paced)
+  assert.deepEqual(never.seen.since, ['2026-09-15T14:01:00Z'])
+  const switched = deps({ ...over, stateOver: { switches: { 'update-tickets': '2026-09-16T13:59:30.000Z' } } })
+  await startNow(switched.deps, paced)
+  assert.deepEqual(switched.seen.since, ['2026-09-16T13:59:30Z'])
+})
+
+test('a run asked for by hand is held by what holds a tick apart from the switch, the pace and the quota: the cap, where a checkout starts, the coding agent, the pull, the skill folder; nothing is swept', async () => {
+  const queue = command('work-queue')
+  const off = { stateOver: { switches: {} } }
+  const full = deps({ ...off, inFlightCards: [running('r1', 'work-queue')] })
+  assert.deepEqual(await startNow(full.deps, queue), { ok: false, outcome: 'cap reached (1 in flight: r1 on other-box)' })
+  const unpublished = deps({ ...off, atStart: async () => ({ ref: 'origin/main', reached: true, there: false }) })
+  assert.deepEqual(await startNow(unpublished.deps, queue), { ok: false, outcome: "not on origin/main: a run's checkout starts from origin/main, and the command's skill is not there" })
+  const loggedOut = deps({ ...off, ready: async () => ({ problems: ['Claude Code is not logged in.'], warnings: [] }) })
+  assert.deepEqual(await startNow(loggedOut.deps, queue), { ok: false, outcome: 'not ready: Claude Code is not logged in.' })
+  const swept: string[] = []
+  const offline = deps({ ...off, pull: async () => ({ ok: false, error: 'offline' }), sweep: async () => void swept.push('sweep') })
+  assert.deepEqual(await startNow(offline.deps, queue), { ok: false, outcome: 'agent-data could not be pulled: offline' })
+  assert.deepEqual(offline.seen.checks, [])
+  const elsewhere = command('codex-only', { dir: '.agents/skills' })
+  assert.deepEqual(await startNow(deps(off).deps, elsewhere), { ok: false, outcome: 'not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills' })
+  const fine = deps({ ...off, sweep: async () => void swept.push('sweep') })
+  assert.equal((await startNow(fine.deps, queue)).ok, true)
+  assert.deepEqual(swept, [])
+  // Not ready within its time, counted from before the pull: given up before anything is written, so no record says running for a run that never was.
+  let at = 0
+  const slow = deps({ ...off, check: async () => ((at += 20_001), { ok: true, stdout: '["one entry"]', stderr: '' }) })
+  assert.deepEqual(await startNow(slow.deps, queue, () => at), { ok: false, outcome: 'took longer than 20 seconds to get ready, so nothing was started: ask again' })
+  assert.deepEqual([slow.seen.markers.length, slow.seen.spawned.length], [0, 0])
+  at = 0
+  const inTime = deps({ ...off, check: async () => ((at += 20_000), { ok: true, stdout: '["one entry"]', stderr: '' }) })
+  assert.equal((await startNow(inTime.deps, queue, () => at)).ok, true)
+  // A run that could not be started leaves no marker behind, and one whose marker was swept away before it began is not started.
+  const unstartable = deps({ ...off, spawn: async () => Promise.reject(new Error('no such file')) })
+  assert.deepEqual(await startNow(unstartable.deps, queue), { ok: false, outcome: 'could not start: no such file' })
+  assert.deepEqual([unstartable.seen.markers.length, unstartable.seen.withdrawn.length], [0, 1])
+  const sweptAway = deps(off)
+  const closed = await startNow({ ...sweptAway.deps, inFlight: async () => [] }, queue)
+  assert.deepEqual(closed, { ok: false, outcome: 'not started: its record was closed before the run began' })
+  assert.deepEqual([sweptAway.seen.spawned.length, sweptAway.seen.withdrawn.length], [0, 1])
+  // The quota is not even read, and the publish pick of this machine goes with the run as on a tick.
+  let reads = 0
+  const picked = deps({ stateOver: { switches: {}, publishes: { 'work-queue': 'pr' } }, quota: async () => (reads++, quota(100)) })
+  await startNow(picked.deps, queue)
+  assert.deepEqual([reads, picked.seen.spawned[0]!.publish], [0, 'pr'])
 })
 
 test('a stop that came in during the tick starts nothing: no marker, no spawn, the decision says so', async () => {

@@ -42,14 +42,22 @@ export async function lastStart(repo: string, command: string, schedule: Schedul
   return latest
 }
 
+/** A command's last run, as a dashboard lists it: which run, when it started, and whether it failed. */
+export interface LastRun {
+  id: string
+  /** When the run started, ISO. */
+  at: string
+  /** Whether the run ended `failed`. */
+  failed?: true
+}
+
 /**
- * The commands whose last run failed, each with that run's id: the latest run a command has, by
- * its start, ended `failed`. A command whose latest run is still going, ended well, was stopped by
- * a person or waits for an answer is not among them: a later run takes the failure's place. Counted
- * like the starts: every machine's runs for a skill's command, this machine's for an automation
- * kept here.
+ * Each command's last run: the latest run it has, by its start, whatever became of it. It says
+ * `failed` only when that run ended `failed`: one still going, ended well, stopped by a person or
+ * waiting for an answer does not, so a later run takes a failure's place. Counted like the
+ * starts: every machine's runs for a skill's command, this machine's for an automation kept here.
  */
-export async function lastFailed(repo: string, schedule: Schedule, host: string, deps: LogsDeps = {}): Promise<Record<string, string>> {
+export async function lastRuns(repo: string, schedule: Schedule, host: string, deps: LogsDeps = {}): Promise<Record<string, LastRun>> {
   const latest = new Map<string, RunCard>()
   for (const card of await listRuns(repo, {}, deps)) {
     const command = commandOf(card, schedule, host)
@@ -57,7 +65,7 @@ export async function lastFailed(repo: string, schedule: Schedule, host: string,
     const known = latest.get(command)
     if (!known || card.startedAt > known.startedAt) latest.set(command, card)
   }
-  return Object.fromEntries([...latest].filter(([, card]) => card.status === 'failed').map(([command, card]) => [command, card.id]))
+  return Object.fromEntries([...latest].map(([command, card]): [string, LastRun] => [command, { id: card.id, at: card.startedAt, ...(card.status === 'failed' ? { failed: true as const } : {}) }]))
 }
 
 /** The runs of one command still in flight: on any machine for a skill's command, on this one for an automation kept here. */

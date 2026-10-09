@@ -1,30 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Checkbox, Tooltip, TooltipContent, TooltipTrigger, cn, formatAge, formatDateTime, useModuleHost, usePolled, type ModulePageProps, type ModuleProject } from '@openagt/dashboard/module'
-import type { PublishPick } from '../src/state.js'
-import { MAX_AGENTS } from '../src/names.js'
-import { MAX_COUNT, PACE_UNITS, parseInterval, takesTimeOfDay, type PaceUnit } from '../src/pace.js'
+import { Switch, Tooltip, TooltipContent, TooltipTrigger, Button, buttonVariants, cn, formatAge, formatDateTime, useModuleHost, usePolled, type ModuleCommandResult, type ModuleHost, type ModuleProject } from '@openagt/dashboard/module'
+import type { ModulePageProps } from '@openagt/dashboard/module'
 import { AutomationForm } from './AutomationForm.js'
-import { openedAutomation, removeWarning, removedWords, type OpenedAutomation } from './automation-form.js'
-import { PUBLISH_LABELS, UNIT_WORDS, rowTitle, unlistedWords, agentsArgs, agentsDraftOf, atOnce, atOnceWords, decided, saysAtOnce, draftOf, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, schedulerStatus, withAgentsDraft, withDraft, type AgentsDraft, type PaceDraft, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
+import { EditPanel } from './EditPanel.js'
+import { openedAutomation, type OpenedAutomation } from './automation-form.js'
+import { atOnce, atOnceWords, cannotRun, decided, isOwn, outcomeWords, ownPace, pace, publishes, readSchedulers, rowTitle, saysAtOnce, schedulerStatus, unlistedWords, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
 
-// The Automations page: what starts by itself while nobody is at the keyboard. One group per
+// The Automations page: what starts by itself while nobody is at the keyboard. One part per
 // project the page is given (every project that has this package, or the one picked in the
-// dashboard), under its name and its scheduler's status; one row per command the project's skills
-// schedule, as the project's scheduler last read them. A row holds the command, what its skill says
-// it does, when it runs in the skill's plain words, how far its runs publish, what the scheduler
-// last decided for it, and its switch. "Edit" opens the row in place to pick when it runs (as its
-// skill says, whenever there is work, or every so many minutes, hours, days, weeks or months, with
-// a time of day for days or more), how many agents may work on it at once, and how far its runs
-// publish; one row is open at a time. "New automation", beside a project's name, opens a form for a
-// prompt of the person's own, saved as a command of the project (`AutomationForm.tsx`). A row made
-// that way, while its file still reads as it was saved, has two more buttons: "Edit prompt" opens
-// the same form in the row, filled in from the file (`agent-scheduler show`), to save it again under
-// its name; "Remove" asks once in the row, then deletes the file (`agent-scheduler remove`). The rows
-// that come from the project's skills have neither. The rest is this machine's, read with
-// `agent-scheduler status` and saved with `switch`, `pace`, `agents` and `publish`: no tracked file
-// changes. A command is off until its switch is flipped here, runs at its skill's pace and with its
-// skill's number of agents until others are picked here, and commits its work until a level is
-// picked here.
+// dashboard), under its name and its scheduler's status. A project's rows come in two groups: the
+// automations a person made with "New automation", and the commands the project's skills schedule,
+// as the project's scheduler last read them.
+//
+// A row is the same whichever group it is in: its name, what it says it does, one line of where it
+// stands (on or off, when it last ran or that its last run failed, and what the scheduler last
+// decided for it), one line of its picks (when it runs, how many agents at once, how far its runs
+// publish), and three controls: "Run now" starts one run of it at once (`agent-scheduler now`),
+// "Edit" opens its panel in place (`EditPanel.tsx`), and its switch says whether it runs by itself
+// (`switch`). One panel or form is open at a time, and nothing opens over one that holds a change
+// not saved yet.
+//
+// "New automation", beside a project's name, opens a form for a prompt of the person's own
+// (`AutomationForm.tsx`). The rest is this machine's, read with `agent-scheduler status`: no
+// tracked file changes. A command is off until its switch is flipped here.
 
 const EMPTY: SchedulerRow[] = []
 
@@ -37,95 +35,98 @@ export function AutomationsPage({ projects }: ModulePageProps) {
   const { value: rows, loaded, reload } = usePolled(() => readSchedulers(host, projects), EMPTY, 10_000, [key])
   /** The rows with a save waiting or in flight, each as often as it has one. */
   const [busy, setBusy] = useState<readonly string[]>([])
-  /** The last save that was not taken, on the row it was for. */
-  const [failed, setFailed] = useState<{ id: string; text: string } | undefined>()
-  /** The row open for editing, and the pace, the number of agents and the publish pick made in it and not saved yet. */
-  const [editing, setEditing] = useState<Editing | undefined>()
-  /** Which row is open, as of now: a save answers long after the click that started it. */
-  const openId = useRef<string | undefined>(undefined)
-  const edit = (next: Editing | undefined): void => {
-    openId.current = next?.id
-    setEditing(next)
+  /** What the last save or start on a row answered, said on that row. */
+  const [said, setSaid] = useState<{ id: string } & Answered>()
+  /** The row whose panel is open, with its own automation as its file says it when it is one a person made, or why that could not be read. */
+  const [panel, setPanel] = useState<{ id: string; opened?: OpenedAutomation; refused?: string } | undefined>()
+  /** The project whose "New automation" form is open. */
+  const [creating, setCreating] = useState<string | undefined>()
+  /** Whether the open panel or form holds a change not saved yet: nothing else opens over it. */
+  const [dirty, setDirtyState] = useState(false)
+  /** The same, as of now: an automation read for its panel answers long after the click that asked for it. */
+  const dirtyNow = useRef(false)
+  const setDirty = (next: boolean): void => {
+    dirtyNow.current = next
+    setDirtyState(next)
   }
-  /** The automation form that is open, one at a time: in a project, for a new automation, or in a row, for the automation it was opened from. */
-  const [form, setForm] = useState<{ project: string; row?: string; opened?: OpenedAutomation } | undefined>()
-  /** The row that asks whether its automation is to be removed. */
-  const [removing, setRemoving] = useState<string | undefined>()
   /** What the last removal did and what is left for the person to do, under the project it was in, until they put it away. */
   const [removed, setRemoved] = useState<{ project: string; text: string } | undefined>()
-  // A form, or a question, whose project or row is no longer listed is closed: its row was removed
-  // elsewhere, or another project was picked. Left open it would show nowhere, and keep every
-  // button that opens a form hidden.
+  /** The last panel asked for: an automation that answers late, after another row was opened, opens nothing. */
+  const asked = useRef(0)
+  const held = dirty && (panel !== undefined || creating !== undefined)
+  // A panel, or a form, whose row or project is no longer listed is closed: its row was removed
+  // elsewhere, or another project was picked. Left open it would show nowhere, and hold every
+  // button that opens one.
   useEffect(() => {
     if (!loaded) return
-    const listed = (id: string): boolean => rows.some(row => row.commands.some(c => `${row.project.id}/${c.command}` === id))
-    if (form && !(form.row === undefined ? rows.some(row => row.project.id === form.project) : listed(form.row))) setForm(undefined)
-    if (removing !== undefined && !listed(removing)) setRemoving(undefined)
-  }, [rows, loaded, form, removing])
+    if (panel && !rows.some(row => row.commands.some(c => `${row.project.id}/${c.command}` === panel.id))) setPanel(undefined)
+    if (creating !== undefined && !rows.some(row => row.project.id === creating)) setCreating(undefined)
+  }, [rows, loaded, panel, creating])
   const editButtons = useRef(new Map<string, HTMLButtonElement>())
-  /** Close the row and hand the keyboard back to its Edit button; nothing when the person has opened another row since. */
+  /** Close a row's panel and hand the keyboard back to its Edit button. */
   const close = (id: string): void => {
-    if (openId.current !== id) return
-    edit(undefined)
+    setPanel(current => (current?.id === id ? undefined : current))
     setTimeout(() => editButtons.current.get(id)?.focus())
   }
   // Saves go one at a time: each is a command that reads the state file, changes it and writes it
-  // back. A row stays held until what it saved has been read back, so it never shows the old value
-  // as if nothing had happened. A command that could not even be asked is a save not taken, and
-  // the next save still runs.
+  // back. A command that could not even be asked is a save not taken, and the next one still runs.
   const queue = useRef<Promise<unknown>>(Promise.resolve())
-  const save = (notTaken: string, id: string, project: ModuleProject, args: string[], then?: (output: unknown) => void): void => {
-    setBusy(current => [...current, id])
-    setFailed(current => (current?.id === id ? undefined : current))
-    queue.current = queue.current.then(async () => {
-      const answer = await host.runCommand(project.id, args).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }))
-      await reload().catch(() => {})
-      setBusy(current => current.filter((_, index) => index !== current.indexOf(id)))
-      if (answer.ok) then?.(answer.output)
-      else setFailed({ id, text: `${notTaken}: ${answer.error}` })
-    })
+  const run = (project: ModuleProject, args: string[]): Promise<ModuleCommandResult> => {
+    const answered = queue.current.then(() => host.runCommand(project.id, args).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) })))
+    queue.current = answered
+    return answered
   }
-
-  /** Open a row's automation in the form, as its file says it now: read with `show`, which refuses a file changed by hand since the scheduler last looked. Nothing opens over a form that is open. */
-  const openPrompt = async (id: string, project: ModuleProject, command: string): Promise<void> => {
+  /** A command asked without waiting for the saves: one that takes seconds and writes nothing a save reads. */
+  const ask = (project: ModuleProject, args: string[]): Promise<ModuleCommandResult> => host.runCommand(project.id, args).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }))
+  /** One save or start of a row's own: the row is held until what it did has been read back, so it never shows the old value as if nothing had happened. */
+  const save = async (id: string, project: ModuleProject, pending: Promise<ModuleCommandResult>, answered: (answer: ModuleCommandResult) => Answered | undefined): Promise<void> => {
     setBusy(current => [...current, id])
-    setFailed(current => (current?.id === id ? undefined : current))
-    const answer = await host.runCommand(project.id, ['show', command]).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }))
+    setSaid(current => (current?.id === id ? undefined : current))
+    const answer = await pending
+    await reload().catch(() => {})
     setBusy(current => current.filter((_, index) => index !== current.indexOf(id)))
-    const opened = answer.ok ? openedAutomation(answer.output) : undefined
-    if (!opened) return setFailed({ id, text: `It could not be opened: ${answer.ok ? 'its file holds something this form cannot show' : answer.error}` })
-    setRemoving(current => (current === id ? undefined : current))
-    setForm(current => current ?? { project: project.id, row: id, opened })
+    const says = answered(answer)
+    if (says) setSaid({ id, ...says })
   }
 
-  /** Save what the open row changed, the pace, then the number of agents, then the publish pick, each a command of its own and each only once the one before it is taken; the row closes once the last one is taken, and at once when nothing changed. A save not taken leaves the row open with what was picked. */
-  const saveRow = (id: string, project: ModuleProject, scheduled: SchedulerCommand, open: Editing): void => {
-    const paced = paceArgs(open.pace)
-    const counted = agentsArgs(open.agents)
-    if (!paced || !counted) return
-    const saves: [what: string, args: string[]][] = []
-    if (paced.join(' ') !== paceArgs(draftOf(scheduled))!.join(' ')) saves.push(['pace', ['pace', scheduled.command, ...paced]])
-    if (counted[0] !== agentsArgs(agentsDraftOf(scheduled))![0]) saves.push(['number of agents', ['agents', scheduled.command, ...counted]])
-    if (open.publish !== scheduled.publish) saves.push(['publish pick', ['publish', scheduled.command, open.publish]])
-    const step = (index: number): void => {
-      const next = saves[index]
-      if (!next) return close(id)
-      save(`The ${next[0]} was not saved`, id, project, next[1], () => step(index + 1))
+  /**
+   * Open a row's panel. A row a person made is read first, as its file says it now (`show`, which
+   * refuses a file changed by hand): its words are then the panel's to change, and when it cannot
+   * be read the panel says why and leaves them alone. Nothing opens over a change not saved yet.
+   */
+  const open = async (id: string, project: ModuleProject, scheduled: SchedulerCommand): Promise<void> => {
+    const mine = ++asked.current
+    setSaid(current => (current?.id === id ? undefined : current))
+    if (!scheduled.editable) {
+      setCreating(undefined)
+      return setPanel({ id })
     }
-    step(0)
+    setBusy(current => [...current, id])
+    const answer = await ask(project, ['show', scheduled.command])
+    setBusy(current => current.filter((_, index) => index !== current.indexOf(id)))
+    // Nothing opens over a change made, meanwhile, in what is open.
+    if (asked.current !== mine || dirtyNow.current) return
+    const opened = answer.ok ? openedAutomation(answer.output) : undefined
+    setCreating(undefined)
+    setPanel({ id, ...(opened ? { opened } : { refused: answer.ok ? 'its file holds something this panel cannot show' : answer.error }) })
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-6">
       <h1 className="text-lg font-semibold">Automations</h1>
-      <p className="mt-1 text-sm text-muted-foreground">What starts by itself while nobody is at the keyboard. Each row's switch and picks are yours, on this machine. Every row starts switched off.</p>
+      <p className="mt-1 text-sm text-muted-foreground">What starts by itself while nobody is at the keyboard. Every row starts switched off: it runs on this machine only once you switch it on here.</p>
       {!loaded && <p className="mt-6 text-sm text-muted-foreground">Loading…</p>}
       {rows.map(row => {
         const status = schedulerStatus(row)
         const note = row.lastTick?.note
+        const ticking = row.on && row.running
+        const groups: [title: string, commands: SchedulerCommand[]][] = [
+          ['Your automations', row.commands.filter(isOwn)],
+          ["From the project's skills", row.commands.filter(c => !isOwn(c))],
+        ]
         return (
           <section key={row.project.id} aria-label={row.project.name} className="mt-6">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-border pb-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border pb-2">
               <h2 className="text-sm font-semibold">{row.project.name}</h2>
               <span className={cn('text-xs font-medium', status.tone)}>Scheduler {status.label}</span>
               {row.model && <span className="text-xs text-muted-foreground">{row.model}</span>}
@@ -140,14 +141,24 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                   {note !== undefined && note !== 'off' && note !== NOTHING_SCHEDULED && `: ${note}`}
                 </span>
               )}
-              {/* One form at a time, and none offered over an open one: opening another would drop what was typed. */}
-              {row.error === undefined && form === undefined && (
-                <button type="button" onClick={() => setForm({ project: row.project.id })} aria-label={`New automation in ${row.project.name}`} className="ml-auto text-xs underline">
+              {row.error === undefined && creating !== row.project.id && (
+                <Button
+                  variant="outline"
+                  size="xs"
+                  disabled={held}
+                  onClick={() => {
+                    asked.current++
+                    setPanel(undefined)
+                    setCreating(row.project.id)
+                  }}
+                  aria-label={`New automation in ${row.project.name}`}
+                  className="ml-auto"
+                >
                   New automation
-                </button>
+                </Button>
               )}
             </div>
-            {form?.project === row.project.id && form.row === undefined && <AutomationForm project={row.project} ticking={row.on && row.running} onClose={() => setForm(undefined)} onSaved={() => void reload().catch(() => {})} />}
+            {creating === row.project.id && <AutomationForm project={row.project} ticking={ticking} run={args => run(row.project, args)} onDirty={setDirty} onClose={() => setCreating(undefined)} onSaved={() => void reload().catch(() => {})} />}
             {removed?.project === row.project.id && (
               <div role="status" aria-label="Removed" className="mt-3 flex items-start justify-between gap-3 rounded-md border border-border bg-muted/40 p-3 text-sm">
                 <p>{removed.text}</p>
@@ -157,8 +168,8 @@ export function AutomationsPage({ projects }: ModulePageProps) {
               </div>
             )}
             {row.error !== undefined && <p role="alert" className="py-3 text-sm text-danger">{`The scheduler could not be read: ${row.error}`}</p>}
-            {row.error === undefined && !row.on && <p className="py-3 text-sm text-muted-foreground">The scheduler is off in this project, so nothing here starts. It starts with the dashboard once the project has run `npx agent-scheduler init`, or by hand with `npx agent-scheduler start`.</p>}
-            {row.error === undefined && row.on && !row.running && <p className="py-3 text-sm text-warning">The scheduler is on but its process is not running, so nothing here starts. `npx agent-scheduler start`, run in the project, starts it.</p>}
+            {row.error === undefined && !row.on && <p className="py-3 text-sm text-muted-foreground">The scheduler is off in this project, so nothing here starts by itself. It starts with the dashboard once the project has run `npx agent-scheduler init`, or by hand with `npx agent-scheduler start`.</p>}
+            {row.error === undefined && row.on && !row.running && <p className="py-3 text-sm text-warning">The scheduler is on but its process is not running, so nothing here starts by itself. `npx agent-scheduler start`, run in the project, starts it.</p>}
             {row.unreadable.map((unreadable, index) => (
               <p key={`${index}/${unreadable.skill}`} role="alert" className="py-3 text-sm text-danger">
                 {unlistedWords(unreadable)}
@@ -167,155 +178,104 @@ export function AutomationsPage({ projects }: ModulePageProps) {
             {row.error === undefined && row.commands.length === 0 && row.unreadable.length === 0 && (
               <p className="py-3 text-sm text-muted-foreground">{row.lastTick ? 'Nothing here: no skill of this project says it can be scheduled.' : 'Nothing here yet: the scheduler of this project has not looked at its skills.'}</p>
             )}
-            {row.commands.length > 0 && (
-              <ul className="divide-y divide-border">
-                {row.commands.map(scheduled => {
-                  const id = `${row.project.id}/${scheduled.command}`
-                  const title = rowTitle(scheduled)
-                  const saving = busy.includes(id)
-                  const open = editing?.id === id ? editing : undefined
-                  const prompt = form?.row === id ? form.opened : undefined
-                  const asked = removing === id
-                  return (
-                    <li key={id} aria-label={title} className={cn('py-3', saving && 'opacity-60')}>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <p className="font-mono text-sm">
-                            {title}
-                            {scheduled.onThisMachine && <span className="ml-2 font-sans text-xs text-info">only on this machine</span>}
-                          </p>
-                          {scheduled.description && <p className="line-clamp-2 text-sm text-muted-foreground">{scheduled.description}</p>}
-                          {!open && <Summary host={host} project={row.project} scheduled={scheduled} />}
-                        </div>
-                        <div className="flex shrink-0 items-center gap-3">
-                          {/* Only a row whose file the tool wrote, and only while no form is open: opening another would drop what was typed. */}
-                          {scheduled.editable && !open && !asked && form === undefined && (
-                            <>
-                              <button type="button" disabled={saving} onClick={() => void openPrompt(id, row.project, scheduled.command)} aria-label={`Edit the prompt of ${title}`} className="text-xs underline disabled:opacity-50">
-                                Edit prompt
-                              </button>
-                              <button type="button" disabled={saving} onClick={() => setRemoving(id)} aria-label={`Remove ${title}`} className="text-xs underline disabled:opacity-50">
-                                Remove
-                              </button>
-                            </>
-                          )}
-                          {!open && !prompt && !asked && (
-                            <button
-                              type="button"
-                              ref={button => {
-                                if (button) editButtons.current.set(id, button)
-                                else editButtons.current.delete(id)
-                              }}
-                              disabled={saving}
-                              onClick={() => edit({ id, publish: scheduled.publish, pace: draftOf(scheduled), agents: agentsDraftOf(scheduled) })}
-                              aria-label={`Edit ${title}`}
-                              className="text-xs underline disabled:opacity-50"
-                            >
-                              Edit
-                            </button>
-                          )}
-                          <Checkbox
-                            checked={scheduled.on}
-                            disabled={saving}
-                            onCheckedChange={next => save('The switch was not saved', id, row.project, ['switch', scheduled.command, next === true ? 'on' : 'off'])}
-                            aria-label={`Run ${title} by itself`}
-                          />
-                        </div>
-                      </div>
-                      {open && (
-                        <div
-                          role="group"
-                          aria-label={`Editing ${title}`}
-                          onKeyDown={e => {
-                            if (e.key === 'Escape' && !saving) close(id)
-                          }}
-                          className="mt-3 rounded-md border border-border bg-muted/40 p-4"
-                        >
-                          <PaceFields scheduled={scheduled} draft={open.pace} disabled={saving} onChange={next => edit({ ...open, pace: next })} />
-                          <AgentsFields scheduled={scheduled} draft={open.agents} disabled={saving} onChange={next => edit({ ...open, agents: next })} />
-                          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">What its runs publish</p>
-                          <select
-                            value={open.publish}
-                            disabled={saving}
-                            onChange={e => edit({ ...open, publish: e.target.value as PublishPick })}
-                            aria-label="What its runs publish"
-                            className="mt-2 rounded-md border border-border bg-background px-2 py-1 text-sm"
-                          >
-                            {publishChoices(row.project.gitHost, open.publish).map(pick => (
-                              <option key={pick} value={pick}>
-                                {PUBLISH_LABELS[pick]}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-sm">
-                            {paceProblem(open.pace) ?? (agentsArgs(open.agents) ? `${pace(withDraft(scheduled, open.pace))}. ${saysAtOnce(withAgentsDraft(scheduled, open.agents)) ? `${atOnceWords(atOnce(withAgentsDraft(scheduled, open.agents)))}. ` : ''}${publishes({ ...scheduled, publish: open.publish })}.` : `Type a whole number of agents, from 1 to ${MAX_AGENTS}.`)}
-                          </p>
-                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                            <p className="text-xs text-muted-foreground">Saved for you, in this project, on this machine. No tracked file changes.</p>
-                            <div className="flex gap-2">
-                              <Button variant="outline" size="sm" disabled={saving} onClick={() => close(id)}>
-                                Cancel
-                              </Button>
-                              <Button size="sm" disabled={saving || !paceArgs(open.pace) || !agentsArgs(open.agents)} onClick={() => saveRow(id, row.project, scheduled, open)}>
-                                Save
-                              </Button>
+            {groups.map(
+              ([group, commands]) =>
+                commands.length > 0 && (
+                  <div key={group} role="group" aria-label={group} className="mt-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</h3>
+                    <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
+                      {commands.map(scheduled => {
+                        const id = `${row.project.id}/${scheduled.command}`
+                        const title = rowTitle(scheduled)
+                        const saving = busy.includes(id)
+                        const shown = panel?.id === id ? panel : undefined
+                        const says = said?.id === id ? said : undefined
+                        return (
+                          <li key={id} aria-label={title} className={cn('p-4', saving && 'opacity-60')}>
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="min-w-0">
+                                <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                                  <span className="font-mono font-medium">{title}</span>
+                                  {isOwn(scheduled) && <span className="text-xs text-info">{scheduled.onThisMachine ? 'only on this machine' : 'shared with the project'}</span>}
+                                </p>
+                                {scheduled.description && <p className="line-clamp-2 text-sm text-muted-foreground">{scheduled.description}</p>}
+                                <Stands host={host} project={row.project} scheduled={scheduled} />
+                                {!shown && <Picks scheduled={scheduled} />}
+                              </div>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="xs"
+                                  disabled={saving || cannotRun(scheduled) !== undefined}
+                                  onClick={() => void save(id, row.project, ask(row.project, ['now', scheduled.command]), startedNow)}
+                                  aria-label={`Run ${title} now`}
+                                >
+                                  Run now
+                                </Button>
+                                <button
+                                  type="button"
+                                  ref={button => {
+                                    if (button) editButtons.current.set(id, button)
+                                    else editButtons.current.delete(id)
+                                  }}
+                                  disabled={saving || shown !== undefined || held}
+                                  onClick={() => void open(id, row.project, scheduled)}
+                                  aria-label={`Edit ${title}`}
+                                  className={buttonVariants({ variant: 'outline', size: 'xs' })}
+                                >
+                                  Edit
+                                </button>
+                                <Switch
+                                  checked={scheduled.on}
+                                  disabled={saving}
+                                  onCheckedChange={next => void save(id, row.project, run(row.project, ['switch', scheduled.command, next ? 'on' : 'off']), answer => (answer.ok ? undefined : { failed: `The switch was not saved: ${answer.error}` }))}
+                                  aria-label={`Run ${title} by itself`}
+                                />
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      )}
-                      {prompt && (
-                        <AutomationForm
-                          project={row.project}
-                          ticking={row.on && row.running}
-                          opened={prompt}
-                          {...(ownPace(scheduled) ? { ownPace: pace(scheduled) } : {})}
-                          onClose={() => setForm(undefined)}
-                          onSaved={() => void reload().catch(() => {})}
-                        />
-                      )}
-                      {asked && (
-                        <div
-                          role="group"
-                          aria-label={`Removing ${title}`}
-                          onKeyDown={e => {
-                            if (e.key === 'Escape' && !saving) setRemoving(undefined)
-                          }}
-                          className="mt-3 rounded-md border border-border bg-muted/40 p-4 text-sm"
-                        >
-                          <p>
-                            Remove <span className="font-mono">{title}</span>?
-                          </p>
-                          <p className="mt-2">{removeWarning(scheduled)}</p>
-                          <div className="mt-3 flex justify-end gap-2">
-                            {/* The keyboard lands on the way out, not on the deletion. */}
-                            <Button variant="outline" size="sm" autoFocus disabled={saving} onClick={() => setRemoving(undefined)}>
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              disabled={saving}
-                              onClick={() =>
-                                save('It was not removed', id, row.project, ['remove', scheduled.command], output => {
-                                  setRemoving(undefined)
-                                  setRemoved({ project: row.project.id, text: removedWords(title, output) })
-                                })
-                              }
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                      {failed?.id === id && (
-                        <p role="alert" className="mt-2 text-xs text-danger">
-                          {failed.text}
-                        </p>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
+                            {shown && (
+                              <EditPanel
+                                project={row.project}
+                                scheduled={scheduled}
+                                opened={shown.opened}
+                                refused={shown.refused}
+                                ticking={ticking}
+                                run={args => run(row.project, args)}
+                                reload={reload}
+                                onDirty={setDirty}
+                                onClose={() => close(id)}
+                                onRemoved={text => {
+                                  setPanel(undefined)
+                                  setRemoved({ project: row.project.id, text })
+                                }}
+                              />
+                            )}
+                            {says?.started !== undefined && (
+                              <p role="status" className="mt-2 text-xs text-success">
+                                Started a run.{' '}
+                                {says.started !== '' && (
+                                  <button type="button" onClick={() => host.openAgent(row.project.id, says.started!)} className="underline">
+                                    Open it
+                                  </button>
+                                )}
+                              </p>
+                            )}
+                            {says?.note !== undefined && (
+                              <p role="status" className="mt-2 text-xs text-muted-foreground">
+                                {says.note}
+                              </p>
+                            )}
+                            {says?.failed !== undefined && (
+                              <p role="alert" className="mt-2 text-xs text-danger">
+                                {says.failed}
+                              </p>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                ),
             )}
           </section>
         )
@@ -324,135 +284,77 @@ export function AutomationsPage({ projects }: ModulePageProps) {
   )
 }
 
-const lower = (text: string): string => text.charAt(0).toLowerCase() + text.slice(1)
-
-/** A row open for editing: which one, and what the person picked in it and has not saved yet. */
-interface Editing {
-  id: string
-  publish: PublishPick
-  pace: PaceDraft
-  agents: AgentsDraft
+/** What a save or a start on a row answered, for the row to say: why it was not taken, that nothing was to do, or the run it started (empty when the answer names none). */
+interface Answered {
+  failed?: string
+  note?: string
+  started?: string
 }
 
 /**
- * "How many at once", in an open row: as the skill says, or up to a number the person types. The
- * number is held against the agents of every machine that shares the repository, and a new agent
- * still starts only when the row is due by its pace and its check.
+ * What "Run now" answered (`agent-scheduler now`), for the row to say: the run it started, or why
+ * none started, in the page's words for the scheduler's decision. Nothing to do, or one already
+ * running, is no failure.
  */
-function AgentsFields({ scheduled, draft, disabled, onChange }: { scheduled: SchedulerCommand; draft: AgentsDraft; disabled: boolean; onChange: (next: AgentsDraft) => void }) {
-  const skills = scheduled.skillAgents ?? 1
-  const typed = draft.kind === 'own' ? draft : { kind: 'own' as const, count: String(skills) }
-  const name = `how many of ${rowTitle(scheduled)} at once`
-  return (
-    <fieldset disabled={disabled} className="mt-4 space-y-2">
-      <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">How many at once</legend>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="radio" name={name} checked={draft.kind === 'skill'} onChange={() => onChange({ kind: 'skill' })} />
-        {scheduled.onThisMachine ? 'As it was saved' : 'As the skill says'}
-        <span className="text-xs text-muted-foreground">{lower(atOnceWords(skills))}</span>
-      </label>
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <label className="flex items-center gap-2">
-          <input type="radio" name={name} checked={draft.kind === 'own'} onChange={() => onChange(typed)} />
-          Up to
-        </label>
-        <input
-          type="number"
-          min={1}
-          max={MAX_AGENTS}
-          value={typed.count}
-          disabled={draft.kind !== 'own'}
-          onChange={e => onChange({ kind: 'own', count: e.target.value })}
-          aria-label="How many agents"
-          className="w-20 rounded-md border border-border bg-background px-2 py-1 text-sm disabled:opacity-50"
-        />
-        <span>{Number(typed.count) === 1 ? 'agent' : 'agents'} at once</span>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        A new one starts only when the row is due, and only while fewer than this are working {scheduled.onThisMachine ? 'on this machine' : 'on any machine that shares this repository'}.
-      </p>
-    </fieldset>
-  )
+function startedNow(answer: ModuleCommandResult): Answered {
+  if (answer.ok) {
+    const run = typeof answer.output === 'object' && answer.output !== null ? (answer.output as Record<string, unknown>)['run'] : undefined
+    return { started: typeof run === 'string' ? run : '' }
+  }
+  if (answer.error === 'not due') return { note: 'Nothing started. No work: its shell line printed nothing.' }
+  if (answer.error.startsWith('cap reached ')) return { note: `Nothing started. ${outcomeWords(answer.error)}.` }
+  // The dashboard ended the command before it answered: whether it had started the run by then is not known here.
+  if (answer.error.endsWith(' took too long')) return { failed: 'No answer in time. A run may have started all the same: the row says when it last ran once the scheduler has looked.' }
+  const why = outcomeWords(answer.error) ?? answer.error
+  return { failed: `Nothing started. ${/[.!?]$/.test(why) ? why : `${why}.`}` }
 }
 
 /**
- * "When it runs", in an open row: as the skill says, whenever there is work (only for a command
- * with a check), or every so many of a unit, with a time of day beside days, weeks or months.
- * Picking the third without a count yet starts from the skill's own interval, else one day.
+ * Where a row stands, in one line: on or off; when it last ran, or that its last run failed, which
+ * opens that run; and what the scheduler last decided for it while it is on. A command the coding
+ * agent cannot run says so whatever its switch.
  */
-function PaceFields({ scheduled, draft, disabled, onChange }: { scheduled: SchedulerCommand; draft: PaceDraft; disabled: boolean; onChange: (next: PaceDraft) => void }) {
-  const skills = scheduled.every === undefined ? undefined : parseInterval(scheduled.every)
-  const typed = draft.kind === 'every' ? draft : { kind: 'every' as const, count: String(skills?.count ?? 1), unit: skills?.unit ?? ('d' as PaceUnit), at: '' }
-  const timed = takesTimeOfDay({ count: 1, unit: typed.unit, ms: 0, text: '' })
-  const name = `when ${rowTitle(scheduled)} runs`
-  const field = 'rounded-md border border-border bg-background px-2 py-1 text-sm disabled:opacity-50'
+function Stands({ host, project, scheduled }: { host: ModuleHost; project: ModuleProject; scheduled: SchedulerCommand }) {
+  const last = scheduled.lastRun
+  const decision = decided(scheduled)
   return (
-    <fieldset disabled={disabled} className="space-y-2">
-      <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">When it runs</legend>
-      <label className="flex items-center gap-2 text-sm">
-        {/* The keyboard lands where the row opened. */}
-        <input type="radio" name={name} autoFocus={draft.kind === 'skill'} checked={draft.kind === 'skill'} onChange={() => onChange({ kind: 'skill' })} />
-        {scheduled.onThisMachine ? 'As it was saved' : 'As the skill says'}
-        <span className="text-xs text-muted-foreground">{lower(pace(withDraft(scheduled, { kind: 'skill' })))}</span>
-      </label>
-      {scheduled.when !== undefined && scheduled.every !== undefined && (
-        <label className="flex items-center gap-2 text-sm">
-          <input type="radio" name={name} autoFocus={draft.kind === 'work'} checked={draft.kind === 'work'} onChange={() => onChange({ kind: 'work' })} />
-          Whenever there is work
-        </label>
+    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs">
+      <span className={cn('inline-flex items-center gap-1.5 font-medium', scheduled.on ? 'text-success' : 'text-muted-foreground')}>
+        <span aria-hidden className={cn('h-1.5 w-1.5 rounded-full', scheduled.on ? 'bg-success' : 'bg-muted-foreground/50')} />
+        {scheduled.on ? 'On' : 'Off'}
+      </span>
+      <span aria-hidden className="text-muted-foreground">
+        ·
+      </span>
+      {last === undefined ? (
+        <span className="text-muted-foreground">Never ran</span>
+      ) : (
+        <Tooltip>
+          <TooltipTrigger render={<button type="button" onClick={() => host.openAgent(project.id, last.id)} className={cn('underline', last.failed ? 'text-danger' : 'text-muted-foreground hover:text-foreground')} />}>
+            {last.failed ? 'Last run failed' : 'Last ran'} <span className="tabular-nums">{formatAge(last.at)}</span>
+          </TooltipTrigger>
+          <TooltipContent>{formatDateTime(last.at)}</TooltipContent>
+        </Tooltip>
       )}
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <label className="flex items-center gap-2">
-          <input type="radio" name={name} autoFocus={draft.kind === 'every'} checked={draft.kind === 'every'} onChange={() => onChange(typed)} />
-          Every
-        </label>
-        <input
-          type="number"
-          min={1}
-          max={MAX_COUNT}
-          value={typed.count}
-          disabled={draft.kind !== 'every'}
-          onChange={e => onChange({ ...typed, count: e.target.value })}
-          aria-label="How many"
-          className={cn(field, 'w-20')}
-        />
-        <select value={typed.unit} disabled={draft.kind !== 'every'} onChange={e => onChange({ ...typed, unit: e.target.value as PaceUnit })} aria-label="Unit" className={field}>
-          {PACE_UNITS.map(unit => (
-            <option key={unit} value={unit}>
-              {Number(typed.count) === 1 ? UNIT_WORDS[unit] : `${UNIT_WORDS[unit]}s`}
-            </option>
-          ))}
-        </select>
-        {timed && (
-          <>
-            <span>at</span>
-            <input
-              type="time"
-              value={typed.at}
-              disabled={draft.kind !== 'every'}
-              // A time left half typed has no text; the browser says so on the field itself.
-              onChange={e => onChange({ kind: 'every', count: typed.count, unit: typed.unit, at: e.target.value, ...(e.target.validity.badInput ? { atHalfTyped: true as const } : {}) })}
-              aria-label="Time of day"
-              className={field}
-            />
-            <span className="text-xs text-muted-foreground">optional, this machine's time{typed.unit === 'mo' ? '; a month counts as 30 days' : ''}</span>
-          </>
-        )}
-      </div>
-      <p className="text-xs text-muted-foreground">Counted from its last start, {scheduled.onThisMachine ? 'on this machine' : 'on any machine that shares this repository'}.</p>
-    </fieldset>
+      {decision !== undefined && (
+        <>
+          <span aria-hidden className="text-muted-foreground">
+            ·
+          </span>
+          <span className={cannotRun(scheduled) ? 'text-warning' : 'text-muted-foreground'}>{decision}</span>
+        </>
+      )}
+    </p>
   )
 }
 
-/** A row's one line: when the command runs, how many agents at once when that is worth saying, how far its runs publish, what the scheduler last decided for it, and that its last run failed when it did; a decision that started a run opens that agent, and the failure opens the run that failed. */
-function Summary({ host, project, scheduled }: { host: ReturnType<typeof useModuleHost>; project: ModuleProject; scheduled: SchedulerCommand }) {
-  const last = decided(scheduled)
-  const run = scheduled.decision?.run
-  const failed = scheduled.failed
+/** A row's picks, in one line: when it runs, how many agents at once when that is worth saying, and how far its runs publish. A pick of the person's own, on a row that could follow its skill, says so. */
+function Picks({ scheduled }: { scheduled: SchedulerCommand }) {
+  const follows = !isOwn(scheduled)
   return (
     <p className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
       <span>{pace(scheduled)}</span>
-      {ownPace(scheduled) && (
+      {follows && ownPace(scheduled) && (
         <>
           <span aria-hidden>·</span>
           <span className="text-info">your pick</span>
@@ -462,7 +364,7 @@ function Summary({ host, project, scheduled }: { host: ReturnType<typeof useModu
         <>
           <span aria-hidden>·</span>
           <span>{atOnceWords(atOnce(scheduled))}</span>
-          {scheduled.agents !== undefined && (
+          {follows && scheduled.agents !== undefined && (
             <>
               <span aria-hidden>·</span>
               <span className="text-info">your pick</span>
@@ -472,27 +374,6 @@ function Summary({ host, project, scheduled }: { host: ReturnType<typeof useModu
       )}
       <span aria-hidden>·</span>
       <span>{publishes(scheduled)}</span>
-      {last !== undefined && (
-        <>
-          <span aria-hidden>·</span>
-          {run !== undefined && scheduled.on ? (
-            <button type="button" onClick={() => host.openAgent(project.id, run)} className="underline hover:text-foreground">
-              {last}
-            </button>
-          ) : (
-            <span>{last}</span>
-          )}
-        </>
-      )}
-      {/* Nothing is tried again by itself after a failure: the row says so until a later run of it starts, and opens the run that failed. */}
-      {failed !== undefined && (
-        <>
-          <span aria-hidden>·</span>
-          <button type="button" onClick={() => host.openAgent(project.id, failed)} className="text-danger underline">
-            Last run failed
-          </button>
-        </>
-      )}
     </p>
   )
 }

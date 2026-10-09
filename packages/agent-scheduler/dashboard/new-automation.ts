@@ -20,6 +20,8 @@ export interface AutomationDraft {
   when: string
   /** What the shell line waits for, in plain words; said on the row. */
   waitsFor: string
+  /** Whether it is kept on this machine alone, and not shared with the project as a file to commit. */
+  onThisMachine: boolean
 }
 
 /**
@@ -29,8 +31,8 @@ export interface AutomationDraft {
  */
 export const TEXT_MAX = 4000
 
-/** The form as it opens: once a day, no shell line. */
-export const EMPTY_DRAFT: AutomationDraft = { name: '', prompt: '', paced: true, count: '1', unit: 'd', when: '', waitsFor: '' }
+/** The form as it opens: once a day, no shell line, shared with the project. */
+export const EMPTY_DRAFT: AutomationDraft = { name: '', prompt: '', paced: true, count: '1', unit: 'd', when: '', waitsFor: '', onThisMachine: false }
 
 /** The interval a draft's pace is, as a skill writes it (`15m`); nothing without a pace, or while the count is no whole number the tool takes. */
 function everyOf(draft: AutomationDraft): string | undefined {
@@ -41,7 +43,7 @@ function everyOf(draft: AutomationDraft): string | undefined {
 /** What keeps a draft from being saved yet, for the person typing it, the first thing first; nothing when it can be saved. */
 export function draftProblem(draft: AutomationDraft): string | undefined {
   const name = draft.name.trim()
-  if (name === '') return 'Give it a name. It becomes the command, like /answer-comments.'
+  if (name === '') return draft.onThisMachine ? 'Give it a name, like answer-comments.' : 'Give it a name. It becomes the command, like /answer-comments.'
   if (!isCommandName(name)) return 'A name is lower-case letters, digits and dashes, never three dashes in a row, like answer-comments.'
   if (name.length > MAX_NAME) return `A name is ${MAX_NAME} characters at most.`
   if (draft.prompt.trim() === '') return 'Write what the agent is told.'
@@ -57,13 +59,14 @@ export function draftProblem(draft: AutomationDraft): string | undefined {
  * The command that saves a draft, after `agent-scheduler`; nothing while the draft cannot be
  * saved. Each text goes as one argument with its flag (`--prompt=…`), so one that opens with a
  * dash is still the flag's own text. What the shell line waits for is left out without a line.
+ * `--private` keeps it on this machine alone.
  */
 export function addArgs(draft: AutomationDraft): string[] | undefined {
   if (draftProblem(draft) !== undefined) return undefined
   const every = everyOf(draft)
   const when = draft.when.trim()
   const waitsFor = draft.waitsFor.trim()
-  return ['add', draft.name.trim(), `--prompt=${draft.prompt.trim()}`, ...(every !== undefined ? [`--every=${every}`] : []), ...(when !== '' ? [`--when=${when}`] : []), ...(when !== '' && waitsFor !== '' ? [`--waits-for=${waitsFor}`] : [])]
+  return ['add', draft.name.trim(), `--prompt=${draft.prompt.trim()}`, ...(every !== undefined ? [`--every=${every}`] : []), ...(when !== '' ? [`--when=${when}`] : []), ...(when !== '' && waitsFor !== '' ? [`--waits-for=${waitsFor}`] : []), ...(draft.onThisMachine ? ['--private'] : [])]
 }
 
 /** When a draft would run, as the sentence its row would say; nothing while it has no pace and no shell line that could say. */
@@ -108,10 +111,21 @@ export function triedLine(output: unknown): TriedLine {
   return answer['due'] === true ? { ...lastRun, printed, verdict: 'It printed something: an agent would start now.', tone: 'start' } : { ...lastRun, printed, verdict: 'It printed nothing to do: no agent would start.', tone: 'quiet' }
 }
 
-/** Read what `agent-scheduler add` printed: the file it wrote and where a run's checkout starts. */
-export function savedFile(output: unknown): { file: string; startsFrom: string } {
+/** Read what `agent-scheduler add` printed: the file it wrote, where a run's checkout starts, and whether it is kept on this machine alone. */
+export function savedFile(output: unknown): { file: string; startsFrom: string; onThisMachine: boolean } {
   const answer = typeof output === 'object' && output !== null ? (output as Record<string, unknown>) : {}
-  return { file: typeof answer['file'] === 'string' ? answer['file'] : 'a skill file', startsFrom: typeof answer['startsFrom'] === 'string' ? answer['startsFrom'] : 'HEAD' }
+  return { file: typeof answer['file'] === 'string' ? answer['file'] : 'a skill file', startsFrom: typeof answer['startsFrom'] === 'string' ? answer['startsFrom'] : 'HEAD', onThisMachine: answer['onThisMachine'] === true }
+}
+
+/** What a saved automation is and what the person has to do with it, in a sentence: a shared one is a file to commit that must reach where a run's checkout starts; one kept on this machine needs nothing. */
+export function savedWords(saved: { startsFrom: string; onThisMachine: boolean }): string {
+  if (saved.onThisMachine) return 'It is kept on this machine alone: nothing to commit, and nobody else gets the row. Its row can start as soon as you switch it on. Its prompt is in the record of each run, which is shared where this project shares its records.'
+  return `It is a file of yours, in this project, and nothing was committed for you. ${startsWhen(saved.startsFrom)}`
+}
+
+/** What the form says of where a draft will be saved, under its two choices. */
+export function whereHint(draft: AutomationDraft): string {
+  return draft.onThisMachine ? 'Kept on this machine alone, outside git. The row starts switched off, and can start as soon as you switch it on.' : 'Saved as a skill file in this project, which you commit. The row starts switched off.'
 }
 
 /** When a saved automation's row shows on the page, in a sentence: the rows are what the project's scheduler last read, so a scheduler that is not running shows none. */

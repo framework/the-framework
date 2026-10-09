@@ -1,7 +1,7 @@
 export { STATE_DIR, STATE_FILE, RUN_SKILLS_DIR, DEFAULT_MODEL, DEFAULT_PUBLISH, DEFAULT_SPEND_OFFSET, DEFAULT_CAP, MAX_AGENTS, TICK_MS } from './names.js'
 export { skillSchedule, readSchedule, commandPrompt, promptCommand, isDue, type Schedule, type ScheduledCommand } from './schedule.js'
 export { readStartPoint, isOnCommit, atStartOf, type StartPoint } from './start-point.js'
-export { addAutomation, automationProblem, automationSkill, tryCheck, type NewAutomation, type Tried } from './automation.js'
+export { addAutomation, automationProblem, automationSkill, tryCheck, type Added, type NewAutomation, type Tried } from './automation.js'
 export { readState, writeState, updateState, statePath, DEFAULT_STATE, type State, type TickRecord, type TickDecision } from './state.js'
 export { quotaBoundaryStatus, quotaHeadroom, parseResetsAt, boundaryFromResetsAt, type QuotaBoundaryStatus, type QuotaDecision } from './quota-boundary.js'
 export { inFlight, lastStart, commandOf } from './records.js'

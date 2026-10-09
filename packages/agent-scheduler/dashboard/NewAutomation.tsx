@@ -2,15 +2,16 @@ import { useRef, useState } from 'react'
 import { Button, cn, useModuleHost, type ModuleProject } from '@openagt/dashboard/module'
 import { MAX_COUNT, PACE_UNITS, type PaceUnit } from '../src/pace.js'
 import { UNIT_WORDS } from './schedulers.js'
-import { EMPTY_DRAFT, addArgs, draftProblem, draftSentence, isUntouched, paceHint, savedFile, showsWhen, startsWhen, triedLine, type AutomationDraft, type TriedLine } from './new-automation.js'
+import { EMPTY_DRAFT, addArgs, draftProblem, draftSentence, isUntouched, paceHint, savedFile, savedWords, showsWhen, triedLine, whereHint, type AutomationDraft, type TriedLine } from './new-automation.js'
 
 // The "New automation" form of the Automations page: a person's own prompt, saved as a command of
 // the project with a row like any skill's. A name, what the agent is told, and when it runs: on a
 // pace, by a shell line that prints what is new, or both. "Try it" runs the shell line once in the
 // project and shows what it printed and whether an agent would start; nothing is saved and nothing
-// starts. Saving writes a skill file into the project (`agent-scheduler add`): a file of the
-// person's to commit, whose row cannot start before it is where an agent's checkout starts. The
-// form says so once it is saved, and where the file is.
+// starts. Saving (`agent-scheduler add`) is the person's choice of two: shared with the project, a
+// skill file of theirs to commit, whose row cannot start before it is where an agent's checkout
+// starts; or only on this machine, where nothing is to commit and the row can start at once. The
+// form says which once it is saved, and where the file is.
 
 const field = 'rounded-md border border-border bg-background px-2 py-1 text-sm disabled:opacity-50'
 const label = 'text-xs font-semibold uppercase tracking-wide text-muted-foreground'
@@ -22,7 +23,7 @@ export function NewAutomation({ project, ticking, onClose, onSaved }: { project:
   const [tried, setTried] = useState<'trying' | TriedLine | undefined>()
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState<string | undefined>()
-  const [saved, setSaved] = useState<{ command: string; file: string; startsFrom: string } | undefined>()
+  const [saved, setSaved] = useState<{ command: string; file: string; startsFrom: string; onThisMachine: boolean } | undefined>()
   const set = (change: Partial<AutomationDraft>): void => {
     setDraft(current => ({ ...current, ...change }))
     setFailed(undefined)
@@ -57,9 +58,9 @@ export function NewAutomation({ project, ticking, onClose, onSaved }: { project:
     return (
       <div role="group" aria-label="New automation" className="mt-3 rounded-md border border-border bg-muted/40 p-4 text-sm">
         <p>
-          Saved <span className="font-mono">/{saved.command}</span> as <span className="font-mono">{saved.file}</span>.
+          Saved <span className="font-mono">{saved.onThisMachine ? saved.command : `/${saved.command}`}</span> as <span className="font-mono">{saved.file}</span>.
         </p>
-        <p className="mt-2">It is a file of yours, in this project, and nothing was committed for you. {startsWhen(saved.startsFrom)}</p>
+        <p className="mt-2">{savedWords(saved)}</p>
         <p className="mt-2 text-muted-foreground">{showsWhen(ticking)}</p>
         <div className="mt-3 flex justify-end">
           <Button size="sm" onClick={onClose}>
@@ -86,7 +87,8 @@ export function NewAutomation({ project, ticking, onClose, onSaved }: { project:
             Name
           </label>
           <div className="mt-2 flex items-center gap-1 text-sm">
-            <span className="font-mono text-muted-foreground">/</span>
+            {/* A shared one is a command a person can type; one kept on this machine is no command, so it has no slash. */}
+            {!draft.onThisMachine && <span className="font-mono text-muted-foreground">/</span>}
             <input id="automation-name" type="text" autoFocus value={draft.name} onChange={e => set({ name: e.target.value })} placeholder="answer-comments" className={cn(field, 'w-64 font-mono')} />
           </div>
         </div>
@@ -156,6 +158,19 @@ export function NewAutomation({ project, ticking, onClose, onSaved }: { project:
             </div>
           )}
         </div>
+        <div className="space-y-2">
+          <p className={label}>Who gets it</p>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="radio" name="who gets the automation" checked={!draft.onThisMachine} onChange={() => set({ onThisMachine: false })} />
+            Shared with the project
+            <span className="text-xs text-muted-foreground">a file you commit; everyone who has the project gets the row, switched off</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="radio" name="who gets the automation" checked={draft.onThisMachine} onChange={() => set({ onThisMachine: true })} />
+            Only on this machine
+            <span className="text-xs text-muted-foreground">nothing to commit; nobody else gets the row</span>
+          </label>
+        </div>
       </fieldset>
       <p className="mt-4 rounded-md border border-border bg-background px-3 py-2 text-sm">{problem ?? `${sentence}.`}</p>
       {failed !== undefined && (
@@ -164,7 +179,7 @@ export function NewAutomation({ project, ticking, onClose, onSaved }: { project:
         </p>
       )}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">Saved as a skill file in this project, which you commit. The row starts switched off.</p>
+        <p className="text-xs text-muted-foreground">{whereHint(draft)}</p>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" disabled={saving} onClick={onClose}>
             Cancel

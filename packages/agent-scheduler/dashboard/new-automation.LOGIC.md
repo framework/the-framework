@@ -1,8 +1,8 @@
-The "New automation" form of the Automations page as data: the draft [3] of an automation [1] while a person types it, what still keeps it from being saved, the words of the command that saves it (`agent-scheduler add`), the sentence its page row [6] would say for when it runs, the words beside its interval, whether anything was typed yet, what trying its check [2] answered (`agent-scheduler try`), what a save answered, and when the saved automation's page row shows. The form itself (`NewAutomation.tsx`) draws what this file says.
+The "New automation" form of the Automations page as data: the draft [3] of an automation [1] while a person types it, whether it will be shared with the project or kept on this machine, what still keeps it from being saved, the words of the command that saves it (`agent-scheduler add`), the sentence its page row [6] would say for when it runs, the words beside its interval, whether anything was typed yet, what trying its check [2] answered (`agent-scheduler try`), what a save answered and what the person has to do with a saved automation, the words that say where a draft will be saved, and when the saved automation's page row shows. The form itself (`NewAutomation.tsx`) draws what this file says.
 
 ## Context
 
-**User story**: on the Automations page the user presses "New automation" and types a name, what the agent is told, and when it runs: every so many minutes, hours, days, weeks or months, by a shell line that prints what is new, or both. Under the fields, one line says what is still missing, and once nothing is, when the automation would run, in the words its page row will use ("Every 15 minutes at most, when someone commented"). "Try it" says whether the shell line would start an agent now. After Save the user reads where the file is and where it has to get to.
+**User story**: on the Automations page the user presses "New automation" and types a name, what the agent is told, and when it runs: every so many minutes, hours, days, weeks or months, by a shell line that prints what is new, or both. Under the fields, one line says what is still missing, and once nothing is, when the automation would run, in the words its page row will use ("Every 15 minutes at most, when someone commented"). "Try it" says whether the shell line would start an agent now. After Save the user reads where the file is and where it has to get to. A user who wants the automation for themselves alone picks "Only on this machine": the note under the form then says it is kept outside git, and after Save they read that nothing is to commit.
 
 **Problem**: a name and a count are typed a key at a time. A half-typed one must not be sent to the command, and must not be said as if it were a time the automation runs.
 
@@ -16,7 +16,7 @@ The "New automation" form of the Automations page as data: the draft [3] of an a
 
 ## Glossary
 
-[1] automation: a person's own prompt saved as a command skill of the project (a skill run as the slash command `/<name>`, never picked up by the coding agent on its own): the file `.claude/skills/<name>/SKILL.md`, whose text is the prompt and whose front matter carries the `schedule` the person picked (the key where a skill says when its command is due), an interval [4], a check [2] or both. Written by `agent-scheduler add` or the "New automation" form of the Automations page; from then on a skill like any other, and its command a scheduled command like any other.
+[1] automation: a person's own prompt saved as a scheduled command, with the `schedule` the person picked (the key where a skill says when its command is due), an interval [4], a check [2] or both. Written by `agent-scheduler add` or the "New automation" form of the Automations page, as one of two kinds, the person's choice. A shared automation is a command skill of the project (a skill run as the slash command `/<name>`, never picked up by the coding agent on its own): the file `.claude/skills/<name>/SKILL.md`, whose text is the prompt and whose front matter carries that `schedule`; the person commits it, and from then on it is a skill like any other, and its command a scheduled command like any other. An automation kept on this machine is one file written the same way, `.agent-scheduler/automations/<name>.md`, in the tool's own folder, which is hidden from git: nothing is to commit and nobody else gets its command, though its text is in the record of each of its runs, which is shared where the project shares its records. It is no skill and no slash command: its command is listed, switched and started like any other scheduled command, a run of it has the automation's name as its prompt, with no slash, and is handed the file's text with it, its runs are counted on this machine alone (where a command's runs in flight or its last start are said to be counted on any machine, for it that is this machine's), and what is said of a command's skill (the interval and the check its skill gives, its skill's number of agents, what its skill says it does) is, for it, said of that file.
 [2] check: the shell line a skill's `schedule` gives a scheduled command as `when`: the scheduler runs it in the project, every minute at most, while the command is switched on and the time between two of its starts has passed, when it has one, and starts an agent when it prints something. The form calls it "a shell line".
 [3] draft: what the form holds of an automation while a person types it, before anything is saved.
 [4] interval: how often at most a scheduled command starts as its skill says it, the `every` of the skill's `schedule`: a count from 1 to 9999 and a unit of minutes, hours, days, weeks or months (`15m`, `1d`).
@@ -25,15 +25,16 @@ The "New automation" form of the Automations page as data: the draft [3] of an a
 
 ## Business logic — TL;DR
 
-- **A draft** - a name, a prompt, whether it runs on an interval [4], the interval's count as the text typed and its unit, a check [2], and plain words for what the check waits for; the form opens on no name, no prompt, an interval of 1 day, no check.
+- **A draft** - a name, a prompt, whether it runs on an interval [4], the interval's count as the text typed and its unit, a check [2], plain words for what the check waits for, and whether it is kept on this machine; the form opens on no name, no prompt, an interval of 1 day, no check, shared with the project.
 - **The draft's interval** - the count and the unit as a skill writes them (`15m`); none while the interval is unticked, or while the count is no whole number from 1 to 9999.
 - **What keeps a draft from being saved** - one sentence for the person, the first thing first: no name, a name that is no command's name, a name longer than 64 characters, no prompt, a prompt, a check or plain words longer than 4000 characters, a count that is no number yet, nothing that says when it runs; nothing when it can be saved.
 - **The words beside the interval** - "by time alone", "at most, and only when the shell line below prints something", "not on a pace: the shell line below alone says when" or "not on a pace", by whether the interval is ticked and whether there is a check.
-- **A draft nothing was typed into** - no name, no prompt, no check and no plain words, whatever the interval holds: closing such a form loses nothing.
-- **The command that saves a draft** - `add <name> --prompt=<prompt>`, then `--every=<interval>` when the interval is ticked, `--when=<check>` when there is a check, and `--waits-for=<plain words>` only beside a check; each text one argument together with its flag; none while something keeps the draft from being saved.
+- **A draft nothing was typed into** - no name, no prompt, no check and no plain words, whatever the interval holds and whoever gets it: closing such a form loses nothing.
+- **The command that saves a draft** - `add <name> --prompt=<prompt>`, then `--every=<interval>` when the interval is ticked, `--when=<check>` when there is a check, `--waits-for=<plain words>` only beside a check, and `--private` last when the draft is kept on this machine; each text one argument together with its flag; none while something keeps the draft from being saved.
 - **When a draft would run** - the sentence its page row [6] would say, made by the same rule as every page row's (`schedulers.ts`); none while nothing says when, or while the count is half typed.
 - **What a try answered** - what `agent-scheduler try` printed, as the form shows it: what the check printed, the time it was given, and a verdict with its tone: an agent would start, nothing to do, or the line failed and why; an answer that is not what the command promises reads as a line that failed.
-- **What a save answered** - what `agent-scheduler add` printed: the file it wrote and where a run's checkout starts; the sentence that says where the file has to get to before its page row [6] can start; and the sentence that says when the page row shows, by whether the project's scheduler is running.
+- **What a save answered** - what `agent-scheduler add` printed: the file it wrote, where a run's checkout starts and whether the automation is kept on this machine; what the person has to do with it: for a shared automation, that the file is theirs and where it has to get to before its page row [6] can start, for one kept on this machine, that nothing is to commit and its page row can start as soon as it is switched on; and the sentence that says when the page row shows, by whether the project's scheduler is running.
+- **Where a draft will be saved** - the note under the form, by the draft's choice: a skill file in the project that the person commits, or kept on this machine alone, outside git.
 
 ## Business logic
 
@@ -52,8 +53,9 @@ A draft [3] holds:
 - Whether the automation runs on an interval [4], and that interval as a count, kept as the text typed, and a unit (minutes, hours, days, weeks or months).
 - The check [2]: empty for none.
 - Plain words for what the check waits for, which the page row [6] will say.
+- Whether it is kept on this machine [1], and not shared with the project.
 
-The form opens on an empty name and an empty prompt, the interval ticked with a count of 1 and days, no check and no plain words: once a day.
+The form opens on an empty name and an empty prompt, the interval ticked with a count of 1 and days, no check and no plain words, shared with the project: once a day.
 
 The draft's interval, as a skill writes one, is the count and the unit read by the tool's own rule (`../src/pace.ts`): `15m` for 15 and minutes, spaces around the count ignored. It has none while the interval is unticked, and none while the count is not a whole number from 1 to 9999 written in digits alone (empty, `0`, `1.5`).
 
@@ -67,7 +69,7 @@ See the first **Problem** in `## Context`.
 
 One sentence for the person typing, the first of these that holds; spaces around the name are ignored:
 
-1. The name is empty: "Give it a name. It becomes the command, like /answer-comments."
+1. The name is empty: "Give it a name. It becomes the command, like /answer-comments."; or, for a draft kept on this machine, which becomes no command a person types, "Give it a name, like answer-comments."
 2. The name is not lower-case letters, digits and dashes, starting with a letter or a digit, with no three dashes in a row (`../src/names.ts`; `Answer comments`, `a---b`): "A name is lower-case letters, digits and dashes, never three dashes in a row, like answer-comments."
 3. The name is longer than 64 characters (`../src/names.ts`): "A name is 64 characters at most."
 4. The prompt is empty or only whitespace: "Write what the agent is told."
@@ -104,7 +106,7 @@ A check of whitespace alone is no check.
 
 #### Business logic
 
-Nothing was typed into a draft when its name, its prompt, its check and its plain words are all empty, exactly: one blank typed counts as typed. The interval does not count: a draft with the interval unticked, or with another count and unit, and no text is still one nothing was typed into. The form lets Escape close only such a draft (`NewAutomation.tsx`).
+Nothing was typed into a draft when its name, its prompt, its check and its plain words are all empty, exactly: one blank typed counts as typed. The interval does not count: a draft with the interval unticked, or with another count and unit, and no text is still one nothing was typed into. Neither does the choice of who gets it: a draft kept on this machine with no text is still one nothing was typed into. The form lets Escape close only such a draft (`NewAutomation.tsx`).
 
 ### The command that saves a draft
 
@@ -114,9 +116,9 @@ See the second **Problem** in `## Context`.
 
 #### Business logic
 
-The words after `agent-scheduler`, for a draft that can be saved: `add`, the name, `--prompt=<the prompt>`, then `--every=<the draft's interval>` when the interval is ticked, `--when=<the check>` when there is a check, and `--waits-for=<the plain words>` when there are plain words and a check. The name, the prompt, the check and the plain words each go with their surrounding whitespace removed. Each text is one argument together with its flag, so a prompt that opens with a dash stays the flag's own text. Plain words typed for a check that was then cleared are left out: they say what a check waits for, and there is none. A draft that cannot be saved yet has no such words.
+The words after `agent-scheduler`, for a draft that can be saved: `add`, the name, `--prompt=<the prompt>`, then `--every=<the draft's interval>` when the interval is ticked, `--when=<the check>` when there is a check, `--waits-for=<the plain words>` when there are plain words and a check, and last `--private` when the draft is kept on this machine. The name, the prompt, the check and the plain words each go with their surrounding whitespace removed. Each text is one argument together with its flag, so a prompt that opens with a dash stays the flag's own text. Plain words typed for a check that was then cleared are left out: they say what a check waits for, and there is none. A draft that cannot be saved yet has no such words.
 
-So the form's opening draft with a name and a prompt saves as `add answer-comments --prompt=<prompt> --every=1d`, and one with the interval unticked and a check as `add answer-comments --prompt=<prompt> --when=<check>`.
+So the form's opening draft with a name and a prompt saves as `add answer-comments --prompt=<prompt> --every=1d`, one with the interval unticked and a check as `add answer-comments --prompt=<prompt> --when=<check>`, and the opening draft kept on this machine as `add answer-comments --prompt=<prompt> --every=1d --private`.
 
 ### When a draft would run
 
@@ -157,14 +159,29 @@ The reading is forgiving: an answer that is no object, or whose fields are not w
 
 #### Context
 
-**Problem**: saving writes a file into the person's own checkout, and a scheduled run's checkout is made from the start point [5]. A person who is not told would switch the new page row on and wait for an agent that cannot start.
+**Problem**: saving a shared automation writes a file into the person's own checkout, and a scheduled run's checkout is made from the start point [5]. A person who is not told would switch the new page row on and wait for an agent that cannot start. An automation kept on this machine has no such way to go: a person told to commit it would look for a file git does not show.
 
 See also the last **Problem** in `## Context`.
 
 #### Business logic
 
-What `agent-scheduler add` printed (`../src/cli.ts`) is read as the file it wrote, as a path from the repository root, and where a run's checkout starts, the start point [5] by name. An answer without the file reads as "a skill file", and one without the start point's name as `HEAD`.
+What `agent-scheduler add` printed (`../src/cli.ts`) is read as the file it wrote, as a path from the repository root, where a run's checkout starts, the start point [5] by name, and whether the automation is kept on this machine: it is only when the answer says so, exactly true. An answer without the file reads as "a skill file", and one without the start point's name as `HEAD`.
 
-The sentence that says where the file has to get to follows that name: "Its row cannot start before the file is on <start point>: commit it and bring it there." ("Its row cannot start before the file is on origin/main: commit it and bring it there."), or, for `HEAD`, as in a repository with no remote, "Its row cannot start before you commit the file."
+What the person has to do with the saved automation follows its kind. One kept on this machine: "It is kept on this machine alone: nothing to commit, and nobody else gets the row. Its row can start as soon as you switch it on. Its prompt is in the record of each run, which is shared where this project shares its records.", and the start point is not named. Only the row is this machine's alone: the prompt travels with each run's record, so the person is told. A shared one: "It is a file of yours, in this project, and nothing was committed for you.", followed by the sentence that says where the file has to get to.
+
+That sentence follows the start point's name: "Its row cannot start before the file is on <start point>: commit it and bring it there." ("Its row cannot start before the file is on origin/main: commit it and bring it there."), or, for `HEAD`, as in a repository with no remote, "Its row cannot start before you commit the file."
 
 The sentence that says when the saved automation's page row [6] shows follows whether the project's scheduler is running, which the page tells the form: "Its row shows here once the scheduler has looked, within a minute. It starts switched off." where it is; "The scheduler is not running in this project, so its row does not show yet: it shows once the scheduler runs. It starts switched off." where it is not.
+
+### Where a draft will be saved
+
+#### Context
+
+**User story**: before saving, the user reads under the form what their choice of who gets the automation means for them: a file to commit, or nothing to do.
+
+#### Business logic
+
+The note the form shows beside its buttons follows the draft's choice:
+
+- Shared with the project: "Saved as a skill file in this project, which you commit. The row starts switched off."
+- Kept on this machine: "Kept on this machine alone, outside git. The row starts switched off, and can start as soon as you switch it on."

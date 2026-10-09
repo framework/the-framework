@@ -105,6 +105,7 @@ test('what cannot be saved says why: a name that is no command, no prompt, and a
   assert.equal(automationProblem({ ...ANSWER, name: 'a--b' }), undefined)
   assert.deepEqual(automationProblem({ ...ANSWER, name: 'a'.repeat(MAX_NAME + 1) }), { ok: false, reason: 'bad-name', detail: `a name is ${MAX_NAME} characters at most` })
   assert.deepEqual(automationProblem({ ...ANSWER, prompt: ' \n ' }), { ok: false, reason: 'no-prompt' })
+  assert.deepEqual(automationProblem({ ...ANSWER, prompt: '\0\0' }), { ok: false, reason: 'no-prompt' }, 'a NUL character is no text')
   assert.deepEqual(automationProblem({ name: 'x', prompt: 'p' }), { ok: false, reason: 'bad-schedule', detail: 'neither every nor when says when' })
   assert.deepEqual(automationProblem({ name: 'x', prompt: 'p', every: 'often' }), { ok: false, reason: 'bad-schedule', detail: 'every is a number from 1 to 9999 and a unit, m, h, d, w or mo (15m, 6h, 7d, 2w, 1mo)' })
   assert.deepEqual(automationProblem({ name: 'x', prompt: 'p', every: '1d', waitsFor: 'when it rains' }), { ok: false, reason: 'bad-schedule', detail: 'waits-for says what when waits for, and there is no when' })
@@ -152,11 +153,44 @@ test('a project with no remote and no skills folder yet: the folder is made, and
     assert.deepEqual(await addAutomation(repo, { name: 'daily', prompt: 'Tidy up.', every: '1d' }, git), { ok: true, command: 'daily', file: '.claude/skills/daily/SKILL.md', startsFrom: 'HEAD' })
     assert.deepEqual((await readSchedule(repo)).commands.map(c => c.name), ['daily'])
     // The file cannot be written (a full disk): the save fails, and the folder made for it is taken away again.
-    await assert.rejects(addAutomation(repo, { name: 'weekly', prompt: 'Tidy more.', every: '7d' }, git, async () => Promise.reject(new Error('ENOSPC: no space left on device'))), /ENOSPC/)
+    await assert.rejects(addAutomation(repo, { name: 'weekly', prompt: 'Tidy more.', every: '7d' }, git, { write: async () => Promise.reject(new Error('ENOSPC: no space left on device')) }), /ENOSPC/)
     assert.deepEqual(await readdir(join(repo, '.claude', 'skills')), ['daily'])
     assert.equal((await addAutomation(repo, { name: 'weekly', prompt: 'Tidy more.', every: '7d' }, git)).ok, true, 'and the name is free for the next save')
+    // Kept on this machine, the same: the folder made for the first one is not left empty.
+    await assert.rejects(addAutomation(repo, { name: 'monthly', prompt: 'Tidy most.', every: '1mo' }, git, { onThisMachine: true, write: async () => Promise.reject(new Error('ENOSPC: no space left on device')) }), /ENOSPC/)
+    assert.deepEqual(await readdir(join(repo, '.agent-scheduler')).catch(() => 'no folder'), [], 'the tool\'s folder is there, hidden, with nothing in it')
   } finally {
     await rm(repo, RETRIED_RM)
+  }
+})
+
+test('kept on this machine alone, an automation is one file in the tool\'s own folder, hidden from git, and the project schedules it at once with its text as what a run is sent; a name taken by a skill or by another automation, shared or kept here, is refused both ways', async () => {
+  const repo = await testRepo()
+  try {
+    const kept = await addAutomation(repo, ANSWER, git, { onThisMachine: true })
+    assert.deepEqual(kept, { ok: true, command: 'answer-comments', file: '.agent-scheduler/automations/answer-comments.md', startsFrom: 'origin/main', onThisMachine: true })
+    assert.equal(await readFile(join(repo, '.agent-scheduler', 'automations', 'answer-comments.md'), 'utf8'), automationSkill(ANSWER), 'written like a skill\'s file')
+    assert.equal((await git(['status', '--porcelain'], repo)).trim(), '', 'nothing of it shows in git: the folder is hidden before the file is written')
+    assert.deepEqual((await readSchedule(repo)).commands.map(c => [c.name, c.dir, c.when, c.text]), [['answer-comments', '.agent-scheduler/automations', CHECK, 'Answer: each new comment below.\n\nBe short.']])
+    // The name is taken now, for one kept here and for one shared, whatever the capitals of the file there.
+    assert.deepEqual(await addAutomation(repo, { ...ANSWER, prompt: 'Other.' }, git, { onThisMachine: true }), { ok: false, reason: 'taken', folder: '.agent-scheduler/automations/answer-comments.md' })
+    assert.deepEqual(await addAutomation(repo, { ...ANSWER, prompt: 'Other.' }, git), { ok: false, reason: 'taken', folder: '.agent-scheduler/automations/answer-comments.md' })
+    await writeFile(join(repo, '.agent-scheduler', 'automations', 'Loud.md'), 'x')
+    assert.deepEqual(await addAutomation(repo, { ...ANSWER, name: 'loud' }, git), { ok: false, reason: 'taken', folder: '.agent-scheduler/automations/Loud.md' })
+    // A skill of the project keeps its name from an automation kept here too.
+    assert.deepEqual(await addAutomation(repo, { ...ANSWER, name: 'work-queue' }, git, { onThisMachine: true }), { ok: false, reason: 'taken', folder: '.claude/skills/work-queue' })
+    // And a shared one keeps its name from one kept here.
+    assert.equal((await addAutomation(repo, { name: 'shared-one', prompt: 'p', every: '1d' }, git)).ok, true)
+    assert.deepEqual(await addAutomation(repo, { name: 'shared-one', prompt: 'p', every: '1d' }, git, { onThisMachine: true }), { ok: false, reason: 'taken', folder: '.claude/skills/shared-one' })
+    // What cannot be saved is refused here as there, and writes nothing.
+    assert.deepEqual(await addAutomation(repo, { name: 'never', prompt: 'p' }, git, { onThisMachine: true }), { ok: false, reason: 'bad-schedule', detail: 'neither every nor when says when' })
+    // A text longer than a run can be handed is refused before it is saved; shared, it is a skill's text and has no such limit.
+    assert.deepEqual(await addAutomation(repo, { name: 'endless', prompt: 'x'.repeat(32_001), every: '1d' }, git, { onThisMachine: true }), { ok: false, reason: 'long-prompt', detail: 'the prompt is 32001 characters, and one kept on this machine has 32000 at most' })
+    assert.equal((await addAutomation(repo, { name: 'longest', prompt: 'x'.repeat(32_000), every: '1d' }, git, { onThisMachine: true })).ok, true)
+    await rm(join(repo, '.agent-scheduler', 'automations', 'longest.md'))
+    assert.deepEqual((await readdir(join(repo, '.agent-scheduler', 'automations'))).sort(), ['Loud.md', 'answer-comments.md'])
+  } finally {
+    await removeRepo(repo)
   }
 })
 

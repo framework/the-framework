@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { readFile, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cleanup } from './cleanup.js'
 import { runCli } from './cli.js'
@@ -72,6 +72,29 @@ test('a file of the person\'s own in the directory stays with it; the tool\'s tw
       kept: [{ path: `${STATE_DIR}/notes.txt`, reason: 'not made by agent-scheduler' }],
     })
     assert.match(await excludeOf(repo), /^\/\.agent-scheduler$/m)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('the automations a person keeps on this machine stay, with the directory and its rule: they are the person\'s own writing and exist nowhere else, and the answer says so', async () => {
+  const repo = await testRepo()
+  try {
+    await ran(repo)
+    await mkdir(join(repo, STATE_DIR, 'automations'))
+    await writeFile(join(repo, STATE_DIR, 'automations', 'answer-comments.md'), '---\nschedule:\n  every: 1d\n---\nAnswer.\n')
+    assert.deepEqual(await cleanup(repo), {
+      ok: true,
+      removed: [`${STATE_DIR}/${SCHEDULER_LOG}`, `${STATE_DIR}/state.json`],
+      kept: [{ path: `${STATE_DIR}/automations`, reason: 'your own automations, kept on this machine alone: remove the folder by hand to delete them' }],
+    })
+    assert.equal(await readFile(join(repo, STATE_DIR, 'automations', 'answer-comments.md'), 'utf8'), '---\nschedule:\n  every: 1d\n---\nAnswer.\n')
+    assert.match(await excludeOf(repo), /^\/\.agent-scheduler$/m)
+    // The person deletes their automations by hand: the folder is empty, and now everything goes.
+    await rm(join(repo, STATE_DIR, 'automations', 'answer-comments.md'))
+    assert.deepEqual(await cleanup(repo), { ok: true, removed: [STATE_DIR], kept: [] })
+    assert.equal(await exists(join(repo, STATE_DIR)), false)
+    assert.doesNotMatch(await excludeOf(repo), /agent-scheduler/)
   } finally {
     await removeRepo(repo)
   }

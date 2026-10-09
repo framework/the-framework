@@ -37,7 +37,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   nothing machine-wide is left for it to hold.
 
 ## The schedule and the state
-- The schedule is the project's skills. A skill brings its scheduled command in the front
+- The schedule is the project's skills, and the automations a person keeps on their own
+  machine. A skill brings its scheduled command in the front
   matter of its `SKILL.md`, under `schedule`: its check, its pace, how many agents may run
   it at once, and one plain line saying what the check waits for. Picked over
   `agent-schedule.md`, a tracked file at the repository root that a person wrote, one line
@@ -97,10 +98,12 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   starts another agent only while fewer than its person's number are working, counting the
   agents of every machine that shares the repository. Picked over the number being the
   skill's alone, where letting two agents work on one machine meant editing a tracked file.
-- A person may save a prompt of their own from the Automations page. It becomes a command
-  skill of the project, a file the person commits, with a row like any skill's that starts
-  switched off. Picked over a kind of row of its own that the tool would keep: the tool
-  still names no command, and what runs still comes from the project's skills.
+- A person may save a prompt of their own from the Automations page, and chooses who gets
+  it. Shared, it becomes a command skill of the project, a file the person commits, with a
+  row like any skill's. Kept on their machine, it is a file in the tool's own folder,
+  hidden from git: nobody else gets the row, nothing is to commit, and it can start at
+  once. Either way the row starts switched off. Picked over one kind alone: a shared one
+  needs a commit and reaches everyone, a private one neither.
 - The state, `.agent-scheduler/state.json`, untracked, per user, hidden through git's
   exclude file the way `.branches/` is: on or off, keep-alive, the model, the spend
   cushion, this machine's switches, paces, numbers of agents and publish picks, the

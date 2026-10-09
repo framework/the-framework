@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseInterval } from './pace.js'
-import { checkFound, commandPrompt, FOUND_OPENING, isDue, lastRunValue, promptCommand, readSchedule, skillSchedule } from './schedule.js'
+import { checkFound, commandPrompt, FOUND_OPENING, isDue, lastRunValue, promptCommand, readSchedule, skillSchedule, FOUND_OPENING_OWN, ownAttached, skillText } from './schedule.js'
 import { FOUND_MAX } from './names.js'
 
 const CLAUDE = '.claude/skills'
@@ -61,15 +61,17 @@ test('a skill with several modes lists one row per mode, each with the word the 
   assert.deepEqual(read('triage', skill('triage', 'schedule:\n  word: quick\n  every: 6h\n')).commands.map(c => c.name), ['triage quick'])
   assert.deepEqual(read('triage', skill('triage', 'schedule:\n  - every: 1d\n  - word: quick\n    every: 6h\n')).commands.map(c => c.name), ['triage', 'triage quick'])
 
-  assert.equal(commandPrompt('triage quick'), '/triage quick')
-  // A person's prompt is filed under the command it names, else under its first word.
+  assert.equal(commandPrompt({ name: 'triage quick' }), '/triage quick')
+  // A person's prompt is filed under the scheduled command it names with a slash, else under the one its first word is; under none when it names none.
   assert.equal(promptCommand('/triage quick', schedule), 'triage quick')
   assert.equal(promptCommand('/triage consensual', schedule), 'triage consensual')
-  assert.equal(promptCommand('/triage', schedule), 'triage')
-  assert.equal(promptCommand('/triage quick', { commands: [], unreadable: [] }), 'triage')
-  assert.equal(promptCommand('/work-queue now', schedule), 'work-queue')
-  assert.equal(promptCommand('Read the docs', schedule), 'Read')
   assert.equal(promptCommand('  /triage quick  ', schedule), 'triage quick')
+  assert.equal(promptCommand('/triage', schedule), undefined, 'the skill alone is no command when each of its rows has a word')
+  assert.equal(promptCommand('/triage quick', { commands: [], unreadable: [] }), undefined)
+  assert.equal(promptCommand('Read the docs', schedule), undefined)
+  assert.equal(promptCommand('triage quick', schedule), undefined, 'no slash: no skill\'s command')
+  const withQueue = { commands: [...schedule.commands, { name: 'work-queue', cap: 1, dir: '.claude/skills' }], unreadable: [] }
+  assert.equal(promptCommand('/work-queue now', withQueue), 'work-queue')
 })
 
 test('a schedule the reader cannot read gives no command and says why, the row named when there are several', () => {
@@ -160,8 +162,94 @@ test('due is a check whose JSON is not empty; a non-JSON answer is due by its te
   assert.equal(isDue('three entries'), true)
 })
 
-test("a command's prompt is its slash command", () => {
-  assert.equal(commandPrompt('work-queue'), '/work-queue')
+test("a command's prompt is its slash command; an automation kept on this machine has its name as its prompt, with no slash, and its text is handed over with it, before what its check printed", () => {
+  assert.equal(commandPrompt({ name: 'work-queue' }), '/work-queue')
+  const text = 'Answer each new comment below.\n\n- Be short.'
+  const own = { name: 'answer-comments', text, cap: 1, dir: '.agent-scheduler/automations' }
+  assert.equal(commandPrompt(own), 'answer-comments')
+  assert.equal(ownAttached(text), text, 'started by its pace alone: its text, and nothing after it')
+  assert.equal(ownAttached(text, { stdout: '\n[{"url":"u"}]\n', lastRun: '2026-10-09T10:00:00Z' }), `${text}\n\n${FOUND_OPENING_OWN}\n[{"url":"u"}]`)
+  assert.equal(FOUND_OPENING_OWN, 'The scheduler starts this when its check prints something, and this time the check printed what is below. It says why this run started; what the work is, the text above says.')
+  // A run is counted by its prompt, which is the name and nothing else: whatever the text says, and however it changes.
+  const schedule = { commands: [{ name: 'work-queue', cap: 1, dir: '.claude/skills' }, own], unreadable: [] }
+  assert.equal(promptCommand('answer-comments', schedule), 'answer-comments')
+  assert.equal(promptCommand(' answer-comments\n', schedule), 'answer-comments')
+  assert.equal(promptCommand('/work-queue', schedule), 'work-queue')
+  // The text itself, a prompt that only starts with the name, and the name typed as a command are no runs of the automation.
+  assert.equal(promptCommand(text, schedule), undefined)
+  assert.equal(promptCommand('answer-comments is broken, fix it', schedule), undefined)
+  assert.equal(promptCommand('/answer-comments', schedule), undefined)
+  // And a skill's command typed with no slash is no run of the skill's.
+  assert.equal(promptCommand('work-queue', schedule), undefined)
+})
+
+test('the text of a skill file is what follows its front matter, wherever the reader of the schedule ends it: a closing line with blanks after its dashes, Windows line ends, a rule of dashes further down; NUL characters are dropped', () => {
+  assert.equal(skillText('---\nname: x\n---\n\nDo it.\n'), 'Do it.')
+  assert.equal(skillText('---\nname: x\n--- \n\nPart one.\n\n---\n\nPart two.\n'), 'Part one.\n\n---\n\nPart two.')
+  assert.equal(skillText('---\r\nname: x\r\n---\r\n\r\nDo it.\r\nTwice.\r\n'), 'Do it.\r\nTwice.')
+  assert.equal(skillText('No front matter.\n'), 'No front matter.')
+  assert.equal(skillText('---\nname: x\n---\nDo\0 it.'), 'Do it.')
+  assert.equal(skillText('---\nname: x\n---'), '')
+})
+
+test("the automations a person keeps on this machine are read after the skills, in name order, each one file whose text is what a run is handed; one that cannot be listed is named with why, and one named like a skill of the project takes that skill's commands off the list too", async () => {
+  const repo = await mkdtemp(join(tmpdir(), 'scheduler-own-'))
+  try {
+    const own = join(repo, '.agent-scheduler', 'automations')
+    await mkdir(own, { recursive: true })
+    for (const [name, front] of [['work-queue', 'schedule:\n  when: npx queue\n'], ['triage', 'schedule:\n  - word: quick\n    every: 6h\n  - word: consensual\n    every: 7d\n'], ['update-tickets', 'schedule:\n  every: 15m\n']] as const) {
+      await mkdir(join(repo, '.claude', 'skills', name), { recursive: true })
+      await writeFile(join(repo, '.claude', 'skills', name, 'SKILL.md'), skill(name, front))
+    }
+    await mkdir(join(repo, '.claude', 'skills', 'plan'), { recursive: true })
+    await writeFile(join(repo, '.claude', 'skills', 'plan', 'SKILL.md'), '---\nname: plan\n---\nPlan.\n')
+    const file = (name: string, front: string, text = 'Do the job.') => writeFile(join(own, `${name}.md`), `---\nname: ${name}\ndescription: "What it does."\ndisable-model-invocation: true\n${front}---\n\n${text}\n`)
+    await file('watch-competitor', 'schedule:\n  every: 1h\n', '/look for threads.\n\n---\n- Tell me.')
+    await file('answer-comments', 'schedule:\n  when: gh api comments\n  waits-for: when someone commented\n')
+    // Named like a scheduled skill: neither it nor the skill's commands are listed, so the skill does not start on the automation's switch.
+    await file('work-queue', 'schedule:\n  every: 1d\n')
+    await file('triage', 'schedule:\n  every: 1d\n')
+    // Named like a skill that schedules nothing: only the automation is left out.
+    await file('plan', 'schedule:\n  every: 1d\n')
+    await file('two-rows', 'schedule:\n  - every: 1d\n  - word: fast\n    every: 1h\n')
+    await file('worded', 'schedule:\n  word: fast\n  every: 1h\n')
+    await file('typo', 'schedule:\n  evry: 1h\n')
+    await file('wordless', 'schedule:\n  every: 1h\n', ' ')
+    await file('unscheduled', '')
+    await file('endless', 'schedule:\n  every: 1h\n', 'x'.repeat(32_001))
+    await file('longest', 'schedule:\n  every: 1h\n', 'x'.repeat(32_000))
+    // Not an automation's file: another ending.
+    await writeFile(join(own, 'notes.txt'), 'x')
+    // Files that are there and cannot be listed are named too: a name no command has, a folder, a link that leads nowhere.
+    await writeFile(join(own, 'Loud Name.md'), '---\nschedule:\n  every: 1h\n---\nx\n')
+    await mkdir(join(own, 'a-folder.md'))
+    await symlink('nowhere.md', join(own, 'dangling.md'))
+    const schedule = await readSchedule(repo)
+    assert.deepEqual(schedule.commands, [
+      { name: 'update-tickets', every: { count: 15, unit: 'm', ms: 900_000, text: '15m' }, cap: 1, dir: '.claude/skills' },
+      { name: 'answer-comments', when: 'gh api comments', waitsFor: 'when someone commented', cap: 1, dir: '.agent-scheduler/automations', description: 'What it does.', text: 'Do the job.' },
+      { name: 'longest', every: { count: 1, unit: 'h', ms: 3_600_000, text: '1h' }, cap: 1, dir: '.agent-scheduler/automations', description: 'What it does.', text: 'x'.repeat(32_000) },
+      { name: 'watch-competitor', every: { count: 1, unit: 'h', ms: 3_600_000, text: '1h' }, cap: 1, dir: '.agent-scheduler/automations', description: 'What it does.', text: '/look for threads.\n\n---\n- Tell me.' },
+    ])
+    assert.deepEqual(schedule.unreadable, [
+      { skill: 'Loud Name', reason: 'its file is named with something other than lower-case letters, digits and dashes', own: true },
+      { skill: 'a-folder', reason: 'its file cannot be read', own: true },
+      { skill: 'dangling', reason: 'its file cannot be read', own: true },
+      { skill: 'endless', reason: 'its text is 32001 characters, and 32000 is the most', own: true },
+      { skill: 'plan', reason: 'a skill of the project has this name too: rename or remove .agent-scheduler/automations/plan.md, then switch on what you want', own: true },
+      { skill: 'triage', reason: 'a skill of the project has this name too, so neither is listed: rename or remove .agent-scheduler/automations/triage.md, then switch on what you want', own: true },
+      { skill: 'two-rows', reason: 'it has one row, with no word', own: true },
+      { skill: 'typo', reason: 'unknown key evry', own: true },
+      { skill: 'unscheduled', reason: 'it has no schedule', own: true },
+      { skill: 'worded', reason: 'it has one row, with no word', own: true },
+      { skill: 'wordless', reason: 'it has no text after its front matter', own: true },
+      { skill: 'work-queue', reason: 'a skill of the project has this name too, so neither is listed: rename or remove .agent-scheduler/automations/work-queue.md, then switch on what you want', own: true },
+    ])
+    // The names two things have: this machine's picks under them are taken back.
+    assert.deepEqual(schedule.clashes, ['plan', 'triage', 'work-queue'])
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
 })
 
 /** The time the check was given, which a cut output names. */

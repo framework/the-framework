@@ -5,7 +5,7 @@ import type { RunCard } from '@openagt/skill-logs'
 import { LAST_RUN_ENV, RUN_SKILLS_DIR } from './names.js'
 import { dueFrom, localStamp, paceInForce, paceText } from './pace.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
-import { checkFound, commandPrompt, isDue, lastRunValue, skillFile, type Schedule, type ScheduledCommand } from './schedule.js'
+import { checkFound, commandPrompt, isDue, lastRunValue, ownAttached, skillFile, type Schedule, type ScheduledCommand } from './schedule.js'
 import type { StartPoint } from './start-point.js'
 import { capInForce, publishInForce, switchedOnAt, type ListedCommand, type State, type TickDecision, type TickRecord } from './state.js'
 
@@ -63,7 +63,7 @@ export interface TickDeps {
 export async function tick(deps: TickDeps): Promise<TickRecord> {
   const at = deps.now().toISOString()
   // A schedule that cannot be read is named on every tick, on or off: nothing else says why a skill's commands are missing.
-  const unreadable = deps.schedule.unreadable.map(({ skill, reason }): TickDecision => ({ command: skill, outcome: `unreadable schedule: ${reason}` }))
+  const unreadable = deps.schedule.unreadable.map(({ skill, reason, own }): TickDecision => ({ command: skill, outcome: `${own ? 'unlisted automation' : 'unreadable schedule'}: ${reason}` }))
   const record: TickRecord = { at, decisions: unreadable, schedule: deps.schedule.commands.map(listed) }
   const pulled = await deps.pull()
   if (!pulled.ok) return { ...record, note: `agent-data could not be pulled: ${pulled.error}` }
@@ -77,7 +77,8 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     const decide = (outcome: string, run?: string): void => {
       record.decisions.push({ command: command.name, outcome, ...(run ? { run } : {}) })
     }
-    if (command.dir !== RUN_SKILLS_DIR) {
+    // An automation kept on this machine is no skill: a run is handed its text, so no folder and no commit has to hold it.
+    if (command.text === undefined && command.dir !== RUN_SKILLS_DIR) {
       decide(`not a command of the coding agent: its skill is only under ${command.dir}, not ${RUN_SKILLS_DIR}`)
       continue
     }
@@ -102,7 +103,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       }
     }
     // What the check printed, handed to the run it starts: a command its pace alone starts has none.
-    let found: string | undefined
+    let found: { stdout: string; lastRun: string } | undefined
     if (command.when !== undefined) {
       // What is new for the check: since its command last started, or since it was switched on here when that is later.
       const since = lastRunValue(last !== undefined && Date.parse(last) > Date.parse(switchedOn) ? last : switchedOn)
@@ -115,7 +116,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
         decide('not due')
         continue
       }
-      found = checkFound(checked.stdout, since)
+      found = { stdout: checked.stdout, lastRun: since }
     }
     // The cap in force: this machine's number for the command, else the skill's, held against every machine's runs.
     const cap = capInForce(deps.state, command)
@@ -126,10 +127,12 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     }
     // A run's checkout starts from the project's published commit, not from the files here: a skill
     // that is not there is no command to the agent. Asked only now, when a run would start: it fetches.
-    const start = await deps.atStart(skillFile(command))
-    if (!start.there) {
-      decide(`not on ${start.ref}${start.reached ? '' : ' as this clone last saw it'}: a run's checkout starts from ${start.ref}, and the command's skill is not there`)
-      continue
+    if (command.text === undefined) {
+      const start = await deps.atStart(skillFile(command))
+      if (!start.there) {
+        decide(`not on ${start.ref}${start.reached ? '' : ' as this clone last saw it'}: a run's checkout starts from ${start.ref}, and the command's skill is not there`)
+        continue
+      }
     }
     // Both read once per tick, and only now: each spawns the agent's CLI.
     readiness ??= await deps.ready()
@@ -148,7 +151,9 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       continue
     }
     const id = deps.mint()
-    const prompt = commandPrompt(command.name)
+    const prompt = commandPrompt(command)
+    // A skill's run is handed what its check found; an automation kept on this machine, its text first.
+    const attached = command.text !== undefined ? ownAttached(command.text, found) : found ? checkFound(found.stdout, found.lastRun) : undefined
     // The publish level in force, this machine's pick, goes on the marker and to the run: the agent is told it after its prompt.
     const level = publishInForce(deps.state, command.name)
     const publish = level !== undefined ? { publish: level } : {}
@@ -171,7 +176,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
       continue
     }
     try {
-      await deps.spawn({ id, prompt, startedAt: now.toISOString(), model: deps.state.model, ...publish, ...(found !== undefined ? { attached: found } : {}) })
+      await deps.spawn({ id, prompt, startedAt: now.toISOString(), model: deps.state.model, ...publish, ...(attached !== undefined ? { attached } : {}) })
       decide(`started ${id}`, id)
     } catch (err) {
       decide(`could not start: ${err instanceof Error ? err.message : String(err)}`)
@@ -182,7 +187,7 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
 
 /** A command as a dashboard lists it: what its skill says, not this machine's switch or publish pick, which the state carries. */
 function listed(command: ScheduledCommand): ListedCommand {
-  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}), ...(command.cap > 1 ? { agents: command.cap } : {}) }
+  return { command: command.name, ...(command.every ? { every: command.every.text } : {}), ...(command.when !== undefined ? { when: command.when } : {}), ...(command.waitsFor !== undefined ? { waitsFor: command.waitsFor } : {}), ...(command.description !== undefined ? { description: command.description } : {}), ...(command.cap > 1 ? { agents: command.cap } : {}), ...(command.text !== undefined ? { onThisMachine: true as const } : {}) }
 }
 
 /** An age for a decision line: `less than a minute`, `12m`, `3h`, `2d`, floored. */

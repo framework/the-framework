@@ -4,7 +4,7 @@ import type { DriverQuota } from '@openagt/agent-driver'
 import type { RunCard } from '@openagt/skill-logs'
 import { DEFAULT_STATE, type State } from './state.js'
 import { parseInterval, type Interval } from './pace.js'
-import { FOUND_OPENING, type ScheduledCommand } from './schedule.js'
+import { FOUND_OPENING, FOUND_OPENING_OWN, type ScheduledCommand } from './schedule.js'
 import { runCheck, tick, type TickDeps } from './tick.js'
 
 // The tick's decisions with every reading injected: what it reads, in which order, and the one
@@ -64,7 +64,8 @@ function deps(over: Partial<TickDeps> & { stateOver?: Partial<State>; commands?:
       return { ok: true, stdout: '["one entry"]', stderr: '' }
     },
     lastStart: async () => undefined,
-    inFlight: async command => [...cards, ...seen.markers].filter(c => c.status === 'running' && c.intent === `/${command}`),
+    // A run counts for the command its prompt names: a skill's with its slash, an automation's kept on this machine without.
+    inFlight: async command => [...cards, ...seen.markers].filter(c => c.status === 'running' && (c.intent === `/${command}` || c.intent === command)),
     ready: async () => ({ problems: [], warnings: [] }),
     quota: async () => quota(10),
     mint: () => `2026-09-16T14-01-00-00${ids++}Z`,
@@ -203,6 +204,39 @@ test("a skill that is missing where a run's checkout starts says how the start p
   // Origin not reached and the skill there as last seen: the run starts, and its own fetch decides.
   const stale = deps({ commands: [command('answer-comments')], atStart: async () => ({ ref: 'origin/main', reached: false, there: true }) })
   assert.match((await tick(stale.deps)).decisions[0]!.outcome, /^started /)
+})
+
+test("an automation kept on this machine starts like any command: its run's prompt is its name, and it is handed its text, then what its check printed; no skill folder is asked for, and nothing is asked of where a run's checkout starts; the tick lists it as this machine's", async () => {
+  const text = '/answer each new comment below.\n\n- Be short.'
+  const own = { dir: '.agent-scheduler/automations', text, description: 'Answer each new comment below.' }
+  const commands = [command('answer-comments', { when: 'gh api comments', ...own }), command('daily-notes', { every: every('1d'), ...own }), command('work-queue')]
+  const { deps: d, seen } = deps({ commands, atStart: async file => (file === '.claude/skills/work-queue/SKILL.md' ? { ref: 'origin/main', reached: true, there: true } : assert.fail(`asked where ${file} is`)) })
+  const record = await tick(d)
+  assert.deepEqual(record.decisions.map(d => [d.command, d.outcome.replace(/^started .*/, 'started')]), [['answer-comments', 'started'], ['daily-notes', 'started'], ['work-queue', 'started']])
+  assert.deepEqual(seen.spawned.map(s => [s.prompt, s.attached]), [
+    ['answer-comments', `${text}\n\n${FOUND_OPENING_OWN}\n["one entry"]`],
+    // Started by its pace alone: its text, and nothing of a check.
+    ['daily-notes', text],
+    ['/work-queue', `${FOUND_OPENING}\n["one entry"]`],
+  ])
+  assert.equal(seen.markers[0]!.intent, 'answer-comments', 'its record holds its name, which is what its runs are counted by')
+  assert.deepEqual(record.schedule, [
+    { command: 'answer-comments', when: 'gh api comments', description: 'Answer each new comment below.', onThisMachine: true },
+    { command: 'daily-notes', every: '1d', description: 'Answer each new comment below.', onThisMachine: true },
+    { command: 'work-queue', when: 'npx queue' },
+  ])
+  // Its own run in flight counts against its number at once, like a skill's.
+  const again = await tick({ ...d, mint: () => '2026-09-16T14-02-00-000Z' })
+  assert.match(again.decisions[0]!.outcome, /^cap reached \(1 in flight/)
+})
+
+test('an automation kept on this machine that is not listed is named apart from a skill whose schedule cannot be read', async () => {
+  const { deps: d } = deps({ commands: [] })
+  d.schedule = { commands: [], unreadable: [{ skill: 'triage', reason: 'unknown key evry' }, { skill: 'plan', reason: 'it has no schedule', own: true }] }
+  assert.deepEqual((await tick(d)).decisions, [
+    { command: 'triage', outcome: 'unreadable schedule: unknown key evry' },
+    { command: 'plan', outcome: 'unlisted automation: it has no schedule' },
+  ])
 })
 
 test('a check is given the time its command last started, to the whole second, or the time it was switched on on this machine when that is later or it never started', async () => {

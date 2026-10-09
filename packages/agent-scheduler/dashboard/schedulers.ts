@@ -44,14 +44,27 @@ export interface SchedulerCommand {
   agents?: number
   /** What the command's skill does, in the skill's own words, when it says. */
   description?: string
+  /** Whether the command is an automation the person keeps on this machine alone, not a skill of the project. */
+  onThisMachine?: true
   /** What the scheduler's last tick decided for the command, when it decided anything. */
   decision?: TickDecision
 }
 
-/** A skill of the project whose `schedule` the scheduler could not read, with why: its commands are missing from the list. */
+/** A row's name as the page writes it: the command with its slash, as a person types it; an automation kept on this machine is no command to type, so its name alone. */
+export function rowTitle(command: Pick<SchedulerCommand, 'command' | 'onThisMachine'>): string {
+  return command.onThisMachine ? command.command : `/${command.command}`
+}
+
+/** A skill of the project whose `schedule` the scheduler could not read, with why: its commands are missing from the list. Marked `own`, an automation kept on this machine that is not listed. */
 export interface UnreadableSchedule {
   skill: string
   reason: string
+  own?: true
+}
+
+/** What the page says of something the scheduler could not list, in a sentence. */
+export function unlistedWords(unreadable: UnreadableSchedule): string {
+  return unreadable.own ? `The automation ${unreadable.skill}, kept on this machine, is not listed: ${unreadable.reason}` : `The schedule of the ${unreadable.skill} skill cannot be read, so it is not listed: ${unreadable.reason}`
 }
 
 /** One project's scheduler, as its `status` answered. */
@@ -94,6 +107,9 @@ function record(value: unknown): Record<string, unknown> {
 /** What a tick says of a skill whose `schedule` it could not read, before the reason. */
 const UNREADABLE = 'unreadable schedule: '
 
+/** What a tick says of an automation kept on this machine that it does not list, before the reason. */
+const UNLISTED = 'unlisted automation: '
+
 /** A project's row from what `status` printed: each scheduled command with this machine's switch and publish pick and the last tick's decision folded in, and the skills the tick could not read. */
 export function schedulerRow(project: ModuleProject, output: unknown): SchedulerRow {
   const state = record(output)
@@ -114,7 +130,8 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
     const command = row['command']
     if (typeof command !== 'string') continue
     const picked = publishes[command]
-    const decision = decisions.find(d => d.command === command)
+    // A line that says something is not listed is no decision of a command, though it may carry a command's name.
+    const decision = decisions.find(d => d.command === command && !d.outcome.startsWith(UNREADABLE) && !d.outcome.startsWith(UNLISTED))
     commands.push({
       command,
       ...(typeof row['every'] === 'string' ? { every: row['every'] } : {}),
@@ -126,6 +143,7 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
       ...(isAgents(row['agents']) && row['agents'] > 1 ? { skillAgents: row['agents'] } : {}),
       ...(isAgents(agents[command]) ? { agents: agents[command] } : {}),
       ...(typeof row['description'] === 'string' ? { description: row['description'] } : {}),
+      ...(row['onThisMachine'] === true ? { onThisMachine: true as const } : {}),
       ...(decision ? { decision } : {}),
     })
   }
@@ -139,7 +157,7 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
     ...(typeof offset === 'number' && Number.isFinite(offset) ? { spendOffset: offset } : {}),
     ...(typeof tick['at'] === 'string' ? { lastTick: { at: tick['at'], decisions, ...(typeof tick['note'] === 'string' ? { note: tick['note'] } : {}) } } : {}),
     commands,
-    unreadable: decisions.flatMap(d => (d.outcome.startsWith(UNREADABLE) ? [{ skill: d.command, reason: d.outcome.slice(UNREADABLE.length) }] : [])),
+    unreadable: decisions.flatMap((d): UnreadableSchedule[] => (d.outcome.startsWith(UNREADABLE) ? [{ skill: d.command, reason: d.outcome.slice(UNREADABLE.length) }] : d.outcome.startsWith(UNLISTED) ? [{ skill: d.command, reason: d.outcome.slice(UNLISTED.length), own: true }] : [])),
   }
 }
 

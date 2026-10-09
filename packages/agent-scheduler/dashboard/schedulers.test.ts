@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { STATUS, hostAnswering } from './fixtures.js'
-import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, saysAtOnce, decided, draftOf, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withAgentsDraft, withDraft } from './schedulers.js'
+import { agentsArgs, agentsDraftOf, atOnce, atOnceWords, saysAtOnce, decided, draftOf, loosestSpendOffset, nextWords, offsetsThatDiffer, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, saveSpendOffset, schedulerRow, schedulerStatus, spelled, typedOffset, withAgentsDraft, withDraft, rowTitle, unlistedWords } from './schedulers.js'
 
 const GEMSTACK = { id: 'p1', name: 'gemstack', gitHost: true }
 const OTHER = { id: 'p2', name: 'other', gitHost: false }
@@ -31,6 +31,39 @@ describe('a scheduler row, from what status printed', () => {
     })
     expect(row.unreadable).toEqual([{ skill: 'triage', reason: 'row 2: unknown key evry' }])
     expect(row.commands.map(c => c.decision?.outcome)).toEqual(['started 2026-10-03T10-00-00-000Z', 'switched off on this machine'])
+  })
+
+  test("a command the tick lists as this machine's is an automation kept here: its row is named without a slash, since nobody types it as a command", () => {
+    const row = schedulerRow(GEMSTACK, { on: true, running: true, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], schedule: [{ command: 'answer-comments', when: 'gh api comments', onThisMachine: true }, { command: 'work-queue', when: 'npx queue', onThisMachine: 'yes' }] } })
+    expect(row.commands.map(c => [c.command, c.onThisMachine, rowTitle(c)])).toEqual([
+      ['answer-comments', true, 'answer-comments'],
+      ['work-queue', undefined, '/work-queue'],
+    ])
+  })
+
+  test('what the tick could not list: a skill whose schedule it could not read, and an automation kept on this machine, each said in its own words; such a line is no decision of a command of that name', () => {
+    const row = schedulerRow(GEMSTACK, {
+      on: true,
+      running: true,
+      lastTick: {
+        at: '2026-10-03T10:00:00.000Z',
+        decisions: [
+          { command: 'triage', outcome: 'unreadable schedule: unknown key evry' },
+          { command: 'plan', outcome: 'unlisted automation: a skill of the project has this name too: rename or remove .agent-scheduler/automations/plan.md, then switch on what you want' },
+          { command: 'plan', outcome: 'started 2026-10-03T10-00-00-000Z', run: '2026-10-03T10-00-00-000Z' },
+        ],
+        schedule: [{ command: 'plan', every: '1d' }],
+      },
+    })
+    expect(row.unreadable).toEqual([
+      { skill: 'triage', reason: 'unknown key evry' },
+      { skill: 'plan', reason: 'a skill of the project has this name too: rename or remove .agent-scheduler/automations/plan.md, then switch on what you want', own: true },
+    ])
+    expect(row.unreadable.map(unlistedWords)).toEqual([
+      'The schedule of the triage skill cannot be read, so it is not listed: unknown key evry',
+      'The automation plan, kept on this machine, is not listed: a skill of the project has this name too: rename or remove .agent-scheduler/automations/plan.md, then switch on what you want',
+    ])
+    expect(row.commands[0]!.decision).toEqual({ command: 'plan', outcome: 'started 2026-10-03T10-00-00-000Z', run: '2026-10-03T10-00-00-000Z' })
   })
 
   test('a scheduler that never ticked lists no command; a field that is not what the command promises reads as absent', () => {

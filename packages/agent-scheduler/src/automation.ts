@@ -1,8 +1,8 @@
 import { mkdir, readdir, rmdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { originDefaultBranch, type GitRunner } from '@openagt/agent-data'
+import { excludeFromGit, originDefaultBranch, type GitRunner } from '@openagt/agent-data'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
-import { MAX_NAME, RUN_SKILLS_DIR, SKILL_FILE, TRY_TIMEOUT_MS, isCommandName } from './names.js'
+import { MAX_NAME, OWN_AUTOMATIONS_DIR, OWN_TEXT_MAX, RUN_SKILLS_DIR, SKILL_FILE, STATE_DIR, TRY_TIMEOUT_MS, isCommandName } from './names.js'
 import { foundOutput, isDue, lastRunValue, skillSchedule } from './schedule.js'
 import { runCheck } from './tick.js'
 
@@ -12,9 +12,11 @@ import { runCheck } from './tick.js'
  * prompt; its front matter makes it a command (`disable-model-invocation`) and carries the
  * `schedule` the person picked: a pace, a check, or both.
  *
- * It is a file in the person's checkout, in the folder the coding agent that runs scheduled
- * commands reads. Like any skill a person writes there, it is no command to a run until it is on
- * the commit a run's checkout starts from: the person commits it and brings it there.
+ * Shared with the project, it is a file in the person's checkout, in the folder the coding agent
+ * that runs scheduled commands reads. Like any skill a person writes there, it is no command to a
+ * run until it is on the commit a run's checkout starts from: the person commits it and brings it
+ * there. Kept on this machine alone, it is the same file in the tool's own folder, and a run is
+ * handed its text with a prompt that is the automation's name.
  */
 
 /** An automation as a person fills it in. */
@@ -37,6 +39,7 @@ const DESCRIPTION_MAX = 150
 export type AddRefusal =
   | { ok: false; reason: 'bad-name'; detail: string }
   | { ok: false; reason: 'no-prompt' }
+  | { ok: false; reason: 'long-prompt'; detail: string }
   | { ok: false; reason: 'bad-schedule'; detail: string }
   | { ok: false; reason: 'taken'; folder: string }
 
@@ -49,7 +52,8 @@ export type AddRefusal =
 export function automationProblem(automation: NewAutomation): AddRefusal | undefined {
   if (!isCommandName(automation.name)) return { ok: false, reason: 'bad-name', detail: 'a name is lower-case letters, digits and single or double dashes, and starts with a letter or a digit' }
   if (automation.name.length > MAX_NAME) return { ok: false, reason: 'bad-name', detail: `a name is ${MAX_NAME} characters at most` }
-  if (!automation.prompt.trim()) return { ok: false, reason: 'no-prompt' }
+  // A NUL character is no text: a file holds none of it for an agent.
+  if (!automation.prompt.replaceAll('\0', '').trim()) return { ok: false, reason: 'no-prompt' }
   const text = automationSkill(automation)
   const read = skillSchedule(automation.name, text, RUN_SKILLS_DIR)
   const unreadable = read.unreadable[0]
@@ -132,20 +136,61 @@ export function automationSkill(automation: NewAutomation): string {
   return lines.join('\n')
 }
 
+/** Where an automation was saved, and what whoever asked needs to say about it. */
+export interface Added {
+  ok: true
+  command: string
+  /** The file written, from the repository root. */
+  file: string
+  /** What a run's checkout starts from, as git names it: where a shared automation's file has to get to before its command can start. */
+  startsFrom: string
+  /** Whether it is kept on this machine alone: it needs no commit, and its command can start at once. */
+  onThisMachine?: true
+}
+
 /**
- * Save an automation as a skill file of the project. Refused when it cannot be read back as
- * written, and when a skill of that name is already in any folder a coding agent reads skills
- * from, whatever its capitals: a person's automation never replaces a skill, and on a disk that
- * ignores capitals `Foo` and `foo` are one folder. Answers the file, from the repository root, and
- * where a run's checkout starts, so whoever asked can say where the file has to get to. A write
- * that fails leaves no empty folder behind.
+ * Save an automation, shared with the project or kept on this machine alone.
+ *
+ * Shared, it is a skill file of the project, which the person commits; like any skill, its command
+ * starts no run before the file is on the commit a run's checkout starts from. Kept on this
+ * machine, it is one file in the tool's own folder, hidden from git like the state: nobody else
+ * gets the row, nothing is to commit, and a run of it is handed its text.
+ *
+ * Refused when it cannot be read back as written, and when its name is taken, whatever its
+ * capitals: by a skill in any folder a coding agent reads skills from, or by an automation kept on
+ * this machine. An automation never replaces either, and on a disk that ignores capitals `Foo` and
+ * `foo` are one name. A write that fails leaves no empty folder behind, shared or kept here.
  */
-export async function addAutomation(repo: string, automation: NewAutomation, git: GitRunner, write: typeof writeFile = writeFile): Promise<{ ok: true; command: string; file: string; startsFrom: string } | AddRefusal> {
+export async function addAutomation(repo: string, automation: NewAutomation, git: GitRunner, opts: { onThisMachine?: boolean; write?: typeof writeFile } = {}): Promise<Added | AddRefusal> {
+  const write = opts.write ?? writeFile
   const problem = automationProblem(automation)
   if (problem) return problem
   for (const dir of HARNESS_SKILL_DIRS) {
     const there = (await readdir(join(repo, dir)).catch((): string[] => [])).find(name => name.toLowerCase() === automation.name)
     if (there !== undefined) return { ok: false, reason: 'taken', folder: `${dir}/${there}` }
+  }
+  const kept = (await readdir(join(repo, OWN_AUTOMATIONS_DIR)).catch((): string[] => [])).find(file => file.toLowerCase() === `${automation.name}.md`)
+  if (kept !== undefined) return { ok: false, reason: 'taken', folder: `${OWN_AUTOMATIONS_DIR}/${kept}` }
+  const origin = await originDefaultBranch(repo, git).catch(() => undefined)
+  const startsFrom = origin ?? 'HEAD'
+  if (opts.onThisMachine) {
+    // Its text travels to each run as one command-line argument: a longer one could be saved and never listed.
+    const length = automation.prompt.trim().length
+    if (length > OWN_TEXT_MAX) return { ok: false, reason: 'long-prompt', detail: `the prompt is ${length} characters, and one kept on this machine has ${OWN_TEXT_MAX} at most` }
+    const file = `${OWN_AUTOMATIONS_DIR}/${automation.name}.md`
+    await mkdir(join(repo, OWN_AUTOMATIONS_DIR), { recursive: true })
+    // The tool's folder is hidden from git before anything of a person's is in it; best-effort, as for the state.
+    await excludeFromGit(repo, `/${STATE_DIR}`, undefined, git).catch(() => {})
+    try {
+      await write(join(repo, file), automationSkill(automation), { flag: 'wx' })
+    } catch (err) {
+      // Another save made it since the look above.
+      if ((err as NodeJS.ErrnoException).code === 'EEXIST') return { ok: false, reason: 'taken', folder: file }
+      // The folder made for the first automation is not left empty behind a write that failed.
+      await rmdir(join(repo, OWN_AUTOMATIONS_DIR)).catch(() => {})
+      throw err
+    }
+    return { ok: true, command: automation.name, file, startsFrom, onThisMachine: true }
   }
   const folder = join(repo, RUN_SKILLS_DIR, automation.name)
   await mkdir(join(repo, RUN_SKILLS_DIR), { recursive: true })
@@ -162,8 +207,7 @@ export async function addAutomation(repo: string, automation: NewAutomation, git
     await rmdir(folder).catch(() => {})
     throw err
   }
-  const origin = await originDefaultBranch(repo, git).catch(() => undefined)
-  return { ok: true, command: automation.name, file: `${RUN_SKILLS_DIR}/${automation.name}/${SKILL_FILE}`, startsFrom: origin ?? 'HEAD' }
+  return { ok: true, command: automation.name, file: `${RUN_SKILLS_DIR}/${automation.name}/${SKILL_FILE}`, startsFrom }
 }
 
 /** How far back a check that is only being tried asks from: a command that does not exist yet has no last start, and "since now" would never show a person anything. */

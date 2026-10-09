@@ -1,14 +1,15 @@
-import { mkdir, readdir, rmdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readdir, readFile, realpath, rename, rmdir, unlink, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { excludeFromGit, originDefaultBranch, type GitRunner } from '@openagt/agent-data'
 import { HARNESS_SKILL_DIRS } from '@openagt/skill-branches'
 import { MAX_NAME, OWN_AUTOMATIONS_DIR, OWN_TEXT_MAX, RUN_SKILLS_DIR, SKILL_FILE, STATE_DIR, TRY_TIMEOUT_MS, isCommandName } from './names.js'
-import { foundOutput, isDue, lastRunValue, skillSchedule } from './schedule.js'
+import { FOLDER_LITTER, automationOf, automationSkill, frontMatterOf, wellFormed, type NewAutomation } from './automation-file.js'
+import { foundOutput, isDue, lastRunValue, readSchedule, skillFile, skillSchedule } from './schedule.js'
 import { runCheck } from './tick.js'
 
 /**
  * A person's own automation: a prompt they wrote, saved as a command skill of the project, so it
- * has a row like any skill's and nothing else in the tool knows it apart. The skill's text is the
+ * has a row like any skill's and the tick treats it as one. The skill's text is the
  * prompt; its front matter makes it a command (`disable-model-invocation`) and carries the
  * `schedule` the person picked: a pace, a check, or both.
  *
@@ -17,24 +18,10 @@ import { runCheck } from './tick.js'
  * run until it is on the commit a run's checkout starts from: the person commits it and brings it
  * there. Kept on this machine alone, it is the same file in the tool's own folder, and a run is
  * handed its text with a prompt that is the automation's name.
+ *
+ * Saved, it can be shown, saved again with other words under the same name, and removed: only
+ * while its file still reads as the tool writes one (`automation-file.ts`).
  */
-
-/** An automation as a person fills it in. */
-export interface NewAutomation {
-  /** The command's name, without its slash: the skill's folder. */
-  name: string
-  /** What the agent is told: the skill's whole text. */
-  prompt: string
-  /** How often at most, as a skill writes it (`15m`, `1d`). */
-  every?: string
-  /** The check, a shell line. */
-  when?: string
-  /** What the check waits for, in one plain line. */
-  waitsFor?: string
-}
-
-/** How much of the prompt's first line stands as the skill's description, in characters. */
-const DESCRIPTION_MAX = 150
 
 export type AddRefusal =
   | { ok: false; reason: 'bad-name'; detail: string }
@@ -65,79 +52,8 @@ export function automationProblem(automation: NewAutomation): AddRefusal | undef
   return undefined
 }
 
-/** Characters a quoted value writes as an escape beyond what JSON escapes: DEL and the C1 controls, the two Unicode line ends, the byte order mark. */
-const SPECIALS = /[\u007f-\u009f\u2028\u2029\ufeff]/g
-
-/** Characters a block cannot hold as typed: every control character but the line end, and the ones above. */
-const CONTROLS = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u2028\u2029\ufeff]/
-
-/** A text with each half of a broken character pair replaced: such a half is no text a file holds. */
-function wellFormed(text: string): string {
-  return text.replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, '\ufffd')
-}
-
-/** The front matter of a skill file as written here, between its two lines of dashes. */
-function frontMatterOf(text: string): string {
-  return text.slice(4, text.indexOf('\n---\n', 4))
-}
-
-/**
- * A text as a quoted value of the front matter: every character that could end the value, the
- * line or the front matter is written as an escape, three dashes in a row among them, since a
- * coding agent's reader ends the front matter at the first three dashes anywhere. Half of a
- * broken character pair, which no file holds as text, is replaced. It reads back as the text.
- */
-function quoted(text: string): string {
-  return JSON.stringify(wellFormed(text))
-    .replace(SPECIALS, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)
-    .replaceAll('---', '--\\u002d')
-}
-
-/**
- * Whether a check can stand in the file as a block, line for line as typed, the way the skills
- * write theirs: no character a block would lose or read as layout (a control character, blanks at
- * a line's end, blanks at its first line's start, where the block's indent is measured), and no
- * three dashes. Any other check is written quoted, on one line.
- */
-function fitsBlock(check: string): boolean {
-  if (CONTROLS.test(check) || check.includes('---')) return false
-  const lines = check.split('\n')
-  return lines[0] === lines[0]!.trimStart() && lines.every(line => line === line.trimEnd())
-}
-
-/**
- * The skill file of an automation: the front matter, then the prompt. The description is the
- * prompt's first line, cut short: it is what the row says the command does. Every text a person
- * typed is written quoted, so it can change no other key of the front matter, and the check as a
- * block where it can be, so it reads in the file as typed.
- */
-export function automationSkill(automation: NewAutomation): string {
-  const prompt = wellFormed(automation.prompt.trim())
-  // Cut by whole characters: half an emoji is no text.
-  const first = Array.from(prompt.split('\n')[0]!.trim())
-  const description = first.length > DESCRIPTION_MAX ? `${first.slice(0, DESCRIPTION_MAX - 1).join('')}…` : first.join('')
-  const when = automation.when === undefined ? undefined : wellFormed(automation.when.trim())
-  const lines = [
-    '---',
-    `name: ${automation.name}`,
-    `description: ${quoted(description)}`,
-    'disable-model-invocation: true',
-    // With neither a pace nor a check the schedule is an empty row, which the reader refuses in its own words.
-    automation.every === undefined && when === undefined && automation.waitsFor === undefined ? 'schedule: {}' : 'schedule:',
-    // A pace as the tool writes one stands as it is; anything else typed there is quoted, and the reader then says what is wrong with it.
-    ...(automation.every !== undefined ? [`  every: ${/^\d+(m|h|d|w|mo)$/.test(automation.every) ? automation.every : quoted(automation.every)}`] : []),
-    ...(automation.waitsFor !== undefined ? [`  waits-for: ${quoted(automation.waitsFor.trim())}`] : []),
-    ...(when === undefined ? [] : fitsBlock(when) ? ['  when: |-', ...when.split('\n').map((line: string) => (line === '' ? '' : `    ${line}`))] : [`  when: ${quoted(when)}`]),
-    '---',
-    '',
-    prompt,
-    '',
-  ]
-  return lines.join('\n')
-}
-
-/** Where an automation was saved, and what whoever asked needs to say about it. */
-export interface Added {
+/** Where an automation's file was written, new or anew, and what whoever asked needs to say about it. */
+export interface Written {
   ok: true
   command: string
   /** The file written, from the repository root. */
@@ -161,7 +77,7 @@ export interface Added {
  * this machine. An automation never replaces either, and on a disk that ignores capitals `Foo` and
  * `foo` are one name. A write that fails leaves no empty folder behind, shared or kept here.
  */
-export async function addAutomation(repo: string, automation: NewAutomation, git: GitRunner, opts: { onThisMachine?: boolean; write?: typeof writeFile } = {}): Promise<Added | AddRefusal> {
+export async function addAutomation(repo: string, automation: NewAutomation, git: GitRunner, opts: { onThisMachine?: boolean; write?: typeof writeFile } = {}): Promise<Written | AddRefusal> {
   const write = opts.write ?? writeFile
   const problem = automationProblem(automation)
   if (problem) return problem
@@ -208,6 +124,143 @@ export async function addAutomation(repo: string, automation: NewAutomation, git
     throw err
   }
   return { ok: true, command: automation.name, file: `${RUN_SKILLS_DIR}/${automation.name}/${SKILL_FILE}`, startsFrom }
+}
+
+/** An automation where it is saved: what `show` answers, and what `edit` and `remove` act on. */
+export interface SavedAutomation {
+  automation: NewAutomation
+  /** Its file, from the repository root. */
+  file: string
+  /** Whether it is kept on this machine alone. */
+  onThisMachine?: true
+}
+
+/** Why a name is no automation the tool rewrites or removes. */
+export type NotAnAutomation = { ok: false; reason: 'not-an-automation'; detail: string }
+
+/**
+ * The automation of that name, where it is saved, or why the tool leaves what has the name alone.
+ *
+ * The tool rewrites and removes only what it wrote, and the schedule says what that is
+ * (`editable`): a command whose file reads as the tool writes one, in the tool's own folder, or
+ * alone in a skill folder of the project that is no link. A skill a person or a package wrote, and
+ * an automation changed by hand into something the tool does not write, are edited and removed by
+ * hand: rewriting one from here would lose what the tool does not write. What the schedule does
+ * not list is left alone too, with the schedule's own reason when it has one.
+ */
+export async function savedAutomation(repo: string, name: string): Promise<SavedAutomation | NotAnAutomation> {
+  const none = (detail: string): NotAnAutomation => ({ ok: false, reason: 'not-an-automation', detail })
+  const schedule = await readSchedule(repo)
+  const command = schedule.commands.find(c => c.name === name)
+  if (!command) {
+    const unlisted = schedule.unreadable.find(u => u.skill === name)
+    if (!unlisted) return none(`the schedule lists nothing named ${name}`)
+    return none(`${unlisted.own ? `the automation ${name}, kept on this machine, is not listed` : `the schedule of ${name} cannot be read`}: ${unlisted.reason}`)
+  }
+  const kept = command.text !== undefined
+  const file = kept ? `${OWN_AUTOMATIONS_DIR}/${name}.md` : skillFile(command)
+  // The schedule says the file is the tool's to rewrite; what it holds is read from it now.
+  const automation = command.editable ? automationOf(name, await readFile(join(repo, file), 'utf8').catch(() => '')) : undefined
+  if (automation) return { automation, file, ...(kept ? { onThisMachine: true as const } : {}) }
+  return none(kept ? `${file} is a link, or was changed by hand since it was saved: edit or remove the file itself` : `${dirname(file)} is a skill of the project, or an automation changed by hand since it was saved: edit or remove its files yourself`)
+}
+
+/** What `edit` changes of an automation: a part given takes the place of the file's, `null` takes a part out, and a part left out stays as the file says it. */
+export interface AutomationChange {
+  prompt?: string | undefined
+  every?: string | null | undefined
+  when?: string | null | undefined
+  waitsFor?: string | null | undefined
+}
+
+/**
+ * Save an automation again under its name, with a new prompt or a new schedule: its file is
+ * written anew, where it is, with what was given in place of what it said and the rest as it
+ * was. What a check waits for goes out with the check, unless it is given too. Its name stays,
+ * and a run is counted by the name, so its past runs, its switch and a person's other picks for
+ * it stay its own.
+ *
+ * A shared one is a file of the project: the change is the person's to commit, and a run reads
+ * the prompt from the commit its checkout starts from, so it is told the new words only once the
+ * change is there, while the tick reads the new pace and the new check from the person's checkout
+ * at once. One kept on this machine has only its file: the next tick reads all of it.
+ *
+ * Refused for a name that is no automation the tool wrote ({@link savedAutomation}), and for what
+ * could not be saved new either ({@link automationProblem}, the length of a text kept here).
+ */
+export async function editAutomation(repo: string, name: string, change: AutomationChange, git: GitRunner, opts: { write?: typeof writeFile } = {}): Promise<Written | AddRefusal | NotAnAutomation> {
+  const found = await savedAutomation(repo, name)
+  if ('reason' in found) return found
+  const was = found.automation
+  const every = change.every === undefined ? was.every : (change.every ?? undefined)
+  const when = change.when === undefined ? was.when : (change.when ?? undefined)
+  const waitsFor = change.waitsFor === undefined ? (when === undefined ? undefined : was.waitsFor) : (change.waitsFor ?? undefined)
+  const automation: NewAutomation = { name, prompt: change.prompt ?? was.prompt, ...(every !== undefined ? { every } : {}), ...(when !== undefined ? { when } : {}), ...(waitsFor !== undefined ? { waitsFor } : {}) }
+  const problem = automationProblem(automation)
+  if (problem) return problem
+  const length = automation.prompt.trim().length
+  if (found.onThisMachine && length > OWN_TEXT_MAX) return { ok: false, reason: 'long-prompt', detail: `the prompt is ${length} characters, and one kept on this machine has ${OWN_TEXT_MAX} at most` }
+  // Written beside the file and moved over it: a write that fails midway leaves the automation as it was, not a cut file.
+  const path = join(repo, found.file)
+  try {
+    await (opts.write ?? writeFile)(`${path}.new`, automationSkill(automation))
+    await rename(`${path}.new`, path)
+  } catch (err) {
+    await unlink(`${path}.new`).catch(() => {})
+    throw err
+  }
+  const startsFrom = (await originDefaultBranch(repo, git).catch(() => undefined)) ?? 'HEAD'
+  return { ok: true, command: name, file: found.file, startsFrom, ...(found.onThisMachine ? { onThisMachine: true as const } : {}) }
+}
+
+/** What removing an automation did, and what whoever asked needs to say about it. */
+export type Removed = { ok: true; command: string; /** The file that was deleted, from the repository root. */ file: string } & (
+  | {
+      /** Kept on this machine alone: it was in no git, and nothing of it is left anywhere. */
+      onThisMachine: true
+    }
+  | {
+      /**
+       * What git still holds of a shared one's file: `committed`, the file is in a commit, so the
+       * deletion is a change of the person's to commit and git can bring the file back; `staged`,
+       * it was added to the index and never committed, so a commit made now would still add it;
+       * `nothing`, git never knew the file, and it cannot be brought back; `unknown`, git could
+       * not be asked.
+       */
+      git: 'committed' | 'staged' | 'nothing' | 'unknown'
+      /** What a run's checkout starts from, as git names it: until the deletion is there, everyone else who has the project keeps the command. */
+      startsFrom: string
+    }
+)
+
+/**
+ * Remove an automation: its file is deleted, and the folder that held it alone, with what a file
+ * manager left beside it. Nothing is committed, and nothing git holds is changed: the deletion of
+ * a shared one is a change of the person's where the file is in a commit, and everyone else keeps
+ * the command until the deletion reaches them. What was never committed, a shared one's file or
+ * its last changes, and all of one kept on this machine, cannot be brought back. The records of
+ * its past runs stay.
+ *
+ * Refused for a name that is no automation the tool wrote ({@link savedAutomation}).
+ */
+export async function removeAutomation(repo: string, name: string, git: GitRunner): Promise<Removed | NotAnAutomation> {
+  const found = await savedAutomation(repo, name)
+  if ('reason' in found) return found
+  if (found.onThisMachine) {
+    await unlink(join(repo, found.file))
+    // The folder made for the first automation goes with the last one.
+    await rmdir(join(repo, OWN_AUTOMATIONS_DIR)).catch(() => {})
+    return { ok: true, command: name, file: found.file, onThisMachine: true }
+  }
+  // Git is asked about the file where it really is: the skills folder may be a link to another one.
+  const folder = join(await realpath(join(repo, RUN_SKILLS_DIR)), name)
+  await unlink(join(folder, SKILL_FILE))
+  await unlink(join(folder, FOLDER_LITTER)).catch(() => {})
+  await rmdir(folder).catch(() => {})
+  // One line for the one file, its first letter what the index holds: `A` for a file added and never committed.
+  const held = await git(['status', '--porcelain', '--', join(folder, SKILL_FILE)], repo).catch(() => undefined)
+  const startsFrom = (await originDefaultBranch(repo, git).catch(() => undefined)) ?? 'HEAD'
+  return { ok: true, command: name, file: found.file, git: held === undefined ? 'unknown' : held.trim() === '' ? 'nothing' : held.startsWith('A') ? 'staged' : 'committed', startsFrom }
 }
 
 /** How far back a check that is only being tried asks from: a command that does not exist yet has no last start, and "since now" would never show a person anything. */

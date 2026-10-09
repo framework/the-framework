@@ -46,6 +46,8 @@ export interface SchedulerCommand {
   description?: string
   /** Whether the command is an automation the person keeps on this machine alone, not a skill of the project. */
   onThisMachine?: true
+  /** Whether the command is a person's own automation as the tool wrote it: the page can open it to be saved again, and remove it. */
+  editable?: true
   /** What the scheduler's last tick decided for the command, when it decided anything. */
   decision?: TickDecision
 }
@@ -144,6 +146,7 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
       ...(isAgents(agents[command]) ? { agents: agents[command] } : {}),
       ...(typeof row['description'] === 'string' ? { description: row['description'] } : {}),
       ...(row['onThisMachine'] === true ? { onThisMachine: true as const } : {}),
+      ...(row['editable'] === true ? { editable: true as const } : {}),
       ...(decision ? { decision } : {}),
     })
   }

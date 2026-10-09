@@ -20,6 +20,22 @@ function scheduler(saved: (projectId: string, args: string[]) => ModuleCommandRe
   return hostAnswering((projectId, args) => (args[0] === 'status' ? { ok: true, output: STATUS } : saved(projectId, args)))
 }
 
+/** {@link STATUS} with two rows made with "New automation", both as the tool wrote them: one shared with the project, one kept on this machine. */
+const MINE = {
+  ...STATUS,
+  lastTick: {
+    ...STATUS.lastTick,
+    schedule: [
+      ...STATUS.lastTick.schedule,
+      { command: 'answer-comments', every: '15m', when: 'gh api comments', waitsFor: 'when someone commented', description: 'Answer each new comment below.', editable: true },
+      { command: 'tidy', every: '1d', description: 'Tidy up.', onThisMachine: true, editable: true },
+    ],
+  },
+}
+
+/** What `agent-scheduler show answer-comments` prints for the shared one. */
+const SHOWN = { ok: true, name: 'answer-comments', prompt: 'Answer each new comment below.', every: '15m', when: 'gh api comments', waitsFor: 'when someone commented', file: '.claude/skills/answer-comments/SKILL.md' }
+
 const options = (menu: HTMLSelectElement): string[] => [...menu.options].map(o => o.textContent ?? '')
 const row = (name: string): HTMLElement => screen.getByRole('listitem', { name })
 
@@ -280,6 +296,256 @@ describe('the Automations page', () => {
     show(host)
     await screen.findByRole('region', { name: 'gemstack' })
     expect(screen.getAllByRole('alert').map(a => a.textContent)).toEqual(['The schedule of the triage skill cannot be read, so it is not listed: unknown key evry', 'The automation tidy, kept on this machine, is not listed: it has no schedule'])
+  })
+
+  test('a row made with "New automation" has "Edit prompt" and "Remove", named for its title; the rows that come from the project\'s skills have neither; and none is offered while a form is open', async () => {
+    const { host } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: MINE } : { ok: true, output: { ok: true } }))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    expect(within(row('/answer-comments')).getByRole('button', { name: 'Edit the prompt of /answer-comments' }).textContent).toBe('Edit prompt')
+    expect(within(row('/answer-comments')).getByRole('button', { name: 'Remove /answer-comments' }).textContent).toBe('Remove')
+    expect(within(row('tidy')).getByRole('button', { name: 'Edit the prompt of tidy' })).toBeTruthy()
+    expect(within(row('tidy')).getByRole('button', { name: 'Remove tidy' })).toBeTruthy()
+    // A skill of the project is not the person's to rewrite or delete from the page: it keeps its Edit and its switch alone.
+    for (const name of ['/post-merge-cleanup', '/work-queue']) {
+      expect(within(row(name)).queryByRole('button', { name: /^Edit the prompt of/ })).toBeNull()
+      expect(within(row(name)).queryByRole('button', { name: /^Remove/ })).toBeNull()
+      expect(within(row(name)).getByRole('button', { name: `Edit ${name}` })).toBeTruthy()
+    }
+    // Opening another form would drop what was typed into the open one.
+    fireEvent.click(screen.getByRole('button', { name: 'New automation in gemstack' }))
+    expect(screen.queryByRole('button', { name: /^Edit the prompt of/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Remove/ })).toBeNull()
+    fireEvent.click(within(screen.getByRole('group', { name: 'New automation' })).getByRole('button', { name: 'Cancel' }))
+    expect(screen.getAllByRole('button', { name: /^Edit the prompt of/ }).length).toBe(2)
+    // The row's own Edit box open: the two buttons wait for it to close.
+    fireEvent.click(within(row('tidy')).getByRole('button', { name: 'Edit tidy' }))
+    expect(within(row('tidy')).queryByRole('button', { name: 'Remove tidy' })).toBeNull()
+    expect(within(row('/answer-comments')).getByRole('button', { name: 'Remove /answer-comments' })).toBeTruthy()
+  })
+
+  test('"Edit prompt" reads the automation with `show` and opens the form in its row, filled in: the name is fixed, who gets it is not asked, and Save waits for a change; Save runs `edit` and says what is left to do', async () => {
+    const { host, runCommand } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: MINE } : args[0] === 'show' ? { ok: true, output: SHOWN } : { ok: true, output: { ok: true, command: 'answer-comments', file: SHOWN.file, startsFrom: 'origin/main' } }))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    const mine = row('/answer-comments')
+    fireEvent.click(within(mine).getByRole('button', { name: 'Edit the prompt of /answer-comments' }))
+    const form = await within(mine).findByRole('group', { name: 'Prompt of /answer-comments' })
+    expect(runCommand).toHaveBeenCalledWith('p1', ['show', 'answer-comments'])
+    expect((within(form).getByLabelText('Name') as HTMLInputElement).value).toBe('answer-comments')
+    expect((within(form).getByLabelText('Name') as HTMLInputElement).readOnly).toBe(true)
+    expect(within(form).getByText(/the name stays: its past runs are counted by it\./)).toBeTruthy()
+    expect((within(form).getByLabelText('What the agent is told') as HTMLTextAreaElement).value).toBe('Answer each new comment below.')
+    expect((within(form).getByRole('checkbox', { name: 'Every' }) as HTMLInputElement).checked).toBe(true)
+    expect((within(form).getByLabelText('How many') as HTMLInputElement).value).toBe('15')
+    expect((within(form).getByLabelText('Unit') as HTMLSelectElement).value).toBe('m')
+    expect((within(form).getByLabelText(/A shell line that prints what is new/) as HTMLTextAreaElement).value).toBe('gh api comments')
+    expect((within(form).getByLabelText(/What the line waits for/) as HTMLInputElement).value).toBe('when someone commented')
+    expect(within(form).queryByText('Who gets it')).toBeNull()
+    expect(within(form).getByText(`A skill file in this project, ${SHOWN.file}: the change is yours to commit.`)).toBeTruthy()
+    // The row's other buttons wait, and no project offers a new form over this one.
+    expect(within(mine).queryByRole('button', { name: 'Edit /answer-comments' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New automation in gemstack' })).toBeNull()
+    // Nothing to save yet.
+    expect(within(form).getByText('Every 15 minutes at most, when someone commented. Nothing is changed yet.')).toBeTruthy()
+    expect((within(form).getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(within(form).getByLabelText('What the agent is told'), { target: { value: '- Answer in one line.' } })
+    fireEvent.change(within(form).getByLabelText('How many'), { target: { value: '30' } })
+    expect(within(form).getByText('Every 30 minutes at most, when someone commented.')).toBeTruthy()
+    const statusReads = runCommand.mock.calls.filter(([, args]) => args[0] === 'status').length
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    const saved = await within(mine).findByText(/It is a change to a file of yours, in this project, and nothing was committed for you\./)
+    expect(runCommand).toHaveBeenCalledWith('p1', ['edit', 'answer-comments', '--prompt=- Answer in one line.', '--every=30m', '--when=gh api comments', '--waits-for=when someone commented'])
+    const panel = within(mine).getByRole('group', { name: 'Prompt of /answer-comments' })
+    expect(panel.textContent).toContain(`Saved /answer-comments again, in ${SHOWN.file}.`)
+    expect(saved.textContent).toContain('An agent is told the new words only once the change is on origin/main: commit it and bring it there.')
+    expect(panel.textContent).toContain('Its row shows the change once the scheduler has looked, within a minute.')
+    await waitFor(() => expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'status').length).toBeGreaterThan(statusReads))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('group', { name: 'Prompt of /answer-comments' })).toBeNull()
+    expect(within(row('/answer-comments')).getByRole('button', { name: 'Edit the prompt of /answer-comments' })).toBeTruthy()
+  })
+
+  test('an automation kept on this machine opens the same way and says nothing is to commit; Cancel saves nothing, and Escape closes the form only while no text in it was changed; a refused save says why and keeps what was typed', async () => {
+    const kept = { ok: true, name: 'tidy', prompt: 'Tidy up.', every: '1d', file: '.agent-scheduler/automations/tidy.md', onThisMachine: true }
+    const saves: ModuleCommandResult[] = [{ ok: false, error: 'it cannot run as written: neither every nor when says when' }, { ok: true, output: { ok: true, command: 'tidy', file: kept.file, startsFrom: 'origin/main', onThisMachine: true } }]
+    const { host, runCommand } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: MINE } : args[0] === 'show' ? { ok: true, output: kept } : saves.shift()!))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    fireEvent.click(within(row('tidy')).getByRole('button', { name: 'Edit the prompt of tidy' }))
+    let form = await within(row('tidy')).findByRole('group', { name: 'Prompt of tidy' })
+    expect(within(form).getByText('Kept on this machine alone, outside git: .agent-scheduler/automations/tidy.md.')).toBeTruthy()
+    fireEvent.keyDown(within(form).getByLabelText('What the agent is told'), { key: 'Escape' })
+    expect(screen.queryByRole('group', { name: 'Prompt of tidy' })).toBeNull()
+    fireEvent.click(within(row('tidy')).getByRole('button', { name: 'Edit the prompt of tidy' }))
+    form = await within(row('tidy')).findByRole('group', { name: 'Prompt of tidy' })
+    // A change of the pace alone is a change: a slip of a key does not lose it.
+    fireEvent.change(within(form).getByLabelText('How many'), { target: { value: '2' } })
+    fireEvent.keyDown(within(form).getByLabelText('What the agent is told'), { key: 'Escape' })
+    expect(screen.getByRole('group', { name: 'Prompt of tidy' })).toBeTruthy()
+    fireEvent.change(within(form).getByLabelText('How many'), { target: { value: '1' } })
+    fireEvent.change(within(form).getByLabelText('What the agent is told'), { target: { value: 'Tidy up, gently.' } })
+    fireEvent.keyDown(within(form).getByLabelText('What the agent is told'), { key: 'Escape' })
+    expect(screen.getByRole('group', { name: 'Prompt of tidy' })).toBeTruthy()
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    expect((await within(form).findByRole('alert')).textContent).toBe('Not saved: it cannot run as written: neither every nor when says when')
+    expect((within(form).getByLabelText('What the agent is told') as HTMLTextAreaElement).value).toBe('Tidy up, gently.')
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    const saved = await within(row('tidy')).findByText(/It is kept on this machine alone: nothing to commit\./)
+    expect(saved.textContent).toBe('It is kept on this machine alone: nothing to commit. The scheduler uses the new words from its next look. Its past runs, its switch and your picks for it stay.')
+    expect(runCommand).toHaveBeenCalledWith('p1', ['edit', 'tidy', '--prompt=Tidy up, gently.', '--every=1d', '--when=', '--waits-for='])
+    expect(within(row('tidy')).getByRole('group', { name: 'Prompt of tidy' }).textContent).toContain('Saved tidy again, in .agent-scheduler/automations/tidy.md.')
+    fireEvent.click(within(row('tidy')).getByRole('button', { name: 'Done' }))
+    // Cancel: no command but the reads.
+    fireEvent.click(within(row('tidy')).getByRole('button', { name: 'Edit the prompt of tidy' }))
+    form = await within(row('tidy')).findByRole('group', { name: 'Prompt of tidy' })
+    fireEvent.change(within(form).getByLabelText('What the agent is told'), { target: { value: 'Never saved.' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('group', { name: 'Prompt of tidy' })).toBeNull()
+    expect(runCommand.mock.calls.filter(([, args]) => args[0] === 'edit').length).toBe(2)
+  })
+
+  test('a row that runs at the person\'s own pace says in the form that the pace typed there is the one saved with the automation, and theirs stays in force', async () => {
+    const paced = { ...MINE, paces: { tidy: { every: '6h', since: '2026-10-03T08:00:00.000Z' } } }
+    const { host } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: paced } : { ok: true, output: { ok: true, name: args[1], prompt: 'p', every: '1d', file: 'f', ...(args[1] === 'tidy' ? { onThisMachine: true } : {}) } }))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    fireEvent.click(within(row('tidy')).getByRole('button', { name: 'Edit the prompt of tidy' }))
+    const form = await within(row('tidy')).findByRole('group', { name: 'Prompt of tidy' })
+    expect(within(form).getByText('On this machine the row runs at your own pick, "Every 6 hours", and keeps doing so: this pace is the one saved with the automation. The row\'s Edit changes your pick.')).toBeTruthy()
+    fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }))
+    // A row at the pace it was saved with says no such thing.
+    fireEvent.click(within(row('/answer-comments')).getByRole('button', { name: 'Edit the prompt of /answer-comments' }))
+    const other = await within(row('/answer-comments')).findByRole('group', { name: 'Prompt of /answer-comments' })
+    expect(within(other).queryByText(/your own pick/)).toBeNull()
+  })
+
+  test('an automation whose file was changed by hand since the scheduler last looked does not open: its row says why, in the command\'s words; neither does an answer the form cannot show', async () => {
+    const answers: ModuleCommandResult[] = [{ ok: false, error: '.claude/skills/answer-comments is a skill of the project, or an automation changed by hand since it was saved: edit or remove its files yourself' }, { ok: true, output: { ok: true, name: 'answer-comments' } }]
+    const { host } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: MINE } : answers.shift()!))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    const mine = row('/answer-comments')
+    fireEvent.click(within(mine).getByRole('button', { name: 'Edit the prompt of /answer-comments' }))
+    expect((await within(mine).findByRole('alert')).textContent).toBe('It could not be opened: .claude/skills/answer-comments is a skill of the project, or an automation changed by hand since it was saved: edit or remove its files yourself')
+    expect(screen.queryByRole('group', { name: 'Prompt of /answer-comments' })).toBeNull()
+    fireEvent.click(within(mine).getByRole('button', { name: 'Edit the prompt of /answer-comments' }))
+    await waitFor(() => expect(within(mine).getByRole('alert').textContent).toBe('It could not be opened: its file holds something this form cannot show'))
+    expect(screen.queryByRole('group', { name: 'Prompt of /answer-comments' })).toBeNull()
+  })
+
+  test('a row that goes while its form or its question is open, removed elsewhere, closes them: no form is left open where nobody sees it, and the buttons that open one come back', async () => {
+    let status: unknown = MINE
+    const without = (name: string): unknown => ({ ...MINE, lastTick: { ...MINE.lastTick, schedule: MINE.lastTick.schedule.filter(c => c.command !== name) } })
+    const { host } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: status } : args[0] === 'show' ? { ok: true, output: SHOWN } : { ok: true, output: { ok: true } }))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    fireEvent.click(within(row('/answer-comments')).getByRole('button', { name: 'Edit the prompt of /answer-comments' }))
+    await within(row('/answer-comments')).findByRole('group', { name: 'Prompt of /answer-comments' })
+    expect(screen.queryByRole('button', { name: 'New automation in gemstack' })).toBeNull()
+    // Its file is deleted in a terminal; any save on the page reads the rows again.
+    status = without('answer-comments')
+    within(row('tidy')).getByRole('checkbox', { name: 'Run tidy by itself' }).click()
+    await waitFor(() => expect(screen.queryByRole('listitem', { name: '/answer-comments' })).toBeNull())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'New automation in gemstack' })).toBeTruthy())
+    expect(within(row('tidy')).getByRole('button', { name: 'Edit the prompt of tidy' })).toBeTruthy()
+    // The same for a row that was asking whether to be removed: back on the list, it asks nothing.
+    fireEvent.click(within(row('tidy')).getByRole('button', { name: 'Remove tidy' }))
+    expect(within(row('tidy')).getByRole('group', { name: 'Removing tidy' })).toBeTruthy()
+    status = { ...MINE, lastTick: { ...MINE.lastTick, schedule: [] } }
+    fireEvent.click(screen.getByRole('button', { name: 'New automation in gemstack' }))
+    fireEvent.change(within(screen.getByRole('group', { name: 'New automation' })).getByLabelText('Name'), { target: { value: 'x' } })
+    fireEvent.change(within(screen.getByRole('group', { name: 'New automation' })).getByLabelText('What the agent is told'), { target: { value: 'p' } })
+    fireEvent.click(within(screen.getByRole('group', { name: 'New automation' })).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('listitem', { name: 'tidy' })).toBeNull())
+    status = MINE
+    fireEvent.click(within(screen.getByRole('group', { name: 'New automation' })).getByRole('button', { name: 'Done' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'New automation in gemstack' }))
+    fireEvent.change(within(screen.getByRole('group', { name: 'New automation' })).getByLabelText('Name'), { target: { value: 'y' } })
+    fireEvent.change(within(screen.getByRole('group', { name: 'New automation' })).getByLabelText('What the agent is told'), { target: { value: 'p' } })
+    fireEvent.click(within(screen.getByRole('group', { name: 'New automation' })).getByRole('button', { name: 'Save' }))
+    await screen.findByRole('listitem', { name: 'tidy' })
+    expect(screen.queryByRole('group', { name: 'Removing tidy' })).toBeNull()
+  })
+
+  test('an automation that answers `show` late, after another form was opened, does not take that form\'s place', async () => {
+    let answer!: (shown: ModuleCommandResult) => void
+    const late = new Promise<ModuleCommandResult>(resolve => {
+      answer = resolve
+    })
+    const { host } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: MINE } : (late as unknown as ModuleCommandResult)))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    fireEvent.click(within(row('/answer-comments')).getByRole('button', { name: 'Edit the prompt of /answer-comments' }))
+    fireEvent.click(screen.getByRole('button', { name: 'New automation in gemstack' }))
+    fireEvent.change(within(screen.getByRole('group', { name: 'New automation' })).getByLabelText('Name'), { target: { value: 'typed-meanwhile' } })
+    answer({ ok: true, output: SHOWN })
+    // The row is let go once the answer is in, and the form that was opened meanwhile still holds what was typed.
+    await waitFor(() => expect(row('/answer-comments').className).not.toMatch(/opacity-60/))
+    expect(screen.queryByRole('group', { name: 'Prompt of /answer-comments' })).toBeNull()
+    expect((within(screen.getByRole('group', { name: 'New automation' })).getByLabelText('Name') as HTMLInputElement).value).toBe('typed-meanwhile')
+  })
+
+  test('"Remove" asks first, in the row, and says what is deleted; Cancel and Escape remove nothing; Remove runs `remove`, the row goes, and the project says what is left for the person to do until they put it away', async () => {
+    let status: unknown = MINE
+    const { host, runCommand } = hostAnswering((projectId, args) => {
+      if (args[0] === 'status') return { ok: true, output: projectId === 'p1' ? status : { ...STATUS, lastTick: { ...STATUS.lastTick, schedule: [] } } }
+      status = { ...MINE, lastTick: { ...MINE.lastTick, schedule: MINE.lastTick.schedule.filter(c => c.command !== args[1]) } }
+      return { ok: true, output: { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', git: 'committed', startsFrom: 'origin/main' } }
+    })
+    show(host, [GEMSTACK, OTHER])
+    const gemstack = await screen.findByRole('region', { name: 'gemstack' })
+    const mine = row('/answer-comments')
+    fireEvent.click(within(mine).getByRole('button', { name: 'Remove /answer-comments' }))
+    const asked = within(mine).getByRole('group', { name: 'Removing /answer-comments' })
+    expect(asked.textContent).toContain('Remove /answer-comments?')
+    expect(asked.textContent).toContain('Its skill file is deleted from your files in this project, and nothing is committed for you. Git can bring back only what you committed of it: a file never committed, or your last changes to it, cannot be brought back. Everyone else who has the project keeps the row until your deletion reaches them.')
+    // The keyboard lands on the way out, and the row's other buttons wait.
+    expect(document.activeElement).toBe(within(asked).getByRole('button', { name: 'Cancel' }))
+    expect(within(mine).queryByRole('button', { name: 'Edit /answer-comments' })).toBeNull()
+    expect(within(mine).queryByRole('button', { name: 'Edit the prompt of /answer-comments' })).toBeNull()
+    fireEvent.click(within(asked).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('group', { name: 'Removing /answer-comments' })).toBeNull()
+    fireEvent.click(within(mine).getByRole('button', { name: 'Remove /answer-comments' }))
+    fireEvent.keyDown(within(mine).getByRole('group', { name: 'Removing /answer-comments' }), { key: 'Escape' })
+    expect(screen.queryByRole('group', { name: 'Removing /answer-comments' })).toBeNull()
+    expect(runCommand.mock.calls.some(([, args]) => args[0] === 'remove')).toBe(false)
+
+    fireEvent.click(within(mine).getByRole('button', { name: 'Remove /answer-comments' }))
+    fireEvent.click(within(within(mine).getByRole('group', { name: 'Removing /answer-comments' })).getByRole('button', { name: 'Remove' }))
+    const note = await within(gemstack).findByRole('status', { name: 'Removed' })
+    expect(runCommand).toHaveBeenCalledWith('p1', ['remove', 'answer-comments'])
+    expect(screen.getAllByRole('status', { name: 'Removed' }).length, 'said in the project it was removed from, and in no other').toBe(1)
+    expect(note.textContent).toContain('Removed /answer-comments: .claude/skills/answer-comments/SKILL.md is deleted, and nothing was committed for you. Commit the deletion and bring it to origin/main: until then everyone else who has the project keeps the row.')
+    expect(screen.queryByRole('listitem', { name: '/answer-comments' })).toBeNull()
+    expect(row('tidy')).toBeTruthy()
+    fireEvent.click(within(note).getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('status', { name: 'Removed' })).toBeNull()
+  })
+
+  test('removing an automation kept on this machine says first that it cannot be brought back; a removal that is refused says why on the row, which stays', async () => {
+    const answers: ModuleCommandResult[] = [
+      { ok: false, error: '.agent-scheduler/automations/tidy.md was changed by hand since it was saved: edit or remove the file itself' },
+      { ok: true, output: { ok: true, command: 'tidy', file: '.agent-scheduler/automations/tidy.md', onThisMachine: true } },
+    ]
+    const { host, runCommand } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: MINE } : answers.shift()!))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    const kept = row('tidy')
+    fireEvent.click(within(kept).getByRole('button', { name: 'Remove tidy' }))
+    const asked = within(kept).getByRole('group', { name: 'Removing tidy' })
+    expect(asked.textContent).toContain('Remove tidy?')
+    expect(asked.textContent).toContain('Its file is deleted. It is kept on this machine alone, outside git, so it cannot be brought back.')
+    fireEvent.click(within(asked).getByRole('button', { name: 'Remove' }))
+    expect((await within(kept).findByRole('alert')).textContent).toBe('It was not removed: .agent-scheduler/automations/tidy.md was changed by hand since it was saved: edit or remove the file itself')
+    expect(runCommand).toHaveBeenCalledWith('p1', ['remove', 'tidy'])
+    expect(row('tidy')).toBeTruthy()
+    expect(screen.queryByRole('status', { name: 'Removed' })).toBeNull()
+    // Removed, while a tick that was under way still lists it for a moment: the question is closed, so the row does not come back asking.
+    fireEvent.click(within(within(kept).getByRole('group', { name: 'Removing tidy' })).getByRole('button', { name: 'Remove' }))
+    expect((await screen.findByRole('status', { name: 'Removed' })).textContent).toContain('Removed tidy: .agent-scheduler/automations/tidy.md is deleted. Nothing is to commit.')
+    expect(screen.queryByRole('group', { name: 'Removing tidy' })).toBeNull()
+    expect(within(row('tidy')).queryByRole('alert')).toBeNull()
   })
 
   test('a project whose scheduler could not be read offers no "New automation"', async () => {

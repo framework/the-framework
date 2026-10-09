@@ -9,7 +9,7 @@ import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@ope
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
 import { inFlight, lastStart } from './records.js'
 import { readSchedule } from './schedule.js'
-import { namesGivenUp, readState, stateDir, updateState, withoutName, withoutPid, type State, type TickRecord } from './state.js'
+import { isSwitchedOn, namesGivenUp, readState, stateDir, updateState, withoutListed, withoutName, withoutPid, type State, type TickRecord } from './state.js'
 import { atStartOf } from './start-point.js'
 import { runCheck, tick } from './tick.js'
 
@@ -34,7 +34,7 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
   // name too: a switch left under the name would start the skill's command unasked.
   const givenUp = namesGivenUp((await readState(repo)).lastTick, schedule)
   const state = givenUp.length ? await updateState(repo, s => givenUp.reduce(withoutName, s), git) : await readState(repo)
-  const record = await tick({
+  const decided = await tick({
     state,
     schedule,
     host,
@@ -43,6 +43,7 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     sweep: () => sweep(repo, { host, isAlive: isPidAlive, now, git, log, resume: resumeDetached(repo) }),
     atStart: atStartOf(repo, git),
     check: (shell, lastRun) => runCheck(repo, shell, CHECK_TIMEOUT_MS, lastRun),
+    stillOn: async command => isSwitchedOn(await readState(repo), command),
     lastStart: command => lastStart(repo, command, schedule, host),
     inFlight: command => inFlight(repo, command, schedule, host),
     ready: () => readyToRun(repo, 'claude-code'),
@@ -55,9 +56,18 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     ...(opts.stopped ? { stopped: opts.stopped } : {}),
     log,
   })
+  let record = decided
   // A tick cut short by a stop records nothing: `stop` already took this scheduler off the state,
   // and a write now would put the state file back after a clean-up removed it.
-  if (!opts.stopped?.()) await updateState(repo, s => ({ ...s, lastTick: record }), git)
+  if (!opts.stopped?.()) {
+    // A command whose file went while the tick ran, removed by its person, is not on the record: what lists the record's commands would show it for another minute.
+    // An automation kept on this machine that went so is given up here: off the record, the next tick would not know it had been listed.
+    const there = new Set((await readSchedule(repo)).commands.map(c => c.name))
+    const gone = decided.schedule.filter(c => !there.has(c.command))
+    const written = await updateState(repo, s => gone.reduce<State>((state, c) => withoutListed(c.onThisMachine ? withoutName(state, c.command) : state, c.command), { ...s, lastTick: decided }), git)
+    // What is answered and logged is the record as written.
+    record = written.lastTick ?? decided
+  }
   for (const line of describe(record)) log(line)
   return record
 }

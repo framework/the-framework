@@ -4,11 +4,12 @@ import { projectRoot } from '@openagt/skill-branches'
 import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
 import { cleanup } from './cleanup.js'
-import { PUBLISH_PICKS, isSwitchedOn, readState, updateState, withAgents, withoutCommand, withPace, withPublish, withSwitch, type PublishPick } from './state.js'
+import { PUBLISH_PICKS, isSwitchedOn, readState, updateState, withAgents, withoutCommand, withoutListed, withPace, withPublish, withSwitch, type PublishPick, type State } from './state.js'
 import { parseInterval, parseTimeOfDay, sinceNow, takesTimeOfDay } from './pace.js'
 import { MAX_AGENTS, isAgents } from './names.js'
 import { readSchedule, type ScheduledCommand } from './schedule.js'
-import { addAutomation, tryCheck } from './automation.js'
+import { addAutomation, editAutomation, removeAutomation, savedAutomation, tryCheck, type AddRefusal, type NotAnAutomation } from './automation.js'
+import type { NewAutomation } from './automation-file.js'
 
 /**
  * The command line: JSON on stdout, one line for a person on stderr, and the exit code says how
@@ -41,6 +42,18 @@ export const USAGE = `usage: agent-scheduler <command>
                                 can start at once: a run is named by the automation's name and handed the prompt. The prompt is in each run's record, which
                                 is shared where the project shares its records.
                                 Refused for a name a skill of the project, or an automation kept on this machine, already has
+  show <name>                   an automation saved with add, as it stands: its prompt, its pace, its check, its file, and whether it is kept on this machine alone.
+                                Refused, like edit and remove, for anything whose file does not read as add writes one: a skill of the project,
+                                or an automation changed by hand since; those are edited and removed by hand
+  edit <name> [--prompt <text>] [--every <N<m|h|d|w|mo>>] [--when <shell line>] [--waits-for <line>]
+                                save an automation again under its name: what is given takes the place of what its file said, what is left out stays,
+                                and --every, --when or --waits-for given empty (--when=) takes that part out; what a check waits for goes out with the check.
+                                Its past runs, its switch and your picks for it stay. A shared one is a change of yours to commit: a run is told the new
+                                prompt only once the change is on the commit a run's checkout starts from
+  remove <name>                 delete an automation's file, and what this machine held for it: its switch, its pace, its number of agents, its publish pick.
+                                Nothing is committed: the deletion of a shared one is yours to commit, and everyone else keeps the command until it reaches them.
+                                What was never committed cannot be brought back: all of one kept on this machine, and a shared one's file or its last changes.
+                                The records of its past runs stay
   try --when <shell line>       run a check once, as a tick would, asking what is new since a day ago: what it printed and whether an agent would start; nothing is saved or started;
                                 it has 20 seconds, less than a tick gives a check
   cleanup                       remove what this tool left in the project: the state file and the scheduler's log, then .agent-scheduler/ and the rule hiding it from git once it is empty
@@ -219,17 +232,40 @@ const COMMANDS: Record<string, Command> = {
     const { positionals, values } = parse(args, { prompt: { type: 'string' }, every: { type: 'string' }, when: { type: 'string' }, 'waits-for': { type: 'string' }, private: { type: 'boolean' } }, 1)
     if (values.prompt === undefined) throw new Usage('add needs --prompt, what the agent is told')
     const repo = await project(io.cwd, git)
-    const outcome = await addAutomation(repo, { name: positionals[0]!, prompt: values.prompt, ...(values.every !== undefined ? { every: values.every } : {}), ...(values.when !== undefined ? { when: values.when } : {}), ...(values['waits-for'] !== undefined ? { waitsFor: values['waits-for'] } : {}) }, git, values.private ? { onThisMachine: true } : {})
+    const outcome = await addAutomation(repo, typed(positionals[0]!, values.prompt, values), git, values.private ? { onThisMachine: true } : {})
     if (outcome.ok) {
       // A new command starts off, at its own pace, on this machine: nothing a command of that name left behind here decides for it.
-      // Written only when something was left: a save of the page's own may be writing the state at this moment.
-      const state = await readState(repo)
-      if (withoutCommand(state, outcome.command) !== state) await updateState(repo, s => withoutCommand(s, outcome.command), git)
+      await forget(repo, s => withoutCommand(s, outcome.command), git)
       return outcome
     }
-    const line =
-      outcome.reason === 'taken' ? `that name is taken: ${outcome.folder}` : outcome.reason === 'no-prompt' ? 'the prompt is empty' : outcome.reason === 'bad-name' || outcome.reason === 'long-prompt' ? outcome.detail : `it cannot run as written: ${outcome.detail}`
-    throw new Refused(outcome, line)
+    throw new Refused(outcome, refusal(outcome))
+  },
+
+  async show(args, io, git) {
+    const { positionals } = parse(args, {}, 1)
+    const found = await savedAutomation(await project(io.cwd, git), positionals[0]!)
+    if ('reason' in found) throw new Refused(found, refusal(found))
+    return { ok: true, ...found.automation, file: found.file, ...(found.onThisMachine ? { onThisMachine: true } : {}) }
+  },
+
+  async edit(args, io, git) {
+    const { positionals, values } = parse(args, { prompt: { type: 'string' }, every: { type: 'string' }, when: { type: 'string' }, 'waits-for': { type: 'string' } }, 1)
+    if (values.prompt === undefined && values.every === undefined && values.when === undefined && values['waits-for'] === undefined) throw new Usage('edit needs what to change: --prompt, --every, --when or --waits-for')
+    // A flag left out leaves that part as the file says it; a schedule flag given empty takes its part out.
+    const part = (typed: string | undefined): string | null | undefined => (typed === undefined ? undefined : typed.trim() === '' ? null : typed)
+    const outcome = await editAutomation(await project(io.cwd, git), positionals[0]!, { prompt: values.prompt, every: part(values.every), when: part(values.when), waitsFor: part(values['waits-for']) }, git)
+    if (outcome.ok) return outcome
+    throw new Refused(outcome, refusal(outcome))
+  },
+
+  async remove(args, io, git) {
+    const { positionals } = parse(args, {}, 1)
+    const repo = await project(io.cwd, git)
+    const outcome = await removeAutomation(repo, positionals[0]!, git)
+    if (!outcome.ok) throw new Refused(outcome, refusal(outcome))
+    // What this machine held for the command goes with it, and the last tick's record stops naming it, so a dashboard stops listing it at once.
+    await forget(repo, s => withoutListed(withoutCommand(s, outcome.command), outcome.command), git)
+    return outcome
   },
 
   async try(args, io, git) {
@@ -245,6 +281,25 @@ const COMMANDS: Record<string, Command> = {
     if (outcome.ok) return outcome
     throw new Refused(outcome, `the scheduler is running here (pid ${outcome.pid}): stop it first with agent-scheduler stop`)
   },
+}
+
+/** Take something out of the state, writing it only when it held that: a save of a dashboard's own may be writing the state at this moment, and a project with no state gets none for nothing. */
+async function forget(repo: string, without: (state: State) => State, git: GitRunner): Promise<void> {
+  const state = await readState(repo)
+  if (without(state) !== state) await updateState(repo, without, git)
+}
+
+/** An automation as the command line was given it: its name, its prompt, and the schedule flags that were typed. */
+function typed(name: string, prompt: string, values: { every?: string | undefined; when?: string | undefined; 'waits-for'?: string | undefined }): NewAutomation {
+  return { name, prompt, ...(values.every !== undefined ? { every: values.every } : {}), ...(values.when !== undefined ? { when: values.when } : {}), ...(values['waits-for'] !== undefined ? { waitsFor: values['waits-for'] } : {}) }
+}
+
+/** Why an automation was not saved, shown or removed, as one line for a person. */
+function refusal(outcome: AddRefusal | NotAnAutomation): string {
+  if (outcome.reason === 'taken') return `that name is taken: ${outcome.folder}`
+  if (outcome.reason === 'no-prompt') return 'the prompt is empty'
+  if (outcome.reason === 'bad-schedule') return `it cannot run as written: ${outcome.detail}`
+  return outcome.detail
 }
 
 /** The scheduled command of that name; refused where no skill of the project schedules it, with why when its skill's schedule cannot be read. */

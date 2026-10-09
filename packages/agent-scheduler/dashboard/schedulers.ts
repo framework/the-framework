@@ -341,6 +341,8 @@ export function decided(command: SchedulerCommand, now: Date = new Date()): stri
   if (!command.on) return 'Off'
   if (outcome === undefined || outcome === 'switched off on this machine') return undefined
   if (outcome === 'not due') return 'No work'
+  const unpublished = /^not on (\S+?)( as this clone last saw it)?: /.exec(outcome)
+  if (unpublished) return unpublished[1] === 'HEAD' ? 'Cannot start yet: its skill is not committed' : `Cannot start yet: its skill is not on ${unpublished[1]}${unpublished[2] ? ', as this machine last saw it' : ''}`
   if (outcome.startsWith('started ')) return 'Started a run'
   const paced = /^not due \(last start (.+) ago, /.exec(outcome)
   if (paced) return `Started ${paced[1]} ago, not due yet`

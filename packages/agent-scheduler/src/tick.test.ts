@@ -56,6 +56,8 @@ function deps(over: Partial<TickDeps> & { stateOver?: Partial<State>; commands?:
     now: () => NOW,
     pull: async () => ({ ok: true }),
     sweep: async () => {},
+    // Every scheduled command's skill is where a run's checkout starts, unless a test says otherwise.
+    atStart: async () => ({ ref: 'origin/main', reached: true, there: true }),
     check: async (shell, lastRun) => {
       seen.checks.push(shell)
       seen.since.push(lastRun)
@@ -160,6 +162,47 @@ test('a due command under its cap with quota to spare is marked on the branch, t
   assert.deepEqual(marker.caller, { runner: { host: 'this-box', publish: 'commit' }, host: 'this-box' })
   // The run is handed what its check printed; its prompt stays the command alone, as the marker's does.
   assert.deepEqual(seen.spawned, [{ id: marker.id, prompt: '/work-queue', startedAt: NOW.toISOString(), model: 'opus', publish: 'commit', attached: `${FOUND_OPENING}\n["one entry"]` }])
+})
+
+test("a command that would start and whose skill is not where a run's checkout starts is not started, and says where it is missing; it is asked only then, after the check and the cap, before the coding agent and the quota are read", async () => {
+  const commands = [command('work-queue'), command('answer-comments', { when: 'gh api comments' }), command('triage quick', { every: every('6h') }), command('watch-competitor', { when: 'curl reddit' }), command('plan-tickets', { every: every('6h') })]
+  const asked: string[] = []
+  const order: string[] = []
+  // On origin's default branch: the work-queue skill and the triage skill. The skills of the two commands a person wrote are in this checkout only.
+  const there = new Set(['.claude/skills/work-queue/SKILL.md', '.claude/skills/triage/SKILL.md'])
+  const { deps: d, seen } = deps({
+    commands,
+    atStart: async file => (asked.push(file), order.push('start point'), { ref: 'origin/main', reached: true, there: there.has(file) }),
+    ready: async () => (order.push('ready'), { problems: [], warnings: [] }),
+    // The last ran an hour ago, so its pace says wait: nothing is asked for it.
+    lastStart: async name => (name === 'plan-tickets' ? new Date(NOW.getTime() - 60 * 60_000).toISOString() : undefined),
+    stateOver: { switches: { 'work-queue': ON, 'answer-comments': ON, 'triage quick': ON, 'plan-tickets': ON } },
+  })
+  const record = await tick(d)
+  assert.deepEqual(record.decisions.map(d => [d.command, d.outcome.replace(/^started .*/, 'started')]), [
+    ['work-queue', 'started'],
+    ['answer-comments', "not on origin/main: a run's checkout starts from origin/main, and the command's skill is not there"],
+    ['triage quick', 'started'],
+    ['watch-competitor', 'switched off on this machine'],
+    ['plan-tickets', 'not due (last start 1h ago, every 6h)'],
+  ])
+  assert.deepEqual(asked, ['.claude/skills/work-queue/SKILL.md', '.claude/skills/answer-comments/SKILL.md', '.claude/skills/triage/SKILL.md'], 'only for a command about to start: the file of its skill, the folder of a command with a word being its first word')
+  assert.deepEqual(seen.checks, ['npx queue', 'gh api comments'], 'its check ran first: a command with no work is not asked about')
+  assert.equal(order[0], 'start point', 'before the coding agent is probed')
+  assert.equal(seen.spawned.length, 2)
+  // The cap comes first: a command with a run in flight is not asked about.
+  const capped = deps({ commands: [command('answer-comments')], inFlightCards: [running('r1', 'answer-comments')], atStart: async () => assert.fail('asked for a command at its cap') })
+  assert.match((await tick(capped.deps)).decisions[0]!.outcome, /^cap reached/)
+})
+
+test("a skill that is missing where a run's checkout starts says how the start point was read: origin that could not be reached, a repository with no remote", async () => {
+  const offline = deps({ commands: [command('answer-comments')], atStart: async () => ({ ref: 'origin/main', reached: false, there: false }) })
+  assert.deepEqual((await tick(offline.deps)).decisions, [{ command: 'answer-comments', outcome: "not on origin/main as this clone last saw it: a run's checkout starts from origin/main, and the command's skill is not there" }])
+  const local = deps({ commands: [command('answer-comments')], atStart: async () => ({ ref: 'HEAD', reached: true, there: false }) })
+  assert.deepEqual((await tick(local.deps)).decisions, [{ command: 'answer-comments', outcome: "not on HEAD: a run's checkout starts from HEAD, and the command's skill is not there" }])
+  // Origin not reached and the skill there as last seen: the run starts, and its own fetch decides.
+  const stale = deps({ commands: [command('answer-comments')], atStart: async () => ({ ref: 'origin/main', reached: false, there: true }) })
+  assert.match((await tick(stale.deps)).decisions[0]!.outcome, /^started /)
 })
 
 test('a check is given the time its command last started, to the whole second, or the time it was switched on on this machine when that is later or it never started', async () => {

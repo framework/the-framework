@@ -21,6 +21,7 @@ The Automations page: the page this package adds to the dashboard, at `/automati
 [9] pace pick: a person's choice, on one machine, of a pace for one scheduled command there: "whenever there is work", or an interval with an optional time of day; kept in the state, not in the skill. A command with no pace pick runs at its skill's pace.
 [10] agents pick: a person's choice, on one machine, of that machine's number for one scheduled command: the machine starts another run of the command only while fewer than that number are in flight on any machine that shares the repository. A whole number from 1 to 99; kept in the state, not in the skill. A command with no agents pick has its skill's number.
 [11] cap: how many runs of one scheduled command a machine lets be in flight at once: the machine starts another run of the command only while fewer than its number are in flight on any machine that shares the repository. Its number is the agents pick [10] made on it, a person's own number for the command there, else the number the command's skill gives, 1 when the skill gives none.
+[12] start point: the commit a scheduled run's checkout starts from: origin's default branch (`origin/main`), or, in a repository with no remote, the commit the person's own checkout is on (`HEAD`). Never the files in a person's own checkout: a skill written there and not committed, or committed and not yet on origin's default branch, is not on the start point.
 
 ## Business logic — TL;DR
 
@@ -96,13 +97,15 @@ A page row [6] shows, from the top:
   3. How many agents may work on the command at once, as `schedulers.ts` says the cap [11] in force ("Up to 3 at once"), only when that is more than one or the person set an agents pick [10] for the command ("One at a time" for an agents pick of 1).
   4. "your pick" again, only when that number is the person's agents pick and not the skill's. A page row with a pace pick [9] and an agents pick shows "your pick" twice, once after each.
   5. How far its runs publish on this machine, by its publish pick [3]: "Commits its work" for a command nobody picked for, "Opens a pull request", "Publishes nothing".
-  6. What the scheduler last decided for the command, as `schedulers.ts` says it for a person: "Off" for a command switched off on this machine, "No work", "Started a run", "Started 2h ago, not due yet", "Next: Saturday 10:00" for a command waiting for its time of day ("Next: as soon as the scheduler looks" when that time has passed since the last tick), "One is already running", else the tool's own words with a capital ("Quota: …", "Check failed: …"). This part is absent for a command that is switched on and that no tick [4] has decided yet.
+  6. What the scheduler last decided for the command, as `schedulers.ts` says it for a person: "Off" for a command switched off on this machine, "No work", "Started a run", "Started 2h ago, not due yet", "Next: Saturday 10:00" for a command waiting for its time of day ("Next: as soon as the scheduler looks" when that time has passed since the last tick), "One is already running", "Cannot start yet: its skill is not on origin/main" for a command the scheduler would have started and whose skill is not on the start point [12], else the tool's own words with a capital ("Quota: …", "Check failed: …"). This part is absent for a command that is switched on and that no tick [4] has decided yet.
 
 "Started a run" is a button that opens that agent's page in the dashboard; every other decision is plain text.
 
 On the right of the page row stand "Edit" and the checkbox.
 
 A scheduled command whose skill is only under `.agents/skills` is listed like any other, since the tick records it. Its page row says why it never starts ("Cannot start: its skill is only in .agents/skills, which Claude Code does not read"), whether its checkbox is checked or not: checking it starts nothing.
+
+A scheduled command whose skill is not on the start point [12] is listed like any other too: the tick records the schedule as the skill files in the person's own checkout say it, so a skill the person just wrote there has its page row at the next tick. Switched off, its page row says "Off" like any other. Switched on, it reads like any other switched-on command ("No work", "Next: Saturday 10:00") until the scheduler would otherwise start a run of it; from then on its page row says why none started, as `schedulers.ts` words it: "Cannot start yet: its skill is not on origin/main", with ", as this machine last saw it" after it when the scheduler could not reach origin, or "Cannot start yet: its skill is not committed" in a repository with no remote.
 
 ### The checkbox
 

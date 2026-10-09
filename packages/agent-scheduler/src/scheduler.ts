@@ -10,6 +10,7 @@ import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
 import { inFlight, lastStart } from './records.js'
 import { readSchedule } from './schedule.js'
 import { readState, stateDir, updateState, withoutPid, type State, type TickRecord } from './state.js'
+import { atStartOf } from './start-point.js'
 import { runCheck, tick } from './tick.js'
 
 /**
@@ -37,6 +38,7 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     now,
     pull: () => pullFileBranch(repo, DATA_BRANCH, { git, log }),
     sweep: () => sweep(repo, { host, isAlive: isPidAlive, now, git, log, resume: resumeDetached(repo) }),
+    atStart: atStartOf(repo, git),
     check: (shell, lastRun) => runCheck(repo, shell, CHECK_TIMEOUT_MS, lastRun),
     lastStart: command => lastStart(repo, command, schedule),
     inFlight: command => inFlight(repo, command, schedule),

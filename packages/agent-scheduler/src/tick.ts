@@ -5,13 +5,14 @@ import type { RunCard } from '@openagt/skill-logs'
 import { LAST_RUN_ENV, RUN_SKILLS_DIR } from './names.js'
 import { dueFrom, localStamp, paceInForce, paceText } from './pace.js'
 import { quotaBoundaryStatus, quotaHeadroom } from './quota-boundary.js'
-import { checkFound, commandPrompt, isDue, lastRunValue, type Schedule, type ScheduledCommand } from './schedule.js'
+import { checkFound, commandPrompt, isDue, lastRunValue, skillFile, type Schedule, type ScheduledCommand } from './schedule.js'
+import type { StartPoint } from './start-point.js'
 import { capInForce, publishInForce, switchedOnAt, type ListedCommand, type State, type TickDecision, type TickRecord } from './state.js'
 
 /**
  * One tick (#1774): pull the branch, sweep, read the schedule, and for each command decide in
  * the cheapest order — can the coding agent run it, is it switched on on this machine, is it due by its pace (this machine's, else its skill's), is its check
- * due, is its cap reached, can the coding agent start at all, is there quota — then mark and spawn one run. Every decision is one line in the state, so a
+ * due, is its cap reached, is its skill where a run's checkout starts, can the coding agent start at all, is there quota — then mark and spawn one run. Every decision is one line in the state, so a
  * dashboard or a person reads why nothing started without a log. A run its check started is handed
  * what the check printed, with its prompt.
  *
@@ -37,6 +38,8 @@ export interface TickDeps {
   now: () => Date
   pull: () => Promise<{ ok: true } | { ok: false; error: string }>
   sweep: () => Promise<unknown>
+  /** Where a run's checkout starts, brought up to date, and whether a file is there: a skill that is not is no command to the run's agent. */
+  atStart: (file: string) => Promise<StartPoint & { there: boolean }>
   /** Run a check, which reads `lastRun` as `$LAST_RUN`. */
   check: (shell: string, lastRun: string) => Promise<CheckResult>
   /** When the command last started on any machine, ISO; nothing when it never did. */
@@ -119,6 +122,13 @@ export async function tick(deps: TickDeps): Promise<TickRecord> {
     const running = await deps.inFlight(command.name)
     if (running.length >= cap) {
       decide(`cap reached (${running.length} in flight: ${running.map(describe).join(', ')})`)
+      continue
+    }
+    // A run's checkout starts from the project's published commit, not from the files here: a skill
+    // that is not there is no command to the agent. Asked only now, when a run would start: it fetches.
+    const start = await deps.atStart(skillFile(command))
+    if (!start.there) {
+      decide(`not on ${start.ref}${start.reached ? '' : ' as this clone last saw it'}: a run's checkout starts from ${start.ref}, and the command's skill is not there`)
       continue
     }
     // Both read once per tick, and only now: each spawns the agent's CLI.

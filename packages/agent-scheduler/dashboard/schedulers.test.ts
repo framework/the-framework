@@ -246,6 +246,12 @@ describe('in words', () => {
     const elsewhere = 'not a command of the coding agent: its skill is only under .agents/skills, not .claude/skills'
     expect(said(elsewhere, { on: false })).toBe('Cannot start: its skill is only in .agents/skills, which Claude Code does not read')
     expect(said(elsewhere)).toBe('Cannot start: its skill is only in .agents/skills, which Claude Code does not read')
+    // A command that was due and whose skill is not yet where a run's checkout starts: in the remote's words, saying when origin was not reached, or, with no remote, as not committed. Switched off, it is Off like any other.
+    const unpublished = "not on origin/main: a run's checkout starts from origin/main, and the command's skill is not there"
+    expect(said(unpublished)).toBe('Cannot start yet: its skill is not on origin/main')
+    expect(said(unpublished, { on: false })).toBe('Off')
+    expect(said("not on origin/main as this clone last saw it: a run's checkout starts from origin/main, and the command's skill is not there")).toBe('Cannot start yet: its skill is not on origin/main, as this machine last saw it')
+    expect(said("not on HEAD: a run's checkout starts from HEAD, and the command's skill is not there")).toBe('Cannot start yet: its skill is not committed')
   })
 
   test('the publish menu: every pick with a git host package, Nothing, Commit and Publish branch without; the pick in force is listed even when not offered', () => {

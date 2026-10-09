@@ -180,6 +180,11 @@ export async function readSchedule(repo: string): Promise<Schedule> {
   return schedule
 }
 
+/** The file a command's skill is, from the repository root: the skills folder it was read from, the command's first word, the skill's file (`.claude/skills/triage/SKILL.md` for `triage quick`). */
+export function skillFile(command: Pick<ScheduledCommand, 'name' | 'dir'>): string {
+  return `${command.dir}/${command.name.split(' ')[0]}/${SKILL_FILE}`
+}
+
 /** The prompt a command runs with: its slash command, which the agent's harness expands, the word after it handed to the skill. */
 export function commandPrompt(name: string): string {
   return `/${name}`

@@ -2,7 +2,7 @@ What the module knows of a project's scheduler and how it changes it: one projec
 
 ## Context
 
-**User story**: the user sees, per project, whether the scheduler is on and what its last tick [5] decided, and per scheduled command what it does, whether it runs on this machine, how often at most it starts here, how many agents may work on it at once, how far its runs publish here and what the scheduler last decided for it, each said in plain words ("Every 2 days at 10:00", "Up to 3 at once", "Opens a pull request", "No work", "One is already running", "Next: Saturday 10:00").
+**User story**: the user sees, per project, whether the scheduler is on and what its last tick [5] decided, and per scheduled command what it does, whether it runs on this machine, how often at most it starts here, how many agents may work on it at once, how far its runs publish here and what the scheduler last decided for it, each said in plain words ("Every 2 days at 10:00", "Up to 3 at once", "Opens a pull request", "No work", "One is already running", "Next: Saturday 10:00"). A command the user switched on, whose skill they wrote in their own checkout and that is not on the start point [11] yet, reads "Cannot start yet: its skill is not on origin/main" once the scheduler would otherwise have started it.
 
 **Problem**: the module reads another process's output. A project whose command fails, or a state [1] written by an older version, must not break the page, the section or the card for every other project.
 
@@ -18,6 +18,7 @@ What the module knows of a project's scheduler and how it changes it: one projec
 [8] pace pick: a person's choice, on one machine, of a pace for one scheduled command there: "whenever there is work", or an interval with an optional time of day; kept in the state, not in the skill. A command with no pace pick runs at its skill's pace.
 [9] agents pick: a person's choice, on one machine, of that machine's number for one scheduled command: the machine starts another run of the command only while fewer than that number are in flight on any machine that shares the repository. A whole number from 1 to 99; kept in the state, not in the skill. A command with no agents pick has its skill's number.
 [10] cap: how many runs of one scheduled command a machine lets be in flight at once: the machine starts another run of the command only while fewer than its number are in flight on any machine that shares the repository. Its number is the agents pick [9] made on it, a person's own number for the command there, else the number the command's skill gives, 1 when the skill gives none.
+[11] start point: the commit a scheduled run's checkout starts from: origin's default branch (`origin/main`), or, in a repository with no remote, the commit the person's own checkout is on (`HEAD`). Never the files in a person's own checkout: a skill written there and not committed, or committed and not yet on origin's default branch, is not on the start point.
 
 ## Business logic — TL;DR
 
@@ -108,11 +109,12 @@ A new cushion is saved by running `agent-scheduler offset -- <points>` in every 
   2. The command is off on this machine: "Off", whatever the last tick said.
   3. The command is on and the last tick decided nothing for it, or still said `switched off on this machine` (it was switched on since): nothing is said.
   4. The decision is `not due`, the check found no work: "No work".
-  5. The decision starts with `started `: "Started a run".
-  6. The decision is `not due (last start <age> ago, …)`, the interval of the command's pace [7] has not passed: "Started <age> ago, not due yet", the age as the tick wrote it ("Started 2h ago, not due yet", "Started less than a minute ago, not due yet").
-  7. The decision is `not due (next start from <YYYY-MM-DD HH:MM>, …)`, the command waits for its time of day: "Next: " and that time as a coming time, below ("Next: Saturday 10:00").
-  8. The decision is `cap reached (<N> in flight: …)`: "One is already running" when N is 1, else "<N> are already running" ("3 are already running").
-  9. Any other decision: the tool's own line with a capital ("Quota: …", "Check failed: …", "Not ready: …").
+  5. The decision starts with `not on <start point>: `, or with `not on <start point> as this clone last saw it: ` (`not on origin/main: a run's checkout starts from origin/main, and the command's skill is not there`): the scheduler would have started the command, and its skill is not on the start point [11]. "Cannot start yet: its skill is not on <start point>", the start point as the tick named it ("Cannot start yet: its skill is not on origin/main"), followed by ", as this machine last saw it" when the tick's line says so, origin not having been reached ("Cannot start yet: its skill is not on origin/main, as this machine last saw it"); or, when the tick named `HEAD`, as in a repository with no remote, "Cannot start yet: its skill is not committed". A command switched off on this machine says "Off" by rule 2, like any other.
+  6. The decision starts with `started `: "Started a run".
+  7. The decision is `not due (last start <age> ago, …)`, the interval of the command's pace [7] has not passed: "Started <age> ago, not due yet", the age as the tick wrote it ("Started 2h ago, not due yet", "Started less than a minute ago, not due yet").
+  8. The decision is `not due (next start from <YYYY-MM-DD HH:MM>, …)`, the command waits for its time of day: "Next: " and that time as a coming time, below ("Next: Saturday 10:00").
+  9. The decision is `cap reached (<N> in flight: …)`: "One is already running" when N is 1, else "<N> are already running" ("3 are already running").
+  10. Any other decision: the tool's own line with a capital ("Quota: …", "Check failed: …", "Not ready: …").
 - **A coming time**, for a person, from a local time and the time now, by how many local days lie between the two days: "today 10:00" on the same day, "tomorrow 10:00" on the next, the weekday from the second to the sixth day after ("Saturday 10:00"), else the day and the month ("15 Oct 10:00"). The time is written in 24 hours with two digits each. A time that is now or already past reads "as soon as the scheduler looks": it was read off an old tick, and the scheduler has not ticked since ("Next: as soon as the scheduler looks").
 - **The publish picks' labels**: "Nothing", "Commit", "Publish branch", "Open PR", "Merge on green", in that order.
 - **Which picks a project is offered**: all five where one of the project's packages provides a git host; "Nothing", "Commit" and "Publish branch" only where none does, since no pull request can be opened there. The pick a menu shows, when the project is not offered it, is listed after them, so a menu always lists the entry it shows.

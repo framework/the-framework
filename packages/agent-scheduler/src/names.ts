@@ -49,6 +49,9 @@ export function isTime(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) && !Number.isNaN(Date.parse(value))
 }
 
+/** How long a tick waits for origin's default branch to be fetched before it starts a run: the wait a run's own checkout gives the same fetch. */
+export const START_POINT_FETCH_MS = 5_000
+
 /** How often a started scheduler ticks. */
 export const TICK_MS = 60_000
 

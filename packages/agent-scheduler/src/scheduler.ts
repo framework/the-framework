@@ -7,7 +7,7 @@ import { readClaudeQuota } from '@openagt/agent-driver-claude'
 import { isPidAlive, markerCard, readyToRun, resumeDetached, runIdFrom, spawnRun, sweep, withdrawMarker, writeMarker } from '@openagt/agent-runner'
 import { DATA_BRANCH, nodeGitRunner, pullFileBranch, type GitRunner } from '@openagt/agent-data'
 import { CHECK_TIMEOUT_MS, SCHEDULER_LOG, TICK_MS } from './names.js'
-import { inFlight, lastStart } from './records.js'
+import { inFlight, lastFailed, lastStart } from './records.js'
 import { readSchedule } from './schedule.js'
 import { isSwitchedOn, namesGivenUp, readState, stateDir, updateState, withoutListed, withoutName, withoutPid, type State, type TickRecord } from './state.js'
 import { atStartOf } from './start-point.js'
@@ -44,6 +44,7 @@ export async function tickProject(repo: string, opts: { git?: GitRunner; log?: (
     atStart: atStartOf(repo, git),
     check: (shell, lastRun) => runCheck(repo, shell, CHECK_TIMEOUT_MS, lastRun),
     stillOn: async command => isSwitchedOn(await readState(repo), command),
+    lastFailed: () => lastFailed(repo, schedule, host),
     lastStart: command => lastStart(repo, command, schedule, host),
     inFlight: command => inFlight(repo, command, schedule, host),
     ready: () => readyToRun(repo, 'claude-code'),

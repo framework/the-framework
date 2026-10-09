@@ -118,7 +118,7 @@ export function AutomationsPage({ projects }: ModulePageProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-6">
       <h1 className="text-lg font-semibold">Automations</h1>
-      <p className="mt-1 text-sm text-muted-foreground">What starts by itself while nobody is at the keyboard. Your choices, on this machine. Every row starts switched off.</p>
+      <p className="mt-1 text-sm text-muted-foreground">What starts by itself while nobody is at the keyboard. Each row's switch and picks are yours, on this machine. Every row starts switched off.</p>
       {!loaded && <p className="mt-6 text-sm text-muted-foreground">Loading…</p>}
       {rows.map(row => {
         const status = schedulerStatus(row)
@@ -444,10 +444,11 @@ function PaceFields({ scheduled, draft, disabled, onChange }: { scheduled: Sched
   )
 }
 
-/** A row's one line: when the command runs, how many agents at once when that is worth saying, how far its runs publish, and what the scheduler last decided for it; a decision that started a run opens that agent. */
+/** A row's one line: when the command runs, how many agents at once when that is worth saying, how far its runs publish, what the scheduler last decided for it, and that its last run failed when it did; a decision that started a run opens that agent, and the failure opens the run that failed. */
 function Summary({ host, project, scheduled }: { host: ReturnType<typeof useModuleHost>; project: ModuleProject; scheduled: SchedulerCommand }) {
   const last = decided(scheduled)
   const run = scheduled.decision?.run
+  const failed = scheduled.failed
   return (
     <p className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
       <span>{pace(scheduled)}</span>
@@ -481,6 +482,15 @@ function Summary({ host, project, scheduled }: { host: ReturnType<typeof useModu
           ) : (
             <span>{last}</span>
           )}
+        </>
+      )}
+      {/* Nothing is tried again by itself after a failure: the row says so until a later run of it starts, and opens the run that failed. */}
+      {failed !== undefined && (
+        <>
+          <span aria-hidden>·</span>
+          <button type="button" onClick={() => host.openAgent(project.id, failed)} className="text-danger underline">
+            Last run failed
+          </button>
         </>
       )}
     </p>

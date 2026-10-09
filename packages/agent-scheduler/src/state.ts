@@ -43,6 +43,8 @@ export interface ListedCommand {
   onThisMachine?: true
   /** Whether the command is a person's own automation as the tool wrote it: `show`, `edit` and `remove` take it. */
   editable?: true
+  /** The id of the command's last run, when that run failed: said until a later run of the command starts. */
+  failed?: string
 }
 
 /** One tick as the state remembers it. */

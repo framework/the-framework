@@ -41,6 +41,16 @@ describe('a scheduler row, from what status printed', () => {
     ])
   })
 
+  test("a command the tick lists with a failed last run carries that run's id; anything else said there is no run", () => {
+    const row = schedulerRow(GEMSTACK, { on: true, running: true, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], schedule: [{ command: 'work-queue', when: 'npx queue', failed: '2026-10-03T09-00-00-000Z' }, { command: 'triage', every: '6h', failed: true }, { command: 'plan', every: '6h', failed: '' }, { command: 'tidy', every: '1d' }] } })
+    expect(row.commands.map(c => [c.command, c.failed])).toEqual([
+      ['work-queue', '2026-10-03T09-00-00-000Z'],
+      ['triage', undefined],
+      ['plan', undefined],
+      ['tidy', undefined],
+    ])
+  })
+
   test("a command the tick lists as an automation the tool wrote is one the page can open again and remove; anything else the tick says there is not", () => {
     const row = schedulerRow(GEMSTACK, { on: true, running: true, lastTick: { at: '2026-10-03T10:00:00.000Z', decisions: [], schedule: [{ command: 'answer-comments', every: '15m', editable: true }, { command: 'tidy', every: '1d', onThisMachine: true, editable: true }, { command: 'work-queue', when: 'npx queue' }, { command: 'triage', every: '6h', editable: 'yes' }] } })
     expect(row.commands.map(c => [c.command, c.editable])).toEqual([
@@ -142,12 +152,12 @@ describe('in words', () => {
     expect(schedulerStatus({ ...row, on: false }).label).toBe('off')
   })
 
-  test('the pace, as a sentence: an interval spelled out, what the check waits for, or both; a check with no plain line is "when its check finds work"', () => {
+  test('the pace, as a sentence: an interval spelled out, what the check waits for, or both; a check with no plain line is "when its shell line prints something"', () => {
     const base = { command: 'a', on: true, publish: 'commit' as const }
     expect(pace({ ...base, every: '1d' })).toBe('Every 1 day')
-    expect(pace({ ...base, when: 'npx queue' })).toBe('When its check finds work')
+    expect(pace({ ...base, when: 'npx queue' })).toBe('When its shell line prints something')
     expect(pace({ ...base, when: 'npx queue', waitsFor: 'when the queue holds a task' })).toBe('When the queue holds a task')
-    expect(pace({ ...base, every: '6h', when: 'x' })).toBe('Every 6 hours at most, when its check finds work')
+    expect(pace({ ...base, every: '6h', when: 'x' })).toBe('Every 6 hours at most, when its shell line prints something')
     expect(pace({ ...base, every: '15m', when: 'x', waitsFor: 'when a ticket has no plan' })).toBe('Every 15 minutes at most, when a ticket has no plan')
     expect([spelled('1m'), spelled('1h'), spelled('7d'), spelled('2w'), spelled('1mo'), spelled('soon'), spelled('0d'), spelled('d'), spelled('-3h'), spelled('06h')]).toEqual(['1 minute', '1 hour', '7 days', '2 weeks', '1 month', 'soon', '0d', 'd', '-3h', '6 hours'])
     // An interval of the skill's the tool would not have read is shown as written.
@@ -204,9 +214,9 @@ describe('in words', () => {
     expect(draftOf({ ...skill, pace: { work: false, every: '2d', since } as never })).toEqual({ kind: 'every', count: '2', unit: 'd', at: '' })
 
     // What the row would read as, saved.
-    expect(pace(withDraft(skill, { kind: 'every', count: '2', unit: 'd', at: '10:00' }))).toBe('Every 2 days from 10:00, when its check finds work')
-    expect(pace(withDraft({ ...skill, pace: { every: '30m', since } }, { kind: 'skill' }))).toBe('Every 6 hours at most, when its check finds work')
-    expect(pace(withDraft(skill, { kind: 'work' }))).toBe('When its check finds work')
+    expect(pace(withDraft(skill, { kind: 'every', count: '2', unit: 'd', at: '10:00' }))).toBe('Every 2 days from 10:00, when its shell line prints something')
+    expect(pace(withDraft({ ...skill, pace: { every: '30m', since } }, { kind: 'skill' }))).toBe('Every 6 hours at most, when its shell line prints something')
+    expect(pace(withDraft(skill, { kind: 'work' }))).toBe('When its shell line prints something')
     expect(withDraft(skill, { kind: 'every', count: '', unit: 'd', at: '' })).toBe(skill)
   })
 

@@ -46,7 +46,7 @@ describe('the Automations page', () => {
     const { host } = scheduler()
     show(host)
     const gemstack = await screen.findByRole('region', { name: 'gemstack' })
-    expect(screen.getByText('What starts by itself while nobody is at the keyboard. Your choices, on this machine. Every row starts switched off.')).toBeTruthy()
+    expect(screen.getByText("What starts by itself while nobody is at the keyboard. Each row's switch and picks are yours, on this machine. Every row starts switched off.")).toBeTruthy()
     expect(within(gemstack).getByText('Scheduler on').className).toMatch(/text-success/)
     expect(within(gemstack).getByText('opus')).toBeTruthy()
 
@@ -553,6 +553,19 @@ describe('the Automations page', () => {
     show(host)
     await screen.findByText('The scheduler could not be read: no such command')
     expect(screen.queryByRole('button', { name: /New automation/ })).toBeNull()
+  })
+
+  test('a row whose last run failed says so, whatever its switch, and opens the run that failed; a row whose last run did not fail says nothing', async () => {
+    const status = { ...STATUS, lastTick: { ...STATUS.lastTick, schedule: STATUS.lastTick.schedule.map(c => (c.command === 'work-queue' ? { ...c, failed: '2026-10-03T09-00-00-000Z' } : c)) } }
+    const { host } = hostAnswering((_, args) => (args[0] === 'status' ? { ok: true, output: status } : { ok: true, output: { ok: true } }))
+    show(host)
+    await screen.findByRole('region', { name: 'gemstack' })
+    // Switched off here, and still said: nothing tries the work again by itself.
+    const failed = within(row('/work-queue')).getByRole('button', { name: 'Last run failed' })
+    expect(failed.className).toMatch(/text-danger/)
+    fireEvent.click(failed)
+    expect(host.openAgent).toHaveBeenCalledWith('p1', '2026-10-03T09-00-00-000Z')
+    expect(within(row('/post-merge-cleanup')).queryByRole('button', { name: 'Last run failed' })).toBeNull()
   })
 
   test('a decision that started a run opens that agent; any other decision is plain words', async () => {

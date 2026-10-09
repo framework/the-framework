@@ -42,6 +42,24 @@ export async function lastStart(repo: string, command: string, schedule: Schedul
   return latest
 }
 
+/**
+ * The commands whose last run failed, each with that run's id: the latest run a command has, by
+ * its start, ended `failed`. A command whose latest run is still going, ended well, was stopped by
+ * a person or waits for an answer is not among them: a later run takes the failure's place. Counted
+ * like the starts: every machine's runs for a skill's command, this machine's for an automation
+ * kept here.
+ */
+export async function lastFailed(repo: string, schedule: Schedule, host: string, deps: LogsDeps = {}): Promise<Record<string, string>> {
+  const latest = new Map<string, RunCard>()
+  for (const card of await listRuns(repo, {}, deps)) {
+    const command = commandOf(card, schedule, host)
+    if (command === undefined || !isTime(card.startedAt)) continue
+    const known = latest.get(command)
+    if (!known || card.startedAt > known.startedAt) latest.set(command, card)
+  }
+  return Object.fromEntries([...latest].filter(([, card]) => card.status === 'failed').map(([command, card]) => [command, card.id]))
+}
+
 /** The runs of one command still in flight: on any machine for a skill's command, on this one for an automation kept here. */
 export async function inFlight(repo: string, command: string, schedule: Schedule, host: string, deps: LogsDeps = {}): Promise<RunCard[]> {
   const cards = await listRuns(repo, {}, deps)

@@ -208,9 +208,42 @@ async function project(cwd: string, git: GitRunner): Promise<string> {
 
 type Options = Record<string, { type: 'string' | 'boolean' }>
 
+/**
+ * The arguments with every text made safe for the reader of options: a text may open with a dash
+ * (`- fix the tests`, an answer that is a list), and a line of a project's hook file hands it
+ * over as it was typed. An argument that is one of the command's own flags, alone or with `=` and
+ * a value, is a flag; a flag that takes a text takes the next argument whole, whatever it opens
+ * with, unless that is another of the command's flags, which leaves it with no text for the
+ * reader to refuse. One word behind a dash that is no flag of the command (`--help`, a flag
+ * misspelled) is left for the reader to refuse too: nobody's prompt is that. Everything else is a
+ * text, handed over after `--`.
+ */
+export function withTextsApart(args: readonly string[], options: Options): string[] {
+  const flags: string[] = []
+  const texts: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!
+    if (arg === '--') {
+      texts.push(...args.slice(i + 1))
+      break
+    }
+    const option = ownFlag(arg, options)
+    if (!option) (/^--?[A-Za-z][\w-]*$/.test(arg) ? flags : texts).push(arg)
+    else if (option.type === 'string' && !arg.includes('=') && i + 1 < args.length && !ownFlag(args[i + 1]!, options)) flags.push(`${arg}=${args[++i]}`)
+    else flags.push(arg)
+  }
+  return [...flags, '--', ...texts]
+}
+
+/** The command's own flag an argument is, alone (`--model`) or with `=` and a value; nothing for any other argument. */
+function ownFlag(arg: string, options: Options): Options[string] | undefined {
+  const name = /^--([a-z][a-z-]*)(=[\s\S]*)?$/.exec(arg)?.[1]
+  return name !== undefined && Object.hasOwn(options, name) ? options[name] : undefined
+}
+
 function parse<O extends Options>(args: string[], options: O, min: number, max: number = min) {
   try {
-    const parsed = parseArgs({ args, options, allowPositionals: true, strict: true })
+    const parsed = parseArgs({ args: withTextsApart(args, options), options, allowPositionals: true, strict: true })
     if (parsed.positionals.length < min || parsed.positionals.length > max) {
       throw new Usage(`expected ${max === min ? min : `${min} to ${max}`} argument(s), got ${parsed.positionals.length}`)
     }

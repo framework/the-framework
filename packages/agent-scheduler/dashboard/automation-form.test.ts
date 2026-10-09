@@ -61,10 +61,10 @@ describe('a new automation', () => {
 
   test('when it would run, as its row would say it; nothing while nothing says when', () => {
     expect(draftSentence(draft())).toBe('Every 1 day')
-    expect(draftSentence(draft({ count: '15', unit: 'm', when: CHECK }))).toBe('Every 15 minutes at most, when its check finds work')
+    expect(draftSentence(draft({ count: '15', unit: 'm', when: CHECK }))).toBe('Every 15 minutes at most, when its shell line prints something')
     expect(draftSentence(draft({ count: '15', unit: 'm', when: CHECK, waitsFor: 'when someone commented' }))).toBe('Every 15 minutes at most, when someone commented')
     expect(draftSentence(draft({ paced: false, when: CHECK, waitsFor: 'when someone commented' }))).toBe('When someone commented')
-    expect(draftSentence(draft({ paced: false, when: CHECK }))).toBe('When its check finds work')
+    expect(draftSentence(draft({ paced: false, when: CHECK }))).toBe('When its shell line prints something')
     expect(draftSentence(draft({ paced: false }))).toBeUndefined()
     expect(draftSentence(draft({ count: '', when: CHECK }))).toBeUndefined()
     // Before a name is typed the sentence is already there: it does not name the command.

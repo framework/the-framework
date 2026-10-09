@@ -48,6 +48,8 @@ export interface SchedulerCommand {
   onThisMachine?: true
   /** Whether the command is a person's own automation as the tool wrote it: the page can open it to be saved again, and remove it. */
   editable?: true
+  /** The id of the command's last run, when that run failed and no later run of it has started. */
+  failed?: string
   /** What the scheduler's last tick decided for the command, when it decided anything. */
   decision?: TickDecision
 }
@@ -147,6 +149,7 @@ export function schedulerRow(project: ModuleProject, output: unknown): Scheduler
       ...(typeof row['description'] === 'string' ? { description: row['description'] } : {}),
       ...(row['onThisMachine'] === true ? { onThisMachine: true as const } : {}),
       ...(row['editable'] === true ? { editable: true as const } : {}),
+      ...(typeof row['failed'] === 'string' && row['failed'] !== '' ? { failed: row['failed'] } : {}),
       ...(decision ? { decision } : {}),
     })
   }
@@ -231,7 +234,7 @@ const sentence = (text: string): string => text.charAt(0).toUpperCase() + text.s
  * work, which may be later that day.
  */
 export function pace(command: SchedulerCommand): string {
-  const waits = command.waitsFor ?? 'when its check finds work'
+  const waits = command.waitsFor ?? 'when its shell line prints something'
   const skills = command.every === undefined ? undefined : parseInterval(command.every)
   const inForce = paceInForce(command.pace, { ...(skills ? { every: skills } : {}), ...(command.when !== undefined ? { when: command.when } : {}) })
   // An interval of the skill's the tool would not have read is shown as written.

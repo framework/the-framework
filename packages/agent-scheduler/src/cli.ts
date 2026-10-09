@@ -4,10 +4,11 @@ import { projectRoot } from '@openagt/skill-branches'
 import { schedulerStatus, startScheduler, stopScheduler, tickProject } from './scheduler.js'
 import { initHooks } from './init.js'
 import { cleanup } from './cleanup.js'
-import { PUBLISH_PICKS, isSwitchedOn, updateState, withAgents, withPace, withPublish, withSwitch, type PublishPick } from './state.js'
+import { PUBLISH_PICKS, isSwitchedOn, readState, updateState, withAgents, withoutCommand, withPace, withPublish, withSwitch, type PublishPick } from './state.js'
 import { parseInterval, parseTimeOfDay, sinceNow, takesTimeOfDay } from './pace.js'
 import { MAX_AGENTS, isAgents } from './names.js'
 import { readSchedule, type ScheduledCommand } from './schedule.js'
+import { addAutomation, tryCheck } from './automation.js'
 
 /**
  * The command line: JSON on stdout, one line for a person on stderr, and the exit code says how
@@ -32,6 +33,13 @@ export const USAGE = `usage: agent-scheduler <command>
                                 for days, weeks or months (2d 10:00, this machine's time); work for whenever its check finds work; skill for the skill's own pace again, taken for any name
   agents <command> <skill|N>    how many runs of a scheduled command may be in flight at once: this machine starts another only while fewer than N are in flight
                                 on any machine; a whole number from 1 to ${MAX_AGENTS}; skill for the skill's own number again, taken for any name
+  add <name> --prompt <text> [--every <N<m|h|d|w|mo>>] [--when <shell line>] [--waits-for <line>]
+                                a person's own automation, saved as a command skill of the project: the prompt is the skill's text, and its schedule a pace (--every),
+                                a check (--when, a shell line that prints what is new; it may read $LAST_RUN), or both; --waits-for says in one plain line what the check
+                                waits for. The file is yours to commit: its command starts no run before it is on the commit a run's checkout starts from.
+                                Refused for a name a skill of the project already has
+  try --when <shell line>       run a check once, as a tick would, asking what is new since a day ago: what it printed and whether an agent would start; nothing is saved or started;
+                                it has 20 seconds, less than a tick gives a check
   cleanup                       remove what this tool left in the project: the state file and the scheduler's log, then .agent-scheduler/ and the rule hiding it from git once it is empty;
                                 refused while the state names a scheduler that is alive; the command a dashboard asks for when a project is removed with its files
 
@@ -201,6 +209,30 @@ const COMMANDS: Record<string, Command> = {
     // Taking a number back needs no scheduled command: one left for a skill that is gone can always be taken back.
     if (to !== 'skill') await scheduled(repo, name)
     return { ok: true, ...(await updateState(repo, s => withAgents(s, name, count), git)) }
+  },
+
+  async add(args, io, git) {
+    const { positionals, values } = parse(args, { prompt: { type: 'string' }, every: { type: 'string' }, when: { type: 'string' }, 'waits-for': { type: 'string' } }, 1)
+    if (values.prompt === undefined) throw new Usage('add needs --prompt, what the agent is told')
+    const repo = await project(io.cwd, git)
+    const outcome = await addAutomation(repo, { name: positionals[0]!, prompt: values.prompt, ...(values.every !== undefined ? { every: values.every } : {}), ...(values.when !== undefined ? { when: values.when } : {}), ...(values['waits-for'] !== undefined ? { waitsFor: values['waits-for'] } : {}) }, git)
+    if (outcome.ok) {
+      // A new command starts off, at its own pace, on this machine: nothing a command of that name left behind here decides for it.
+      // Written only when something was left: a save of the page's own may be writing the state at this moment.
+      const state = await readState(repo)
+      if (withoutCommand(state, outcome.command) !== state) await updateState(repo, s => withoutCommand(s, outcome.command), git)
+      return outcome
+    }
+    const line =
+      outcome.reason === 'taken' ? `the project already has a skill there: ${outcome.folder}` : outcome.reason === 'no-prompt' ? 'the prompt is empty' : outcome.reason === 'bad-name' ? outcome.detail : `it cannot run as written: ${outcome.detail}`
+    throw new Refused(outcome, line)
+  },
+
+  async try(args, io, git) {
+    const { values } = parse(args, { when: { type: 'string' } }, 0)
+    if (values.when === undefined || !values.when.trim()) throw new Usage('try needs --when, the shell line to run')
+    const repo = await project(io.cwd, git)
+    return { ok: true, ...(await tryCheck(repo, values.when.trim(), new Date())) }
   },
 
   async cleanup(args, io, git) {

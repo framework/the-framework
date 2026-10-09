@@ -3,6 +3,7 @@ import { Button, Checkbox, Tooltip, TooltipContent, TooltipTrigger, cn, formatAg
 import type { PublishPick } from '../src/state.js'
 import { MAX_AGENTS } from '../src/names.js'
 import { MAX_COUNT, PACE_UNITS, parseInterval, takesTimeOfDay, type PaceUnit } from '../src/pace.js'
+import { NewAutomation } from './NewAutomation.js'
 import { PUBLISH_LABELS, UNIT_WORDS, agentsArgs, agentsDraftOf, atOnce, atOnceWords, decided, saysAtOnce, draftOf, ownPace, pace, paceArgs, paceProblem, publishChoices, publishes, readSchedulers, schedulerStatus, withAgentsDraft, withDraft, type AgentsDraft, type PaceDraft, type SchedulerCommand, type SchedulerRow } from './schedulers.js'
 
 // The Automations page: what starts by itself while nobody is at the keyboard. One group per
@@ -13,7 +14,8 @@ import { PUBLISH_LABELS, UNIT_WORDS, agentsArgs, agentsDraftOf, atOnce, atOnceWo
 // last decided for it, and its switch. "Edit" opens the row in place to pick when it runs (as its
 // skill says, whenever there is work, or every so many minutes, hours, days, weeks or months, with
 // a time of day for days or more), how many agents may work on it at once, and how far its runs
-// publish; one row is open at a time. All of it is this machine's, read with
+// publish; one row is open at a time. "New automation", beside a project's name, opens a form for a
+// prompt of the person's own, saved as a command of the project (`NewAutomation.tsx`). The rest is this machine's, read with
 // `agent-scheduler status` and saved with `switch`, `pace`, `agents` and `publish`: no tracked file
 // changes. A command is off until its switch is flipped here, runs at its skill's pace and with its
 // skill's number of agents until others are picked here, and commits its work until a level is
@@ -40,6 +42,8 @@ export function AutomationsPage({ projects }: ModulePageProps) {
     openId.current = next?.id
     setEditing(next)
   }
+  /** The project whose "New automation" form is open; one at a time. */
+  const [adding, setAdding] = useState<string | undefined>()
   const editButtons = useRef(new Map<string, HTMLButtonElement>())
   /** Close the row and hand the keyboard back to its Edit button; nothing when the person has opened another row since. */
   const close = (id: string): void => {
@@ -106,7 +110,14 @@ export function AutomationsPage({ projects }: ModulePageProps) {
                   {note !== undefined && note !== 'off' && note !== NOTHING_SCHEDULED && `: ${note}`}
                 </span>
               )}
+              {/* One form at a time, and none offered over an open one: opening another would drop what was typed. */}
+              {row.error === undefined && adding === undefined && (
+                <button type="button" onClick={() => setAdding(row.project.id)} aria-label={`New automation in ${row.project.name}`} className="ml-auto text-xs underline">
+                  New automation
+                </button>
+              )}
             </div>
+            {adding === row.project.id && <NewAutomation project={row.project} ticking={row.on && row.running} onClose={() => setAdding(undefined)} onSaved={() => void reload().catch(() => {})} />}
             {row.error !== undefined && <p role="alert" className="py-3 text-sm text-danger">{`The scheduler could not be read: ${row.error}`}</p>}
             {row.error === undefined && !row.on && <p className="py-3 text-sm text-muted-foreground">The scheduler is off in this project, so nothing here starts. It starts with the dashboard once the project has run `npx agent-scheduler init`, or by hand with `npx agent-scheduler start`.</p>}
             {row.error === undefined && row.on && !row.running && <p className="py-3 text-sm text-warning">The scheduler is on but its process is not running, so nothing here starts. `npx agent-scheduler start`, run in the project, starts it.</p>}

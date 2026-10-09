@@ -306,6 +306,71 @@ test("agents writes this machine's number of agents at once for a scheduled comm
   }
 })
 
+test("add saves a person's own automation as a command skill of the project, which its switch then takes; what cannot be saved is refused with why, and a text that opens with a dash is the flag's own", async () => {
+  const repo = await testRepo()
+  try {
+    const added = await run(repo, 'add', 'answer-comments', '--prompt=- Answer each new comment below.', '--every', '15m', '--when=gh api comments --jq .', '--waits-for', 'when someone commented')
+    assert.deepEqual([added.code, added.out, added.err], [0, { ok: true, command: 'answer-comments', file: '.claude/skills/answer-comments/SKILL.md', startsFrom: 'origin/main' }, ''])
+    const text = await readFile(join(repo, '.claude', 'skills', 'answer-comments', 'SKILL.md'), 'utf8')
+    assert.equal(text, '---\nname: answer-comments\ndescription: "- Answer each new comment below."\ndisable-model-invocation: true\nschedule:\n  every: 15m\n  waits-for: "when someone commented"\n  when: |-\n    gh api comments --jq .\n---\n\n- Answer each new comment below.\n')
+    // A row like any other: its switch is this machine's.
+    assert.equal((await run(repo, 'switch', 'answer-comments', 'on')).code, 0)
+    assert.deepEqual(Object.keys((await readState(repo)).switches ?? {}), ['answer-comments'])
+
+    // Saved anew under a name a command had before: what that one left on this machine does not decide for the new one.
+    await run(repo, 'publish', 'answer-comments', 'merge')
+    await run(repo, 'pace', 'answer-comments', '5m')
+    await run(repo, 'agents', 'answer-comments', '3')
+    await run(repo, 'switch', 'work-queue-like', 'off')
+    await rm(join(repo, '.claude', 'skills', 'answer-comments'), { recursive: true })
+    const anew = await run(repo, 'add', 'answer-comments', '--prompt', 'Delete nothing.', '--every', '1d')
+    assert.equal(anew.code, 0)
+    const state = await readState(repo)
+    assert.deepEqual([state.switches, state.publishes, state.paces, state.agents], [undefined, undefined, undefined, undefined], 'it starts switched off, at its own pace, like any new row')
+
+    // A name nothing was left for: the state file is not written, so a save of the page's own in flight loses nothing.
+    const stateBefore = await readFile(statePath(repo), 'utf8')
+    assert.equal((await run(repo, 'add', 'brand-new', '--prompt', 'p', '--every', '1d')).code, 0)
+    assert.equal(await readFile(statePath(repo), 'utf8'), stateBefore)
+
+    const again = await run(repo, 'add', 'answer-comments', '--prompt', 'Other words.', '--every', '1d')
+    assert.deepEqual([again.code, again.out, again.err], [1, { ok: false, reason: 'taken', folder: '.claude/skills/answer-comments' }, 'the project already has a skill there: .claude/skills/answer-comments'])
+    const unnamed = await run(repo, 'add', 'Answer Comments', '--prompt', 'p', '--every', '1d')
+    assert.deepEqual([unnamed.code, unnamed.err], [1, 'a name is lower-case letters, digits and single or double dashes, and starts with a letter or a digit'])
+    const silent = await run(repo, 'add', 'x', '--prompt', '  ', '--every', '1d')
+    assert.deepEqual([silent.code, silent.out, silent.err], [1, { ok: false, reason: 'no-prompt' }, 'the prompt is empty'])
+    const never = await run(repo, 'add', 'x', '--prompt', 'p')
+    assert.deepEqual([never.code, never.out, never.err], [1, { ok: false, reason: 'bad-schedule', detail: 'neither every nor when says when' }, 'it cannot run as written: neither every nor when says when'])
+    const promptless = await run(repo, 'add', 'x', '--every', '1d')
+    assert.equal(promptless.code, 2)
+    assert.match(promptless.err, /^add needs --prompt, what the agent is told/)
+    assert.equal((await run(repo, 'add', '--prompt', 'p', '--every', '1d')).code, 2, 'no name')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('try runs a check once in the project and answers what it printed and whether an agent would start; nothing is saved', async () => {
+  const repo = await testRepo()
+  try {
+    const before = await readFile(statePath(repo), 'utf8').catch(() => 'no state')
+    const tried = await run(repo, 'try', '--when=printf \'["%s"]\' "$(basename "$PWD")"')
+    assert.equal(tried.code, 0)
+    const out = tried.out as { ok: boolean; lastRun: string; ran: boolean; due: boolean; printed: string }
+    assert.deepEqual([out.ok, out.ran, out.due, out.printed], [true, true, true, '["repo"]'], 'run at the repository root')
+    assert.match(out.lastRun, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/)
+    const age = Date.now() - Date.parse(out.lastRun)
+    assert.ok(age >= 24 * 60 * 60 * 1000 && age < 24 * 60 * 60 * 1000 + 60_000, `since a day ago, not ${out.lastRun}`)
+    const failing = await run(repo, 'try', '--when', 'echo nope >&2; exit 1')
+    assert.deepEqual([failing.code, (failing.out as { ran: boolean }).ran, (failing.out as { error: string }).error], [0, false, 'nope'], 'a check that fails is an answer, not a failure of the command')
+    assert.equal((await run(repo, 'try')).code, 2)
+    assert.equal((await run(repo, 'try', '--when', '  ')).code, 2)
+    assert.equal(await readFile(statePath(repo), 'utf8').catch(() => 'no state'), before)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
 test('tick on a project with the scheduler off: the branch is pulled, nothing is decided, the state remembers the tick', async () => {
   const repo = await testRepo()
   try {

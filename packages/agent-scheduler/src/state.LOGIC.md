@@ -13,6 +13,7 @@ The state [1]: one JSON file under `.agent-scheduler/` at the repository root, w
 [5] pace pick: a person's choice, on one machine, of a pace for one scheduled command there: "whenever there is work", or an interval with an optional time of day; kept in the state, not in the skill. A command with no pace pick runs at its skill's pace.
 [6] agents pick: a person's choice, on one machine, of that machine's number for one scheduled command: the machine starts another run of the command only while fewer than that number are in flight on any machine that shares the repository. A whole number from 1 to 99; kept in the state, not in the skill. A command with no agents pick has its skill's number.
 [7] cap: how many runs of one scheduled command a machine lets be in flight at once: the machine starts another run of the command only while fewer than its number are in flight on any machine that shares the repository. Its number is the agents pick [6] made on it, a person's own number for the command there, else the number the command's skill gives, 1 when the skill gives none.
+[8] automation: a person's own prompt saved as a command skill of the project (a skill run as the slash command `/<name>`, never picked up by the coding agent on its own): the file `.claude/skills/<name>/SKILL.md`, whose text is the prompt and whose front matter carries the `schedule` the person picked (the key where a skill says when its command is due), an interval, a check (a shell line whose output says whether the command is due) or both. Written by `agent-scheduler add` or the "New automation" form of the Automations page; from then on a skill like any other, and its command a scheduled command like any other.
 
 ## Business logic — TL;DR
 
@@ -20,6 +21,7 @@ The state [1]: one JSON file under `.agent-scheduler/` at the repository root, w
 - **A pace pick per machine** - a command's pace pick [5] is kept only where a person set one, and taking it back removes it; a command with none runs at its skill's pace.
 - **An agents pick per machine** - a command's agents pick [6] is kept only where a person set one, and taking it back removes it; the cap [7] in force is that number, else the skill's.
 - **A publish pick per machine** - a command's publish pick [4] is kept once a person set it, and decides how far the command's runs publish on this machine, `nothing` meaning no level; the runs of a command nobody picked for commit their work and push nothing.
+- **Nothing left of one command** - a command's schedule switch [3], pace pick [5], agents pick [6] and publish pick [4] taken out of the state together, by the command's name; what a command saved anew under a name starts from on this machine (`agent-scheduler add`); a state that holds nothing under the name is answered as it is, so nothing is written for it.
 - **A scheduler ending clears only its own pid** - the pid and the start time are removed only when the pid is the ending process's; a pid the next scheduler wrote meanwhile stays.
 - **What the state holds** - `on`, `keepAlive`, `model`, `spendOffset`, `switches`, `paces`, `agents`, `publishes`, the scheduler's `pid` and `startedAt` while its process runs, and `lastTick`: when, one decision per command and per skill whose `schedule` key, in its front matter, cannot be read (`command`, `outcome`, `run` when one started), the schedule's commands as the tick read them, each with what its skill says it does and its skill's number of agents at once when that is more than one, and a `note` when the tick decided nothing per command.
 - **The defaults** - off, no keep-alive, `opus`, a spend cushion of 100/14 points; a missing file, and a file that does not parse, read as the defaults with nothing else, so a corrupt state never stops a tick.
@@ -86,6 +88,18 @@ The cap [7] in force for a command on this machine is its entry in `agents` when
 Setting a command's publish pick takes the command's name and the pick, `nothing`, `commit`, `branch`, `pr` or `merge`: the command's entry in `publishes` is set to it. A pick of `commit` is kept like any other. A pick is never removed: another pick replaces it.
 
 A command's publish pick on this machine is its entry in `publishes` when it has one, else `commit`. An entry that is none of the five picks, in a state file edited by hand, counts as no entry. How far a run of the command publishes on this machine follows from that pick: `commit`, `branch`, `pr` or `merge` is the run's publish level, and `nothing` means the run is given no level and publishes nothing. So a run of a command nobody picked for is given the level `commit`: it commits its work and pushes nothing.
+
+### Nothing left of one command
+
+#### Context
+
+**User story**: a person deletes a skill whose command they had switched on, and later saves an automation [8] under the same name. The new command is another prompt, and they never switched it on.
+
+**Problem**: the state keeps a command's schedule switch [3] and picks by the command's name, and keeps them when the skill is gone. A switch left on for a command that is gone would start a new command of that name unasked, at the old one's pace and publishing as far as the old one did.
+
+#### Business logic
+
+Given a command's name, the state is answered with nothing of that command left: its entry is taken out of `switches`, `paces`, `agents` and `publishes`, each only where it has one, and a list left empty is dropped from the state, as when a pick is taken back. Every other command's entries, and everything else in the state, stay as they are. For a name the state holds nothing under, the answer is the very same state, not a copy of it, so a caller can tell that there is nothing to write. `agent-scheduler add` (`cli.ts`) applies it after it saved an automation, and writes the state only when the answer is another state: a save of a dashboard's own may be writing the state at that moment, and a new name needs no write. So the command starts switched off on this machine, at its skill's pace, with its skill's number of agents, its runs committing their work and pushing nothing.
 
 ### A scheduler ending clears only its own pid
 

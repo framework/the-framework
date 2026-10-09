@@ -210,9 +210,11 @@ async function boundary(deps: TickDeps) {
 export async function runCheck(repo: string, shell: string, timeoutMs: number, lastRun: string): Promise<CheckResult> {
   const { execFile } = await import('node:child_process')
   return new Promise<CheckResult>(resolve => {
-    execFile('sh', ['-c', shell], { cwd: repo, timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, [LAST_RUN_ENV]: lastRun } }, (err, stdout, stderr) => {
+    const child = execFile('sh', ['-c', shell], { cwd: repo, timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, [LAST_RUN_ENV]: lastRun } }, (err, stdout, stderr) => {
       resolve({ ok: !err, stdout: String(stdout), stderr: err && !String(stderr).trim() ? err.message : String(stderr) })
     })
+    // Nobody types to a check: one that reads its input finds it at its end at once, where it would wait out its whole budget.
+    child.stdin?.end()
   })
 }
 

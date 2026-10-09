@@ -212,13 +212,18 @@ export function lastRunValue(iso: string): string {
  * found again only by an agent that asks from that earlier time itself.
  */
 export function checkFound(stdout: string, lastRun: string): string {
+  return `${FOUND_OPENING}\n${foundOutput(stdout, lastRun)}`
+}
+
+/** What a check printed, as a run is handed it and as a person trying the check is shown it: without NUL characters and outer blank lines, cut when it is long, the cut said in a last line. */
+export function foundOutput(stdout: string, lastRun: string): string {
   const printed = stdout.replaceAll('\0', '').trim()
-  if (printed.length <= FOUND_MAX) return `${FOUND_OPENING}\n${printed}`
+  if (printed.length <= FOUND_MAX) return printed
   const fits = printed.slice(0, FOUND_MAX)
   // A line that ends exactly at the limit is whole: the line end is the next character.
   const lineEnd = printed[FOUND_MAX] === '\n' ? FOUND_MAX : fits.lastIndexOf('\n')
   const shown = lineEnd > 0 ? fits.slice(0, lineEnd) : fits
-  return `${FOUND_OPENING}\n${shown}\n(cut: the check printed ${printed.length} characters, these are the first ${shown.length}; it asked what is new since ${lastRun})`
+  return `${shown}\n(cut: the check printed ${printed.length} characters, these are the first ${shown.length}; it asked what is new since ${lastRun})`
 }
 
 /**

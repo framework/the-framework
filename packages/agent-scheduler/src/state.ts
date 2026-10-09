@@ -124,6 +124,25 @@ export function withoutPid(state: State, pid: number): State {
   return rest
 }
 
+/**
+ * The state with nothing of one command left: its switch, its publish pick, its pace and its
+ * number of agents. What a command saved anew under a name starts from: a switch left on for a
+ * command of that name that is gone would start the new one unasked.
+ */
+export function withoutCommand(state: State, command: string): State {
+  let rest = state
+  for (const key of ['switches', 'publishes', 'paces', 'agents'] as const) {
+    const picks = state[key]
+    if (!picks || !Object.hasOwn(picks, command)) continue
+    const { [command]: _gone, ...others } = picks as Record<string, unknown>
+    // The state itself is answered when it holds nothing of the command, so a caller can tell there is nothing to write.
+    rest = { ...rest }
+    if (Object.keys(others).length) Object.assign(rest, { [key]: others })
+    else delete rest[key]
+  }
+  return rest
+}
+
 /** When a person switched a scheduled command on on this machine, ISO; nothing for a command that is off. The state is a file a person may edit: anything but a time is off. */
 export function switchedOnAt(state: State, command: string): string | undefined {
   const at = state.switches?.[command]

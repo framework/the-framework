@@ -49,6 +49,18 @@ export function isTime(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) && !Number.isNaN(Date.parse(value))
 }
 
+/** The longest name a person's own automation may have: a folder name, and a command a person types. */
+export const MAX_NAME = 64
+
+/**
+ * Whether a text can name a person's own automation: lower-case letters, digits and dashes, a
+ * letter or a digit first, and never three dashes in a row, which end a skill file's front matter
+ * for a coding agent wherever they stand.
+ */
+export function isCommandName(text: string): boolean {
+  return /^[a-z0-9][a-z0-9-]*$/.test(text) && !text.includes('---')
+}
+
 /** How long a tick waits for origin's default branch to be fetched before it starts a run: the wait a run's own checkout gives the same fetch. */
 export const START_POINT_FETCH_MS = 5_000
 
@@ -57,6 +69,9 @@ export const TICK_MS = 60_000
 
 /** How much of what a check printed a run is handed, in characters: enough for a list of work, short of a prompt nobody can read. */
 export const FOUND_MAX = 8_000
+
+/** How long a check that is only being tried may run: less than a tick gives one, and less than a dashboard waits for a command's answer. */
+export const TRY_TIMEOUT_MS = 20_000
 
 /** How long a command's check may run before it counts as failed. */
 export const CHECK_TIMEOUT_MS = 60_000

@@ -112,9 +112,15 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
 
 ## The tick
 - The checks in the cheapest order: the coding agent can run the command, it is switched
-  on, it is due by its pace, the check says due, the cap, then the quota. The quota is read
+  on, it is due by its pace, the check says due, the cap, its skill is where a run's
+  checkout starts, then the quota. The quota is read
   only when everything else says start, because the reading spawns the agent's CLI and its
   usage fetch is refused upstream when asked too often.
+- A command whose skill is not on the commit a run's checkout starts from is not started,
+  and says so. Asked only when a run would otherwise start, with origin's default branch
+  fetched first as the run's own checkout does. Picked over starting it anyway, where the
+  agent was told a command it does not know each time the command was due; and over asking
+  for every command on every tick, which fetched every minute.
 - The quota gate is OpenAgent's spend boundary, copied: a window in force may be used
   only as far as the week has elapsed, plus the user's cushion, half a day when unset.
   Picked over a plainer line (a window at 100% stands down): nothing would pace the week.

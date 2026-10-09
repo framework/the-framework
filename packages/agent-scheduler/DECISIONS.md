@@ -115,6 +115,19 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   shared one changes its file, which the person commits. The rows the project's skills
   bring are not edited or removed from the page. Picked over a page that edits any
   scheduled skill: a skill's file is its author's.
+- A row has one place for its pace on the Automations page, whoever made it: its Edit
+  panel, the same for every row. For a row a person made, the pace picked there is the
+  automation's own, saved into its file with its prompt and its check, and their machine
+  keeps only a time of day. For a row a skill brings, it is that machine's pick, and the
+  skill's pace is one of the choices. Picked over two places, the automation's pace in one
+  form and the machine's pick in another, which a person could not tell apart.
+- A person may start one run of a row at once, from the Automations page: whatever its
+  switch, without waiting for its pace, and whatever quota is left, as for any run a person
+  starts. A row with a check still starts only when the check finds work, and its run is
+  handed what the check printed; the number of agents at once holds, and so does that its
+  skill is where a run's checkout starts. The run counts as the row's last start, so its
+  pace counts from it. Picked over starting the command from the launcher: that run gets
+  neither the row's publish pick nor what its check found.
 - The state, `.agent-scheduler/state.json`, untracked, per user, hidden through git's
   exclude file the way `.branches/` is: on or off, keep-alive, the model, the spend
   cushion, this machine's switches, paces, numbers of agents and publish picks, the
@@ -180,8 +193,8 @@ decision. An AI proposes a bullet and asks; it never adds or rewrites one.
   scheduled command, with its switch, its pace, its number of agents and its publish pick),
   a Settings section (the spend cushion) and an Overview card (on or off, the last tick).
   All read `status` and write through `offset`, `switch`, `pace`, `agents`, `publish`,
-  `add`, `edit` and `remove`; an automation is read through `show`, and a check is tried
-  through `try`.
+  `add`, `edit` and `remove`; an automation is read through `show`, a check is tried
+  through `try`, and a row is started at once through `now`.
   Picked over a hook line per setting that a dashboard runs, and over the dashboard reading
   the state file by name. The rows are on a page of their own, picked over rows inside
   Settings: Settings keeps only what reaches every project.

@@ -1,6 +1,6 @@
 {
   "name": "@openagt/dashboard",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "OpenAgent: a local dashboard and daemon for coding agents. It starts an agent through the project's own start hook and shows every agent from the files it keeps; it runs no coding agent itself.",
   "keywords": [
     "ai",
@@ -62,6 +62,7 @@
     "@base-ui-components/react": "1.0.0-rc.0",
     "@openagt/agent-data": "workspace:*",
     "@openagt/files": "workspace:*",
+    "@openagt/init": "workspace:*",
     "@openagt/skill-branches": "workspace:*",
     "@openagt/skill-github": "workspace:*",
     "@openagt/skill-logs": "workspace:*",

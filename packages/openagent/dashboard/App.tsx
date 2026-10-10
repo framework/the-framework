@@ -385,6 +385,8 @@ export function App() {
             setProjectsKey(k => k + 1)
             showDashboard()
           }}
+          // A skill written or deleted gives or takes a page: read the projects and their modules again now.
+          onSkillsChanged={() => setProjectsKey(k => k + 1)}
         />
       )
     }

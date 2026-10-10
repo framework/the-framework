@@ -5,6 +5,7 @@ import { readProjectHooks, runCheckHook, startLineTakesBase, type StartReadiness
 import { isPublishPick, publishPickIn, type PublishPick } from '../publish-levels.js'
 import { hasRemote } from '../has-remote.js'
 import { currentBranch } from '../dashboard/git-status.js'
+import { waitingSkills } from '../dashboard/start-branch.js'
 import { pickDirectory, type PickDirectoryResult } from '../pick-directory.js'
 import { projectGitHost } from '../store/git-host.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
@@ -130,7 +131,13 @@ export async function onCommands(projectId: string): Promise<ProjectLauncher | n
   const [commands, hooks, gitHost, remote, main, local] = await Promise.all([readProjectCommands(cwd), readProjectHooks(cwd), projectGitHost(cwd).catch(() => undefined), hasRemote(cwd), originDefaultBranch(cwd), currentBranch(cwd)])
   // Both read locally, never fetched. `HEAD` is a folder on no branch: there is no local branch to start from.
   const startFrom = hooks.start !== undefined && startLineTakesBase(hooks.start) && remote && main !== undefined && local !== undefined && local !== 'HEAD' ? { main: main.slice('origin/'.length), local } : undefined
-  return { commands, startHook: hooks.start !== undefined, gitHost: gitHost !== undefined, remote, ...(startFrom ? { startFrom } : {}) }
+  // A skill written into the folder reaches agents once it is on the branch they start from: until then its command is said to be waiting.
+  const { waiting } = await waitingSkills(cwd, commands.map(command => command.name))
+  const listed = commands.map(command => {
+    const waits = waiting.get(command.name)
+    return waits ? { ...command, waiting: waits.branch, ...(waits.here ? { here: true as const } : {}) } : command
+  })
+  return { commands: listed, startHook: hooks.start !== undefined, gitHost: gitHost !== undefined, remote, ...(startFrom ? { startFrom } : {}) }
 }
 
 /**

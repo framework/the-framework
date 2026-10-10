@@ -103,6 +103,23 @@ already made, and lists it in its pull request; for anything else it proposes an
   among a project's own dependencies is not read: OpenAgent's copy and its rule are the
   only ones. Picked over a project's own copy winning, which gave one package two ways
   into a project.
+- "Add project" stays small: it writes no skill. The project's page then says how many
+  skills it has ("This project has 4 of 25 skills"), with an "Add skills" button that
+  opens the same list with ticks `npx @openagt/init` shows in a terminal, through that
+  package's own code, so the two cannot drift apart. Picked over "Add project" writing
+  the skills itself, which put files into every project a person adds, and over only
+  pointing to the terminal.
+- When a skill in a project has a newer text, the project's page says so in one line ("3
+  skills have a newer text") with an "Update" button; the texts are written only on that
+  press, and the person reads the change in git. Picked over saying nothing until asked,
+  and over writing every text again unasked.
+- After a change the dashboard offers the same commit init does: one commit of the skill
+  files that change wrote or deleted, those alone, on the branch the folder is on, never
+  a push. While a skill's text is in the folder but not yet on the branch agents start
+  from, the page says so ("tickets: waiting to reach main"), and the launcher does not
+  take its command, so it never offers a command the agent does not have. Picked over
+  leaving the commit to the person with a line of advice, and over committing and
+  pushing unasked.
 - A module may bring a section of the Settings page, shown after OpenAgent's own
   sections, where a project has its package. It reads and writes through the package's own
   command. Picked over OpenAgent's own sections knowing a package's file and a hook line

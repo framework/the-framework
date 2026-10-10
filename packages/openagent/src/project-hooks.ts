@@ -110,6 +110,8 @@ export interface RunHooksOptions {
   timeoutMs?: number
   /** The environment the lines run with; default the daemon's own. */
   env?: NodeJS.ProcessEnv
+  /** The lines to run, of the ones the file holds; every line when absent. */
+  only?: readonly string[]
 }
 
 /**
@@ -122,6 +124,7 @@ export async function runProjectHooks(cwd: string, kind: HookKind, opts: RunHook
   const log = opts.log ?? (() => {})
   const hooks = await readProjectHooks(cwd, message => log(`[openagent] ${kind} hook (${basename(cwd)}): ${message}`))
   for (const line of hooks[kind]) {
+    if (opts.only && !opts.only.includes(line)) continue
     const outcome = await runLine(cwd, line, opts.timeoutMs ?? HOOK_TIMEOUT_MS, opts.env ?? process.env)
     log(`[openagent] ${kind} hook (${basename(cwd)}): ${line}: ${outcome.summary}`)
     for (const said of outcome.stderr.split('\n').map(s => s.trimEnd()).filter(Boolean)) log(`[openagent]   ${said}`)

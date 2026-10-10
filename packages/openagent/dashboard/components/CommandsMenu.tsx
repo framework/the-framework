@@ -107,12 +107,13 @@ export function CommandsMenu({
           <DropdownMenuLabel>Commands</DropdownMenuLabel>
           {commands.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">This project has no commands.</div>}
           {commands.map(c => {
+            // A skill written into the folder and not yet on the branch agents start from: an agent started now does not have its command.
             const itemProps = {
-              disabled: busy,
+              disabled: busy || c.waiting !== undefined,
               onClick: () => onLoad(`/${c.name} `, `/${c.name}`),
               className: 'items-start',
             }
-            const label = <OptionLabel label={`/${c.name}`} />
+            const label = <OptionLabel label={`/${c.name}`} {...(c.waiting !== undefined ? { description: `waiting to reach ${c.waiting}` } : {})} />
             if (!c.description)
               return (
                 <DropdownMenuItem key={c.name} {...itemProps}>

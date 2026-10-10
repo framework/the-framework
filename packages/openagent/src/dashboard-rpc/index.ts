@@ -21,6 +21,7 @@ export { onQuota } from './quota.js'
 export { onModels } from './models.js'
 export { checkDevices, type DeviceCheck } from './devices.js'
 export { onModules, runModuleCommand, readModule, type DashboardModule, type ModuleCommandResult, type ModuleReadResult } from './modules.js'
+export { onProjectSkills, sendChangeSkills, sendCommitSkills, type ProjectSkills, type ProjectSkill, type ChangeSkillsResult } from './skills.js'
 
 import * as reads from './reads.js'
 import * as control from './control.js'
@@ -30,6 +31,7 @@ import * as quota from './quota.js'
 import * as models from './models.js'
 import * as devices from './devices.js'
 import * as modules from './modules.js'
+import * as skills from './skills.js'
 import { streamAgentEvents } from './events.js'
 
 /** One RPC: called with whatever the browser sent, answering with whatever JSON.stringify keeps. */
@@ -50,7 +52,7 @@ export type RpcHandler = (...args: never[]) => unknown
 export const RPC_HANDLERS: Record<string, RpcHandler> = Object.assign(
   Object.create(null) as Record<string, RpcHandler>,
   Object.fromEntries(
-    [reads, control, projects, preferences, quota, models, devices, modules]
+    [reads, control, projects, preferences, quota, models, devices, modules, skills]
       .flatMap(module => Object.entries(module))
       .filter((entry): entry is [string, RpcHandler] => typeof entry[1] === 'function'),
   ),

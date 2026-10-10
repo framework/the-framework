@@ -2,6 +2,7 @@ import type { OpenAgentEvent, ProjectError } from '../../src/index.js'
 import { StartAgentForm } from './StartAgentForm.js'
 import { ProjectActions } from './ProjectActions.js'
 import { ProjectErrorBanner } from './ProjectErrorBanner.js'
+import { ProjectSkillsLine } from './ProjectSkills.js'
 import { AgentOverview } from './AgentOverview.js'
 import { OpenQuestions } from './OpenQuestions.js'
 import { ScrollArea } from './ui/scroll-area.js'
@@ -28,6 +29,7 @@ export function ProjectHome({
   onOpenAgent,
   errors,
   onProjectRemoved,
+  onSkillsChanged,
 }: {
   projectId: string
   /** The project's name, for the launcher's chip; absent until the projects are read. */
@@ -49,6 +51,8 @@ export function ProjectHome({
   errors?: ProjectError[] | undefined
   /** Told once the project is off the list, so the shell leaves its page. */
   onProjectRemoved?: (() => void) | undefined
+  /** Told once the project's skills were written, deleted or committed: its pages may have changed. */
+  onSkillsChanged?: (() => void) | undefined
 }) {
   return (
     <>
@@ -56,6 +60,8 @@ export function ProjectHome({
       {/* Above everything, because an agent started on a project whose agent-data branch cannot
           reach origin (#1599) works from stale tickets and a queue nobody else will see. */}
       <ProjectErrorBanner errors={errors} />
+      {/* The project's skills, and the door to add some: a new project has almost none (#2023). */}
+      <ProjectSkillsLine key={projectId} projectId={projectId} onChanged={onSkillsChanged} />
       {/* Laid out as an agent's page is: what waits for the person fills the page from the top, in
           the chat's column, and scrolls there; the box to start an agent stays at the bottom, in
           the place and at the width of an agent's message box. */}

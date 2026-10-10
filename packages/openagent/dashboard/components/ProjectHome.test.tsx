@@ -9,6 +9,7 @@ vi.mock('../rpc/reads.js', () => ({ onDocs }))
 // The sections are tested on their own; here they are stand-ins.
 vi.mock('./ProjectActions.js', () => ({ ProjectActions: () => <div>actions</div> }))
 vi.mock('./ProjectErrorBanner.js', () => ({ ProjectErrorBanner: () => null }))
+vi.mock('./ProjectSkills.js', () => ({ ProjectSkillsLine: () => <div>skills line</div> }))
 vi.mock('./StartAgentForm.js', () => ({ StartAgentForm: () => <div>start form</div> }))
 vi.mock('./AgentOverview.js', () => ({ AgentOverview: () => <div>overview</div> }))
 vi.mock('./OpenQuestions.js', () => ({ OpenQuestions: () => <div>open questions</div> }))

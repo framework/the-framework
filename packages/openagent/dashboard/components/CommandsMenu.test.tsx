@@ -42,6 +42,15 @@ describe('CommandsMenu', () => {
     expect(onLoad).toHaveBeenCalledWith('/work-queue ', '/work-queue')
   })
 
+  test('a command whose skill has not reached the branch agents start from says so, and cannot be picked', () => {
+    const { onLoad } = mount({ commands: [{ name: 'plan', waiting: 'main' }, { name: 'ux' }] })
+    expect(screen.getByText('waiting to reach main')).toBeTruthy()
+    fireEvent.click(screen.getByText('/plan'))
+    expect(onLoad).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('/ux'))
+    expect(onLoad).toHaveBeenCalledWith('/ux ', '/ux')
+  })
+
   test('a project with no commands says so', () => {
     mount({ commands: [] })
     expect(screen.getByText('This project has no commands.')).toBeTruthy()

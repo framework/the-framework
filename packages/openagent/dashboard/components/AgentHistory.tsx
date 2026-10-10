@@ -588,8 +588,8 @@ function AgentHistoryRow({
             it used to pulse identically whether it was mid-edit or had been idle for an hour. */}
         {/* The saving dot pulses green like the session pill's (#1431), so the two surfaces
             describe the same window the same way. */}
-        {/* `parked` alone covers the cloud-side wait: its local status is done, but the SPEC's
-            "waiting" always comes with the still dot, wherever the session is parked. */}
+        {/* `parked` alone covers the cloud-side wait: its local status is done, but "waiting"
+            always comes with the still dot, wherever the session is parked. */}
         {(status === 'running' || parked) && (
           <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full', parked ? 'bg-muted-foreground' : 'animate-pulse bg-primary')} />
         )}

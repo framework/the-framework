@@ -74,21 +74,35 @@ already made, and lists it in its pull request; for anything else it proposes an
 - Notifications are the browser's only: the bell alerts in the open tab. Posting to a
   channel is a skill's, fired by the tool that runs the agent when a run ends. Picked over
   the dashboard's Discord watchers, which posted only while the dashboard was running.
-- The dashboard grows by modules: a package among a project's dependencies that adds to the
-  dashboard (pages, Overview cards, link actions, side-rail tabs, a run's summary,
-  Settings sections) is a module; a skill that brings pages is a module that is also a skill.
-  The Files tab is the first module that is no skill. Picked over keeping Files a folder inside OpenAgent,
-  which gave it a boundary but taught the module contract nothing, and named module over widget.
+- The dashboard grows by modules: a package that adds to the dashboard (pages, Overview
+  cards, link actions, side-rail tabs, a run's summary, Settings sections) is a module;
+  a skill that brings pages is a module that is also a skill. A module is one OpenAgent
+  brings itself, or a package among a project's dependencies, whoever wrote it. The
+  Files tab is the first module that is no skill. Picked over keeping Files a folder
+  inside OpenAgent, which gave it a boundary but taught the module contract nothing, and
+  named module over widget.
 - The packages every project wants are built in: OpenAgent depends on them and uses them
-  for every project through the same contract as a project's own package (a module by its
-  `./dashboard` export, a provider of a kind of data and the writer of its hook lines by its
-  `openagent` key), and a project's own copy wins. They are Files, the runner, the
-  packages that read a project's runs and checkouts, and the GitHub package, so an empty
-  folder starts an agent, shows it, and can be put on GitHub. A built-in git host is a
-  project's only when the project's remote is on that host: it was not chosen by the
-  project, so it does not answer for a project on another host. One list names them, and nothing else in OpenAgent names a package. Picked
-  over each project installing them itself, which left a project with nothing installed
-  unable to start an agent or to see one.
+  for every project through the same contract as any package (a module by its
+  `./dashboard` export, a provider of a kind of data and the writer of its hook lines by
+  its `openagent` key). They are Files, the runner, the packages that read a project's
+  runs and checkouts, and the GitHub package, so an empty folder starts an agent, shows
+  it, and can be put on GitHub. A built-in git host is a project's only when the
+  project's remote is on that host: it was not chosen by the project, so it does not
+  answer for a project on another host. Picked over each project installing them itself,
+  which left a project with nothing installed unable to start an agent or to see one.
+- A project has a skill when the skill's text is in the project, where the coding agents
+  read it (`.claude/skills/<name>/SKILL.md`, `.agents/skills/<name>/SKILL.md`).
+  OpenAgent brings the packages of the skills that have pages itself (tickets, queue,
+  orchestration) and gives each to the projects that hold its text, with its page, its
+  cards and its data; deleting the skill's folder takes them away. The scheduler, a tool
+  with no text, is a project's when one of the project's hook lines runs it. Picked over
+  a project's pages coming from its own `package.json`, which needed an install in every
+  project, and which a project without Node could not have.
+- Two lists name the packages OpenAgent brings, the ones every project has and the ones
+  a project picks, and nothing else in OpenAgent names a package. One of those names
+  among a project's own dependencies is not read: OpenAgent's copy and its rule are the
+  only ones. Picked over a project's own copy winning, which gave one package two ways
+  into a project.
 - A module may bring a section of the Settings page, shown after OpenAgent's own
   sections, where a project has its package. It reads and writes through the package's own
   command. Picked over OpenAgent's own sections knowing a package's file and a hook line

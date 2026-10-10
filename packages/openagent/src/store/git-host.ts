@@ -159,7 +159,7 @@ export function providedGitHost(now: () => number = Date.now): GitHostReader {
       let command = await providedCommand(root, 'git-host').catch(() => undefined)
       // A built-in git host is one the project did not choose: it is the project's only when it
       // knows the project's page there (the origin remote is on that host).
-      if (command && (await isBuiltIn(root, command)) && !(await commandGitHost(root, command).home())) command = undefined
+      if (command && isBuiltIn(command) && !(await commandGitHost(root, command).home())) command = undefined
       const same = known?.command && command && known.command.bin === command.bin
       known = { at: now(), ...(command ? { command, source: same ? known!.source! : commandGitHost(root, command) } : {}) }
       sources.set(root, known)

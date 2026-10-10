@@ -4,11 +4,13 @@ import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
-import { BUILT_IN_PACKAGES, builtInBinDirs, builtInPackages, lookupProvided, providedCommand, runCleanups } from './built-in.js'
+import { BUILT_IN_PACKAGES, OWN_PACKAGE_NAMES, PICKED_PACKAGES, builtInBinDirs, builtInPackages, builtInPackagesOf, lookupProvided, providedCommand, runCleanups } from './built-in.js'
+import { readProjectModules } from './project-modules.js'
 import { providedGitHost } from './store/git-host.js'
 
-test('every built-in package is installed with OpenAgent, and their commands have a directory each', async () => {
-  assert.deepEqual((await builtInPackages()).map(pkg => pkg.name), [...BUILT_IN_PACKAGES])
+test('every package OpenAgent brings is installed with it, and their commands have a directory each', async () => {
+  assert.deepEqual((await builtInPackages()).map(pkg => pkg.name), [...OWN_PACKAGE_NAMES])
+  assert.deepEqual([...OWN_PACKAGE_NAMES], [...BUILT_IN_PACKAGES, ...PICKED_PACKAGES])
   const dirs = await builtInBinDirs()
   assert.ok(dirs.length > 0 && dirs.every(dir => basename(dir) === 'bin'), JSON.stringify(dirs))
 })
@@ -20,6 +22,85 @@ test('a project with nothing installed gets its runs, its branches and a reposit
     assert.equal((await providedCommand(root, 'branches'))?.package, '@openagt/skill-branches')
     assert.deepEqual(await lookupProvided(root, 'tickets'), {})
     assert.equal((await providedCommand(root, 'repository'))?.package, '@openagt/skill-github', 'the built-in package that can create its repository')
+    assert.deepEqual((await builtInPackagesOf(root)).map(pkg => pkg.name), [...BUILT_IN_PACKAGES], 'none of the packages a project picks')
+    assert.deepEqual((await readProjectModules(root)).map(module => module.package), ['@openagt/files', '@openagt/skill-logs'])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+/** A skill's text in a project, as init writes it: the folder named after the skill, with its `SKILL.md`. */
+async function skillText(root: string, dir: string, name: string): Promise<void> {
+  await mkdir(join(root, dir, name), { recursive: true })
+  await writeFile(join(root, dir, name, 'SKILL.md'), `---\nname: ${name}\n---\nThe ${name} skill.\n`)
+}
+
+test('a project has a skill\'s package, its data and its page once it holds the skill\'s text, in either folder, and no longer once the folder is deleted', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-built-in-text-')))
+  const modules = async (): Promise<string[]> => (await readProjectModules(root)).map(module => module.package)
+  try {
+    assert.deepEqual(await lookupProvided(root, 'tickets'), {})
+    await skillText(root, '.agents/skills', 'tickets')
+    assert.equal((await providedCommand(root, 'tickets'))?.package, '@openagt/skill-tickets')
+    assert.deepEqual(await lookupProvided(root, 'queue'), {}, 'a skill the project does not hold stays out')
+    assert.deepEqual(await modules(), ['@openagt/files', '@openagt/skill-logs', '@openagt/skill-tickets'])
+
+    await skillText(root, '.claude/skills', 'queue')
+    await skillText(root, '.claude/skills', 'orchestration')
+    assert.equal((await providedCommand(root, 'queue'))?.package, '@openagt/skill-queue')
+    assert.deepEqual(await modules(), ['@openagt/files', '@openagt/skill-logs', '@openagt/skill-orchestration', '@openagt/skill-queue', '@openagt/skill-tickets'])
+
+    // A folder with no text in it, and a text under another name, are no skill of ours.
+    await rm(join(root, '.agents/skills/tickets/SKILL.md'))
+    await skillText(root, '.claude/skills', 'my-tickets')
+    assert.deepEqual(await lookupProvided(root, 'tickets'), {})
+    await rm(join(root, '.claude/skills/queue'), { recursive: true })
+    assert.deepEqual(await modules(), ['@openagt/files', '@openagt/skill-logs', '@openagt/skill-orchestration'])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('the scheduler is a project\'s once one of the project\'s hook lines runs it, by its command or by its package\'s full name', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-built-in-tool-')))
+  const has = async (): Promise<boolean> => (await builtInPackagesOf(root)).some(pkg => pkg.name === '@openagt/agent-scheduler')
+  const hooks = async (text: string): Promise<void> => writeFile(join(root, '.openagent', 'hooks.yml'), text)
+  try {
+    await mkdir(join(root, '.openagent'))
+    assert.equal(await has(), false, 'no hooks file')
+    await hooks('start: npx agent-runner run --detach "$PROMPT"\n')
+    assert.equal(await has(), false, 'no line runs it')
+    await hooks('open:\n  - npx my-agent-scheduler-wrapper start\n  - echo agent-scheduler-is-not-here\n')
+    assert.equal(await has(), false, 'its name inside another word is not it')
+    await hooks('open:\n  - npx agent-scheduler start\nclose:\n  - npx agent-scheduler stop --unless-keep-alive\n')
+    assert.equal(await has(), true)
+    assert.ok((await readProjectModules(root)).some(module => module.package === '@openagt/agent-scheduler'), 'its page comes with it')
+    await hooks('open:\n  - npx @openagt/agent-scheduler@0.1 start\n')
+    assert.equal(await has(), true, 'the full name with a range')
+    await hooks('open: [')
+    assert.equal(await has(), false, 'a hooks file that cannot be read runs nothing')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('one of OpenAgent\'s own names among a project\'s dependencies is not read: only the skill\'s text gives the project the package, and OpenAgent\'s copy', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'openagent-built-in-reserved-')))
+  try {
+    const listed = join(root, 'node_modules', '@openagt', 'skill-tickets')
+    await mkdir(join(listed, 'bin'), { recursive: true })
+    await writeFile(join(listed, 'package.json'), JSON.stringify({ name: '@openagt/skill-tickets', version: '9.9.9', bin: { tickets: 'bin/tickets' }, openagent: { tickets: 'tickets' }, exports: { './dashboard': './d.js' } }))
+    await writeFile(join(listed, 'bin', 'tickets'), '')
+    await writeFile(join(listed, 'd.js'), 'export default {}')
+    await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: { '@openagt/skill-tickets': '9.9.9' } }))
+    assert.deepEqual(await lookupProvided(root, 'tickets'), {}, 'listed and installed, with no text: not the project\'s')
+    assert.ok(!(await readProjectModules(root)).some(module => module.package === '@openagt/skill-tickets'))
+
+    await skillText(root, '.claude/skills', 'tickets')
+    const command = await providedCommand(root, 'tickets')
+    assert.equal(command?.package, '@openagt/skill-tickets')
+    assert.ok(!command!.bin.startsWith(root), 'OpenAgent\'s copy runs, not the one in the project')
+    assert.notEqual((await readProjectModules(root)).find(module => module.package === '@openagt/skill-tickets')?.version, '9.9.9')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

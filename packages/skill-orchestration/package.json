@@ -27,6 +27,7 @@
     "orchestration": "bin/orchestration"
   },
   "exports": {
+    "./package.json": "./package.json",
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"

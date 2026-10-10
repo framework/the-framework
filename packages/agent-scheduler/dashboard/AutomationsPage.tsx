@@ -177,8 +177,8 @@ export function AutomationsPage({ projects }: ModulePageProps) {
               </div>
             )}
             {row.error !== undefined && <p role="alert" className="py-3 text-sm text-danger">{`The scheduler could not be read: ${row.error}`}</p>}
-            {row.error === undefined && !row.on && <p className="py-3 text-sm text-muted-foreground">The scheduler is off in this project, so nothing here starts by itself. It starts with the dashboard once the project has run `npx agent-scheduler init`, or by hand with `npx agent-scheduler start`.</p>}
-            {row.error === undefined && row.on && !row.running && <p className="py-3 text-sm text-warning">The scheduler is on but its process is not running, so nothing here starts by itself. `npx agent-scheduler start`, run in the project, starts it.</p>}
+            {row.error === undefined && !row.on && <p className="py-3 text-sm text-muted-foreground">The scheduler is off in this project, so nothing here starts by itself. It starts with the dashboard once the project has run `npx @openagt/agent-scheduler@0.1 init`, or by hand with `npx @openagt/agent-scheduler@0.1 start`.</p>}
+            {row.error === undefined && row.on && !row.running && <p className="py-3 text-sm text-warning">The scheduler is on but its process is not running, so nothing here starts by itself. `npx @openagt/agent-scheduler@0.1 start`, run in the project, starts it.</p>}
             {row.unreadable.map((unreadable, index) => (
               <p key={`${index}/${unreadable.skill}`} role="alert" className="py-3 text-sm text-danger">
                 {unlistedWords(unreadable)}

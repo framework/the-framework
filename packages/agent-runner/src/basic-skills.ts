@@ -1,7 +1,7 @@
 import { readFile, realpath } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { declaring, packageBins, readManifest, runPackageCommand, type ProvidedCommand } from '@openagt/agent-data'
+import { declaring, packageBins, readManifest, runPackageCommand, type ProjectPackage, type ProvidedCommand } from '@openagt/agent-data'
 import type { SkillLink } from '@openagt/skill-branches'
 
 /**
@@ -18,10 +18,11 @@ import type { SkillLink } from '@openagt/skill-branches'
  * package answers the project's page there (its `home` command): its text says the project's pull
  * requests are on that host, which is wrong anywhere else.
  */
-const BASIC_PACKAGES: readonly string[] = ['@openagt/skill-logs', '@openagt/skill-question', '@openagt/skill-github']
+export const BASIC_PACKAGES: readonly string[] = ['@openagt/skill-logs', '@openagt/skill-question', '@openagt/skill-github']
 
 interface BasicSkill {
   link: SkillLink
+  pkg: ProjectPackage
   /** The package's git host command, when it declares one: asked before its skill is linked. */
   gitHost?: ProvidedCommand
 }
@@ -44,7 +45,7 @@ async function resolveBasic(): Promise<BasicSkill[]> {
     if (!dir || !manifest || !skill) continue
     const bins = packageBins(name, manifest.bin, dir)
     const gitHost = declaring([{ name, dir, manifest }], 'git-host')[0]
-    skills.push({ link: { name: skill, dir, ...(Object.keys(bins).length > 0 ? { package: { name, dir, bins } } : {}) }, ...(gitHost ? { gitHost } : {}) })
+    skills.push({ link: { name: skill, dir, ...(Object.keys(bins).length > 0 ? { package: { name, dir, bins } } : {}) }, pkg: { name, dir, manifest }, ...(gitHost ? { gitHost } : {}) })
   }
   return skills
 }
@@ -69,4 +70,16 @@ export async function basicSkills(repo: string): Promise<SkillLink[]> {
     skills.push(link)
   }
   return skills
+}
+
+/**
+ * The basic packages that answer as the git host of the project at `repo`: what a run reads its
+ * pull request back through in a project that installed no git host of its own.
+ */
+export async function basicGitHosts(repo: string): Promise<ProjectPackage[]> {
+  const hosts: ProjectPackage[] = []
+  for (const { pkg, gitHost } of await (resolved ??= resolveBasic())) {
+    if (gitHost && (await runPackageCommand(repo, gitHost, ['home'])).ok) hosts.push(pkg)
+  }
+  return hosts
 }

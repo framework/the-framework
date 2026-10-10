@@ -3,7 +3,7 @@
 // names `fake-run-bin.js` as its start and resume lines, so a Start goes the whole production
 // way (the RPC, the hook, a detached run writing the files the dashboard reads) offline.
 import { mkdtempSync } from 'node:fs'
-import { appendFile, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
@@ -27,21 +27,14 @@ import type { StartAgentOptions } from '../dashboard/types.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
 /**
- * The four provider packages every fixture project depends on, linked from this workspace's own
- * install: the records package (the runs provider), the queue package (the queue provider), the
- * tickets package (the tickets provider) and the branches package (the branches provider, which
- * lists the checkouts the stand-in tool makes with that same package's library).
+ * The two skills every fixture project holds, by the name of each one's folder, with the package
+ * whose text it is, read from this workspace's own install: the tickets and the queue. Holding a
+ * skill's text is what gives a project that skill's package in the dashboard.
  */
-const LOGS_PACKAGE = '@openagt/skill-logs'
-const QUEUE_PACKAGE = '@openagt/skill-queue'
-const TICKETS_PACKAGE = '@openagt/skill-tickets'
-const BRANCHES_PACKAGE = '@openagt/skill-branches'
 const packageDir = (name: string): string => resolve(dirname(fileURLToPath(import.meta.resolve(name))), '..')
-const PROVIDER_PACKAGES: Record<string, string> = {
-  [LOGS_PACKAGE]: packageDir(LOGS_PACKAGE),
-  [QUEUE_PACKAGE]: packageDir(QUEUE_PACKAGE),
-  [TICKETS_PACKAGE]: packageDir(TICKETS_PACKAGE),
-  [BRANCHES_PACKAGE]: packageDir(BRANCHES_PACKAGE),
+const SKILL_PACKAGES: Record<string, string> = {
+  tickets: packageDir('@openagt/skill-tickets'),
+  queue: packageDir('@openagt/skill-queue'),
 }
 
 // Re-home the process-global config home FIRST: the registry, preferences, and daemon state all
@@ -224,15 +217,15 @@ export async function makeWorld(): Promise<StoryWorld> {
         await mkdir(dirname(join(cwd, file)), { recursive: true })
         await writeFile(join(cwd, file), text)
       }
-      // The project records its runs and keeps its tickets and queue the way a real one does: the
-      // logs, tickets and queue packages are among its dependencies, each declaring itself the
-      // provider the dashboard reads that data through.
-      await writeFile(join(cwd, 'package.json'), JSON.stringify({ name: 'story-fixture', private: true, devDependencies: Object.fromEntries(Object.keys(PROVIDER_PACKAGES).map(name => [name, '*'])) }, null, 2) + '\n')
+      // The project keeps its tickets and queue the way a real one does: it holds the two skills'
+      // texts, so the dashboard brings their packages to it; its runs and checkouts come from the
+      // packages every project has.
+      for (const [skill, pkg] of Object.entries(SKILL_PACKAGES)) {
+        await mkdir(join(cwd, '.claude', 'skills', skill), { recursive: true })
+        await copyFile(join(pkg, 'SKILL.md'), join(cwd, '.claude', 'skills', skill, 'SKILL.md'))
+      }
       await git(cwd, 'add', '-A')
       await git(cwd, 'commit', '-q', '-m', 'seed')
-      await mkdir(join(cwd, 'node_modules', '@openagt'), { recursive: true })
-      for (const [name, dir] of Object.entries(PROVIDER_PACKAGES)) await symlink(dir, join(cwd, 'node_modules', name))
-      await appendFile(join(cwd, '.git', 'info', 'exclude'), 'node_modules\n')
       if (onBranch.length) {
         const result = await withFileBranch(cwd, DATA_BRANCH, 'seed', async dir => {
           for (const [file, text] of onBranch) {

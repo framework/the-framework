@@ -1,10 +1,12 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
+import { spawn } from 'node:child_process'
 import { mkdir, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { readState, updateState } from '@openagt/agent-scheduler'
 import { removeSkill, setScheduler, writeSkill } from './apply.js'
 import { carriedSkills } from './catalogue.js'
-import { held, readProject, standingOf } from './project.js'
+import { held, readProject, skillCount, standingOf } from './project.js'
 import { stamped } from './skill-file.js'
 import { folder, gone, run } from './test-project.js'
 
@@ -19,6 +21,7 @@ test('how a project\'s text stands: the carried one, an older one, one changed b
   assert.equal(standingOf(stamped(other, skill.version), skill), 'changed', 'this version wrote it, and it is no longer what was written')
   assert.equal(standingOf(other, skill), 'own', 'no stamp: not init\'s')
   assert.equal(standingOf(stamped(other, '99.0.0'), skill), 'ahead', 'a newer init wrote it: this one has nothing to say')
+  assert.equal(standingOf(stamped(skill.text, skill.version).replaceAll('\n', '\r\n'), skill), 'current', 'a checkout that made the line ends CRLF holds the same text')
 })
 
 test('a skill written is one tracked file and one relative link; written again it is the same; read back, the project has it', async () => {
@@ -36,7 +39,8 @@ test('a skill written is one tracked file and one relative link; written again i
     const state = await readProject(root)
     assert.deepEqual(held(state), ['tickets'])
     assert.deepEqual(state.skills.find(s => s.name === 'tickets'), { name: 'tickets', standing: 'current', file: '.agents/skills/tickets/SKILL.md' })
-    assert.deepEqual({ git: state.git, activated: state.activated, scheduler: state.scheduler, github: state.github }, { git: true, activated: false, scheduler: false, github: false })
+    assert.deepEqual({ git: state.git, activated: state.activated, scheduler: state.scheduler, remote: state.remote, github: state.github }, { git: true, activated: false, scheduler: false, remote: false, github: false })
+    assert.equal(skillCount(state), 4, 'tickets, and the three basic ones of a project that is not on GitHub')
     // Nothing but the two paths: no package.json, no install.
     assert.equal(await run(root, 'status', '--porcelain', '-uall'), '?? .agents/skills/tickets/SKILL.md\n?? .claude/skills/tickets\n')
   } finally {
@@ -54,6 +58,21 @@ test('what is already at the link\'s place stays: a folder of the project\'s own
     assert.deepEqual((await writeSkill(root, 'plan')).left, [{ path: '.claude/skills/plan', reason: 'a link to somewhere else' }])
     assert.equal(await readFile(join(root, '.claude/skills/queue/SKILL.md'), 'utf8'), '---\nname: queue\n---\nOurs.\n')
     assert.equal(await readlink(join(root, '.claude/skills/plan')), '../elsewhere')
+  } finally {
+    await gone(root)
+  }
+})
+
+test('a project whose .claude/skills is itself a link to .agents/skills needs no link per skill, and nothing is reported as left', async () => {
+  const root = await folder(true)
+  try {
+    await mkdir(join(root, '.agents/skills'), { recursive: true })
+    await mkdir(join(root, '.claude'))
+    await symlink('../.agents/skills', join(root, '.claude/skills'))
+    assert.deepEqual(await writeSkill(root, 'tickets'), { paths: ['.agents/skills/tickets/SKILL.md'], left: [] })
+    assert.match(await readFile(join(root, '.claude/skills/tickets/SKILL.md'), 'utf8'), /^---\nname: tickets\n/)
+    assert.deepEqual(await removeSkill(root, 'tickets'), { paths: ['.agents/skills/tickets/SKILL.md'], left: [] })
+    assert.deepEqual(held(await readProject(root)), [])
   } finally {
     await gone(root)
   }
@@ -94,7 +113,13 @@ test('the scheduler switched on makes a folder a project first, as a dashboard d
     assert.deepEqual({ scheduler: on.scheduler, activated: on.activated, git: on.git }, { scheduler: true, activated: true, git: true })
     assert.deepEqual(await setScheduler(root, true), { ok: true, changed: false }, 'already on')
 
+    // A scheduler that is running is stopped with it: the line that would stop it at the dashboard's close just went.
+    const running = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+    const ended = new Promise<string | null>(resolve => running.on('exit', (_code, signal) => resolve(signal)))
+    await updateState(root, state => ({ ...state, on: true, pid: running.pid!, startedAt: new Date().toISOString() }))
     assert.deepEqual(await setScheduler(root, false), { ok: true, changed: true })
+    assert.equal(await ended, 'SIGINT', 'the running scheduler was asked to stop')
+    assert.equal((await readState(root)).on, false)
     assert.equal((await readProject(root)).scheduler, false)
     assert.deepEqual(await setScheduler(root, false), { ok: true, changed: false })
 

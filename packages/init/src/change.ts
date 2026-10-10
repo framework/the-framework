@@ -26,7 +26,7 @@ export interface Changed {
   /** What was left as it is, and why. */
   left: { path: string; reason: string }[]
   /** The scheduler after the change, when the change touched it; `error` when it could not be switched. */
-  scheduler?: { on: boolean; changed: boolean; madeRepository?: true } | { error: string }
+  scheduler?: { on: boolean; changed: boolean; madeRepository?: true } | { on: boolean; error: string }
 }
 
 /** Whether `name` is something `init` writes: a skill of its list, or the scheduler. */
@@ -50,7 +50,7 @@ export async function applyChange(root: string, change: Change, git: GitRunner =
   }
   if (change.scheduler !== undefined) {
     const outcome = await setScheduler(root, change.scheduler, git)
-    changed.scheduler = outcome.ok ? { on: change.scheduler, changed: outcome.changed, ...(outcome.madeRepository ? { madeRepository: true as const } : {}) } : { error: outcome.error }
+    changed.scheduler = outcome.ok ? { on: change.scheduler, changed: outcome.changed, ...(outcome.madeRepository ? { madeRepository: true as const } : {}) } : { on: change.scheduler, error: outcome.error }
   }
   return changed
 }

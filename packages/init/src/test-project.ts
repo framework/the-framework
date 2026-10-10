@@ -18,6 +18,7 @@ export async function folder(git: boolean): Promise<string> {
     await run(root, 'init', '-q', '-b', 'main')
     await run(root, 'config', 'user.email', 'tester@example.com')
     await run(root, 'config', 'user.name', 'tester')
+    await run(root, 'config', 'commit.gpgsign', 'false')
     await writeFile(join(root, 'README.md'), '# a project\n')
     await run(root, 'add', '-A')
     await run(root, 'commit', '-q', '-m', 'init')

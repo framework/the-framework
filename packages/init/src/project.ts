@@ -2,6 +2,7 @@ import { lstat, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { nodeGitRunner, OPENAGENT_DIR, type GitRunner } from '@openagt/agent-data'
 import { hasHooks } from '@openagt/agent-scheduler'
+import { homeUrlFromRemote } from '@openagt/skill-github'
 import { carriedSkills, SKILL_NAMES, type CarriedSkill } from './catalogue.js'
 import { olderThan, unstamped } from './skill-file.js'
 
@@ -41,7 +42,9 @@ export interface ProjectState {
   git: boolean
   /** Whether a dashboard knows the folder as a project: its `.openagent/` is there. */
   activated: boolean
-  /** Whether the project's remote is on GitHub, the one git host there is a skill for. */
+  /** Whether the project has a remote named `origin`. */
+  remote: boolean
+  /** Whether that remote is on GitHub, the one git host there is a skill for. */
   github: boolean
 }
 
@@ -56,7 +59,8 @@ async function textFile(root: string, name: string): Promise<string | undefined>
 
 /** How the project's text of one skill stands against the one `init` carries. */
 export function standingOf(file: string, carried: CarriedSkill): Exclude<Standing, 'absent'> {
-  const { version, text } = unstamped(file)
+  // A checkout that turned the line ends into CRLF holds the same text.
+  const { version, text } = unstamped(file.replaceAll('\r\n', '\n'))
   if (text === carried.text) return 'current'
   if (version === undefined) return 'own'
   if (olderThan(version, carried.version)) return 'newer'
@@ -78,11 +82,17 @@ export async function readProject(root: string, git: GitRunner = nodeGitRunner()
     scheduler: await hasHooks(root),
     git: inRepo,
     activated: await lstat(join(root, OPENAGENT_DIR)).then(entry => entry.isDirectory(), () => false),
-    github: /^(git@github\.com:|ssh:\/\/git@github\.com\/|https?:\/\/([^@/]+@)?github\.com\/)/.test(remote),
+    remote: remote !== '',
+    github: homeUrlFromRemote(remote) !== undefined,
   }
 }
 
 /** The skills a project holds, by name. */
 export function held(state: ProjectState): string[] {
   return state.skills.filter(skill => skill.standing !== 'absent').map(skill => skill.name)
+}
+
+/** How many skills the project has in all: the ones it holds, and the basic ones every run gets (github only on a GitHub project). */
+export function skillCount(state: ProjectState): number {
+  return held(state).length + (state.github ? 4 : 3)
 }

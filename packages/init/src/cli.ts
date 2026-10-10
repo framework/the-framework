@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util'
 import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { carriedSkills, GROUPS, SCHEDULER, SCHEDULER_LINE, SKILL_NAMES, SKILLS_IN_ALL } from './catalogue.js'
 import { applyChange, commitChange, isKnown, type Change, type Changed } from './change.js'
-import { held, readProject, type ProjectState, type Standing } from './project.js'
+import { held, readProject, skillCount, type ProjectState, type Standing } from './project.js'
 import { askList, askYesNo, type Row, type Terminal } from './prompt.js'
 
 /**
@@ -24,7 +24,8 @@ export const USAGE = `usage: npx @openagt/init [command]
   (no command)            in a terminal: the skills as a list with ticks. Enter writes the ticked ones
                           and deletes the unticked, then asks "Commit these files now?" and
                           "Open the dashboard?". Run it again to add or remove a skill later.
-  add <name>…             write these skills, asking nothing; \`scheduler\` switches the scheduler on
+  add <name>…             write these skills, asking nothing; one the project already holds is left
+                          as it is; \`scheduler\` switches the scheduler on
   remove <name>…          delete these skills, asking nothing; \`scheduler\` switches the scheduler off
   update [<name>…]        write again every skill that has a newer text; a skill named is written again
                           whatever it holds now, a text changed by hand included
@@ -63,6 +64,9 @@ class Refused extends Error {
 /** Thrown inside a command for an argument that cannot be read: usage on stderr, exit 2. */
 class Usage extends Error {}
 
+/** Thrown inside the conversation when the person leaves at a question (Ctrl-C): nothing more is done, exit 130. */
+class Left extends Error {}
+
 /** Run the CLI: `argv` is everything after the program name. Resolves to the exit code. */
 export async function runCli(argv: string[], io: CliIo, git: GitRunner = nodeGitRunner()): Promise<number> {
   const [command, ...rest] = argv
@@ -71,7 +75,13 @@ export async function runCli(argv: string[], io: CliIo, git: GitRunner = nodeGit
       io.stderr(`not a terminal: the list with ticks needs one. In a script, use add, remove, update or list.\n\n${USAGE}`)
       return 2
     }
-    return converse(io, io.terminal, git)
+    try {
+      return await converse(io, io.terminal, git)
+    } catch (err) {
+      if (err instanceof Left) return 130
+      io.terminal.output.write(`\n${err instanceof Error ? err.message : String(err)}\n`)
+      return 1
+    }
   }
   const run = Object.hasOwn(COMMANDS, command) ? COMMANDS[command] : undefined
   if (!run) {
@@ -91,7 +101,9 @@ export async function runCli(argv: string[], io: CliIo, git: GitRunner = nodeGit
       io.stderr(err.line)
       return 1
     }
-    throw err
+    // Anything else is said in one line, never as a stack: a file where a folder should be, a folder that cannot be written.
+    io.stderr(err instanceof Error ? err.message : String(err))
+    return 1
   }
 }
 
@@ -124,7 +136,11 @@ async function changeByName(io: CliIo, git: GitRunner, change: Change, commit: b
 const COMMANDS: Record<string, Command> = {
   async add(args, io, git) {
     const { names, commit } = parse(args, true)
-    return changeByName(io, git, { write: names.filter(name => name !== SCHEDULER), ...(names.includes(SCHEDULER) ? { scheduler: true } : {}) }, commit)
+    // A skill the project already holds is left as it is, a text changed by hand included: `update <name>` writes over one.
+    const has = held(await readProject(io.cwd, git))
+    const already = names.filter(name => has.includes(name))
+    const changed = (await changeByName(io, git, { write: names.filter(name => name !== SCHEDULER && !has.includes(name)), ...(names.includes(SCHEDULER) ? { scheduler: true } : {}) }, commit)) as object
+    return { ...changed, already }
   },
 
   async remove(args, io, git) {
@@ -145,7 +161,7 @@ const COMMANDS: Record<string, Command> = {
   async list(args, io, git) {
     if (args.length > 0) throw new Usage('list takes no argument')
     const state = await readProject(io.cwd, git)
-    return { ok: true, ...state, has: held(state).length + 4, of: SKILLS_IN_ALL }
+    return { ok: true, ...state, has: skillCount(state), of: SKILLS_IN_ALL }
   },
 }
 
@@ -186,8 +202,8 @@ async function converse(io: CliIo, terminal: Terminal, git: GitRunner): Promise<
   const state = await readProject(io.cwd, git)
   const has = held(state)
   say(`OpenAgent skills for ${basename(io.cwd)}`)
-  say(has.length > 0 ? `This project has ${has.length + 4} of ${SKILLS_IN_ALL} skills. The ticks show what it has now.` : 'Every agent already gets four basic skills with nothing written here: branches, logs, question, and github on a GitHub project.')
-  if (!state.github) say('This project is not on GitHub: agents push their branch, and you open the request yourself. There is no skill for another git host yet.')
+  say(has.length > 0 ? `This project has ${skillCount(state)} of ${SKILLS_IN_ALL} skills. The ticks show what it has now.` : 'Every agent already gets the basic skills with nothing written here: branches, logs, question, and github on a GitHub project.')
+  if (state.remote && !state.github) say('This project is not on GitHub: agents push their branch, and you open the request yourself. There is no skill for another git host yet.')
   say()
 
   const picked = await askList(await rows(state), ticks(state), terminal)
@@ -201,7 +217,7 @@ async function converse(io: CliIo, terminal: Terminal, git: GitRunner): Promise<
   const newer = kept.filter(skill => skill.standing === 'newer').map(skill => skill.name)
   const byHand = kept.filter(skill => skill.standing === 'changed').map(skill => skill.name)
   say()
-  if (newer.length > 0 && (await askYesNo(`${count(newer.length, 'skill has', 'skills have')} a newer text: ${newer.join(', ')}. Update ${newer.length === 1 ? 'it' : 'them'}?`, false, terminal))) write.push(...newer)
+  if (newer.length > 0 && (await ask(`${count(newer.length, 'skill has', 'skills have')} a newer text: ${newer.join(', ')}. Update ${newer.length === 1 ? 'it' : 'them'}?`, false, terminal))) write.push(...newer)
   if (byHand.length > 0) say(`Changed by hand, left as ${byHand.length === 1 ? 'it is' : 'they are'}: ${byHand.join(', ')}. \`npx @openagt/init update <name>\` writes the text over yours.`)
 
   const scheduler = picked.has(SCHEDULER) !== state.scheduler ? { scheduler: picked.has(SCHEDULER) } : {}
@@ -215,20 +231,27 @@ async function converse(io: CliIo, terminal: Terminal, git: GitRunner): Promise<
   if (changed.paths.length > 0) {
     if (!(await readProject(io.cwd, git)).git) {
       say('This folder is not a git repository, so there is nothing to commit. Adding it in the dashboard makes it one.')
-    } else if (await askYesNo('Commit these files now?', true, terminal)) {
+    } else if (await ask('Commit these files now?', true, terminal)) {
       const committed = await commitChange(io.cwd, changed, git)
-      if (!committed.ok) say(`The commit failed: ${committed.error}. The files are written; commit them yourself.`)
+      if (!committed.ok) say(`Not committed: ${committed.error}. The files are in your folder.`)
       else if (committed.committed) say(`Committed as ${committed.commit}, these files alone. Nothing was pushed: push it, or open a pull request where the default branch is protected.`)
       else say('Nothing to commit: git already has these files as they are.')
     } else {
       say('Not committed. The files are in your folder.')
     }
-    say('Your agents get these skills once they are on the branch agents start from.')
+    if (changed.written.length > 0) say('Your agents get these skills once they are on the branch agents start from.')
   }
   return openDashboard(io, terminal, say)
 }
 
 const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
+
+/** A yes or no; a person who leaves at the question (Ctrl-C) ends the conversation where it stands. */
+async function ask(question: string, fallback: boolean, terminal: Terminal): Promise<boolean> {
+  const answer = await askYesNo(question, fallback, terminal)
+  if (answer === undefined) throw new Left()
+  return answer
+}
 
 /** What a change did, in a few lines for a person. */
 function report(changed: Changed, say: (line?: string) => void): void {
@@ -237,14 +260,14 @@ function report(changed: Changed, say: (line?: string) => void): void {
   for (const { path, reason } of changed.left) say(`Left as it is: ${path} (${reason}).`)
   const scheduler = changed.scheduler
   if (!scheduler) return
-  if ('error' in scheduler) say(`The scheduler could not be switched: ${scheduler.error}`)
+  if ('error' in scheduler) say(`The scheduler could not be switched ${scheduler.on ? 'on' : 'off'}: ${scheduler.error}`)
   else if (scheduler.madeRepository) say('Made this folder a git repository, with an empty first commit, as adding it in the dashboard does.')
   if (!('error' in scheduler) && scheduler.changed) say(scheduler.on ? 'The scheduler starts with the dashboard, on this machine. Every automation starts switched off.' : 'The scheduler no longer starts with the dashboard on this machine.')
 }
 
 /** The last question, and the dashboard started in the folder on a yes. */
 async function openDashboard(io: CliIo, terminal: Terminal, say: (line?: string) => void): Promise<number> {
-  if (!(await askYesNo('Open the dashboard?', true, terminal))) return 0
+  if (!(await ask('Open the dashboard?', true, terminal))) return 0
   say('Starting the dashboard here. Ctrl-C closes it.')
   return (io.openDashboard ?? npxDashboard)(io.cwd)
 }
@@ -252,8 +275,12 @@ async function openDashboard(io: CliIo, terminal: Terminal, say: (line?: string)
 /** The dashboard by its full name, in the folder, on this terminal: it offers the folder it was started in as a project. */
 function npxDashboard(cwd: string): Promise<number> {
   return new Promise(resolve => {
-    const child = spawn('npx', ['--yes', '@openagt/dashboard'], { cwd, stdio: 'inherit' })
-    child.on('error', () => resolve(1))
+    // Through a shell on Windows, where `npx` is a script and not a program.
+    const child = spawn('npx', ['--yes', '@openagt/dashboard'], { cwd, stdio: 'inherit', shell: process.platform === 'win32' })
+    child.on('error', err => {
+      console.error(`The dashboard could not be started: ${err.message}. Run it yourself: npx @openagt/dashboard`)
+      resolve(1)
+    })
     child.on('exit', code => resolve(code ?? 0))
   })
 }

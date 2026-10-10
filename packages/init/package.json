@@ -41,6 +41,7 @@
     "@openagt/agent-scheduler": "workspace:*",
     "@openagt/skill-browser": "workspace:*",
     "@openagt/skill-discord": "workspace:*",
+    "@openagt/skill-github": "workspace:*",
     "@openagt/skill-maintainability": "workspace:*",
     "@openagt/skill-maintenance": "workspace:*",
     "@openagt/skill-market-research": "workspace:*",

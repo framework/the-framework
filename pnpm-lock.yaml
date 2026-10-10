@@ -272,6 +272,9 @@ importers:
       '@openagt/skill-discord':
         specifier: workspace:*
         version: link:../skill-discord
+      '@openagt/skill-github':
+        specifier: workspace:*
+        version: link:../skill-github
       '@openagt/skill-maintainability':
         specifier: workspace:*
         version: link:../skill-maintainability

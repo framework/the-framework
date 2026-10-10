@@ -9,8 +9,10 @@ already made, and lists it in its pull request; for anything else it proposes an
 
 ## The front door
 - `npx @openagt/init` is the one front door: it gives a project its skills, and ends by
-  asking "Open the dashboard?". Picked over a dashboard that writes skills into every
-  project it is given, which put files into a project a person only wanted to try.
+  asking "Open the dashboard?". "Add project" in the dashboard stays small and offers
+  the same list with a button, so a person can use either. Picked over "Add project"
+  writing the skills itself, which put files into every project a person adds, also one
+  they only wanted to try, and over the dashboard only pointing to the terminal.
 - A project has a skill when the skill's text is in the project: one tracked file,
   `.agents/skills/<name>/SKILL.md`, where Codex reads it, and one tracked link at
   `.claude/skills/<name>`, where Claude Code reads it. Init writes nothing else: no
@@ -18,8 +20,10 @@ already made, and lists it in its pull request; for anything else it proposes an
   exactly the same. Picked over files hidden from git and linked into each checkout,
   which a teammate, another machine and a cloud agent would not have, and over
   installing the skills' packages into the project.
-- Four basic skills are not in the list: branches, logs, question and github come with
-  every run, with nothing written in the project.
+- Four basic skills are not in the list: branches, logs and question, and github on a
+  GitHub project, come with every run, with nothing written in the project. Picked over
+  branches alone coming that way, where a person who cannot change the default branch
+  got agents that could not ask a question.
 
 ## The list
 - In a terminal init shows the skills as a list with ticks, in groups. Everything is

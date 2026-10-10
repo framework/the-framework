@@ -55,12 +55,12 @@ test('add, remove, update and list for a script: JSON, no question, no commit un
   const root = await folder(true)
   try {
     const empty = await cli(root, 'list')
-    assert.deepEqual({ code: empty.code, has: empty.out.has, of: empty.out.of, scheduler: empty.out.scheduler }, { code: 0, has: 4, of: 25, scheduler: false })
+    assert.deepEqual({ code: empty.code, has: empty.out.has, of: empty.out.of, scheduler: empty.out.scheduler }, { code: 0, has: 3, of: 25, scheduler: false })
 
     const added = await cli(root, 'add', 'plan', 'ux', 'plan')
-    assert.deepEqual({ code: added.code, written: added.out.written, commit: added.out.commit }, { code: 0, written: ['plan', 'ux'], commit: undefined })
+    assert.deepEqual({ code: added.code, written: added.out.written, already: added.out.already, commit: added.out.commit }, { code: 0, written: ['plan', 'ux'], already: [], commit: undefined })
     assert.equal((await run(root, 'log', '--format=%s')).trim(), 'init', 'no commit was asked for')
-    assert.equal((await cli(root, 'list')).out.has, 6)
+    assert.equal((await cli(root, 'list')).out.has, 5, 'two written, and the three basic ones of a project that is not on GitHub')
 
     const unknown = await cli(root, 'add', 'tickets', 'nope')
     assert.deepEqual({ code: unknown.code, out: unknown.out }, { code: 1, out: { ok: false, reason: 'unknown-skill', name: 'nope' } })
@@ -84,6 +84,11 @@ test('add, remove, update and list for a script: JSON, no question, no commit un
     assert.deepEqual(await standings(), { plan: 'newer', ux: 'changed' })
     assert.deepEqual((await cli(root, 'update')).out.written, ['plan'])
     assert.deepEqual(await standings(), { plan: 'current', ux: 'changed' }, 'a text changed by hand is not written over unasked')
+    // add leaves a skill the project holds as it is, whatever its text: only update writes over one.
+    const again = await cli(root, 'add', 'ux', 'queue')
+    assert.deepEqual({ written: again.out.written, already: again.out.already }, { written: ['queue'], already: ['ux'] })
+    assert.equal((await standings())['ux'], 'changed')
+    await cli(root, 'remove', 'queue')
     assert.deepEqual((await cli(root, 'update', 'ux')).out.written, ['ux'])
     assert.deepEqual(await standings(), { plan: 'current', ux: 'current' })
     const absent = await cli(root, 'update', 'queue')
@@ -124,8 +129,12 @@ test('the list drawn: a mark on the cursor\'s row, a tick in the box, a long lin
   const state = { ...startList(ROWS, ['b']), cursor: 2 }
   assert.deepEqual(draw(state, 80, 24), ['  Group one', '  [ ] a  the first', '> [x] b', '  Group two', '  [ ] c', '', LIST_KEYS])
   assert.equal(draw(state, 12, 24)[1], '  [ ] a  th…')
-  const short = draw({ ...state, cursor: 4 }, 80, 5)
-  assert.deepEqual(short, ['> [x] b'.replace('>', ' '), '  Group two', '> [ ] c', '', LIST_KEYS])
+  assert.equal(draw(state, 12, 24).at(-1), '↑↓ space a n', 'the keys are cut to the width too')
+  // Six rows hold three of the five: the ones around the cursor, a line saying there are more, and never as many lines as the terminal has.
+  assert.deepEqual(draw({ ...state, cursor: 4 }, 80, 6), ['  ↑ more', '  Group two', '> [ ] c', '', LIST_KEYS])
+  assert.deepEqual(draw({ ...state, cursor: 1 }, 80, 6), ['  Group one', '> [ ] a  the first', '  ↓ more', '', LIST_KEYS])
+  assert.deepEqual(draw(state, 80, 6), ['  ↑ more', '> [x] b', '  ↓ more', '', LIST_KEYS])
+  for (const height of [6, 10, 24]) assert.ok(draw(state, 80, height).length < height, `fewer lines than a terminal of ${height} rows`)
 })
 
 /** A terminal a test types into: keys go in as a person's would, and everything shown is kept. */
@@ -173,8 +182,8 @@ test('in a terminal, a new project: Enter takes the default picks, the files are
     const defaults = GROUPS.filter(group => group.ticked).flatMap(group => group.skills)
     assert.deepEqual(held(await readProject(root)), defaults)
     assert.equal((await readProject(root)).scheduler, true, 'the scheduler is ticked by default')
-    assert.match(shown, /Every agent already gets four basic skills with nothing written here/)
-    assert.match(shown, /This project is not on GitHub: agents push their branch, and you open the request yourself\./)
+    assert.match(shown, /Every agent already gets the basic skills with nothing written here/)
+    assert.doesNotMatch(shown, /not on GitHub/, 'a project with no remote is told nothing about a git host')
     assert.match(shown, /\[ \] browser/)
     assert.match(shown, /Wrote 19 skills in \.agents\/skills, each linked in \.claude\/skills: tickets, queue, /)
     assert.match(shown, /The scheduler starts with the dashboard, on this machine\. Every automation starts switched off\./)
@@ -196,6 +205,10 @@ test('run again, the ticks show what the project has; a tick removed deletes, a 
     assert.equal(left.code, 0)
     assert.match(left.shown, /This project has 6 of 25 skills\. The ticks show what it has now\./)
     assert.doesNotMatch(left.shown, /not on GitHub/)
+    await run(root, 'remote', 'set-url', 'origin', 'https://gitlab.com/someone/project.git')
+    const elsewhere = await converse(root, [{ after: LIST_KEYS, keys: 'q' }])
+    assert.match(elsewhere.shown, /This project has 5 of 25 skills\./, 'github is not one of its skills')
+    assert.match(elsewhere.shown, /This project is not on GitHub: agents push their branch, and you open the request yourself\. There is no skill for another git host yet\./)
     assert.match(left.shown, /\[x\] tickets/)
     assert.match(left.shown, /\[ \] plan /)
     assert.match(left.shown, /\[ \] scheduler/, 'the scheduler is not ticked in a project that has skills and no scheduler')
@@ -212,7 +225,7 @@ test('run again, the ticks show what the project has; a tick removed deletes, a 
     assert.match(shown, /Deleted 1 skill: tickets\./)
     assert.match(shown, /Not committed\. The files are in your folder\./)
     assert.deepEqual(held(await readProject(root)), ['queue', 'plan'])
-    assert.equal(await run(root, 'status', '--porcelain'), ' D .agents/skills/tickets/SKILL.md\n D .claude/skills/tickets\n?? .agents/skills/plan/\n?? .claude/skills/plan\n')
+    assert.equal(await run(root, 'status', '--porcelain', '-uall'), ' D .agents/skills/tickets/SKILL.md\n D .claude/skills/tickets\n?? .agents/skills/plan/SKILL.md\n?? .claude/skills/plan\n')
   } finally {
     await gone(root)
   }
@@ -248,6 +261,60 @@ test('a newer text is told and written only on a yes; a text changed by hand is 
     assert.doesNotMatch(yes.shown, /Commit these files now/)
     assert.equal(await readFile(join(root, '.agents/skills/plan/SKILL.md'), 'utf8'), stamped(carried.get('plan')!.text, carried.get('plan')!.version))
     assert.equal(await readFile(join(root, '.agents/skills/ux/SKILL.md'), 'utf8'), stamped(reworded('ux'), carried.get('ux')!.version), 'the text changed by hand is as the person left it')
+  } finally {
+    await gone(root)
+  }
+})
+
+const CTRL_C = '\x03'
+
+test('Ctrl-C at a question ends it there: nothing is written at the newer-text question, nothing committed at the commit question, and no later question is asked', async () => {
+  const root = await folder(true)
+  try {
+    const carried = await carriedSkills()
+    await cli(root, 'add', 'plan')
+    const old = stamped(carried.get('plan')!.text.replace(/\n---\n/, '\n---\nA line of the old text.\n'), '0.0.1')
+    await writeFile(join(root, '.agents/skills/plan/SKILL.md'), old)
+    // Tick tickets too, then leave at the question about the newer text.
+    const atNewer = await converse(root, [
+      { after: LIST_KEYS, keys: ' \r' },
+      { after: 'Update it? (y/N)', keys: CTRL_C },
+    ])
+    assert.equal(atNewer.code, 130)
+    assert.deepEqual(held(await readProject(root)), ['plan'], 'the tick was not written')
+    assert.equal(await readFile(join(root, '.agents/skills/plan/SKILL.md'), 'utf8'), old)
+    assert.doesNotMatch(atNewer.shown, /Open the dashboard/)
+
+    const atCommit = await converse(root, [
+      { after: LIST_KEYS, keys: ' \r' },
+      { after: 'Update it? (y/N)', keys: 'n' },
+      { after: 'Commit these files now? (Y/n)', keys: CTRL_C },
+    ])
+    assert.equal(atCommit.code, 130)
+    assert.deepEqual(held(await readProject(root)), ['tickets', 'plan'], 'the files were written before the question')
+    assert.equal((await run(root, 'log', '--format=%s')).trim(), 'init', 'nothing was committed')
+    assert.doesNotMatch(atCommit.shown, /Open the dashboard/)
+  } finally {
+    await gone(root)
+  }
+})
+
+test('a project whose ignore rules cover the skill folders is told so in one line, and nothing is left staged', async () => {
+  const root = await folder(true)
+  try {
+    await writeFile(join(root, '.gitignore'), '.claude/\n')
+    await run(root, 'add', '.gitignore')
+    await run(root, 'commit', '-q', '-m', 'ignore')
+    const refused = await cli(root, 'add', 'tickets', '--commit')
+    assert.equal(refused.code, 1)
+    assert.equal(refused.err, 'the files are written, but the commit failed: git ignores .claude/skills/tickets: an ignore rule of this project, or of yours, covers it')
+    assert.equal(await run(root, 'status', '--porcelain', '-uall'), '?? .agents/skills/tickets/SKILL.md\n', 'written, and nothing staged')
+    const { shown } = await converse(root, [
+      { after: LIST_KEYS, keys: `${DOWN} \r` },
+      { after: 'Commit these files now? (Y/n)', keys: 'y' },
+      { after: 'Open the dashboard? (Y/n)', keys: 'n' },
+    ])
+    assert.match(shown, /Not committed: git ignores \.claude\/skills\/queue: an ignore rule of this project, or of yours, covers it\. The files are in your folder\./)
   } finally {
     await gone(root)
   }

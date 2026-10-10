@@ -96,10 +96,12 @@ async function hookLines(root: string): Promise<string[]> {
   return [...hooks.open, ...hooks.close, hooks.start, hooks.resume, hooks.check].filter((line): line is string => typeof line === 'string')
 }
 
-/** Whether one of `lines` runs the package: one of its commands or its name stands in it as a word of its own. */
+/** Whether one of `lines` runs the package: one of its commands, bare or by a path, or its name with or without a version, stands in it as a word of its own. */
 function runsOneOf(lines: readonly string[], pkg: ProjectPackage): boolean {
-  const words = [pkg.name, ...Object.keys(packageBins(pkg.name, pkg.manifest.bin, pkg.dir))]
-  return lines.some(line => line.split(/[\s"'=;|&()]+/).some(word => words.includes(word.replace(/@[\w.^~<>=*-]+$/, ''))))
+  const commands = Object.keys(packageBins(pkg.name, pkg.manifest.bin, pkg.dir))
+  return lines.some(line =>
+    line.split(/[\s"'`=;|&()<>]+/).some(word => word.replace(/@[\w.^~<>=*-]+$/, '') === pkg.name || commands.includes(word.slice(word.lastIndexOf('/') + 1))),
+  )
 }
 
 /** The project's own installed packages, less the names OpenAgent brings itself. */

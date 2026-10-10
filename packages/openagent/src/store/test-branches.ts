@@ -1,6 +1,3 @@
-import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import type { BranchesFor, BranchesSource, BranchState, Checkout } from './branches.js'
 
 /**
@@ -38,26 +35,4 @@ export function testBranches(byProject: Record<string, Checkout[]> = {}, states:
     },
   })
   return Object.assign(async (root: string) => (checkouts.has(root) ? sourceFor(root) : undefined), { writes })
-}
-
-/** The name of the package whose command is the branches provider of every project a test makes real. */
-const BRANCHES_PACKAGE = '@openagt/skill-branches'
-
-/**
- * Make the real branches package the project's provider, the way a project has it: listed as a
- * dependency in its package.json (kept, when one is there), and installed under `node_modules` as
- * a link to this workspace's copy, whose built command is what the provider runs. The package
- * lists the project's checkouts from `.branches/`, so the project must be a git repository whose
- * checkouts are real worktrees.
- */
-export async function linkBranchesProvider(root: string): Promise<void> {
-  const manifestPath = join(root, 'package.json')
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf8').catch(() => '{}')) as Record<string, unknown>
-  const devDependencies = (manifest['devDependencies'] ?? {}) as Record<string, string>
-  await writeFile(manifestPath, JSON.stringify({ ...manifest, devDependencies: { ...devDependencies, [BRANCHES_PACKAGE]: '*' } }))
-  const link = join(root, 'node_modules', ...BRANCHES_PACKAGE.split('/'))
-  await mkdir(dirname(link), { recursive: true })
-  await symlink(resolve(dirname(fileURLToPath(import.meta.resolve(BRANCHES_PACKAGE))), '..'), link).catch((err: NodeJS.ErrnoException) => {
-    if (err.code !== 'EEXIST') throw err
-  })
 }

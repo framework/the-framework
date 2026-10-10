@@ -111,7 +111,7 @@ test('the command: refused with the pid while the scheduler runs, and the JSON o
     }
     // This test's own process is alive: a state naming it reads as a scheduler that runs.
     await ran(repo, process.pid)
-    assert.deepEqual(await run(), { code: 1, out: { ok: false, reason: 'running', pid: process.pid }, err: `the scheduler is running here (pid ${process.pid}): stop it first with agent-scheduler stop` })
+    assert.deepEqual(await run(), { code: 1, out: { ok: false, reason: 'running', pid: process.pid }, err: `the scheduler is running here (pid ${process.pid}): stop it first with npx @openagt/agent-scheduler@0.1 stop` })
     await ran(repo)
     assert.deepEqual(await run(), { code: 0, out: { ok: true, removed: [STATE_DIR], kept: [] }, err: '' })
   } finally {

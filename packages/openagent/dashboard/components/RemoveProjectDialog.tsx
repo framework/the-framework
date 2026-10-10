@@ -106,8 +106,8 @@ export function RemoveProjectDialog({
                   <p>
                     This deletes, on this machine: the agents&rsquo; checkouts in <span className={name}>.branches</span>, the folders{' '}
                     <span className={name}>.openagent</span> (with <span className={name}>hooks.yml</span>, the project&rsquo;s start lines) and{' '}
-                    <span className={name}>.agent-runner</span>, and the local branch <span className={name}>agent-data</span>. A tool the
-                    project has installed removes its own files too: the scheduler&rsquo;s state, the subagent settings.
+                    <span className={name}>.agent-runner</span>, and the local branch <span className={name}>agent-data</span>. A tool that
+                    worked in the project removes its own files too: the scheduler&rsquo;s state, the subagent settings.
                   </p>
                   <p className="mt-2">
                     <span className={name}>The agents&rsquo; conversations go with that branch.</span> If you never shared the records, this is

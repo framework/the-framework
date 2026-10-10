@@ -68,7 +68,7 @@ function commandQueue(root: string, command: ProvidedCommand, now: () => number)
 }
 
 /**
- * The production {@link QueueReader}: the project's provider, looked up by its package.json, one
+ * The production {@link QueueReader}: the project's provider, looked up among the packages the project has (`built-in.ts`), one
  * source per project kept while the same command provides — so the cache holds across the many
  * reads of one poll, and a project that installs, swaps or drops its provider is read the new way
  * within {@link CACHE_MS}. `changed(root)` forgets that project's read, so the next read runs the

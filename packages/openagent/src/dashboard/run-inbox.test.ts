@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { addWorktree, agentBranchName, worktreePath } from '@openagt/skill-branches'
 import { nodeGitRunner } from '@openagt/agent-data'
-import { linkBranchesProvider } from '../store/test-branches.js'
 import { OPENAGENT_DIR } from '../openagent-dir.js'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { RUN_INBOX_FILE, sayToRun } from './run-inbox.js'
@@ -28,7 +27,6 @@ test('a line written to a run that ended meanwhile is taken back out of the inbo
     await git(['add', '-A'], cwd)
     await git(['commit', '-q', '-m', 'init'], cwd)
     await addWorktree(cwd, { agentId: RUN, branch: agentBranchName(RUN) }, git)
-    await linkBranchesProvider(cwd)
     await mkdir(join(checkout, OPENAGENT_DIR), { recursive: true })
     await mkdir(join(cwd, OPENAGENT_DIR), { recursive: true })
     await writeFile(join(cwd, PROJECT_HOOKS_FILE), `resume: 'printf "%s|%s|%s\\n" "$RUN_ID" "\${TEXT-}" "\${ANSWER-}" >> resumed.txt; echo "{\\"id\\":\\"$RUN_ID\\"}"'\n`)

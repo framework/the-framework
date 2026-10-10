@@ -179,12 +179,18 @@ test('a line reaches its tool with nothing installed in the project: the dashboa
     const checked = await runCheckHook(cwd, {}, { env: { ...process.env, PATH: bare } })
     assert.ok(checked.ok, JSON.stringify(checked))
 
-    // The project installed its own: that copy answers, not the dashboard's.
+    // The project installed a copy of its own: the dashboard's still answers, the one its pages go through too.
     await mkdir(join(cwd, 'node_modules', '.bin'), { recursive: true })
     const own = join(cwd, 'node_modules', '.bin', 'agent-runner')
     await writeFile(own, '#!/bin/sh\necho \'{"problems":["the project\'"\'"\'s own copy answered"],"warnings":[]}\'\n')
     await chmod(own, 0o755)
-    assert.deepEqual(await runCheckHook(cwd, {}, { env: { ...process.env, PATH: bare } }), { ok: true, problems: ["the project's own copy answered"], warnings: [] })
+    assert.deepEqual(await runCheckHook(cwd, {}, { env: { ...process.env, PATH: bare } }), checked)
+    // A tool that is not OpenAgent's is the project's installed one.
+    const other = join(cwd, 'node_modules', '.bin', 'their-tool')
+    await writeFile(other, '#!/bin/sh\necho \'{"problems":["their tool answered"],"warnings":[]}\'\n')
+    await chmod(other, 0o755)
+    await writeFile(join(cwd, PROJECT_HOOKS_FILE), 'check: their-tool\n')
+    assert.deepEqual(await runCheckHook(cwd, {}, { env: { ...process.env, PATH: bare } }), { ok: true, problems: ['their tool answered'], warnings: [] })
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

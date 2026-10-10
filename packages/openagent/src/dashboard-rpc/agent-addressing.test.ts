@@ -12,7 +12,6 @@ import { OPENAGENT_DIR } from '../openagent-dir.js'
 import { RUN_INBOX_FILE } from '../dashboard/run-inbox.js'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { provideTestContext } from './test-context.js'
-import { linkBranchesProvider } from '../store/test-branches.js'
 
 // #749, #1774: what is addressed at a RUN has to resolve the run's own checkout, not the project:
 // the run's card is there, and so is the inbox its tool reads. Addressed at the project root, a
@@ -46,7 +45,6 @@ async function projectWithWorktreeAgent(
   await git(['add', '-A'], dir)
   await git(['commit', '-q', '-m', 'init'], dir)
   await addWorktree(dir, { agentId, branch: agentBranchName(agentId) }, git)
-  await linkBranchesProvider(dir)
   const worktree = worktreePath(dir, agentId)
   await mkdir(join(worktree, OPENAGENT_DIR), { recursive: true })
   // The run's card is what readLiveMetas discovers, and its id is what the caller addresses.
@@ -269,7 +267,6 @@ async function projectWithDirtyWorktree(): Promise<{
   const agentId = 'run1'
   const { path, branch } = await addWorktree(dir, { agentId, branch: agentBranchName(agentId) }, git)
   await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
-  await linkBranchesProvider(dir)
 
   const previous = process.env.XDG_CONFIG_HOME
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')

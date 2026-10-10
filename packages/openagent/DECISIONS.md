@@ -136,9 +136,11 @@ already made, and lists it in its pull request; for anything else it proposes an
   lines are a default: a line already there is kept, and the person can change or delete any
   of them. Picked over the launcher telling the person which command to run, which left an
   empty folder unable to start.
-- A hook line finds its tools in the project's installed packages first, then in the
-  built-in packages. Nothing is downloaded to run a line. Picked over `npx` in the lines, which
-  downloads whatever package holds the name on npm when the project has not installed it.
+- A hook line finds its tools in the packages OpenAgent brings first, then in the
+  project's installed packages. Nothing is downloaded to run a line. Picked over `npx`
+  in the lines, which downloads whatever package holds the name on npm when the project
+  has not installed it, and over the project's installed copy first, where a line ran
+  one copy of a tool and the tool's page went through another.
 - The line gets the prompt, and the coding agent, the model and how far to publish when the
   person picked them; anything else is the line's own business. The publish pick is one menu
   beside Start: Nothing, Commit, Publish branch, Open PR, Merge on green. It is saved like the

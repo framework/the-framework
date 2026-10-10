@@ -77,6 +77,10 @@ test('the scheduler is a project\'s once one of the project\'s hook lines runs i
     assert.ok((await readProjectModules(root)).some(module => module.package === '@openagt/agent-scheduler'), 'its page comes with it')
     await hooks('open:\n  - npx @openagt/agent-scheduler@0.1 start\n')
     assert.equal(await has(), true, 'the full name with a range')
+    await hooks('open:\n  - agent-scheduler start\nclose:\n  - agent-scheduler stop --unless-keep-alive\n')
+    assert.equal(await has(), true, 'the bare lines its own init writes')
+    await hooks('open:\n  - FOO=1 ./node_modules/.bin/agent-scheduler start\n')
+    assert.equal(await has(), true, 'by a path')
     await hooks('open: [')
     assert.equal(await has(), false, 'a hooks file that cannot be read runs nothing')
   } finally {
@@ -100,7 +104,8 @@ test('one of OpenAgent\'s own names among a project\'s dependencies is not read:
     const command = await providedCommand(root, 'tickets')
     assert.equal(command?.package, '@openagt/skill-tickets')
     assert.ok(!command!.bin.startsWith(root), 'OpenAgent\'s copy runs, not the one in the project')
-    assert.notEqual((await readProjectModules(root)).find(module => module.package === '@openagt/skill-tickets')?.version, '9.9.9')
+    const module = (await readProjectModules(root)).find(module => module.package === '@openagt/skill-tickets')
+    assert.ok(module && module.version !== '9.9.9' && !module.dir.startsWith(root), 'its page is OpenAgent\'s copy too')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

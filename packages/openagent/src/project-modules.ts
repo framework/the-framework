@@ -11,7 +11,7 @@ import { builtInPackagesOf, ownPackages } from './built-in.js'
  * (`built-in.ts`).
  */
 export interface ProjectModule {
-  /** The package's name, as the project's package.json lists it. */
+  /** The package's name. */
   package: string
   /** The package's version, when its package.json says one. */
   version?: string

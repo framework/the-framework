@@ -146,7 +146,7 @@ function commandGitHost(root: string, command: ProvidedCommand): GitHostSource {
 }
 
 /**
- * The production {@link GitHostReader}: the project's provider, looked up by its package.json, one
+ * The production {@link GitHostReader}: the project's provider, looked up among the packages the project has (`built-in.ts`), one
  * source per project kept while the same command provides, so a project that installs, swaps or
  * drops its git host is read the new way within {@link CACHE_MS}. `changed(root)` forgets the
  * project, so the next ask looks its provider up again.

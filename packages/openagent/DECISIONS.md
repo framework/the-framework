@@ -113,11 +113,13 @@ already made, and lists it in its pull request; for anything else it proposes an
   skills have a newer text") with an "Update" button; the texts are written only on that
   press, and the person reads the change in git. Picked over saying nothing until asked,
   and over writing every text again unasked.
-- The dashboard offers the same commit init does: one commit of the skill files that
-  stand uncommitted, those alone, on the branch the folder is on, never a push. While a
-  skill's text is in the folder but not yet on the branch agents start from, the page
-  says so ("tickets: waiting to reach main"), and the launcher shows its command as
-  waiting and does not take it, so it never offers a command the agent does not have.
+- After a change the dashboard offers the same commit init does: one commit of the skill
+  files that change wrote or deleted, those alone, on the branch the folder is on, never
+  a push. While a skill's text is in the folder but not yet on the branch agents start
+  from, the page says so ("tickets: waiting to reach main"), and the launcher does not
+  take its command, so it never offers a command the agent does not have. Picked over
+  leaving the commit to the person with a line of advice, and over committing and
+  pushing unasked.
 - A module may bring a section of the Settings page, shown after OpenAgent's own
   sections, where a project has its package. It reads and writes through the package's own
   command. Picked over OpenAgent's own sections knowing a package's file and a hook line

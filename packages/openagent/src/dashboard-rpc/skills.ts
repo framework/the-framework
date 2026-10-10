@@ -1,6 +1,6 @@
-import { applyChange, carriedSkills, commitSkills, GROUPS, isKnown, readProject, SCHEDULER, skillCount, SKILLS_IN_ALL, skillsOn, uncommittedSkills, type Standing } from '@openagt/init'
-import { startScheduler } from '@openagt/agent-scheduler'
-import { startBranch } from '../dashboard/start-branch.js'
+import { applyChange, carriedSkills, commitSkills, GROUPS, isKnown, readProject, SCHEDULER, skillCount, SKILLS_IN_ALL, uncommittedSkills, type Standing } from '@openagt/init'
+import { waitingSkills } from '../dashboard/start-branch.js'
+import { readProjectHooks, runProjectHooks } from '../project-hooks.js'
 import { providedDataChanged } from '../store/provided.js'
 import { resolveProjectPath } from './context.js'
 
@@ -18,7 +18,7 @@ export interface ProjectSkill {
   description: string
   /** How the project's text stands against the one this dashboard carries; `absent` when the project does not hold the skill. */
   standing: Standing
-  /** Whether the skill is in the folder but not yet on the branch agents start from: an agent started now does not have it. */
+  /** Whether the skill is in the folder but not yet on the branch agents start from: an agent started from it does not have the skill. */
   waiting: boolean
 }
 
@@ -36,67 +36,86 @@ export interface ProjectSkills {
   uncommitted: number
   /** Whether the folder is a git repository: without one there is nothing to commit. */
   git: boolean
+  /** Whether the project has a remote: without one a commit on this machine is all agents need. */
+  remote: boolean
 }
 
 /** The project's skills; `null` when the project is unknown here. */
 export async function onProjectSkills(projectId: string): Promise<ProjectSkills | null> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return null
-  const [state, carried, start] = await Promise.all([readProject(cwd), carriedSkills(), startBranch(cwd)])
-  const on = start ? await skillsOn(cwd, start.ref) : new Set<string>()
+  const [state, carried] = await Promise.all([readProject(cwd), carriedSkills()])
   const standing = new Map(state.skills.map(skill => [skill.name, skill.standing]))
+  const { start, waiting } = await waitingSkills(cwd, state.skills.filter(skill => skill.standing !== 'absent').map(skill => skill.name))
   return {
     has: skillCount(state),
     of: SKILLS_IN_ALL,
     groups: GROUPS.map(group => ({
       title: group.title,
       ticked: group.ticked,
-      skills: group.skills.map(name => {
-        const stands = standing.get(name) ?? 'absent'
-        return { name, description: carried.get(name)!.description, standing: stands, waiting: stands !== 'absent' && start !== undefined && !on.has(name) }
-      }),
+      skills: group.skills.map(name => ({ name, description: carried.get(name)!.description, standing: standing.get(name) ?? 'absent', waiting: waiting.has(name) })),
     })),
     scheduler: state.scheduler,
     ...(start ? { startBranch: start.name } : {}),
     uncommitted: state.git ? await uncommittedSkills(cwd) : 0,
     git: state.git,
+    remote: state.remote,
   }
 }
 
-/** What a change of skills answered: what was written and deleted, and what was left as it is. */
+/** What a change of skills answered: what was written and deleted, what was left as it is, and the scheduler when the change switched it. */
 export type ChangeSkillsResult =
-  | { ok: true; written: string[]; removed: string[]; left: { path: string; reason: string }[]; schedulerError?: string }
+  | { ok: true; written: string[]; removed: string[]; left: { path: string; reason: string }[]; scheduler?: 'on' | 'off'; schedulerError?: string }
   | { ok: false; error: string }
 
+/** A list of the list's own skill names, each once; nothing for anything else. */
 const names = (value: unknown): string[] | undefined => (value === undefined ? [] : Array.isArray(value) && value.every(name => typeof name === 'string' && name !== SCHEDULER && isKnown(name)) ? [...new Set(value as string[])] : undefined)
 
 /**
  * Write and delete skills in a project's folder, and switch its scheduler: what the "Add skills"
- * screen saves. Only the names of the list are taken; anything else is refused whole. The scheduler
- * switched on starts at once, as its line would have at this dashboard's opening. Nothing is
- * committed here: `sendCommitSkills` is the person's next press.
+ * screen saves. Only the names of the list are taken; anything else is refused whole. A scheduler
+ * switched on starts at once, by its own line, as it would have at this dashboard's opening.
+ * Nothing is committed here: `sendCommitSkills` is the person's next press.
  */
 export async function sendChangeSkills(projectId: string, change: { write?: string[]; remove?: string[]; scheduler?: boolean }): Promise<ChangeSkillsResult> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
-  const write = names(change?.write)
-  const remove = names(change?.remove)
-  if (!write || !remove || (change.scheduler !== undefined && typeof change.scheduler !== 'boolean')) return { ok: false, error: 'not a list of skills' }
+  const asked = change && typeof change === 'object' && !Array.isArray(change) ? change : undefined
+  const write = names(asked?.write)
+  const remove = names(asked?.remove)
+  if (!asked || !write || !remove || (asked.scheduler !== undefined && typeof asked.scheduler !== 'boolean')) return { ok: false, error: 'not a list of skills' }
   try {
-    const changed = await applyChange(cwd, { write, remove, ...(change.scheduler !== undefined ? { scheduler: change.scheduler } : {}) })
+    const opened = (await readProjectHooks(cwd).catch(() => undefined))?.open ?? []
+    const changed = await applyChange(cwd, { write, remove, ...(asked.scheduler !== undefined ? { scheduler: asked.scheduler } : {}) })
     providedDataChanged(cwd)
-    // The scheduler's line runs when the dashboard opens, and this dashboard is open: switched on here, it starts now.
-    const started = changed.scheduler && !('error' in changed.scheduler) && changed.scheduler.on && changed.scheduler.changed ? await startScheduler(cwd).then(() => undefined, (err: unknown) => (err instanceof Error ? err.message : String(err))) : undefined
-    const schedulerError = changed.scheduler && 'error' in changed.scheduler ? changed.scheduler.error : started
-    return { ok: true, written: changed.written, removed: changed.removed, left: changed.left, ...(schedulerError !== undefined ? { schedulerError } : {}) }
+    const scheduler = changed.scheduler
+    // The lines the change added run when the dashboard opens, and this dashboard is open: they run now, the way they would have.
+    if (scheduler && !('error' in scheduler) && scheduler.on && scheduler.changed) {
+      const added = ((await readProjectHooks(cwd).catch(() => undefined))?.open ?? []).filter(line => !opened.includes(line))
+      if (added.length > 0) await runProjectHooks(cwd, 'open', { only: added, log: console.log })
+    }
+    return {
+      ok: true,
+      written: changed.written,
+      removed: changed.removed,
+      left: changed.left,
+      ...(scheduler && !('error' in scheduler) && scheduler.changed ? { scheduler: scheduler.on ? ('on' as const) : ('off' as const) } : {}),
+      ...(scheduler && 'error' in scheduler ? { schedulerError: scheduler.error } : {}),
+    }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
 }
 
-/** One commit of the skill files that stand uncommitted in the project's folder, those alone, on the branch the folder is on. Never a push. */
-export async function sendCommitSkills(projectId: string): Promise<{ ok: true; committed: boolean; commit?: string } | { ok: false; error: string }> {
+/**
+ * One commit of skill files that stand uncommitted in the project's folder, on the branch the
+ * folder is on: the files of the skills `only` names, after a change that wrote or deleted them,
+ * else every uncommitted skill file. Never a push.
+ */
+export async function sendCommitSkills(projectId: string, only?: string[]): Promise<{ ok: true; committed: boolean; commit?: string } | { ok: false; error: string }> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
-  return commitSkills(cwd)
+  const named = names(only)
+  if (!named) return { ok: false, error: 'not a list of skills' }
+  return named.length > 0 ? commitSkills(cwd, named) : commitSkills(cwd)
 }

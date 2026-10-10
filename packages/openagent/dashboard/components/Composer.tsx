@@ -22,7 +22,7 @@ import { useSelectedRemoteDeviceId, selectRemoteDevice } from '../lib/remote-tar
 import { useDeviceStatus } from '../lib/use-device-status.js'
 import { stashDraftFromUrl, takePendingDraft } from '../lib/draft-handoff.js'
 import { driverOptions, useModels } from '../lib/models.js'
-import { useProjectLauncher } from '../lib/use-project-launcher.js'
+import { readyCommands, useProjectLauncher } from '../lib/use-project-launcher.js'
 import { ClaudeLogo, CodexLogo } from './driver-logos.js'
 import { Button } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -192,7 +192,7 @@ export const Composer = forwardRef<ComposerHandle, {
       {...(removeContext ? { onMentionRemoved: removeContext } : {})}
       projects={projects}
       files={files}
-      commands={commands}
+      commands={readyCommands(commands)}
       customPresets={customPresets}
       projectPresets={projectPresets}
       // The `/` menu offers "Save prompt…" only in the full composer, where the create panel renders;

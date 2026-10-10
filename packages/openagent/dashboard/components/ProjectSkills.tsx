@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { onProjectSkills, sendChangeSkills, sendCommitSkills, type ProjectSkills, type ProjectSkill } from '../rpc/skills.js'
 import { useAction } from '../lib/use-action.js'
 import { usePolled } from '../lib/use-async.js'
@@ -26,9 +26,15 @@ export const SCHEDULER_LINE = 'Starts the automations you switch on, while the d
 
 export function ProjectSkillsLine({ projectId, onChanged }: { projectId: string; onChanged?: (() => void) | undefined }) {
   const { value: skills, reload } = usePolled<ProjectSkills | null>(() => onProjectSkills(projectId), null, 15_000, [projectId], 'previous')
-  const [adding, setAdding] = useState(false)
+  // The list opens on the project as it stands at that moment: a later read must not change it under the person's ticks.
+  const [adding, setAdding] = useState<ProjectSkills | null>(null)
   const [committed, setCommitted] = useState<string | null>(null)
   const { busy, error, run } = useAction()
+  // The note of a commit made here holds until skill files stand uncommitted again.
+  const uncommitted = skills?.uncommitted ?? 0
+  useEffect(() => {
+    if (uncommitted > 0) setCommitted(null)
+  }, [uncommitted])
   if (!skills) return null
 
   const changed = async (): Promise<void> => {
@@ -51,7 +57,7 @@ export function ProjectSkillsLine({ projectId, onChanged }: { projectId: string;
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-4 py-2 text-xs text-muted-foreground">
       <span className="flex items-center gap-2">
         This project has {skills.has} of {skills.of} skills.
-        <Button type="button" variant="outline" size="xs" onClick={() => setAdding(true)}>
+        <Button type="button" variant="outline" size="xs" onClick={() => setAdding(skills)}>
           Add skills
         </Button>
       </span>
@@ -74,15 +80,15 @@ export function ProjectSkillsLine({ projectId, onChanged }: { projectId: string;
       {skills.uncommitted === 0 && committed !== null && <span>Committed as {committed}. Nothing was pushed.</span>}
       {waiting.length > 0 && skills.startBranch !== undefined && (
         <span>
-          <span className="text-foreground">{waiting.length > 4 ? `${waiting.length} skills` : waiting.join(', ')}</span>: waiting to reach {skills.startBranch}. An agent started now does not have {waiting.length === 1 ? 'it' : 'them'}.
+          <span className="text-foreground">{waiting.length > 4 ? `${waiting.length} skills` : waiting.join(', ')}</span>: waiting to reach {skills.startBranch}. An agent started from {skills.startBranch} does not have {waiting.length === 1 ? 'it' : 'them'}.
         </span>
       )}
       {error && <span className="text-danger">{error}</span>}
       {adding && (
         <AddSkillsDialog
           projectId={projectId}
-          skills={skills}
-          onClose={() => setAdding(false)}
+          skills={adding}
+          onClose={() => setAdding(null)}
           onSaved={() => void changed()}
         />
       )}
@@ -101,6 +107,7 @@ interface Saved {
   written: string[]
   removed: string[]
   left: { path: string; reason: string }[]
+  scheduler?: 'on' | 'off' | undefined
   schedulerError?: string | undefined
 }
 
@@ -130,7 +137,8 @@ export function AddSkillsDialog({ projectId, skills, onClose, onSaved }: { proje
     onSaved()
   }
   const commitNow = async (): Promise<void> => {
-    const outcome = await run(() => sendCommitSkills(projectId), 'Could not commit the skill files.')
+    // The files this save wrote or deleted, and no other skill file that stands uncommitted.
+    const outcome = await run(() => sendCommitSkills(projectId, [...(saved?.written ?? []), ...(saved?.removed ?? [])]), 'Could not commit the skill files.')
     if (!outcome.ok) return
     setCommit(outcome.value)
     onSaved()
@@ -151,19 +159,22 @@ export function AddSkillsDialog({ projectId, skills, onClose, onSaved }: { proje
               Deleted {count(saved.removed.length, 'skill', 'skills')}: <span className="text-foreground">{saved.removed.join(', ')}</span>.
             </p>
           )}
-          {saved.written.length === 0 && saved.removed.length === 0 && !saved.schedulerError && <p>Saved.</p>}
+          {saved.scheduler === 'on' && <p>The scheduler is on for this project, on this machine. Every automation starts switched off.</p>}
+          {saved.scheduler === 'off' && <p>The scheduler is off for this project on this machine, and stopped.</p>}
           {saved.left.map(({ path, reason }) => (
             <p key={path}>
               Left as it is: <code className="rounded bg-muted px-1">{path}</code> ({reason}).
             </p>
           ))}
-          {saved.schedulerError && <p className="text-danger">The scheduler could not be switched: {saved.schedulerError}</p>}
+          {saved.schedulerError && <p className="text-danger">The scheduler was not switched: {saved.schedulerError}</p>}
           {saved.written.length + saved.removed.length > 0 && !skills.git && <p>This folder is not a git repository, so there is nothing to commit.</p>}
           {saved.written.length + saved.removed.length > 0 && skills.git && commit === null && (
             <p>The files are in the project&rsquo;s folder, not committed. A commit holds these files alone, on the branch the folder is on. Nothing is pushed.</p>
           )}
-          {commit !== null && <p>{commit.committed ? `Committed as ${commit.commit}, these files alone. Nothing was pushed: push it, or open a pull request where the default branch is protected.` : 'Nothing to commit: git already has these files as they are.'}</p>}
-          {saved.written.length > 0 && skills.startBranch !== undefined && <p>Your agents get these skills once they are on {skills.startBranch}.</p>}
+          {commit !== null && !commit.committed && <p>Nothing to commit: git already has these files as they are.</p>}
+          {commit?.committed && skills.remote && <p>Committed as {commit.commit}, these files alone. Nothing was pushed: push it, or open a pull request where the default branch is protected.</p>}
+          {commit?.committed && !skills.remote && <p>Committed as {commit.commit}, these files alone.{saved.written.length > 0 ? ' Your agents have these skills from their next start.' : ''}</p>}
+          {saved.written.length > 0 && skills.startBranch !== undefined && !(commit?.committed && !skills.remote) && <p>Your agents get these skills once they are on {skills.startBranch}.</p>}
           {error && <p className="text-danger">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
             {saved.written.length + saved.removed.length > 0 && skills.git && commit === null && (

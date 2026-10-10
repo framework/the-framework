@@ -7,7 +7,7 @@ import { offeredPublishPicks, publishPickIn } from '../../src/client.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId } from '../lib/remote-target.js'
 import { cleanupPick, offersPostMergeCleanup, startPicks, useStartAgent } from '../lib/use-start-agent.js'
-import { useProjectLauncher } from '../lib/use-project-launcher.js'
+import { readyCommands, useProjectLauncher } from '../lib/use-project-launcher.js'
 import { useLoaded } from '../lib/use-async.js'
 import { promptWithContext } from '../lib/use-context-set.js'
 import { AutoMenu } from './AutoMenu.js'
@@ -86,8 +86,9 @@ export function StartAgentForm({
   const selectedDeviceId = useSelectedRemoteDeviceId()
   const remoteDevice = selectedDeviceId ? profiles.find(p => p.id === selectedDeviceId) : undefined
   const noStartHook = launcher !== null && !launcher.startHook && !remoteDevice
-  // A device starts the run in its own project, whose commands this launcher does not read.
-  const commands = remoteDevice ? [] : (launcher?.commands ?? [])
+  // A device starts the run in its own project, whose commands this launcher does not read. A command
+  // whose skill has yet to reach the branch the agent starts from is not one the run can follow with.
+  const commands = remoteDevice ? [] : readyCommands(launcher?.commands ?? [])
   const offersCleanup = offersPostMergeCleanup(commands)
   // Whether a pull request can be opened here: unknown until the launcher is read, and a device's
   // own project is not read at all, so both are offered every pick; the daemon that starts the run

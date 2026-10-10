@@ -60,6 +60,7 @@ test('a project\'s skills: none yet; written, they are in the folder and wait to
   try {
     const empty = (await onProjectSkills(id))!
     assert.deepEqual({ has: empty.has, of: empty.of, scheduler: empty.scheduler, startBranch: empty.startBranch, uncommitted: empty.uncommitted, git: empty.git }, { has: 3, of: 25, scheduler: false, startBranch: 'main', uncommitted: 0, git: true })
+    assert.equal(empty.remote, false)
     assert.deepEqual(empty.groups.map(group => [group.title, group.skills.length]), [['Tickets and queue', 9], ['Reviews and research', 8], ['Subagents', 1], ['After a merge', 1], ['Needs its own setup', 2]])
     assert.ok(flat(empty).every(skill => skill.standing === 'absent' && !skill.waiting && skill.description.length > 10))
 
@@ -75,9 +76,15 @@ test('a project\'s skills: none yet; written, they are in the folder and wait to
     assert.ok((await readProjectModules(dir)).some(module => module.package === '@openagt/skill-tickets'))
     assert.deepEqual((await onCommands(id))!.commands.map(command => [command.name, command.waiting]), [['plan', 'main']])
 
+    // By name, as after a save: the files of that skill alone. Then everything that still stands uncommitted.
+    const one = await sendCommitSkills(id, ['plan'])
+    assert.ok(one.ok && one.committed && /^[0-9a-f]{7,}$/.test(one.commit!))
+    assert.equal(git('show', '--format=', '--name-only', 'HEAD'), '.agents/skills/plan/SKILL.md\n.claude/skills/plan\n')
+    assert.equal((await onProjectSkills(id))!.uncommitted, 2)
+    assert.deepEqual(await sendCommitSkills(id, ['../x']), { ok: false, error: 'not a list of skills' })
     const committed = await sendCommitSkills(id)
-    assert.ok(committed.ok && committed.committed && /^[0-9a-f]{7,}$/.test(committed.commit!))
-    assert.equal(git('log', '--format=%s').trim(), 'Update OpenAgent skills\ninit')
+    assert.ok(committed.ok && committed.committed)
+    assert.equal(git('log', '--format=%s').trim(), 'Update OpenAgent skills\nUpdate OpenAgent skills\ninit')
     const after = (await onProjectSkills(id))!
     assert.equal(after.uncommitted, 0)
     assert.deepEqual(flat(after).filter(skill => skill.waiting), [])
@@ -114,22 +121,44 @@ test('with a remote the branch agents start from is the remote\'s: a skill commi
   }
 })
 
+test('a skill that reached the remote\'s branch elsewhere, a pull request merged on the git host, stops waiting here: this clone\'s copy of the branch is fetched first', async () => {
+  const { dir, id, git, restore } = await project()
+  try {
+    git('init', '-q', '--bare', join(dir, '..', 'origin.git'))
+    git('remote', 'add', 'origin', join(dir, '..', 'origin.git'))
+    git('push', '-q', '-u', 'origin', 'main')
+    const before = git('rev-parse', 'origin/main').trim()
+    await writeFile(join(dir, '.git', 'x'), '')
+    // The skill is committed and on the remote's main, and this clone's copy of that branch does not know yet.
+    const { applyChange, commitChange } = await import('@openagt/init')
+    await commitChange(dir, await applyChange(dir, { write: ['queue'] }))
+    git('push', '-q', 'origin', 'main')
+    git('update-ref', 'refs/remotes/origin/main', before)
+    assert.equal(git('rev-parse', 'origin/main').trim(), before)
+    assert.deepEqual(flat((await onProjectSkills(id))!).filter(skill => skill.waiting), [], 'fetched, and found there')
+    assert.notEqual(git('rev-parse', 'origin/main').trim(), before)
+  } finally {
+    await restore()
+  }
+})
+
 test('the scheduler is switched on and off for the project, and only names of the list are taken', async () => {
   const { dir, id, restore } = await project()
   try {
-    assert.deepEqual(await sendChangeSkills(id, { scheduler: true }), { ok: true, written: [], removed: [], left: [] })
+    assert.deepEqual(await sendChangeSkills(id, { scheduler: true }), { ok: true, written: [], removed: [], left: [], scheduler: 'on' })
     assert.equal((await onProjectSkills(id))!.scheduler, true)
     assert.match(await readFile(join(dir, '.openagent/hooks.yml'), 'utf8'), /agent-scheduler start/)
-    // The dashboard is open, so the scheduler runs from this moment, not from the next opening.
+    // The dashboard is open, so the scheduler runs from this moment, not from the next opening: its own line was run.
+    assert.deepEqual(await sendChangeSkills(id, { scheduler: true }), { ok: true, written: [], removed: [], left: [] }, 'asked again: nothing to switch')
     const running = await readState(dir)
     assert.ok(running.on && running.pid !== undefined && alive(running.pid), 'its process is ticking')
-    await sendChangeSkills(id, { scheduler: false })
+    assert.deepEqual(await sendChangeSkills(id, { scheduler: false }), { ok: true, written: [], removed: [], left: [], scheduler: 'off' })
     assert.equal((await onProjectSkills(id))!.scheduler, false)
     assert.equal((await readState(dir)).on, false, 'and switched off, it is stopped')
     for (let waited = 0; alive(running.pid!) && waited < 5000; waited += 50) await new Promise(resolve => setTimeout(resolve, 50))
     assert.equal(alive(running.pid!), false, 'its process ended')
 
-    for (const change of [{ write: ['../../etc'] }, { write: ['scheduler'] }, { remove: ['logs'] }, { write: 'tickets' }, { scheduler: 'yes' }] as never[]) {
+    for (const change of [{ write: ['../../etc'] }, { write: ['scheduler'] }, { remove: ['logs'] }, { write: 'tickets' }, { scheduler: 'yes' }, null, 7, ['tickets']] as never[]) {
       assert.deepEqual(await sendChangeSkills(id, change), { ok: false, error: 'not a list of skills' }, JSON.stringify(change))
     }
     assert.deepEqual((await onProjectSkills(id))!.has, 3, 'nothing of a refused change was written')

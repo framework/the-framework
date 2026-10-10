@@ -1,5 +1,5 @@
 import { lstat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { SKILL_NAMES } from './catalogue.js'
 import { commitPaths, type CommitOutcome } from './commit.js'
@@ -12,40 +12,79 @@ import { LINKS_DIR, TEXTS_DIR } from './project.js'
  * says it is waiting, and offers the commit.
  */
 
-/** The names of the skills whose text is on `ref`, in either folder: the text itself, or a link there to a text that is. */
-export async function skillsOn(root: string, ref: string, git: GitRunner = nodeGitRunner()): Promise<Set<string>> {
-  const listed = await git(['ls-tree', '-r', '-z', '--name-only', ref, '--', TEXTS_DIR, LINKS_DIR], root).catch(() => '')
-  const paths = new Set(listed.split('\0').filter(Boolean))
+/** Which skills are on a branch: asked by name. */
+export interface OnBranch {
+  has(name: string): boolean
+}
+
+/** Everything counts as there: the answer where the branch cannot be read, so that nothing is held back on a guess. */
+const UNKNOWN: OnBranch = { has: () => true }
+
+/**
+ * The skills on `ref`, in either folder: a text there, or a link named as the skill (where it
+ * leads is the project's own business). Read with one listing of the two folders. Where the
+ * listing fails, or a skills folder is itself a link to somewhere the listing does not show, the
+ * answer is that every skill is there: a skill is said to be waiting only when that is known.
+ */
+export async function skillsOn(root: string, ref: string, git: GitRunner = nodeGitRunner()): Promise<OnBranch> {
+  // No commit behind the ref: a repository that has none yet, a branch that is not there. Nothing is on it.
+  if (!(await git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], root).then(() => true, () => false))) return { has: () => false }
+  const listed = await git(['ls-tree', '-r', '-z', ref, '--', TEXTS_DIR, LINKS_DIR], root).catch(() => undefined)
+  if (listed === undefined) return UNKNOWN
   const on = new Set<string>()
-  const texts = (dir: string): string[] => [...paths].flatMap(path => (path.startsWith(`${dir}/`) && path.endsWith('/SKILL.md') && path.split('/').length === 4 ? [path.split('/')[2]!] : []))
-  for (const name of [...texts(TEXTS_DIR), ...texts(LINKS_DIR)]) on.add(name)
-  // A link is one entry of the tree, named as the skill: it counts where the text it leads to is on the branch too.
-  for (const path of paths) {
-    const [, , name, more] = path.split('/')
-    if (path.startsWith(`${LINKS_DIR}/`) && name !== undefined && more === undefined && paths.has(`${TEXTS_DIR}/${name}/SKILL.md`)) on.add(name)
+  let linkedFolders = 0
+  for (const entry of listed.split('\0').filter(Boolean)) {
+    const [meta, path] = entry.split('\t') as [string, string]
+    const link = meta.startsWith('120000 ')
+    const [first, second, name, file, more] = path.split('/')
+    const dir = `${first}/${second}`
+    if (dir !== TEXTS_DIR && dir !== LINKS_DIR) continue
+    if (name === undefined) linkedFolders += link ? 1 : 0
+    else if (file === undefined ? link : file === 'SKILL.md' && more === undefined) on.add(name)
   }
+  // Claude Code's folder linked to the other one is the usual shape, and that one is listed. Any other linked folder is not.
+  if (linkedFolders > 0 && !(linkedFolders === 1 && (await linksTo(root, ref, LINKS_DIR, TEXTS_DIR, git)))) return UNKNOWN
   return on
 }
 
-/** The paths git may hold for the skills of `init`'s list, from the project's root: each text, each link, and a text in a folder of Claude Code's own where there is no link. */
-async function skillPaths(root: string): Promise<string[]> {
+/** Whether `ref` holds `from` as a link that leads to the folder `to`. */
+async function linksTo(root: string, ref: string, from: string, to: string, git: GitRunner): Promise<boolean> {
+  const target = await git(['cat-file', 'blob', `${ref}:${from}`], root).catch(() => undefined)
+  return target !== undefined && join(dirname(from), target.trim()).replace(/\/$/, '') === to
+}
+
+/** Whether a path from the project's root goes through a link on the way: git takes a link as one path, and refuses one that goes through it. */
+async function throughLink(root: string, path: string): Promise<boolean> {
+  for (let dir = dirname(path); dir !== '.'; dir = dirname(dir)) {
+    if (await lstat(join(root, dir)).then(entry => entry.isSymbolicLink(), () => false)) return true
+  }
+  return false
+}
+
+/** The paths git may hold for `names`, from the project's root: each text, each link, and a text in a folder of Claude Code's own where there is no link. */
+async function skillPaths(root: string, names: readonly string[]): Promise<string[]> {
   const paths: string[] = []
-  for (const name of SKILL_NAMES) {
-    paths.push(`${TEXTS_DIR}/${name}/SKILL.md`)
-    // Git takes a link as one path, and refuses a path that goes through one.
+  for (const name of names) {
     const link = await lstat(join(root, LINKS_DIR, name)).catch(() => undefined)
-    paths.push(link?.isDirectory() ? `${LINKS_DIR}/${name}/SKILL.md` : `${LINKS_DIR}/${name}`)
+    for (const path of [`${TEXTS_DIR}/${name}/SKILL.md`, link?.isDirectory() ? `${LINKS_DIR}/${name}/SKILL.md` : `${LINKS_DIR}/${name}`]) {
+      if (!(await throughLink(root, path))) paths.push(path)
+    }
   }
   return paths
 }
 
 /** How many skill files stand written, changed or deleted in the folder with no commit yet. */
 export async function uncommittedSkills(root: string, git: GitRunner = nodeGitRunner()): Promise<number> {
-  const status = await git(['status', '--porcelain', '-z', '-uall', '--', ...(await skillPaths(root))], root).catch(() => '')
+  // Read without taking git's lock on the index: this is polled, and must never stand in the way of the person's own git.
+  const status = await git(['--no-optional-locks', 'status', '--porcelain', '-z', '-uall', '--', ...(await skillPaths(root, SKILL_NAMES))], root).catch(() => '')
   return status.split('\0').filter(Boolean).length
 }
 
-/** One commit of every skill file that stands uncommitted, and nothing else: what a dashboard's "Commit" does. Never a push. */
-export async function commitSkills(root: string, git: GitRunner = nodeGitRunner()): Promise<CommitOutcome> {
-  return commitPaths(root, await skillPaths(root), 'Update OpenAgent skills\n', git)
+/**
+ * One commit of skill files that stand uncommitted, and nothing else. With `names`, the files of
+ * those skills alone: what a dashboard commits after a change, the same commit `init` offers in a
+ * terminal. Without, every uncommitted file of the list's skills. Never a push.
+ */
+export async function commitSkills(root: string, names: readonly string[] = SKILL_NAMES, git: GitRunner = nodeGitRunner()): Promise<CommitOutcome> {
+  return commitPaths(root, await skillPaths(root, names), 'Update OpenAgent skills\n', git)
 }

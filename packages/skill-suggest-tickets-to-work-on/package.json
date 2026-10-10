@@ -1,6 +1,6 @@
 {
   "name": "@openagt/skill-suggest-tickets-to-work-on",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "The suggest-tickets-to-work-on command for coding agents: pick and rank the tickets worth working on next, each with the priority it should get on the agent queue. Changes nothing. A skill file only, no code.",
   "license": "MIT",
   "repository": {

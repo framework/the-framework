@@ -1,6 +1,6 @@
 {
   "name": "@openagt/skill-suggest-new-features",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "The suggest-new-features command for coding agents: think like a product manager and write a ticket for each net-new feature the product should have next. A skill file only, no code.",
   "license": "MIT",
   "repository": {

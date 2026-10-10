@@ -46,7 +46,7 @@ already made, and lists it in its pull request; for anything else it proposes an
   claim names. Leaving that to the caller's prompts was the alternative and was not taken:
   outside the caller nobody would ever read the logs.
 - The skill calls the command by its full name and a version range,
-  `npx @openagt/skill-logs@^1`: the name is ours on npm, so no other package can run
+  `npx @openagt/skill-logs@0.1`: the name is ours on npm, so no other package can run
   under it, and nothing is installed in the project. Picked over `npx logs` with the
   package as a dependency of the project, which ran whatever package holds that name on
   npm where the install was missing, and which a project without Node could not have.

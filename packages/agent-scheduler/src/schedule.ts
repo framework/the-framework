@@ -16,7 +16,7 @@ import { parseInterval, type Interval } from './pace.js'
  *     disable-model-invocation: true
  *     schedule:
  *       every: 15m
- *       when: npx @openagt/skill-tickets@^1 meta | jq …
+ *       when: npx @openagt/skill-tickets@0.1 meta | jq …
  *       waits-for: when an issue changed since the last import
  *     ---
  *
@@ -385,7 +385,7 @@ export function promptCommand(prompt: string, schedule: Schedule): string | unde
 /**
  * Whether a check's output says the command is due (#1774): the output parsed as JSON is
  * something other than empty — `[]`, `{}`, `null`, `false`, `""`, `0` and no output at all are not
- * due. Every skill command prints JSON on stdout, so a check like `npx @openagt/skill-queue@^1` needs no piping.
+ * due. Every skill command prints JSON on stdout, so a check like `npx @openagt/skill-queue@0.1` needs no piping.
  * Output that is not JSON counts by its text: anything non-blank is due.
  */
 export function isDue(stdout: string): boolean {

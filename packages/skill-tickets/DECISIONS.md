@@ -47,7 +47,7 @@ already made, and lists it in its pull request; for anything else it proposes an
   summary from the first prose line after `## TLDR`, else after the title, scanning past
   headings, `Priority:` lowercased.
 - The skill calls the command by its full name and a version range,
-  `npx @openagt/skill-tickets@^1`: the name is ours on npm, so no other package can run
+  `npx @openagt/skill-tickets@0.1`: the name is ours on npm, so no other package can run
   under it, and nothing is installed in the project. Picked over `npx tickets` with the
   package as a dependency of the project, which ran whatever package holds that name on
   npm where the install was missing, and which a project without Node could not have.

@@ -18,14 +18,14 @@ already made, and lists it in its pull request; for anything else it proposes an
   and the scheduler compose push then open through the two declared commands. Picked over
   one `publish` that pushed and opened, which was one skill naming another.
 - The skill calls the command by its full name and a version range,
-  `npx @openagt/skill-github@^1`: the name is ours on npm, so no other package can run
+  `npx @openagt/skill-github@0.1`: the name is ours on npm, so no other package can run
   under it, and nothing is installed in the project. Picked over `npx github` with the
   package as a dependency of the project, which ran whatever package holds that name on
   npm where the install was missing, and which a project without Node could not have.
 
 ## Flow: open
 - The agent opens its pull request only when asked to publish, by its task or by the
-  person: `npx @openagt/skill-github@^1 open` with the title and body the agent wrote,
+  person: `npx @openagt/skill-github@0.1 open` with the title and body the agent wrote,
   and the merge armed on green when whoever asked says the work may land on its own.
   Opening it when it finishes was the earlier rule and was dropped: a pull request is
   the person's act. Picked over whoever started the agent opening it, which needed a run

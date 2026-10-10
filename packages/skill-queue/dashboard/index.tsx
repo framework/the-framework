@@ -3,7 +3,7 @@
 // one Overview card, AI Queue, that lists them in full and starts agents on them; and one action
 // on the links dashboard pages show, "Add to queue". Its data is the `queue` command's own output,
 // run in each project by the dashboard: the module reads exactly what an agent reads with
-// `npx @openagt/skill-queue@^1`, and writes exactly the line an agent writes with `npx @openagt/skill-queue@^1 add`.
+// `npx @openagt/skill-queue@0.1`, and writes exactly the line an agent writes with `npx @openagt/skill-queue@0.1 add`.
 import { ListTodo } from 'lucide-react'
 import { defineModule } from '@openagt/dashboard/module'
 import { QueuePage } from './QueuePage.js'

@@ -1,6 +1,6 @@
 {
   "name": "@openagt/skill-plan",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "The plan command for coding agents: write a ticket for a task and, under it, a plan naming the ways to do it and the one to take, then stop. A skill file only, no code.",
   "license": "MIT",
   "repository": {

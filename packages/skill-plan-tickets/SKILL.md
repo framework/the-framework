@@ -6,7 +6,7 @@ schedule:
   every: 6h
   waits-for: when a ticket that is not waiting, claimed, in review or queued has no plan, or an outdated one
   when: |-
-    npx @openagt/skill-tickets@^1 list | jq --argjson q "$(npx @openagt/skill-queue@^1)" '[.[] | select(((.planned | not) or .outdated) and .pr == null and (.waiting | not) and (.locked | not) and ((.file | rtrimstr(".md")) as $s | $q | any(contains($s)) | not)) | .file]'
+    npx @openagt/skill-tickets@0.1 list | jq --argjson q "$(npx @openagt/skill-queue@0.1)" '[.[] | select(((.planned | not) or .outdated) and .pr == null and (.waiting | not) and (.locked | not) and ((.file | rtrimstr(".md")) as $s | $q | any(contains($s)) | not)) | .file]'
 ---
 
 Queue plans for the tickets that need one. Nobody will answer you: never ask, decide yourself. You only queue work, you never do it: write no plan yourself, the only thing you change is the queue.

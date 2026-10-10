@@ -5,16 +5,16 @@ description: "Split your task across subagents: plan it, get the person's yes, s
 
 # Orchestration
 
-A subagent is another coding agent you start on one part of your task: it works alone, in its own checkout. Use the `orchestration` command, always run by its full name: `npx @openagt/skill-orchestration@^1`.
+A subagent is another coding agent you start on one part of your task: it works alone, in its own checkout. Use the `orchestration` command, always run by its full name: `npx @openagt/skill-orchestration@0.1`.
 
 ```
-npx @openagt/skill-orchestration@^1 plan <file>    save the file as your plan; answers the `question` to ask the person
-npx @openagt/skill-orchestration@^1 start --level <simple|hard> "<task>"
-                                                   start a subagent on the task; answers its id at once, without waiting for it
-npx @openagt/skill-orchestration@^1 list           your subagents, newest first, as one JSON array
-npx @openagt/skill-orchestration@^1 read <id>      one subagent: its `status`, and once it ended its `branch` and `result`, its last reply
-npx @openagt/skill-orchestration@^1 stop <id>      stop a subagent that is running
-npx @openagt/skill-orchestration@^1 land <id>      merge an ended subagent's branch into yours, then delete that branch
+npx @openagt/skill-orchestration@0.1 plan <file>    save the file as your plan; answers the `question` to ask the person
+npx @openagt/skill-orchestration@0.1 start --level <simple|hard> "<task>"
+                                                    start a subagent on the task; answers its id at once, without waiting for it
+npx @openagt/skill-orchestration@0.1 list           your subagents, newest first, as one JSON array
+npx @openagt/skill-orchestration@0.1 read <id>      one subagent: its `status`, and once it ended its `branch` and `result`, its last reply
+npx @openagt/skill-orchestration@0.1 stop <id>      stop a subagent that is running
+npx @openagt/skill-orchestration@0.1 land <id>      merge an ended subagent's branch into yours, then delete that branch
 ```
 
 A refusal exits 1 with a line on stderr saying why.

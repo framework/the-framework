@@ -17,7 +17,7 @@ already made, and lists it in its pull request; for anything else it proposes an
 - The package and its command are named `orchestration`. Picked over `subagents` and
   `agents`.
 - The skill calls the command by its full name and a version range,
-  `npx @openagt/skill-orchestration@^1`: the name is ours on npm, so no other package
+  `npx @openagt/skill-orchestration@0.1`: the name is ours on npm, so no other package
   can run under it, and nothing is installed in the project. Picked over
   `npx orchestration` with the package as a dependency of the project, which ran
   whatever package holds that name on npm where the install was missing, and which a

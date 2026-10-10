@@ -1,17 +1,21 @@
-import { lstat, mkdir, symlink } from 'node:fs/promises'
+import { lstat, mkdir, realpath, symlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { CLI_BIN_DIR } from './bin-dir.js'
 
 /**
- * This package's command, linked into a checkout that has none: the package itself at
- * `node_modules/@openagt/skill-branches`, and its command at `node_modules/.bin/branches`.
+ * This package's command, linked into a checkout that has none: its command at
+ * `node_modules/.bin/branches`, and the package itself at `node_modules/@openagt/skill-branches`.
  *
- * The skill tells the agent to run `npx @openagt/skill-branches@^1`. `npx` runs a copy it finds
- * in the checkout, and asks npm for one otherwise. In a project that depends on this package the
- * checkout already has both, linked with the project's other tools. In a project with nothing
- * installed (an empty folder a dashboard added) it has neither, so both are linked here: the
- * agent then runs the very copy that made its checkout, with nothing downloaded and no network.
+ * The skill tells the agent to run `npx @openagt/skill-branches@0.1`. `npx` looks for a copy of
+ * the package in the checkout, and asks npm for one otherwise; a copy it finds, it runs by the
+ * command's name from `node_modules/.bin`. In a project that depends on this package the checkout
+ * already has both, linked with the project's other tools. In a project with nothing installed (an
+ * empty folder a dashboard added) it has neither, so both are linked here: the agent then runs the
+ * very copy that made its checkout, with nothing downloaded and no network.
+ *
+ * The package is linked only beside this package's own command. Beside another tool that holds the
+ * name `branches` in the project, the full name would run that tool, so there it is left to npm.
  *
  * Hidden from the project's git through the repository's exclude file, like the skill's link: a
  * link is the package's state, not the agent's work. Best-effort: an entry already there (the
@@ -19,34 +23,37 @@ import { CLI_BIN_DIR } from './bin-dir.js'
  * one.
  */
 
-/** The command's name, and where a checkout holds its tools. */
-export const COMMAND = 'branches'
-const BIN_DIR = 'node_modules/.bin'
+/** The command's name, where a checkout holds its tools, and where it holds this package. */
+const COMMAND = 'branches'
+const COMMAND_LINK = `node_modules/.bin/${COMMAND}`
+const PACKAGE_LINK = 'node_modules/@openagt/skill-branches'
 
-/** This package's directory, the one holding its `package.json`: beside `bin/`. */
+/** The command's script, and this package's directory, the one holding its `package.json`: beside `bin/`. */
+const COMMAND_FILE = join(CLI_BIN_DIR, COMMAND)
 const PACKAGE_DIR = dirname(CLI_BIN_DIR)
 
-/** The two links, each a path in a checkout and what it points at; the paths are also what the exclude file hides. */
-const LINKS: readonly { path: string; target: string; dir?: true }[] = [
-  { path: 'node_modules/@openagt/skill-branches', target: PACKAGE_DIR, dir: true },
-  { path: `${BIN_DIR}/${COMMAND}`, target: join(CLI_BIN_DIR, COMMAND) },
-]
-
-/** The paths of the links, relative to a checkout: the rules a cleanup lifts. */
-export const COMMAND_LINKS: readonly string[] = LINKS.map(link => link.path)
+/** The paths of the links, relative to a checkout: what the exclude file hides, and the rules a cleanup lifts. */
+export const COMMAND_LINKS: readonly string[] = [COMMAND_LINK, PACKAGE_LINK]
 
 export async function linkOwnCommand(repo: string, checkout: string, git: GitRunner = nodeGitRunner()): Promise<void> {
-  for (const { path, target, dir } of LINKS) {
-    const link = join(checkout, path)
-    // lstat, not stat: a link that is there counts, whatever it points at.
-    if (await lstat(link).then(() => true, () => false)) continue
-    await excludeFromGit(repo, `/${path}`, undefined, git).catch(() => {})
-    try {
-      await mkdir(dirname(link), { recursive: true })
-      // 'junction' is the only directory-link type Windows grants without elevation; it is ignored on POSIX.
-      await symlink(target, link, dir ? (process.platform === 'win32' ? 'junction' : 'dir') : 'file')
-    } catch {
-      // A filesystem that refuses the link: the agent still starts.
-    }
+  const command = join(checkout, COMMAND_LINK)
+  if (!(await entryExists(command))) await link(repo, checkout, COMMAND_LINK, COMMAND_FILE, 'file', git)
+  const ours = await realpath(command).then(async path => path === (await realpath(COMMAND_FILE)), () => false)
+  // 'junction' is the only directory-link type Windows grants without elevation; it is ignored on POSIX.
+  if (ours && !(await entryExists(join(checkout, PACKAGE_LINK)))) await link(repo, checkout, PACKAGE_LINK, PACKAGE_DIR, process.platform === 'win32' ? 'junction' : 'dir', git)
+}
+
+/** lstat, not stat: a link that is there counts, whatever it points at. */
+function entryExists(path: string): Promise<boolean> {
+  return lstat(path).then(() => true, () => false)
+}
+
+async function link(repo: string, checkout: string, path: string, target: string, type: 'file' | 'dir' | 'junction', git: GitRunner): Promise<void> {
+  await excludeFromGit(repo, `/${path}`, undefined, git).catch(() => {})
+  try {
+    await mkdir(dirname(join(checkout, path)), { recursive: true })
+    await symlink(target, join(checkout, path), type)
+  } catch {
+    // A filesystem that refuses the link: the agent still starts.
   }
 }

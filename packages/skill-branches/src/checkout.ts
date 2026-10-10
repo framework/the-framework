@@ -47,7 +47,7 @@ export async function attachCheckout(
  * through the repository's own exclude file, so no tracked file changes; `node_modules` is
  * gitignored, so a fresh checkout has none and a link that cannot be made is a worse run, not a
  * failed one; the package and its command are linked into a checkout that has neither, so the skill's
- * `npx @openagt/skill-branches@^1` runs this copy and downloads nothing (`command-link.ts`); a link under `.branches/` is a view, and the next reconcile pass makes it.
+ * `npx @openagt/skill-branches@0.1` runs this copy and downloads nothing (`command-link.ts`); a link under `.branches/` is a view, and the next reconcile pass makes it.
  */
 async function settle(repo: string, path: string, git: GitRunner, skills: readonly SkillLink[] = []): Promise<void> {
   await excludeFromGit(repo, `/${BRANCHES_DIR}`, undefined, git).catch(() => {})

@@ -2,6 +2,8 @@
 name: readability
 description: Refactor a part of the code to make it as easy as possible for humans to read, rating every file and function before and after.
 disable-model-invocation: true
+metadata:
+  version: 0.1.0
 ---
 
 Refactor a part of the project to make it as easy as possible for humans to read. Nobody will answer you: never ask, decide yourself. The part is what follows the command: a folder, a file, or a feature in words; when nothing follows it, it is the whole project. Below, a function means any unit of logic: a function, a class, a procedure.

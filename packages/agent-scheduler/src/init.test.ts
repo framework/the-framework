@@ -57,6 +57,12 @@ test('removeHooks takes out every line that runs the scheduler, and leaves the r
     assert.equal(await hasHooks(repo), false)
     assert.deepEqual(await removeHooks(repo), { ok: true, file, removed: [] }, 'asked again: nothing left to take')
 
+    // A file that held only the scheduler's lines goes with them.
+    await initHooks(repo)
+    await writeFile(file, 'open:\n  - agent-scheduler start\nclose:\n  - agent-scheduler stop --unless-keep-alive\n')
+    assert.deepEqual(await removeHooks(repo), { ok: true, file, removed: ['open', 'close'] })
+    assert.equal(await readFile(file, 'utf8').catch(() => undefined), undefined, 'the file is gone')
+
     await writeFile(file, 'open: [')
     const unreadable = await removeHooks(repo)
     assert.ok(!unreadable.ok && unreadable.reason === 'unreadable')

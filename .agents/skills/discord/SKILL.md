@@ -1,6 +1,8 @@
 ---
 name: discord
 description: Post a message to the team's Discord channel from the shell, when a task asks you to tell people something there.
+metadata:
+  version: 0.1.0
 ---
 
 # Discord

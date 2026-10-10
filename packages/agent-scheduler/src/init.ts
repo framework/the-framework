@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isMap, isScalar, isSeq, parseDocument, type YAMLSeq } from 'yaml'
 import { OPENAGENT_DIR, lineRuns } from '@openagt/agent-data'
@@ -68,8 +68,8 @@ export async function initHooks(repo: string): Promise<InitOutcome> {
 
 /**
  * Take this tool's lines out of the hooks file: every `open` and `close` line that runs it. A list
- * left empty goes with its key; every other line, key and comment stays. A file that is not there
- * has nothing to take.
+ * left empty goes with its key; every other line, key and comment stays, and a file left with
+ * nothing in it is deleted. A file that is not there has nothing to take.
  */
 export async function removeHooks(repo: string): Promise<RemoveOutcome> {
   const file = join(repo, HOOKS_FILE)
@@ -90,6 +90,9 @@ export async function removeHooks(repo: string): Promise<RemoveOutcome> {
     if (kept.length === 0) doc.delete(key)
     else seq.items = kept
   }
-  if (removed.length > 0) await writeFile(file, doc.toString({ lineWidth: 0 }))
+  if (removed.length === 0) return { ok: true, file, removed }
+  // A file that held nothing but these lines goes with them: it was this tool's.
+  if (doc.contents.items.length === 0 && !/^\s*#/m.test(raw)) await rm(file)
+  else await writeFile(file, doc.toString({ lineWidth: 0 }))
   return { ok: true, file, removed }
 }

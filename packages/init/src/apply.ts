@@ -1,0 +1,99 @@
+import { lstat, mkdir, readlink, rm, rmdir, symlink, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { installProject, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
+import { initHooks, removeHooks } from '@openagt/agent-scheduler'
+import { carriedSkills } from './catalogue.js'
+import { LINKS_DIR, TEXTS_DIR } from './project.js'
+import { stamped } from './skill-file.js'
+
+/**
+ * Writing and deleting a project's skills (#2023). A skill is one tracked file,
+ * `.agents/skills/<name>/SKILL.md`, where Codex reads it, and one tracked link,
+ * `.claude/skills/<name>`, pointing at that folder, where Claude Code reads it: the way the
+ * OpenAgent repository itself holds its skills. Nothing else is written: no `package.json`, no
+ * install, so a Node project, a PHP project and an empty folder get exactly the same.
+ */
+
+/** What one write or delete touched, as paths from the project's root: what a commit of it holds. */
+export interface Touched {
+  paths: string[]
+  /** A place that was left as it is, and why: something there that `init` did not write. */
+  left: { path: string; reason: string }[]
+}
+
+const kindOf = async (path: string): Promise<'none' | 'link' | 'directory' | 'other'> => {
+  const entry = await lstat(path).catch(() => undefined)
+  if (!entry) return 'none'
+  return entry.isSymbolicLink() ? 'link' : entry.isDirectory() ? 'directory' : 'other'
+}
+
+/** The link `init` makes for Claude Code: relative, so it holds in every clone and every checkout. */
+const linkTarget = (name: string): string => `../../${TEXTS_DIR}/${name}`
+
+/** Write (or write again) the text of skill `name` and its link. */
+export async function writeSkill(root: string, name: string): Promise<Touched> {
+  const skill = (await carriedSkills()).get(name)
+  if (!skill) throw new Error(`no skill ${name}`)
+  const touched: Touched = { paths: [], left: [] }
+  const file = `${TEXTS_DIR}/${name}/SKILL.md`
+  await mkdir(join(root, TEXTS_DIR, name), { recursive: true })
+  await writeFile(join(root, file), stamped(skill.text, skill.version))
+  touched.paths.push(file)
+
+  const link = `${LINKS_DIR}/${name}`
+  const kind = await kindOf(join(root, link))
+  if (kind === 'none') {
+    await mkdir(join(root, LINKS_DIR), { recursive: true })
+    // 'junction' is the only directory-link type Windows grants without elevation; it is ignored on POSIX.
+    await symlink(linkTarget(name), join(root, link), process.platform === 'win32' ? 'junction' : 'dir')
+    touched.paths.push(link)
+  } else if (kind === 'link' && (await readlink(join(root, link)).catch(() => '')) === linkTarget(name)) {
+    // The link is already the one `init` makes.
+  } else {
+    touched.left.push({ path: link, reason: kind === 'link' ? 'a link to somewhere else' : 'not a link: Claude Code reads what is there' })
+  }
+  return touched
+}
+
+/** Delete the text of skill `name` and its link. A folder that holds more than the text keeps the rest. */
+export async function removeSkill(root: string, name: string): Promise<Touched> {
+  const touched: Touched = { paths: [], left: [] }
+  const link = `${LINKS_DIR}/${name}`
+  const kind = await kindOf(join(root, link))
+  if (kind === 'link') {
+    await rm(join(root, link))
+    touched.paths.push(link)
+  }
+  for (const dir of kind === 'directory' ? [TEXTS_DIR, LINKS_DIR] : [TEXTS_DIR]) {
+    const folder = `${dir}/${name}`
+    const file = `${folder}/SKILL.md`
+    if ((await kindOf(join(root, file))) === 'none') continue
+    await rm(join(root, file))
+    touched.paths.push(file)
+    // rmdir, never a recursive remove: a file a person put beside the text keeps the folder.
+    if (!(await rmdir(join(root, folder)).then(() => true, () => false))) touched.left.push({ path: folder, reason: 'it holds other files' })
+  }
+  return touched
+}
+
+/** What switching the scheduler answered. */
+export type SchedulerOutcome = { ok: true; changed: boolean; madeRepository?: true } | { ok: false; error: string }
+
+/**
+ * Switch the scheduler on or off for this project on this machine: its two lines in the project's
+ * hooks file, which is outside git. Switching it on in a folder no dashboard knows yet makes the
+ * folder a project first, exactly as a dashboard's "Add project" does (a git repository when it is
+ * none, an empty first commit when it has none, the hidden `.openagent/`), since the hooks file
+ * lives there.
+ */
+export async function setScheduler(root: string, on: boolean, git: GitRunner = nodeGitRunner()): Promise<SchedulerOutcome> {
+  if (!on) {
+    const removed = await removeHooks(root)
+    return removed.ok ? { ok: true, changed: removed.removed.length > 0 } : { ok: false, error: `${removed.file}: ${removed.detail ?? 'unreadable'}` }
+  }
+  const installed = await installProject(root, { git })
+  if (!installed.ok) return { ok: false, error: installed.error }
+  const written = await initHooks(root)
+  if (!written.ok) return { ok: false, error: `${written.file}: ${written.detail ?? written.reason}` }
+  return { ok: true, changed: written.added.length > 0, ...(installed.initialized ? { madeRepository: true as const } : {}) }
+}

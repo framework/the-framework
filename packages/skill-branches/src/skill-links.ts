@@ -2,6 +2,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { nodeGitRunner, type GitRunner, excludeFromGit } from '@openagt/agent-data'
 import { nodeLinkFs, type LinkFs } from './worktree-deps.js'
+import { linkPackage, packageLinkPaths, type PackageLink } from './command-link.js'
 
 /**
  * The skill, where the agent's harness looks for one (#1739). A harness discovers skills under a
@@ -36,6 +37,8 @@ export const SKILL_DIR = join(dirname(fileURLToPath(import.meta.url)), '..')
 export interface SkillLink {
   name: string
   dir: string
+  /** The package the skill's text calls by its full name, when the skill has a command: linked with its commands (`command-link.ts`). */
+  package?: PackageLink
 }
 
 /** This package's own skill, as a {@link SkillLink}. */
@@ -68,5 +71,11 @@ export async function linkSkill(
         // A filesystem that refuses the link: the agent still starts, without the skill.
       }
     }
+    if (skill.package) await linkPackage(repo, checkout, skill.package, git)
   }
+}
+
+/** The paths of a skill's links, relative to a checkout: its text for every harness, and its package's links when it has one. */
+export function skillLinkPaths(skill: SkillLink): string[] {
+  return [...HARNESS_SKILL_DIRS.map(dir => `${dir}/${skill.name}`), ...(skill.package ? packageLinkPaths(skill.package) : [])]
 }

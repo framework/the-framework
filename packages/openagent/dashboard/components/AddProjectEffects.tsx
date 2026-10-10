@@ -13,6 +13,11 @@ export function AddProjectEffects() {
           branch <code className={code}>agent-data</code>
         </li>
         <li>keeps the records on this machine, unless you choose to share them</li>
+        <li>
+          gives each agent four basic skills in its own copy, hidden from git: <code className={code}>branches</code>,{' '}
+          <code className={code}>logs</code>, <code className={code}>question</code>, and <code className={code}>github</code> when the
+          project is on GitHub
+        </li>
       </ul>
       <p>Agents work in their own copies, on their own branches. Your files and your branch stay as they are.</p>
       <p className="italic">A folder with no git, or a repository with no commit yet, gets one empty first commit.</p>

@@ -1,0 +1,112 @@
+import { strict as assert } from 'node:assert'
+import { test } from 'node:test'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { lstat, readFile, realpath } from 'node:fs/promises'
+import { join } from 'node:path'
+import { createCheckout, HARNESS_SKILL_DIRS, skillLinkPaths } from '@openagt/skill-branches'
+import { basicSkills, everyBasicSkill } from './basic-skills.js'
+import { runCli } from './cli.js'
+import { git, removeRepo, testRepo } from './test-repo.js'
+
+// The skills every run gets, on a real repository: which ones a project has by its remote, what a
+// checkout holds for them, that the command a text names runs with nothing downloaded, and that a
+// cleanup takes the rules back.
+
+const run = promisify(execFile)
+const exists = (path: string): Promise<boolean> => lstat(path).then(() => true, () => false)
+const excludeOf = (repo: string): Promise<string> => readFile(join(repo, '.git', 'info', 'exclude'), 'utf8').catch(() => '')
+
+test('every project gets logs and question; the git host\'s skill only where the project is on that host', async () => {
+  const repo = await testRepo()
+  try {
+    // The test project's remote is a folder on this machine: no git host answers for it.
+    assert.deepEqual((await basicSkills(repo)).map(skill => skill.name), ['logs', 'question'])
+    await git(['remote', 'set-url', 'origin', 'https://gitlab.com/someone/project.git'], repo)
+    assert.deepEqual((await basicSkills(repo)).map(skill => skill.name), ['logs', 'question'])
+    await git(['remote', 'set-url', 'origin', 'git@github.com:someone/project.git'], repo)
+    assert.deepEqual((await basicSkills(repo)).map(skill => skill.name), ['logs', 'question', 'github'])
+    assert.deepEqual((await everyBasicSkill()).map(skill => skill.name), ['logs', 'question', 'github'], 'a cleanup knows all of them, whatever the remote')
+    // A skill with a command brings its package; one that is only a text brings none.
+    const byName = Object.fromEntries((await everyBasicSkill()).map(skill => [skill.name, skill]))
+    assert.equal(byName['logs']!.package?.name, '@openagt/skill-logs')
+    assert.deepEqual(Object.keys(byName['logs']!.package!.bins), ['logs'])
+    assert.equal(byName['github']!.package?.name, '@openagt/skill-github')
+    assert.equal(byName['question']!.package, undefined)
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a checkout holds each basic skill where every harness looks, with its command, hidden from git, and the full name runs that copy with nothing downloaded', async () => {
+  const repo = await testRepo()
+  try {
+    await git(['remote', 'set-url', 'origin', 'git@github.com:someone/project.git'], repo)
+    const skills = await basicSkills(repo)
+    const { path } = await createCheckout(repo, { agentId: 'a1', skills })
+    for (const skill of skills) {
+      for (const dir of HARNESS_SKILL_DIRS) {
+        const text = await readFile(join(path, dir, skill.name, 'SKILL.md'), 'utf8')
+        assert.match(text, new RegExp(`^name: ${skill.name}$`, 'm'), `${dir}/${skill.name} is the skill's text`)
+      }
+      if (!skill.package) continue
+      assert.equal(await realpath(join(path, 'node_modules', skill.package.name)), await realpath(skill.package.dir))
+      // The range the text names is the one the linked copy is in: a copy outside it would send `npx` to npm.
+      const text = await readFile(join(skill.dir, 'SKILL.md'), 'utf8')
+      const version: string = JSON.parse(await readFile(join(skill.package.dir, 'package.json'), 'utf8')).version
+      assert.ok(text.includes(`npx ${skill.package.name}@${version.split('.').slice(0, 2).join('.')}`), `${skill.name}'s text names the range ${version} is in`)
+    }
+    assert.equal((await git(['status', '--porcelain'], path)).trim(), '', 'the links are not the agent\'s work')
+    assert.equal((await git(['status', '--porcelain'], repo)).trim(), '', 'nor the project\'s')
+    // `npx` itself, kept off the network: the full name finds the linked copy and runs it.
+    const logs = await run('npx', ['--offline', '--yes', '@openagt/skill-logs@0.1', '--limit', '1'], { cwd: path })
+    assert.deepEqual(JSON.parse(logs.stdout), [])
+    const home = await run('npx', ['--offline', '--yes', '@openagt/skill-github@0.1', 'home'], { cwd: path })
+    assert.equal(JSON.parse(home.stdout).url, 'https://github.com/someone/project')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a project that tracks its own copy of a basic skill keeps it in the checkout', async () => {
+  const repo = await testRepo()
+  try {
+    const { mkdir, writeFile } = await import('node:fs/promises')
+    await mkdir(join(repo, '.claude', 'skills', 'question'), { recursive: true })
+    await writeFile(join(repo, '.claude', 'skills', 'question', 'SKILL.md'), '---\nname: question\n---\nThe project\'s own way to ask.\n')
+    await git(['add', '-A'], repo)
+    await git(['commit', '-q', '-m', 'our question skill'], repo)
+    await git(['push', '-q', 'origin', 'main'], repo)
+    const { path } = await createCheckout(repo, { agentId: 'a2', skills: await basicSkills(repo) })
+    assert.match(await readFile(join(path, '.claude', 'skills', 'question', 'SKILL.md'), 'utf8'), /The project's own way to ask/)
+    assert.equal((await git(['status', '--porcelain'], path)).trim(), '')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('cleanup takes the rules of the basic skills back once no agent checkout is left, and leaves a person\'s lines', async () => {
+  const repo = await testRepo()
+  try {
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(join(repo, '.git', 'info', 'exclude'), '# mine\n/notes.txt\n')
+    const skills = await everyBasicSkill()
+    const { path } = await createCheckout(repo, { agentId: 'a3', skills })
+    const rules = skills.flatMap(skillLinkPaths).map(link => `/${link}`)
+    assert.ok(rules.length >= 10)
+    for (const rule of rules) assert.ok((await excludeOf(repo)).split('\n').includes(rule), `${rule} hides a link`)
+
+    const io = { cwd: repo, stdout: () => {}, stderr: () => {} }
+    assert.equal(await runCli(['cleanup'], io), 0)
+    for (const rule of rules) assert.ok((await excludeOf(repo)).split('\n').includes(rule), `${rule} stays while a checkout holds what it hides`)
+
+    await git(['worktree', 'remove', '--force', path], repo)
+    assert.equal(await exists(path), false)
+    assert.equal(await runCli(['cleanup'], io), 0)
+    const left = (await excludeOf(repo)).split('\n')
+    for (const rule of rules) assert.ok(!left.includes(rule), `${rule} went`)
+    assert.ok(left.includes('/notes.txt') && left.includes('# mine'), 'a person\'s own lines stay')
+  } finally {
+    await removeRepo(repo)
+  }
+})

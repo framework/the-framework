@@ -3,11 +3,12 @@ import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { AgentExitError, continuationPrompt, logDiaryFile, parseQuestion, promptOf, takeInbox, type Driver, type DriverSession, type LogEndStatus } from '@openagt/agent-driver'
 import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
-import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, worktreeBranch, worktreePath } from '@openagt/skill-branches'
+import { agentBranchName, attachCheckout, createCheckout, reclaimWorktree, relinkCheckout, worktreeBranch, worktreePath, type SkillLink } from '@openagt/skill-branches'
 import { findRun, readDiary, type AnyDiaryLine, type LogsDeps, type RunCard, type RunStatus } from '@openagt/skill-logs'
 import { hideLiveDir, inboxPath, liveDir, readLiveCard, readLiveDiary } from './live-card.js'
 import { forReaders, lasting, markerCard, recordBranchGone, recordRun, runnerMark, startOf, writeMarker, type Publish, type RunnerMark } from './records.js'
 import { projectGitHost, type GitHost, type MergeOutcome } from './git-host.js'
+import { basicSkills } from './basic-skills.js'
 import { acquireRunLock, isPidAlive, releaseRunLock } from './run-lock.js'
 import { runEndedLine } from './ended.js'
 import { childEndedLine, tellParent, type ParentDeps } from './parent.js'
@@ -146,6 +147,8 @@ export interface RunOptions {
   git?: GitRunner
   /** The project's git host; the one the project declares when absent. */
   gitHost?: GitHost
+  /** The skills linked into the checkout beside the branches skill; the basic ones (`basic-skills.ts`) when absent. */
+  skills?: (repo: string) => Promise<readonly SkillLink[]>
   logs?: LogsDeps
   log?: (line: string) => void
 }
@@ -201,7 +204,8 @@ async function runOnce(repo: string, opts: RunOptions): Promise<RunOutcome> {
     // Without one there is no run, and the record says so instead of a marker left running.
     let checkout: { path: string; branch: string }
     try {
-      checkout = opts.branch !== undefined ? await attachCheckout(repo, { agentId: id, branch: opts.branch }, git) : await createCheckout(repo, { agentId: id, ...(opts.base !== undefined ? { base: opts.base } : {}) }, git)
+      const skills = await (opts.skills ?? basicSkills)(repo).catch((): SkillLink[] => [])
+      checkout = opts.branch !== undefined ? await attachCheckout(repo, { agentId: id, branch: opts.branch, skills }, git) : await createCheckout(repo, { agentId: id, skills, ...(opts.base !== undefined ? { base: opts.base } : {}) }, git)
     } catch (err) {
       const detail = `could not create a checkout: ${errorMessage(err)}`
       const endedAt = clock()
@@ -259,6 +263,8 @@ export interface ResumeOptions {
   git?: GitRunner
   /** The project's git host; the one the project declares when absent. */
   gitHost?: GitHost
+  /** The skills linked into the checkout beside the branches skill; the basic ones (`basic-skills.ts`) when absent. */
+  skills?: (repo: string) => Promise<readonly SkillLink[]>
   logs?: LogsDeps
   log?: (line: string) => void
 }
@@ -319,7 +325,10 @@ async function resumeOnce(repo: string, opts: ResumeOptions): Promise<{ outcome:
     const branch = card.branch ?? agentBranchName(opts.id)
     const path = worktreePath(repo, opts.id)
     const kept = await stat(path).then(s => s.isDirectory(), () => false)
-    const checkout: { path: string; branch: string; again?: true } = kept ? { path, branch } : await attachCheckout(repo, { agentId: opts.id, branch, ...(previous.base !== undefined ? { base: previous.base } : {}) }, git)
+    const skills = await (opts.skills ?? basicSkills)(repo).catch((): SkillLink[] => [])
+    const checkout: { path: string; branch: string; again?: true } = kept ? { path, branch } : await attachCheckout(repo, { agentId: opts.id, branch, skills, ...(previous.base !== undefined ? { base: previous.base } : {}) }, git)
+    // A checkout that stayed was made by whatever version ran then: its links are brought to what a new one gets.
+    if (kept) await relinkCheckout(repo, path, { skills }, git)
     // A branch that was gone everywhere was just made again, from where it starts as that is now:
     // that is where the run's own work begins. One still on origin came back with its work.
     const restarted = checkout.again ? await startCommit(checkout.path, git) : {}

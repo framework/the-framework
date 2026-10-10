@@ -4,8 +4,9 @@ import { join } from 'node:path'
 import { mkdtemp, readFile, realpath, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { nodeGitRunner } from '@openagt/agent-data'
-import { createCheckout } from './checkout.js'
-import { HARNESS_SKILL_DIRS, linkSkill, SKILL_DIR, SKILL_NAME } from './skill-links.js'
+import { createCheckout, relinkCheckout } from './checkout.js'
+import { COMMAND_LINKS } from './command-link.js'
+import { HARNESS_SKILL_DIRS, linkSkill, SKILL_DIR, SKILL_NAME, skillLinkPaths } from './skill-links.js'
 
 const git = nodeGitRunner()
 
@@ -52,7 +53,7 @@ test('an entry already at a link path is left alone (#1739)', async () => {
   }
 })
 
-test('a caller-named skill is linked beside the package\'s own, under its own name (#1748, temporary)', async () => {
+test('a caller-named skill is linked beside the package\'s own, under its own name (#1748)', async () => {
   const repo = await repoWithOneCommit()
   const other = await realpath(await mkdtemp(join(tmpdir(), 'other-skill-')))
   try {
@@ -62,6 +63,48 @@ test('a caller-named skill is linked beside the package\'s own, under its own na
       assert.equal(await realpath(join(path, dir, 'other')), other, `${dir} links the other skill`)
       assert.equal(await realpath(join(path, dir, SKILL_NAME)), await realpath(SKILL_DIR), `${dir} still links this package`)
     }
+    assert.equal((await git(['status', '--porcelain'], path)).trim(), '')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+    await rm(other, { recursive: true, force: true })
+  }
+})
+
+test('a caller-named skill that has a command gets its package and its command linked too, hidden from git', async () => {
+  const repo = await repoWithOneCommit()
+  const other = await realpath(await mkdtemp(join(tmpdir(), 'other-skill-')))
+  try {
+    await writeFile(join(other, 'SKILL.md'), '---\nname: other\n---\n# Other\n')
+    await writeFile(join(other, 'package.json'), '{"name":"@acme/skill-other","version":"0.1.0"}\n')
+    await writeFile(join(other, 'other-cli'), '#!/bin/sh\necho other ran\n', { mode: 0o755 })
+    const skill = { name: 'other', dir: other, package: { name: '@acme/skill-other', dir: other, bins: { other: join(other, 'other-cli') } } }
+    assert.deepEqual(skillLinkPaths(skill), ['.claude/skills/other', '.agents/skills/other', 'node_modules/.bin/other', 'node_modules/@acme/skill-other'])
+    const { path } = await createCheckout(repo, { agentId: 'a3', skills: [skill] })
+    for (const link of skillLinkPaths(skill)) assert.equal(await realpath(join(path, link)), link.endsWith('.bin/other') ? join(other, 'other-cli') : other, link)
+    assert.equal((await git(['status', '--porcelain'], path)).trim(), '')
+    const hidden = await readFile(join(repo, '.git', 'info', 'exclude'), 'utf8')
+    for (const link of skillLinkPaths(skill)) assert.ok(hidden.split('\n').includes(`/${link}`), `/${link} is hidden`)
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+    await rm(other, { recursive: true, force: true })
+  }
+})
+
+test('a checkout that stayed is brought to what a new one gets: links that are missing are made, links that are there are left', async () => {
+  const repo = await repoWithOneCommit()
+  const other = await realpath(await mkdtemp(join(tmpdir(), 'other-skill-')))
+  try {
+    await writeFile(join(other, 'SKILL.md'), '---\nname: other\n---\n# Other\n')
+    // A checkout made before the caller had a skill to link, and before this package linked itself.
+    const { path } = await createCheckout(repo, { agentId: 'a4' })
+    await rm(join(path, 'node_modules'), { recursive: true, force: true })
+    await unlink(join(path, HARNESS_SKILL_DIRS[1], SKILL_NAME))
+    await relinkCheckout(repo, path, { skills: [{ name: 'other', dir: other }] })
+    for (const dir of HARNESS_SKILL_DIRS) {
+      assert.equal(await realpath(join(path, dir, SKILL_NAME)), await realpath(SKILL_DIR))
+      assert.equal(await realpath(join(path, dir, 'other')), other)
+    }
+    for (const link of COMMAND_LINKS) assert.ok(await realpath(join(path, link)), `${link} is back`)
     assert.equal((await git(['status', '--porcelain'], path)).trim(), '')
   } finally {
     await rm(repo, { recursive: true, force: true })

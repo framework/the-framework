@@ -176,12 +176,13 @@ ending.
   network. Beside another tool that holds the name `branches` in the project the package
   is not linked, and the full name is left to npm. Picked over leaving the full name to
   npm alone, which takes a second a call and fails where the network is down.
-- Each agent tool (Claude Code, Codex) looks for skills in its own folder at the checkout
-  root: `.claude/skills`, `.agents/skills`. In every checkout it makes, the package links
-  its own folder, which holds `SKILL.md`, into both as `branches`, hidden through the
-  repository's exclude. An entry already there, a committed skill say, is left alone. A
-  caller may name further skills to link in beside it, each under its own name, not from
-  the command line; temporary, until the project commits its own skill files.
+- Each agent tool (Claude Code, Codex) looks for skills in its own folder at the
+  checkout root: `.claude/skills`, `.agents/skills`. In every checkout it makes, the
+  package links its own folder, which holds `SKILL.md`, into both as `branches`, hidden
+  through the repository's exclude. An entry already there, a committed skill say, is
+  left alone. A caller may name further skills to link in beside it, each under its own
+  name and with its package and command when it has one, not from the command line: the
+  skills that come with every run, whatever the project committed.
 - `merge <branch>` merges a branch into the project's default branch, on this machine, in
   the project's folder, which must be on that branch. It is how a finished agent's work
   reaches the folder where there is no remote to push to and no pull request to merge. A

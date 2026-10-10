@@ -4,7 +4,7 @@ import { BRANCHES_DIR, nodeGitRunner, repositoryCheckouts, unexcludeFromGit, typ
 import { reconcileBranchLinks } from './branch-links.js'
 import { isAgentBranch } from './branch-names.js'
 import { COMMAND_LINKS } from './command-link.js'
-import { HARNESS_SKILL_DIRS, SKILL_NAME } from './skill-links.js'
+import { HARNESS_SKILL_DIRS, SKILL_NAME, skillLinkPaths, type SkillLink } from './skill-links.js'
 import { worktreeDirEntries } from './worktree.js'
 
 /**
@@ -78,6 +78,19 @@ export async function cleanup(repo: string, reclaimOne: (agentId: string) => Pro
     }
   }
   return { ok: true, removed, kept }
+}
+
+/**
+ * Take back the rules that hide `skills`' links, for a caller that had skills of its own linked
+ * into the checkouts (`SkillLink`) and now removes what it left in the project. Under this
+ * tool's own rule for its links: a rule goes once no agent checkout is left anywhere in the
+ * repository, since every checkout reads the one exclude file.
+ */
+export async function liftSkillRules(repo: string, skills: readonly SkillLink[], git: GitRunner = nodeGitRunner()): Promise<void> {
+  const checkouts = await repositoryCheckouts(repo, git).catch(() => undefined)
+  if (!checkouts) return
+  if ((await worktreeDirEntries(repo)).length > 0 || checkouts.some(path => basename(dirname(path)) === BRANCHES_DIR && isAgentBranch(basename(path)))) return
+  for (const skill of skills) for (const path of skillLinkPaths(skill)) await unexcludeFromGit(repo, `/${path}`, undefined, git).catch(() => {})
 }
 
 async function anyHolds(checkouts: readonly string[], name: string): Promise<boolean> {

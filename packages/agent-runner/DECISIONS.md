@@ -19,7 +19,14 @@ already made, and lists it in its pull request; for anything else it proposes an
   check, on the branches package for the checkout and the reclaim, on the logs package for
   the records, and on `agent-data` for the branch. It never depends on OpenAgent, and
   OpenAgent never depends on it.
-- The runner names no skill and reads no schedule: a run is the prompt it is given.
+- The runner reads no schedule: a run is the prompt it is given. It names skills in one
+  place, the basic skills every run gets: logs and question, and github where the
+  project is on GitHub. Their texts are linked into each agent's checkout, hidden from
+  git like the branches skill, each with its command, so an agent in any project can
+  read earlier runs, ask the person a question and open a pull request with nothing
+  committed. A project's own copy of one is left alone. Picked over every skill coming
+  from the project's own committed files, where a person who cannot change the default
+  branch got agents that could not ask a question.
 
 ## The record
 - A run in flight is its run record, written on `agent-data` before the agent is spawned

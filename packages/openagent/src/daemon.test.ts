@@ -35,7 +35,7 @@ async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done:
 }
 import { OPENAGENT_DIR } from './openagent-dir.js'
 import { projectId, listProjects, addProject } from './registry.js'
-import { gitignorePath, openagentGitignore } from './openagent-gitignore.js'
+import { gitignorePath, openagentGitignore } from '@openagt/agent-data'
 
 // The dashboard steers + starts over the daemon's in-process RPC mount (#405/#426), not the
 // retired per-read HTTP routes. Post to `/_rpc/<name>` (same-origin) and return the unwrapped `ret`.

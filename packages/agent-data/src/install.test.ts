@@ -2,40 +2,22 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { FIRST_COMMIT_MESSAGE, installProject } from './install.js'
 import { openagentGitignore, gitignorePath } from './openagent-gitignore.js'
-import type { GitRunner } from '@openagt/agent-data'
-import type { StoreFs } from './store/index.js'
+import type { GitRunner } from './git.js'
+import type { InstallFs } from './install.js'
 
-/** An in-memory {@link StoreFs} so the install logic is tested without touching disk. */
-function memFs(seed: Record<string, string> = {}): StoreFs & { files: Map<string, string> } {
+/** An in-memory {@link InstallFs} so the install logic is tested without touching disk. */
+function memFs(seed: Record<string, string> = {}): InstallFs & { files: Map<string, string> } {
   const files = new Map<string, string>(Object.entries(seed))
   return {
     files,
-    async read(path) {
-      const v = files.get(path)
-      if (v === undefined) throw new Error(`ENOENT: ${path}`)
-      return v
-    },
     async write(path, contents) {
       files.set(path, contents)
-    },
-    async append(path, contents) {
-      files.set(path, (files.get(path) ?? '') + contents)
     },
     async exists(path) {
       return files.has(path)
     },
     async mkdir() {
       // no-op: the memory fs has no directories
-    },
-    async readdir(dir) {
-      const prefix = dir.endsWith('/') ? dir : dir + '/'
-      const names = new Set<string>()
-      for (const p of files.keys()) {
-        if (!p.startsWith(prefix)) continue
-        const rest = p.slice(prefix.length)
-        if (!rest.includes('/')) names.add(rest)
-      }
-      return [...names]
     },
   }
 }

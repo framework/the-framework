@@ -1,6 +1,5 @@
 import { join } from 'node:path'
-import { DATA_BRANCH } from '@openagt/agent-data/names'
-import { OPENAGENT_DIR } from './openagent-dir.js'
+import { DATA_BRANCH, OPENAGENT_DIR } from './names.js'
 
 /**
  * The `.openagent/.gitignore` (#313): one file, one content, written at install.

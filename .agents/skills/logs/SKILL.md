@@ -7,21 +7,21 @@ description: The record of every run agents made on this project — what was as
 
 Every run an agent made on this project leaves a record on the branch `agent-data`, never on a code branch; your checkout does not contain it. A run is two files under `agents/<who>/`: the card, `<id>.json` — what was asked, the branch, the pull request, how it ended, what it cost — and the diary, `<id>.jsonl` — what the agent said along the way, its result.
 
-Read them with the `logs` command, a dependency of this repository (`@openagt/skill-logs`), run as `npx logs`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. You only read: the program that ran an agent records its run, at its end. The command's `delete` and `patch`, and its `--local` and `--full` flags, are for the dashboard that shows the runs; never use them. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
+Read them with the `logs` command, always run by its full name: `npx @openagt/skill-logs@^1`. You only read: the program that ran an agent records its run, at its end. The command's `delete` and `patch`, and its `--local` and `--full` flags, are for the dashboard that shows the runs; never use them. A refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
 ## Read
 
 ```
-npx logs [--branch <name>] [--limit N]
-                                 the runs, newest first, as one JSON array of cards — the newest 20
-                                 unless --limit says otherwise; --branch keeps the runs on one branch
-npx logs show <id>               one run: its card, plus `diary`, the lines of what the agent
-                                 said, its result, how it ended, and what it cost
+npx @openagt/skill-logs@^1 [--branch <name>] [--limit N]
+                                                   the runs, newest first, as one JSON array of cards — the newest 20
+                                                   unless --limit says otherwise; --branch keeps the runs on one branch
+npx @openagt/skill-logs@^1 show <id>               one run: its card, plus `diary`, the lines of what the agent
+                                                   said, its result, how it ended, and what it cost
 ```
 
 ## Before you plan or work a ticket, read its earlier runs
 
-A ticket may have been worked before. Claiming it names who claimed it before you: a run's id, shaped like `2026-09-08T18-14-30-111Z`, read with `npx logs show <id>`, or else a branch, read with `npx logs --branch <name>`; no run on that branch means no record: read the branch itself. A `stopped` or `failed` run tells you what to avoid: read what its agent said before it ended. A `done` run with a `pr` means the work may already be there: read the pull request before doing it again.
+A ticket may have been worked before. Claiming it names who claimed it before you: a run's id, shaped like `2026-09-08T18-14-30-111Z`, read with `npx @openagt/skill-logs@^1 show <id>`, or else a branch, read with `npx @openagt/skill-logs@^1 --branch <name>`; no run on that branch means no record: read the branch itself. A `stopped` or `failed` run tells you what to avoid: read what its agent said before it ended. A `done` run with a `pr` means the work may already be there: read the pull request before doing it again.
 
 ## The card
 

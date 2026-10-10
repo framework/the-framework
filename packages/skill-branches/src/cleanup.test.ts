@@ -79,7 +79,7 @@ test('cleanup: checkouts go under the reclaim rule; uncommitted work, branches w
     assert.equal(await readlink(join(repo, '.branches', 'agent-fix-title')), 'agent-dirty', 'the kept checkout keeps its link')
     assert.ok((await branches(repo)).includes(work!), 'the branch with work on it stays, at the same commit')
     const hidden = await excludeOf(repo)
-    for (const rule of ['/.branches', '/node_modules/.bin/branches', '/.claude/skills/branches', '/.agents/skills/branches']) {
+    for (const rule of ['/.branches', '/node_modules/@openagt/skill-branches', '/node_modules/.bin/branches', '/.claude/skills/branches', '/.agents/skills/branches']) {
       assert.ok(hidden.split('\n').includes(rule), `${rule} still hides what a kept checkout holds`)
     }
     assert.equal(await outside(repo), before)
@@ -121,7 +121,7 @@ test('cleanup: the rules are the repository\'s: they stay while another checkout
   const { base, repo } = await project()
   try {
     // The same rules written by hand, in a project the tool never worked in.
-    const byHand = '/.branches\n/node_modules/.bin/branches\n/.claude/skills/branches\n/.agents/skills/branches\n'
+    const byHand = '/.branches\n/node_modules/@openagt/skill-branches\n/node_modules/.bin/branches\n/.claude/skills/branches\n/.agents/skills/branches\n'
     await writeFile(join(repo, '.git', 'info', 'exclude'), byHand)
     assert.deepEqual((await run(repo, 'cleanup')).out, { ok: true, removed: [], kept: [] })
     assert.equal(await excludeOf(repo), byHand)

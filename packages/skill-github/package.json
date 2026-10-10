@@ -1,6 +1,6 @@
 {
   "name": "@openagt/skill-github",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "description": "GitHub as a skill for coding agents: the project's pull requests and issues through gh, and the one command OpenAgent and the scheduler run for the git host: requests, open, merge, home.",
   "license": "MIT",
   "repository": {

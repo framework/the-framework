@@ -7,48 +7,48 @@ description: Where the project's tickets live, how to read and change them, how 
 
 The tickets (`tickets/<DATE>_<SLUG>.md`, with their `.plan.md` and `.lock.md` siblings) live on the branch `agent-data`, never on a code branch. A `tickets` link at the repository root, if present, is a possibly stale copy: never write there.
 
-Read and change them with the `tickets` command, a dependency of this repository (`@openagt/skill-tickets`), run as `npx tickets`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. Every change it makes is one commit on the `agent-data` branch, pushed straight to the remote when the project shares its records. Never pass `--local` or `--force`: they are a person's.
+Read and change them with the `tickets` command, always run by its full name: `npx @openagt/skill-tickets@^1`. Every change it makes is one commit on the `agent-data` branch, pushed straight to the remote when the project shares its records. Never pass `--local` or `--force`: they are a person's.
 
 Every command prints one JSON document; a refusal is `{"ok":false,"reason":…}` with why on stderr, exit 1; a wrong command line prints the usage on stderr, nothing on stdout, exit 2. Every `<file>` below is a ticket's filename (`2042-01-01_some-ticket.md`) or the `tickets/…` path a queue entry links to; `put` also takes the ticket's `.plan.md` and `meta.json`.
 
 ## Read
 
 ```
-npx tickets list                 every open ticket, as one JSON array; a row: file, title, summary, date,
-                                 planned, and when set priority, topics, issue, pr (set: the ticket is in
-                                 review), waiting (what it waits on), effort, uncertainty, outdated (the
-                                 plan says so), locked, lockedBy
-npx tickets show <file>          one ticket: its text, its plan, who holds it
-npx tickets meta                 when the tickets last caught up with the issue tracker:
-                                 {"lastImportedAt": <ISO 8601>}, or {} when no import was recorded
+npx @openagt/skill-tickets@^1 list                 every open ticket, as one JSON array; a row: file, title, summary, date,
+                                                   planned, and when set priority, topics, issue, pr (set: the ticket is in
+                                                   review), waiting (what it waits on), effort, uncertainty, outdated (the
+                                                   plan says so), locked, lockedBy
+npx @openagt/skill-tickets@^1 show <file>          one ticket: its text, its plan, who holds it
+npx @openagt/skill-tickets@^1 meta                 when the tickets last caught up with the issue tracker:
+                                                   {"lastImportedAt": <ISO 8601>}, or {} when no import was recorded
 ```
 
 ## Change
 
 ```
-npx tickets put <file>           write one whole file under tickets/ from stdin, creating it if new
-                                 (npx tickets put <file> < draft.md): a ticket, its plan, or meta.json
-                                 holding the object meta shows
-npx tickets close <file>         when the ticket is not wanted, when its work is done with no pull
-                                 request to merge, or for the tracker update once its pull request merged:
-                                 remove the ticket with its plan and claim; refused while someone else
-                                 holds it; its queue entry, if any, stays: `npx queue done` it
+npx @openagt/skill-tickets@^1 put <file>           write one whole file under tickets/ from stdin, creating it if new
+                                                   (npx @openagt/skill-tickets@^1 put <file> < draft.md): a ticket, its plan, or meta.json
+                                                   holding the object meta shows
+npx @openagt/skill-tickets@^1 close <file>         when the ticket is not wanted, when its work is done with no pull
+                                                   request to merge, or for the tracker update once its pull request merged:
+                                                   remove the ticket with its plan and claim; refused while someone else
+                                                   holds it; its queue entry, if any, stays: `npx @openagt/skill-queue@^1 done` it
 ```
 
 ## Claim before you plan or work a ticket
 
 ```
-npx tickets claim <file>         {"ok":true,"file":…,"holder":…,"earlier":[…]}: the ticket is yours;
-                                 earlier: who claimed it before you, newest first, each a run's id or
-                                 a branch; read what they did before you start
-                                 {"ok":false,"reason":"claimed","holder":…}: someone else's: pick another,
-                                 and never remove or overwrite their claim
-npx tickets release <file>       lift your own claim when the plan or the work is done, and before you
-                                 stop unless you closed the ticket: nothing lifts a claim on a timeout
-                                 {"ok":true,"file":…,"holder":…}: your claim is lifted
-                                 {"ok":false,"reason":"no-lock"}: nobody holds it: nothing to lift
-                                 {"ok":false,"reason":"not-holder","holder":…}: someone else holds it:
-                                 leave their claim
+npx @openagt/skill-tickets@^1 claim <file>         {"ok":true,"file":…,"holder":…,"earlier":[…]}: the ticket is yours;
+                                                   earlier: who claimed it before you, newest first, each a run's id or
+                                                   a branch; read what they did before you start
+                                                   {"ok":false,"reason":"claimed","holder":…}: someone else's: pick another,
+                                                   and never remove or overwrite their claim
+npx @openagt/skill-tickets@^1 release <file>       lift your own claim when the plan or the work is done, and before you
+                                                   stop unless you closed the ticket: nothing lifts a claim on a timeout
+                                                   {"ok":true,"file":…,"holder":…}: your claim is lifted
+                                                   {"ok":false,"reason":"no-lock"}: nobody holds it: nothing to lift
+                                                   {"ok":false,"reason":"not-holder","holder":…}: someone else holds it:
+                                                   leave their claim
 ```
 
 `put` ignores claims. You claim as `AGENT_ID` when it is set and not blank, else as your current branch: release from the branch you claimed on, or the claim stays until a person lifts it.
@@ -58,10 +58,10 @@ npx tickets release <file>       lift your own claim when the plan or the work i
 When the repository has the `queue` skill, a ticket goes on the agent queue as a link, its title as the label, at the ticket's own `Priority:` (5 when it has none):
 
 ```
-npx queue add '[<title>](tickets/<file>)' --priority <N>
+npx @openagt/skill-queue@^1 add '[<title>](tickets/<file>)' --priority <N>
 ```
 
-Once the work is committed and its pull request is open: `npx queue done` the entry, its exact text, write the pull request into the ticket as its `PR:` line (`put` the whole ticket, the line added above the title), and release your claim. The ticket is in review. Do not close it: it closes when the pull request merges, through the update from the issue tracker, which reads the line `Closes tickets/<file>` in the pull request's body; add `Closes #<number>` when the ticket has an issue.
+Once the work is committed and its pull request is open: `npx @openagt/skill-queue@^1 done` the entry, its exact text, write the pull request into the ticket as its `PR:` line (`put` the whole ticket, the line added above the title), and release your claim. The ticket is in review. Do not close it: it closes when the pull request merges, through the update from the issue tracker, which reads the line `Closes tickets/<file>` in the pull request's body; add `Closes #<number>` when the ticket has an issue.
 
 ## Formats
 

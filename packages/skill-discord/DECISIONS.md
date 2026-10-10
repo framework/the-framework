@@ -16,3 +16,8 @@ already made, and lists it in its pull request; for anything else it proposes an
 - The webhook is set per machine by a person (`discord setup <webhook>`), outside the
   project; `DISCORD_WEBHOOK` in the environment wins. Picked over a file in the project:
   anyone holding the URL can post to the channel.
+- The skill calls the command by its full name and a version range,
+  `npx @openagt/skill-discord@^1`: the name is ours on npm, so no other package can run
+  under it, and nothing is installed in the project. Picked over `npx discord` with the
+  package as a dependency of the project, which ran whatever package holds that name on
+  npm where the install was missing, and which a project without Node could not have.

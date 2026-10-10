@@ -19,14 +19,14 @@ already made, and lists it in its pull request; for anything else it proposes an
 - The repository's exclude file hides `.branches/` from the first checkout on: an
   untracked folder at the root would ride a sweeping `git add -A` onto a code branch, and
   `.gitignore` is tracked.
-- A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`; `<id>` comes
-  from the program that starts the agent, and must match `[A-Za-z0-9_-]+`, so no id can
-  build a path outside `.branches/`. `npx branches name <name>` (`[a-z0-9-]+`; the skill
-  asks for a leading letter or digit: at the command line a leading `-` reads as a flag, a
-  usage error, and the name check itself does not mind it) renames the branch to
-  `agent-<name>`: a rename, not a new branch, so nothing is left behind; the folder keeps
-  the id, since the agent is running inside it. A checkout on no branch is neither renamed
-  nor reclaimed; `status` answers it without a `branch`.
+- A checkout starts as branch `agent-<id>` in folder `.branches/agent-<id>/`; `<id>`
+  comes from the program that starts the agent, and must match `[A-Za-z0-9_-]+`, so no
+  id can build a path outside `.branches/`. `npx @openagt/skill-branches@^1 name <name>`
+  (`[a-z0-9-]+`; the skill asks for a leading letter or digit: at the command line a
+  leading `-` reads as a flag, a usage error, and the name check itself does not mind
+  it) renames the branch to `agent-<name>`: a rename, not a new branch, so nothing is
+  left behind; the folder keeps the id, since the agent is running inside it. A checkout
+  on no branch is neither renamed nor reclaimed; `status` answers it without a `branch`.
 - After a checkout is made, and after the command names or removes one, each checkout
   whose branch differs from its folder name gets a sibling link `.branches/<branch>` to
   its folder, relative; a detached checkout or a slashed branch gets none. A link whose
@@ -108,10 +108,10 @@ ending.
   the package opening the request itself, which put the git host's tool inside the git skill
   and made another git host a change to this package.
 - The agent pushes its branch only when asked to publish, by its task or by the person:
-  `npx branches push`, once its checkout is clean. Until then its work stays on this
-  machine. Pushing when it finishes was the earlier rule and was dropped: a branch on the
-  remote is in front of everyone who watches the repository, and that is the person's
-  act. Picked over whoever started the agent pushing for it.
+  `npx @openagt/skill-branches@^1 push`, once its checkout is clean. Until then its work
+  stays on this machine. Pushing when it finishes was the earlier rule and was dropped:
+  a branch on the remote is in front of everyone who watches the repository, and that is
+  the person's act. Picked over whoever started the agent pushing for it.
 - A person pushes a finished agent's branch through the same `push`, by name
   (`--branch`): the checkout on it under the agent's clean rule, else the branch itself,
   pushed when this machine has it and left as it is when only origin has it. Picked over
@@ -136,14 +136,16 @@ ending.
 - The command has a second caller, the dashboard, for `list`, `show`, `push --branch` and
   `remove`, declared as the project's branches provider
   (`"openagent": { "branches": "branches" }`).
-- Before its first change the agent names its session, saying what the work is, unless its
-  branch already differs from its folder name, as a continued agent's does: it is already
-  named. The agent finishes only when `npx branches status` reports the checkout clean, or
-  after saying what remains is not its own; an agent that needs anything outside its
-  checkout stops and says so.
-- The skill says: when `node_modules` is missing, install with the lockfile's package
-  manager, then `npx branches`, never a bare `branches`: on a fresh clone no such command
-  exists yet.
+- Before its first change the agent names its session, saying what the work is, unless
+  its branch already differs from its folder name, as a continued agent's does: it is
+  already named. The agent finishes only when `npx @openagt/skill-branches@^1 status`
+  reports the checkout clean, or after saying what remains is not its own; an agent that
+  needs anything outside its checkout stops and says so.
+- The skill calls the command by its full name and a version range,
+  `npx @openagt/skill-branches@^1`: the name is ours on npm, so no other package can run
+  under it, and nothing is installed in the project. Picked over `npx branches` with the
+  package as a dependency of the project, which ran whatever package holds that name on
+  npm where the install was missing, and which a project without Node could not have.
 - Every command that runs prints one JSON document on stdout: the result or the refusal. A
   refusal (a rule saying no) adds one line for a person on stderr and exits 1. A malformed
   command line (an unknown flag, the wrong argument count) never gets that far: the usage
@@ -165,12 +167,12 @@ ending.
   `agent-<name>` branch with git before its first change, another name if that one exists
   locally or on origin. `status`, `name` and a bare `push` are the agent's commands; the
   rest are the caller's.
-- Every checkout holds the package's own command, linked as `node_modules/.bin/branches` and
-  hidden through the repository's exclude, unless the project installed its own copy. The
-  skill says `npx branches`, and in a project with nothing installed `npx` would otherwise
-  download whatever package holds that name on npm and run it. Picked over telling the agent
-  to install first, which an empty project cannot do, and over a bare `branches` in the
-  skill, which a fresh clone on another machine does not have.
+- Every checkout holds the package itself and its command, linked as
+  `node_modules/@openagt/skill-branches` and `node_modules/.bin/branches` and hidden
+  through the repository's exclude, unless the project installed its own copy. `npx`
+  runs a copy it finds in the checkout, so the skill's full name runs the copy that made
+  the checkout, with nothing downloaded and no network. Picked over leaving the full
+  name to npm alone, which takes a second a call and fails where the network is down.
 - Each agent tool (Claude Code, Codex) looks for skills in its own folder at the checkout
   root: `.claude/skills`, `.agents/skills`. In every checkout it makes, the package links
   its own folder, which holds `SKILL.md`, into both as `branches`, hidden through the

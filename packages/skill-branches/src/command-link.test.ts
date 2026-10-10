@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { join } from 'node:path'
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { nodeGitRunner } from '@openagt/agent-data'
 import { CLI_BIN_DIR } from './bin-dir.js'
@@ -33,9 +33,14 @@ test('a checkout in a project with nothing installed holds the command, hidden f
     // The command found in the checkout is this package's: it answers the checkout's own status.
     const { stdout } = await run(link, ['status'], { cwd: path })
     assert.equal(JSON.parse(stdout).path, path)
+    // The package is there too, so the skill's full name finds this copy: `npx` asks npm for nothing.
+    const pkg = join(path, 'node_modules', '@openagt', 'skill-branches')
+    assert.equal(await realpath(pkg), await realpath(join(CLI_BIN_DIR, '..')))
+    assert.equal(JSON.parse(await readFile(join(pkg, 'package.json'), 'utf8')).name, '@openagt/skill-branches')
     // Linking again changes nothing.
     await linkOwnCommand(repo, path)
     assert.equal(await realpath(link), await realpath(join(CLI_BIN_DIR, 'branches')))
+    assert.equal(await realpath(pkg), await realpath(join(CLI_BIN_DIR, '..')))
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
@@ -49,6 +54,21 @@ test("a project that installed its own copy keeps it: the checkout's command is 
     const { path } = await createCheckout(repo, { agentId: 'a2' })
     const { stdout } = await run(join(path, 'node_modules', '.bin', 'branches'), [], { cwd: path })
     assert.equal(stdout.trim(), 'own')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test("a project that installed its own copy of the package keeps it: the checkout's package is the project's", async () => {
+  const repo = await repoWithOneCommit({ '.gitignore': 'node_modules/\n' })
+  try {
+    const own = join(repo, 'node_modules', '@openagt', 'skill-branches')
+    await mkdir(own, { recursive: true })
+    await writeFile(join(own, 'package.json'), '{"name":"@openagt/skill-branches","version":"9.9.9"}\n')
+    const { path } = await createCheckout(repo, { agentId: 'a3' })
+    const pkg = join(path, 'node_modules', '@openagt', 'skill-branches')
+    assert.equal(await realpath(pkg), await realpath(own))
+    assert.equal(JSON.parse(await readFile(join(pkg, 'package.json'), 'utf8')).version, '9.9.9')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

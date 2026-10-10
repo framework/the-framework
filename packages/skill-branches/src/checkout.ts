@@ -46,8 +46,8 @@ export async function attachCheckout(
  * directory at the root, `.branches/` would ride any sweeping `git add -A` onto a code branch —
  * through the repository's own exclude file, so no tracked file changes; `node_modules` is
  * gitignored, so a fresh checkout has none and a link that cannot be made is a worse run, not a
- * failed one; the package's own command is linked into a checkout that has none, so the skill's
- * `npx branches` runs it and downloads nothing (`command-link.ts`); a link under `.branches/` is a view, and the next reconcile pass makes it.
+ * failed one; the package and its command are linked into a checkout that has neither, so the skill's
+ * `npx @openagt/skill-branches@^1` runs this copy and downloads nothing (`command-link.ts`); a link under `.branches/` is a view, and the next reconcile pass makes it.
  */
 async function settle(repo: string, path: string, git: GitRunner, skills: readonly SkillLink[] = []): Promise<void> {
   await excludeFromGit(repo, `/${BRANCHES_DIR}`, undefined, git).catch(() => {})

@@ -1,1 +1,0 @@
-The "How it works" chapter, subtitled "OpenAgent introduces one major building block:", which shows that building block, "Queues" (`Queues.tsx`), and, below it, the note about the prompts everything runs on (`Prompts.tsx`).

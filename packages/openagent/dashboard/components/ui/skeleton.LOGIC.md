@@ -1,1 +1,0 @@
-Provides the pulsing placeholder block shown in place of content that is still loading: a muted, rounded rectangle whose size the host sets; the sidebar's loading rows in `sidebar.tsx` are built from it.

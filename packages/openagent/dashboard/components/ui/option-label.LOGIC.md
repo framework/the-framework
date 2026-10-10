@@ -1,1 +1,0 @@
-Provides the two-line label a menu item shows: the item's name with an optional one-line description in small muted text under it, shared by the options, notifications and Commands menus so their items read identically.

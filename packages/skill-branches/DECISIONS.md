@@ -3,9 +3,9 @@ to the implementer's judgment. Flag conflicts instead of silently deviating. Kee
 outdated decisions (no history).
 
 A bullet is a person's pick, and says what it was picked over. What the code does
-belongs in the LOGIC.md files; a choice made while implementing is the implementer's
-judgment, not a decision. An AI writes a bullet only for a pick a person already made,
-and lists it in its pull request; for anything else it proposes and asks.
+belongs in the code and its tests, not here; a choice made while implementing is the
+implementer's judgment, not a decision. An AI writes a bullet only for a pick a person
+already made, and lists it in its pull request; for anything else it proposes and asks.
 
 ## The checkout
 - One checkout per agent, a git worktree of the user's repository under `.branches/`,

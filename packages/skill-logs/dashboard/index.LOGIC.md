@@ -1,1 +1,0 @@
-The module's definition, the module's default export: one page whose URL is `/logs`, whose sidebar row reads "Logs" with a scroll icon, rendered by the Logs page (`LogsPage.tsx`); and the stylesheet `dashboard.css`, which the dashboard loads from beside the module.

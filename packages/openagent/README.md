@@ -51,9 +51,9 @@ document whose `id` names the agent it began. From there the agent belongs to wh
 line started. Adding a project writes these three lines into the file, so a new project, an
 empty folder included, starts an agent with nothing typed by hand. They are a default: a line
 already there is kept, and any of them can be changed or deleted. A line finds its tools in the
-project's installed packages first, then in the dashboard's built-in ones, which bring `agent-runner`;
+packages the dashboard brings first, `agent-runner` and `agent-scheduler` among them, then in the project's installed ones;
 nothing is downloaded to run a line. A project with no `start` line cannot start an agent from
-the dashboard, and the dashboard says so. `npx agent-scheduler init`, run in the project, writes
+the dashboard, and the dashboard says so. `npx @openagt/agent-scheduler@0.1 init`, run in the project, writes
 the scheduler's `open` and `close` lines (they start it when the dashboard opens and stop it
 when it closes), keeping any line already there. The file's keys are `open`, `close`, `start`, `resume` and `check`; any other key
 is refused and the whole file ignored.

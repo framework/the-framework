@@ -1,16 +1,17 @@
 import { realpath, stat } from 'node:fs/promises'
 import { dirname, join, normalize, sep } from 'node:path'
-import { packageBins, projectPackages, readManifest, runPackageCommand, type PackageCommandResult, type ProjectPackage } from '@openagt/agent-data'
-import { builtInPackages } from './built-in.js'
+import { packageBins, runPackageCommand, type PackageCommandResult, type ProjectPackage } from '@openagt/agent-data'
+import { builtInPackagesOf, ownPackages } from './built-in.js'
 
 /**
  * A package that adds to the dashboard (#1774): its browser part, named by its
  * `exports["./dashboard"]`, and optionally its server part, named by `exports["./server"]`.
- * OpenAgent names no package: any dependency of the project that exports `./dashboard` is a
- * module, whoever wrote it, and OpenAgent's own built-in modules come the same way.
+ * Any dependency of the project that exports `./dashboard` is a module, whoever wrote it, and the
+ * packages OpenAgent brings itself come the same way, for the projects that have them
+ * (`built-in.ts`).
  */
 export interface ProjectModule {
-  /** The package's name, as the project's package.json lists it. */
+  /** The package's name. */
   package: string
   /** The package's version, when its package.json says one. */
   version?: string
@@ -52,17 +53,13 @@ async function fileInside(pkgDir: string, target: string | undefined): Promise<s
 
 /**
  * The modules a project has: each of its dependencies whose package.json exports `./dashboard` to
- * a file that exists inside the package, plus the modules among OpenAgent's built-in packages (`built-in.ts`). A project that
- * depends on a built-in module's package itself gets its own copy. Sorted by name.
+ * a file that exists inside the package, plus the modules among the packages OpenAgent brings to
+ * this project (`built-in.ts`): a skill's page where the project holds the skill's text. Sorted
+ * by name.
  */
 export async function readProjectModules(root: string): Promise<ProjectModule[]> {
   const modules: ProjectModule[] = []
-  for (const pkg of await projectPackages(root)) {
-    const module = await readModule(pkg)
-    if (module) modules.push(module)
-  }
-  for (const pkg of await builtInPackages()) {
-    if (modules.some(module => module.package === pkg.name)) continue
+  for (const pkg of [...(await ownPackages(root)), ...(await builtInPackagesOf(root))]) {
     const module = await readModule(pkg)
     if (module) modules.push(module)
   }

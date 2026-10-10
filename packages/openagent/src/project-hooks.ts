@@ -10,8 +10,8 @@ import { OPENAGENT_DIR } from './openagent-dir.js'
  * A project's hooks (#1774): the shell lines a project's own `.openagent/hooks.yml` names to
  * run when the dashboard opens and when it closes, the two lines that start a run and continue
  * one, and the line that says whether a run can start here at all. The daemon calls no tool by
- * name: it runs whatever the file says, in the project, with the project's installed tools and
- * then the built-in packages' on the PATH, so a line reaches its tool with nothing fetched from npm. Per
+ * name: it runs whatever the file says, in the project, with the commands of the packages
+ * OpenAgent brings and then the project's installed tools on the PATH, so a line reaches its tool with nothing fetched from npm. Per
  * user, since `.openagent/` is ignored: a hook is this machine's, and a teammate's pull
  * changes nothing.
  *
@@ -239,12 +239,13 @@ export async function runCheckHook(cwd: string, input: { driver?: string }, opts
 }
 
 /**
- * The environment a line runs with: the PATH led by the project's installed tools, then the
- * built-in packages' own commands, so a tool named in a line is the project's copy when it
- * installed one and the dashboard's otherwise, and never a package fetched by name.
+ * The environment a line runs with: the PATH led by the commands of the packages OpenAgent
+ * brings, then the project's installed tools. So a tool of OpenAgent's named in a line is always
+ * OpenAgent's copy, the one its pages and its data go through too, any other tool is the
+ * project's, and nothing is a package fetched by name.
  */
 export async function hookEnv(cwd: string, env: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv> {
-  return { ...env, PATH: [join(cwd, 'node_modules', '.bin'), ...(await builtInBinDirs()), env['PATH']].filter(Boolean).join(delimiter) }
+  return { ...env, PATH: [...(await builtInBinDirs()), join(cwd, 'node_modules', '.bin'), env['PATH']].filter(Boolean).join(delimiter) }
 }
 
 /** One line through the shell: how it ended, in words, what it said on stderr, and its stdout when asked for. */

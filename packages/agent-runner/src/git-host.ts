@@ -1,10 +1,14 @@
-import { readProvidedCommand, runPackageCommand } from '@openagt/agent-data'
+import { readProvidedCommand, runPackageCommand, type ProvidedCommand } from '@openagt/agent-data'
+import { BASIC_PACKAGES, basicGitHosts } from './basic-skills.js'
 
 /**
- * The project's git host (#1820), reached by declaration: whichever of the project's packages
- * declares `"openagent": { "git-host": "<command>" }` answers the pull requests, and this tool runs
- * that command the way the dashboard runs any provided command. Nothing here names a git host or a
- * package: a project with none has no pull requests to read back and nothing to merge.
+ * The project's git host (#1820), reached by declaration: whichever package declares
+ * `"openagent": { "git-host": "<command>" }` answers the pull requests, and this tool runs that
+ * command the way the dashboard runs any provided command. A package the project installed for it
+ * comes first; else the git host among this tool's own basic skills, where it answers for the
+ * project (`basic-skills.ts`), so a project with nothing installed has one too. Nothing here names
+ * a git host or a package: a project with none has no pull requests to read back and nothing to
+ * merge.
  *
  * Two questions this tool asks of it: which pull request a branch has, for the run's record, and
  * the merge of one, once a follow-up is done (`run.ts`).
@@ -29,10 +33,15 @@ export interface GitHost {
 
 const NO_GIT_HOST = 'this project has no git host package'
 
+/** The command of the project's git host: its own package's, else this tool's, the names this tool brings never read from the project. */
+export async function gitHostCommand(repo: string): Promise<ProvidedCommand | undefined> {
+  return readProvidedCommand(repo, 'git-host', await basicGitHosts(repo).catch(() => []), BASIC_PACKAGES).catch(() => undefined)
+}
+
 /** The git host the project declares, run as a command. */
 export const projectGitHost: GitHost = {
   async requestOfBranch(repo, branch) {
-    const command = await readProvidedCommand(repo, 'git-host').catch(() => undefined)
+    const command = await gitHostCommand(repo)
     if (!command) return undefined
     const result = await runPackageCommand(repo, command, ['requests', '--branch', branch])
     if (!result.ok || !Array.isArray(result.output)) return undefined
@@ -41,7 +50,7 @@ export const projectGitHost: GitHost = {
   },
 
   async mergeRequest(repo, number) {
-    const command = await readProvidedCommand(repo, 'git-host').catch(() => undefined)
+    const command = await gitHostCommand(repo)
     if (!command) return { outcome: 'failed', error: NO_GIT_HOST }
     const result = await runPackageCommand(repo, command, ['merge', String(number)])
     if (!result.ok) return { outcome: 'failed', error: result.error }

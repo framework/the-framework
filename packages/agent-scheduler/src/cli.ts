@@ -328,7 +328,7 @@ const COMMANDS: Record<string, Command> = {
     parse(args, {}, 0)
     const outcome = await cleanup(await project(io.cwd, git), { git })
     if (outcome.ok) return outcome
-    throw new Refused(outcome, `the scheduler is running here (pid ${outcome.pid}): stop it first with agent-scheduler stop`)
+    throw new Refused(outcome, `the scheduler is running here (pid ${outcome.pid}): stop it first with npx @openagt/agent-scheduler@0.1 stop`)
   },
 }
 

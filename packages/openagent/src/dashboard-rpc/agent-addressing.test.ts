@@ -12,7 +12,6 @@ import { OPENAGENT_DIR } from '../openagent-dir.js'
 import { RUN_INBOX_FILE } from '../dashboard/run-inbox.js'
 import { PROJECT_HOOKS_FILE } from '../project-hooks.js'
 import { provideTestContext } from './test-context.js'
-import { linkBranchesProvider } from '../store/test-branches.js'
 
 // #749, #1774: what is addressed at a RUN has to resolve the run's own checkout, not the project:
 // the run's card is there, and so is the inbox its tool reads. Addressed at the project root, a
@@ -46,7 +45,6 @@ async function projectWithWorktreeAgent(
   await git(['add', '-A'], dir)
   await git(['commit', '-q', '-m', 'init'], dir)
   await addWorktree(dir, { agentId, branch: agentBranchName(agentId) }, git)
-  await linkBranchesProvider(dir)
   const worktree = worktreePath(dir, agentId)
   await mkdir(join(worktree, OPENAGENT_DIR), { recursive: true })
   // The run's card is what readLiveMetas discovers, and its id is what the caller addresses.
@@ -269,7 +267,6 @@ async function projectWithDirtyWorktree(): Promise<{
   const agentId = 'run1'
   const { path, branch } = await addWorktree(dir, { agentId, branch: agentBranchName(agentId) }, git)
   await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
-  await linkBranchesProvider(dir)
 
   const previous = process.env.XDG_CONFIG_HOME
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
@@ -398,10 +395,8 @@ test('sendOpenPullRequest opens the pull request as a draft when asked to, and a
     const remote = join(ctx.dir, 'remote.git')
     await git(['init', '-q', '--bare', remote], ctx.dir)
     await git(['remote', 'add', 'origin', remote], ctx.dir)
-    // The project's git host: a package that declares the command, beside the branches one.
-    const manifestPath = join(ctx.dir, 'package.json')
-    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { devDependencies: Record<string, string> }
-    await writeFile(manifestPath, JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, host: '*' } }))
+    // The project's git host: a package the project installed, which declares the command.
+    await writeFile(join(ctx.dir, 'package.json'), JSON.stringify({ devDependencies: { host: '*' } }))
     const host = join(ctx.dir, 'node_modules', 'host')
     await mkdir(host, { recursive: true })
     await writeFile(join(host, 'package.json'), JSON.stringify({ name: 'host', bin: { host: 'provider.cjs' }, openagent: { 'git-host': 'host' } }))

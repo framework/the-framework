@@ -15,7 +15,7 @@ test('a project the dashboard knows, with no hooks file, gets the scheduler\'s l
   try {
     const outcome = await initHooks(repo)
     assert.deepEqual(outcome, { ok: true, file: join(repo, '.openagent', 'hooks.yml'), added: ['open', 'close'], kept: [] })
-    assert.deepEqual(parse(await readFile(join(repo, '.openagent', 'hooks.yml'), 'utf8')), { open: ['npx agent-scheduler start'], close: ['npx agent-scheduler stop --unless-keep-alive'] })
+    assert.deepEqual(parse(await readFile(join(repo, '.openagent', 'hooks.yml'), 'utf8')), { open: ['agent-scheduler start'], close: ['agent-scheduler stop --unless-keep-alive'] })
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

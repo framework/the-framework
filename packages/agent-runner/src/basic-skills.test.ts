@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { createCheckout, HARNESS_SKILL_DIRS, skillLinkPaths } from '@openagt/skill-branches'
 import { basicSkills, everyBasicSkill } from './basic-skills.js'
 import { runCli } from './cli.js'
+import { gitHostCommand } from './git-host.js'
 import { git, removeRepo, testRepo } from './test-repo.js'
 
 // The skills every run gets, on a real repository: which ones a project has by its remote, what a
@@ -117,6 +118,35 @@ test('cleanup takes the rules of the basic skills back once no agent checkout is
     const left = (await excludeOf(repo)).split('\n')
     for (const rule of rules) assert.ok(!left.includes(rule), `${rule} went`)
     assert.ok(left.includes('/notes.txt') && left.includes('# mine'), 'a person\'s own lines stay')
+  } finally {
+    await removeRepo(repo)
+  }
+})
+
+test('a run\'s git host is the package the project installed for it, else the runner\'s own where the project is on that host; the runner\'s own names in the project\'s package.json are not read', async () => {
+  const repo = await testRepo()
+  try {
+    const { mkdir, writeFile } = await import('node:fs/promises')
+    assert.equal(await gitHostCommand(repo), undefined, 'a remote that is a folder: no git host')
+    await git(['remote', 'set-url', 'origin', 'git@github.com:someone/project.git'], repo)
+    const own = await gitHostCommand(repo)
+    assert.equal(own?.package, '@openagt/skill-github', 'nothing installed in the project: the runner\'s own')
+
+    // The project lists the runner's own package, at a copy of its own: that copy is not read.
+    const listed = join(repo, 'node_modules', '@openagt', 'skill-github')
+    await mkdir(listed, { recursive: true })
+    await writeFile(join(listed, 'package.json'), JSON.stringify({ name: '@openagt/skill-github', bin: { github: 'cli.cjs' }, openagent: { 'git-host': 'github' } }))
+    await writeFile(join(listed, 'cli.cjs'), '')
+    await writeFile(join(repo, 'package.json'), JSON.stringify({ name: 'project', devDependencies: { '@openagt/skill-github': '*' } }))
+    assert.equal((await gitHostCommand(repo))?.bin, own!.bin)
+
+    // A git host the project installed itself comes first.
+    const other = join(repo, 'node_modules', 'other-host')
+    await mkdir(other, { recursive: true })
+    await writeFile(join(other, 'package.json'), JSON.stringify({ name: 'other-host', bin: { 'other-host': 'cli.cjs' }, openagent: { 'git-host': 'other-host' } }))
+    await writeFile(join(other, 'cli.cjs'), '')
+    await writeFile(join(repo, 'package.json'), JSON.stringify({ name: 'project', devDependencies: { '@openagt/skill-github': '*', 'other-host': '*' } }))
+    assert.equal((await gitHostCommand(repo))?.package, 'other-host')
   } finally {
     await removeRepo(repo)
   }

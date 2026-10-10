@@ -23,12 +23,12 @@ already made, and lists it in its pull request; for anything else it proposes an
   runner and the scheduler need git for the checkouts and the records, and inside the
   driver every user of the driver would get git and the skills with it. Either way was
   open; this one for now.
-- The scheduler depends on `@openagt/agent-runner` for the runs, the records and the sweep, on
-  `@openagt/agent-driver` for the quota reading, on the branches package for the project root, on
-  the logs package to count the records, and on `agent-data` for the branch. It never
-  depends on OpenAgent, and OpenAgent never depends on it. Its dashboard part is
-  the exception: it is drawn with the dashboard's module contract, and the tool itself runs
-  without it.
+- The scheduler depends on `@openagt/agent-runner` for the runs, the records and the
+  sweep, on `@openagt/agent-driver` for the quota reading, on the branches package for
+  the project root, on the logs package to count the records, and on `agent-data` for
+  the branch. It never depends on OpenAgent; OpenAgent brings it, as one of its
+  packages. Its dashboard part is the exception: it is drawn with the dashboard's module
+  contract, and the tool itself runs without it.
 - The tool names no skill and no command. What runs comes from the project's skills: a
   skill says in its own file that it can be scheduled, and a skill that is not in the
   project has no scheduled command. Picked over the tool linking a command's skill into the
@@ -191,10 +191,10 @@ already made, and lists it in its pull request; for anything else it proposes an
   exits 0 for a result, 1 for a refusal or a failure, 2 for a command line that cannot be
   read: the skills' contract, so a person and a dashboard read it the same way.
 - `start` is the only clock: OpenAgent's daemon does not tick. A dashboard that wants
-  the scheduler on while it is open runs `start` when it opens and `stop
-  --unless-keep-alive` when it closes, from a hook file of the user's that names the tool;
-  OpenAgent itself names no tool. Picked over the daemon calling the tick, which would
-  have made OpenAgent name the tool.
+  the scheduler on while it is open runs `start` when it opens and
+  `stop --unless-keep-alive` when it closes, from a hook file of the user's that names
+  the tool; OpenAgent's daemon calls no tool by name. Picked over the daemon calling the
+  tick, which would have made the daemon call the tool by name.
 - A stop waits for the tick in flight, and that tick starts nothing more: the readings are
   where a tick spends its seconds, and a person who said stop gets no new agent. The ending
   scheduler clears only its own pid from the state, since a dashboard's close hook stops one

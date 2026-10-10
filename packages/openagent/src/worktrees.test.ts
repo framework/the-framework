@@ -1,14 +1,12 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { deleteProjectAgent, removeProjectWorktree } from './worktrees.js'
 import { nodeGitRunner } from '@openagt/agent-data'
 import { runFiles, writeRun } from '@openagt/skill-logs'
 import { addWorktree, agentBranchName } from '@openagt/skill-branches'
-import { linkBranchesProvider } from './store/test-branches.js'
 // The dashboard's side of reclaiming a checkout: when it may be asked for, and whose refusal is answered. The rule itself lives in the branches package, the project's branches provider here (#1774), and is tested there.
 // Against real git, because "was the diff actually destroyed" is not a question a fake answers.
 
@@ -34,7 +32,6 @@ async function repoWithDirtyWorktree(opts: { remote?: boolean } = {}): Promise<{
   }
   const { path, branch } = await addWorktree(repo, { agentId: RUN_ID, branch: agentBranchName(RUN_ID) }, git)
   await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
-  await linkBranchesProvider(repo)
   return { repo, path, branch }
 }
 
@@ -154,15 +151,10 @@ test('a project none of whose own packages provides its checkouts is asked throu
 // keeps it. Against real git, because "did the branch survive" is the whole distinction.
 
 /**
- * Record a run the way a run's tool does, with the logs package, and make that package the
- * project's runs provider the way a project does: a dependency, installed. The two files that put
- * its row in the rail.
+ * Record a run the way a run's tool does, with the logs package, which every project has as its
+ * runs provider. The two files that put its row in the rail.
  */
 async function recordRun(repo: string, id: string): Promise<{ card: string; diary: string }> {
-  const manifest = JSON.parse(await readFile(join(repo, 'package.json'), 'utf8').catch(() => '{}')) as { devDependencies?: Record<string, string> }
-  await writeFile(join(repo, 'package.json'), JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, '@openagt/skill-logs': '*' } }))
-  await mkdir(join(repo, 'node_modules', '@openagt'), { recursive: true })
-  await symlink(resolve(dirname(fileURLToPath(import.meta.resolve('@openagt/skill-logs'))), '..'), join(repo, 'node_modules', '@openagt', 'skill-logs'))
   const written = await writeRun(repo, { id, startedAt: '2026-01-01T00:00:00.000Z', status: 'stopped' }, [{ kind: 'ended', status: 'stopped' }])
   assert.ok(written.ok || written.committed, 'the record landed')
   return (await runFiles(repo, id))!

@@ -76,6 +76,10 @@ test('packages the caller ships provide a kind only when none of the project\'s 
     assert.equal((await lookupProvidedCommand(join(bare, 'nowhere'), 'runs', shipped)).command?.package, 'shipped', 'no package.json at all')
     assert.equal((await lookupProvidedCommand(own, 'runs', shipped)).command?.package, 'logs', 'the project\'s own package wins')
     assert.deepEqual(await lookupProvidedCommand(bare, 'tickets', shipped), {}, 'a kind no shipped package declares')
+    // A name the caller brings itself is not read from the project: its copy there does not provide, shipped to this project or not.
+    assert.deepEqual(await lookupProvidedCommand(own, 'runs', [], ['logs']), {}, 'reserved, and not shipped to this project')
+    assert.equal((await lookupProvidedCommand(own, 'runs', shipped, ['logs'])).command?.package, 'shipped', 'reserved: the caller\'s own package provides')
+    assert.equal((await lookupProvidedCommand(own, 'runs', shipped, ['other'])).command?.package, 'logs', 'another name reserved changes nothing')
   } finally {
     for (const dir of [shippedRoot, bare, own]) await rm(dir, { recursive: true, force: true })
   }

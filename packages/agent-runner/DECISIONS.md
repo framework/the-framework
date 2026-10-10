@@ -19,7 +19,7 @@ already made, and lists it in its pull request; for anything else it proposes an
   its driver and its readiness check, on the branches package for the checkout and the
   reclaim, on the logs package for the records, on the question and github packages for
   the skills every run gets, and on `agent-data` for the branch. It never depends on
-  OpenAgent, and OpenAgent never depends on it.
+  OpenAgent; OpenAgent brings it, as one of its packages.
 - The runner reads no schedule: a run is the prompt it is given. It names skills in one
   place, the basic skills every run gets: logs and question, and github where the
   project is on GitHub. Their texts are linked into each agent's checkout, hidden from

@@ -105,12 +105,15 @@ function declaredFor(manifest: PackageManifest, kind: string): unknown {
  * package.json names under `"openagent": { "<kind>": "<package name>" }`, else none, with the
  * reason. The project naming a package that does not declare the kind is the same: none, said.
  *
- * `shipped` are packages the caller brings for every project (a dashboard's built-in ones): they
- * are asked only when none of the project's own packages declares the kind, so a project's own
- * copy wins and a project with nothing installed still has a provider.
+ * `shipped` are packages the caller brings itself (a dashboard's built-in ones): they are asked
+ * only when none of the project's own packages declares the kind, so a package the project
+ * installed for the kind wins and a project with nothing installed still has a provider.
+ * `reserved` are the names the caller brings itself, whether or not this project has them: one of
+ * them among the project's dependencies is not read, so the caller's copy and the caller's rule
+ * for which project has it are the only ones.
  */
-export async function lookupProvidedCommand(root: string, kind: string, shipped: readonly ProjectPackage[] = []): Promise<ProvidedCommandLookup> {
-  let providers = declaring(await projectPackages(root), kind)
+export async function lookupProvidedCommand(root: string, kind: string, shipped: readonly ProjectPackage[] = [], reserved: readonly string[] = []): Promise<ProvidedCommandLookup> {
+  let providers = declaring((await projectPackages(root)).filter(pkg => !reserved.includes(pkg.name)), kind)
   if (providers.length === 0) providers = declaring(shipped, kind)
   const project = await readManifest(join(root, 'package.json'))
   const named = project ? declaredFor(project, kind) : undefined
@@ -138,8 +141,8 @@ export function declaring(packages: readonly ProjectPackage[], kind: string): Pr
 }
 
 /** {@link lookupProvidedCommand}'s command, for a caller that only needs to run it. */
-export async function readProvidedCommand(root: string, kind: string, shipped: readonly ProjectPackage[] = []): Promise<ProvidedCommand | undefined> {
-  return (await lookupProvidedCommand(root, kind, shipped)).command
+export async function readProvidedCommand(root: string, kind: string, shipped: readonly ProjectPackage[] = [], reserved: readonly string[] = []): Promise<ProvidedCommand | undefined> {
+  return (await lookupProvidedCommand(root, kind, shipped, reserved)).command
 }
 
 /** What a package's command answered: its JSON output, or why there is none. */

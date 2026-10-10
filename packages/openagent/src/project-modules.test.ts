@@ -60,7 +60,7 @@ test('a project\'s modules are the dependencies whose package exports ./dashboar
   }
 })
 
-test('a module may bring a server part; every project has the built-in modules, and its own copy of one wins', async () => {
+test('a module may bring a server part; every project has the built-in modules, and one of their names among its own dependencies is not read', async () => {
   const root = await tempDir('openagent-modules-server-')
   try {
     await pkg(root, { dependencies: { withServer: '1', '@openagt/files': '1' } })
@@ -72,7 +72,8 @@ test('a module may bring a server part; every project has the built-in modules, 
     assert.equal(modules.find(module => module.package === 'withServer')?.server, join(nodeModules, 'withServer', 's.js'))
     const files = modules.filter(module => module.package === '@openagt/files')
     assert.equal(files.length, 1)
-    assert.equal(files[0]!.version, '9.9.9', 'the project’s own copy, not OpenAgent’s')
+    assert.notEqual(files[0]!.version, '9.9.9', 'OpenAgent’s copy, not the one the project lists')
+    assert.ok(files[0]!.server, 'with its server part, which the project’s copy has none of')
 
     // Without its own copy, a project has OpenAgent's: its browser part and its server part.
     const builtIn = (await readProjectModules(join(root, 'no-such-project'))).find(module => module.package === '@openagt/files')

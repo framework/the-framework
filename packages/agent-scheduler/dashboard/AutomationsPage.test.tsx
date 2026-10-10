@@ -401,12 +401,12 @@ describe('the Automations page: its rows', () => {
     const other = screen.getByRole('region', { name: 'other' })
     expect(within(other).getByText('Scheduler off')).toBeTruthy()
     expect(within(other).queryByText(/: off/)).toBeNull()
-    expect(within(other).getByText('The scheduler is off in this project, so nothing here starts by itself. It starts with the dashboard once the project has run `npx agent-scheduler init`, or by hand with `npx agent-scheduler start`.')).toBeTruthy()
+    expect(within(other).getByText('The scheduler is off in this project, so nothing here starts by itself. It starts with the dashboard once the project has run `npx @openagt/agent-scheduler@0.1 init`, or by hand with `npx @openagt/agent-scheduler@0.1 start`.')).toBeTruthy()
     expect(within(gemstack).queryByText(/so nothing here starts/)).toBeNull()
     cleanup()
     const { host: stopped } = hostAnswering(() => ({ ok: true, output: { ...STATUS, running: false } }))
     show(stopped)
-    expect(await screen.findByText('The scheduler is on but its process is not running, so nothing here starts by itself. `npx agent-scheduler start`, run in the project, starts it.')).toBeTruthy()
+    expect(await screen.findByText('The scheduler is on but its process is not running, so nothing here starts by itself. `npx @openagt/agent-scheduler@0.1 start`, run in the project, starts it.')).toBeTruthy()
   })
 
   test('a skill whose schedule cannot be read is named with the reason, and an automation kept on this machine that the scheduler does not list is said so in its own words', async () => {

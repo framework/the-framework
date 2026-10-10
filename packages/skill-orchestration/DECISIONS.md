@@ -10,9 +10,9 @@ already made, and lists it in its pull request; for anything else it proposes an
 ## Orchestration as a skill
 - A main agent runs subagents through a skill with a thin command of its own,
   `orchestration` (`start`, `list`, `read`, `stop`), in a package that depends on the
-  runner. Picked over more commands on `agent-runner` (the runner names no skill, and
-  would grow commands only a skill uses) and over a skill file alone (listing and
-  stopping need the runner's mark and a pid, which no command prints to an agent).
+  runner. Picked over more commands on `agent-runner` (the runner would grow commands
+  only a skill uses) and over a skill file alone (listing and stopping need the runner's
+  mark and a pid, which no command prints to an agent).
 - The words are main agent and subagent. Picked over coordinator and worker.
 - The package and its command are named `orchestration`. Picked over `subagents` and
   `agents`.

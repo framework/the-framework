@@ -3,7 +3,7 @@ import { readProvidedCommand, runPackageCommand } from '@openagt/agent-data'
 /**
  * The project's git host (#1820), reached by declaration: whichever of the project's packages
  * declares `"openagent": { "git-host": "<command>" }` answers the pull requests, and this tool runs
- * that command the way the dashboard runs any provided command. The tool names no git host and no
+ * that command the way the dashboard runs any provided command. Nothing here names a git host or a
  * package: a project with none has no pull requests to read back and nothing to merge.
  *
  * Two questions this tool asks of it: which pull request a branch has, for the run's record, and

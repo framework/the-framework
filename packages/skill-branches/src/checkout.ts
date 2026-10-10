@@ -41,6 +41,16 @@ export async function attachCheckout(
 }
 
 /**
+ * The links of a checkout that is already there, brought to what a new one gets: the package's
+ * command and skill, and the caller's skills. For a continued agent whose checkout stayed, made by
+ * whatever version ran then. A link that is there is left alone, so this is safe to ask again.
+ */
+export async function relinkCheckout(repo: string, path: string, opts: CheckoutSkills = {}, git: GitRunner = nodeGitRunner()): Promise<void> {
+  await linkOwnCommand(repo, path, git)
+  await linkSkill(repo, path, undefined, git, opts.skills)
+}
+
+/**
  * What a checkout gets besides its files. All best-effort: the checkouts are the package's state
  * and hidden from the project's git the moment the first one exists (#1600) — as an untracked
  * directory at the root, `.branches/` would ride any sweeping `git add -A` onto a code branch —

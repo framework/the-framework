@@ -1,10 +1,11 @@
 import { parseArgs } from 'node:util'
 import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
-import { projectRoot } from '@openagt/skill-branches'
+import { liftSkillRules, projectRoot } from '@openagt/skill-branches'
 import { findRun } from '@openagt/skill-logs'
 import { DRIVER_NAMES, detachResume, detachRun, isDriverName, readyToRun, resumeProject, runProject } from './runner.js'
 import { initHooks } from './init.js'
 import { cleanup } from './cleanup.js'
+import { everyBasicSkill } from './basic-skills.js'
 import { isPublish, PUBLISH_LEVELS } from './records.js'
 
 /**
@@ -191,7 +192,11 @@ const COMMANDS: Record<string, Command> = {
     parse(args, {}, 0)
     const repo = await project(io.cwd, git)
     const outcome = await cleanup(repo, { git })
-    if (outcome.ok) return outcome
+    if (outcome.ok) {
+      // The rules that hid the basic skills' links: this tool had them linked, so it takes them back.
+      await liftSkillRules(repo, await everyBasicSkill(), git)
+      return outcome
+    }
     throw new Refused(outcome, `a run is still working here (${outcome.runs.join(', ')}): stop it first`)
   },
 }

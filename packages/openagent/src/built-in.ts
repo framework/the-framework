@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import type { CleanupReport } from './dashboard/types.js'
 import { SKILLS_DIRS } from './project-commands.js'
 import { readProjectHooks } from './project-hooks.js'
-import { declaring, lookupProvidedCommand, packageBins, projectPackages, readManifest, runPackageCommand, type ProjectPackage, type ProvidedCommand, type ProvidedCommandLookup } from '@openagt/agent-data'
+import { declaring, lineRuns, lookupProvidedCommand, packageBins, projectPackages, readManifest, runPackageCommand, type ProjectPackage, type ProvidedCommand, type ProvidedCommandLookup } from '@openagt/agent-data'
 
 /**
  * The packages OpenAgent brings, by name: dependencies of OpenAgent itself, resolved from its
@@ -96,12 +96,10 @@ async function hookLines(root: string): Promise<string[]> {
   return [...hooks.open, ...hooks.close, hooks.start, hooks.resume, hooks.check].filter((line): line is string => typeof line === 'string')
 }
 
-/** Whether one of `lines` runs the package: one of its commands, bare or by a path, or its name with or without a version, stands in it as a word of its own. */
+/** Whether one of `lines` runs the package: see `lineRuns`. */
 function runsOneOf(lines: readonly string[], pkg: ProjectPackage): boolean {
-  const commands = Object.keys(packageBins(pkg.name, pkg.manifest.bin, pkg.dir))
-  return lines.some(line =>
-    line.split(/[\s"'`=;|&()<>]+/).some(word => word.replace(/@[\w.^~<>=*-]+$/, '') === pkg.name || commands.includes(word.slice(word.lastIndexOf('/') + 1))),
-  )
+  const tool = { name: pkg.name, commands: Object.keys(packageBins(pkg.name, pkg.manifest.bin, pkg.dir)) }
+  return lines.some(line => lineRuns(line, tool))
 }
 
 /** The project's own installed packages, less the names OpenAgent brings itself. */

@@ -10,4 +10,4 @@ export { MAX_COUNT, parseInterval, parseTimeOfDay, paceInForce, dueFrom, type In
 export { tick, startNow, runCheck, type TickDeps, type CheckResult } from './tick.js'
 export { tickProject, runNow, startScheduler, stopScheduler, schedulerStatus, type Status, type StatusCommand } from './scheduler.js'
 export { runCli, USAGE, type CliIo, type CliRefusal } from './cli.js'
-export { initHooks, HOOK_LINES, type InitOutcome } from './init.js'
+export { initHooks, hasHooks, removeHooks, HOOK_LINES, type InitOutcome, type RemoveOutcome } from './init.js'

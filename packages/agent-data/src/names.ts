@@ -1,5 +1,5 @@
 /**
- * The two names every consumer of the package hangs off. Pure: no node imports, so browser-side
+ * The names every consumer of the package hangs off. Pure: no node imports, so browser-side
  * code can name them too.
  */
 
@@ -17,3 +17,10 @@ export const BRANCHES_DIR = '.branches'
  * import — never spelled out again.
  */
 export const DATA_BRANCH = 'agent-data'
+
+/**
+ * The directory, under a project root, that holds OpenAgent's own files on this machine: the
+ * hooks file, a run's live files. Hidden from git by an ignore file of its own, written when the
+ * folder becomes a project (`install.ts`).
+ */
+export const OPENAGENT_DIR = '.openagent'

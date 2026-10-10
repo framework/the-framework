@@ -1,6 +1,8 @@
 ---
 name: tickets
 description: Where the project's tickets live, how to read and change them, how to claim a ticket so no two agents work the same one, how to queue one, and the formats.
+metadata:
+  version: 0.1.0
 ---
 
 # Tickets

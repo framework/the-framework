@@ -1,6 +1,5 @@
-import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
+import { gitignorePath, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { nodeFs } from './node-fs.js'
-import { gitignorePath } from './openagent-gitignore.js'
 
 /**
  * Project-level repo helpers (#380): the activation marker check and a

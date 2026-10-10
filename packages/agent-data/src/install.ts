@@ -1,15 +1,33 @@
+import { access, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { nodeGitRunner, type GitRunner } from '@openagt/agent-data'
-import { OPENAGENT_DIR } from './openagent-dir.js'
+import { nodeGitRunner, type GitRunner } from './git.js'
+import { OPENAGENT_DIR } from './names.js'
 import { openagentGitignore, gitignorePath } from './openagent-gitignore.js'
-import { nodeStoreFs, type StoreFs } from './store/index.js'
-import { errorMessage } from './error-message.js'
 
 /**
- * Install/activate a repo for OpenAgent (#391): create the `.openagent/` marker and its
- * ignore file. Nothing is committed on a branch that has a commit. Pure core over the same
- * {@link GitRunner} + {@link StoreFs} seams as project.ts.
+ * Make a folder a project of OpenAgent's (#391): create the `.openagent/` marker and its ignore
+ * file. Nothing is committed on a branch that has a commit. What a dashboard's "Add project" and
+ * `@openagt/init` both do to a folder, so here, where both reach it. Pure core over a
+ * {@link GitRunner} and the three file operations it needs.
  */
+
+/** The file operations an install needs; `node:fs/promises` in production. */
+export interface InstallFs {
+  exists(path: string): Promise<boolean>
+  mkdir(path: string): Promise<void>
+  write(path: string, contents: string): Promise<void>
+}
+
+/** The `node:fs/promises` implementation of {@link InstallFs}. */
+export function nodeInstallFs(): InstallFs {
+  return {
+    exists: path => access(path).then(() => true, () => false),
+    async mkdir(path) {
+      await mkdir(path, { recursive: true })
+    },
+    write: (path, contents) => writeFile(path, contents),
+  }
+}
 
 /** The message of the empty commit an install gives a repository that has none. */
 export const FIRST_COMMIT_MESSAGE = '[OpenAgent] first commit'
@@ -25,7 +43,7 @@ export type InstallResult =
 /** Injectable seams for {@link installProject}. */
 export interface InstallDeps {
   git?: GitRunner
-  fs?: StoreFs
+  fs?: InstallFs
 }
 
 /**
@@ -36,7 +54,7 @@ export interface InstallDeps {
  */
 export async function installProject(cwd: string, deps: InstallDeps = {}): Promise<InstallResult> {
   const git = deps.git ?? nodeGitRunner()
-  const fs = deps.fs ?? nodeStoreFs()
+  const fs = deps.fs ?? nodeInstallFs()
 
   if (await fs.exists(gitignorePath(cwd))) return { ok: true, alreadyActivated: true }
 
@@ -64,6 +82,6 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
     await fs.write(gitignorePath(cwd), openagentGitignore())
     return insideRepo ? { ok: true } : { ok: true, initialized: true }
   } catch (err) {
-    return { ok: false, error: errorMessage(err) }
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
 }

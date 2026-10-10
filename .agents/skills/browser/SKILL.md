@@ -1,6 +1,8 @@
 ---
 name: browser
 description: A real browser you drive from the shell, to see or act on a web page (open it, read it, click, type, take a screenshot), such as checking that the app you changed works.
+metadata:
+  version: 0.1.0
 ---
 
 # The browser

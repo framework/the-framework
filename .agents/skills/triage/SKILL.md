@@ -13,6 +13,8 @@ schedule:
     waits-for: when a planned ticket is consensual work and is not waiting, claimed, in review or queued
     when: |-
       npx @openagt/skill-tickets@0.1 list | jq --argjson q "$(npx @openagt/skill-queue@0.1)" '[.[] | select(.planned and .pr == null and (.waiting | not) and (.locked | not) and (.outdated | not) and .effort != null and .uncertainty != null and .uncertainty <= 3 and (.effort > 2 or .uncertainty > 2) and (.file as $f | $q | any(contains($f)) | not)) | .file]'
+metadata:
+  version: 0.1.0
 ---
 
 Choose work for the agent queue. Nobody will answer you: never ask, decide yourself. You only queue work, you never do it: the only thing you change is the queue. The word after the command is the mode: `quick`, `consensual`, or nothing for both.

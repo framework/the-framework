@@ -6,6 +6,8 @@ schedule:
   waits-for: when the queue holds a task nobody has claimed
   when: |-
     npx @openagt/skill-queue@0.1 | jq --argjson t "$(npx @openagt/skill-tickets@0.1 list)" '[.[] | . as $e | select($t | any(.[]; .locked and ((.file | rtrimstr(".md")) as $s | $e | contains($s))) | not)]'
+metadata:
+  version: 0.1.0
 ---
 
 Work one task off the project's agent queue. Nobody will answer you: never ask, decide yourself.

@@ -1,6 +1,8 @@
 ---
 name: queue
 description: Where the project's agent queue lives, how to read it and change it, and its format.
+metadata:
+  version: 0.1.0
 ---
 
 # The agent queue

@@ -41,8 +41,12 @@ test('every project gets logs and question; the git host\'s skill only where the
 test('a checkout holds each basic skill where every harness looks, with its command, hidden from git, and the full name runs that copy with nothing downloaded', async () => {
   const repo = await testRepo()
   try {
+    // The remote is on GitHub only while a command that reads its address runs: making a checkout
+    // and reading the runs both fetch from origin, and no test reaches a real host.
+    const local = (await git(['remote', 'get-url', 'origin'], repo)).trim()
     await git(['remote', 'set-url', 'origin', 'git@github.com:someone/project.git'], repo)
     const skills = await basicSkills(repo)
+    await git(['remote', 'set-url', 'origin', local], repo)
     const { path } = await createCheckout(repo, { agentId: 'a1', skills })
     for (const skill of skills) {
       for (const dir of HARNESS_SKILL_DIRS) {
@@ -61,6 +65,7 @@ test('a checkout holds each basic skill where every harness looks, with its comm
     // `npx` itself, kept off the network: the full name finds the linked copy and runs it.
     const logs = await run('npx', ['--offline', '--yes', '@openagt/skill-logs@0.1', '--limit', '1'], { cwd: path })
     assert.deepEqual(JSON.parse(logs.stdout), [])
+    await git(['remote', 'set-url', 'origin', 'git@github.com:someone/project.git'], repo)
     const home = await run('npx', ['--offline', '--yes', '@openagt/skill-github@0.1', 'home'], { cwd: path })
     assert.equal(JSON.parse(home.stdout).url, 'https://github.com/someone/project')
   } finally {
@@ -80,6 +85,12 @@ test('a project that tracks its own copy of a basic skill keeps it in the checko
     const { path } = await createCheckout(repo, { agentId: 'a2', skills: await basicSkills(repo) })
     assert.match(await readFile(join(path, '.claude', 'skills', 'question', 'SKILL.md'), 'utf8'), /The project's own way to ask/)
     assert.equal((await git(['status', '--porcelain'], path)).trim(), '')
+    // No rule hides the project's own folder: a file a person adds beside its text shows in git.
+    const hidden = (await excludeOf(repo)).split('\n')
+    assert.ok(!hidden.includes('/.claude/skills/question'), 'the tracked copy gets no rule')
+    assert.ok(hidden.includes('/.agents/skills/question'), 'the folder the project has no copy in is linked and hidden')
+    await writeFile(join(path, '.claude', 'skills', 'question', 'notes.md'), 'more\n')
+    assert.equal((await git(['status', '--porcelain'], path)).trim(), '?? .claude/skills/question/notes.md')
   } finally {
     await removeRepo(repo)
   }

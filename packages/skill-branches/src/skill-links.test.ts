@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { mkdtemp, readFile, realpath, rm, unlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readlink, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { nodeGitRunner } from '@openagt/agent-data'
 import { createCheckout, relinkCheckout } from './checkout.js'
@@ -109,5 +109,28 @@ test('a checkout that stayed is brought to what a new one gets: links that are m
   } finally {
     await rm(repo, { recursive: true, force: true })
     await rm(other, { recursive: true, force: true })
+  }
+})
+
+test('a link of the package\'s that points at an install that is gone is made again; a relative link, the project\'s own, is left', async () => {
+  const repo = await repoWithOneCommit()
+  const gone = join(await realpath(tmpdir()), 'an-install-that-moved', 'skill')
+  try {
+    const { path } = await createCheckout(repo, { agentId: 'a5' })
+    const ours = join(path, HARNESS_SKILL_DIRS[0], SKILL_NAME)
+    const command = join(path, COMMAND_LINKS[0]!)
+    for (const link of [ours, command]) {
+      await unlink(link)
+      await symlink(gone, link)
+    }
+    const theirs = join(path, HARNESS_SKILL_DIRS[1], SKILL_NAME)
+    await unlink(theirs)
+    await symlink('../nowhere', theirs)
+    await relinkCheckout(repo, path)
+    assert.equal(await realpath(ours), await realpath(SKILL_DIR))
+    assert.ok(await realpath(command), 'the command link works again')
+    assert.equal(await readlink(theirs), '../nowhere')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
   }
 })

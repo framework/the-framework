@@ -2,7 +2,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { nodeGitRunner, type GitRunner, excludeFromGit } from '@openagt/agent-data'
 import { nodeLinkFs, type LinkFs } from './worktree-deps.js'
-import { linkPackage, packageLinkPaths, type PackageLink } from './command-link.js'
+import { entryExists, linkPackage, packageLinkPaths, type PackageLink } from './command-link.js'
 
 /**
  * The skill, where the agent's harness looks for one (#1739). A harness discovers skills under a
@@ -49,7 +49,8 @@ export const OWN_SKILL: SkillLink = { name: SKILL_NAME, dir: SKILL_DIR }
  * the caller names (see {@link SkillLink}) — and hide the links from the project's git
  * through the repository's exclude file: a symlink at the checkout root would otherwise ride any
  * sweeping `git add -A` onto the agent's branch. Best-effort: an entry already at a link's path is
- * left alone, and a link that cannot be made is a worse run, not a failed one.
+ * left alone and gets no rule, a link of this package's that points nowhere is made again, and a
+ * link that cannot be made is a worse run, not a failed one.
  */
 export async function linkSkill(
   repo: string,
@@ -61,10 +62,11 @@ export async function linkSkill(
   for (const skill of [OWN_SKILL, ...skills]) {
     for (const dir of HARNESS_SKILL_DIRS) {
       const rel = `${dir}/${skill.name}`
-      await excludeFromGit(repo, `/${rel}`, undefined, git).catch(() => {})
       try {
         const path = join(checkout, rel)
-        if (await fs.entryExists(path)) continue
+        // The project's own copy, tracked or not, stays, and gets no rule: a rule would hide what a person adds there.
+        if (await entryExists(path)) continue
+        await excludeFromGit(repo, `/${rel}`, undefined, git).catch(() => {})
         await fs.mkdir(join(checkout, dir))
         await fs.symlinkDir(skill.dir, path)
       } catch {

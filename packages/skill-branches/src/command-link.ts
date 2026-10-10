@@ -1,5 +1,5 @@
-import { lstat, mkdir, realpath, symlink } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { lstat, mkdir, readlink, realpath, stat, symlink, unlink } from 'node:fs/promises'
+import { dirname, isAbsolute, join } from 'node:path'
 import { excludeFromGit, nodeGitRunner, type GitRunner } from '@openagt/agent-data'
 import { CLI_BIN_DIR } from './bin-dir.js'
 
@@ -20,7 +20,8 @@ import { CLI_BIN_DIR } from './bin-dir.js'
  *
  * Hidden from the project's git through the repository's exclude file, like a skill's link: a link
  * is the package's state, not the agent's work. Best-effort: an entry already there (the project's
- * own copy) is left alone, and a link that cannot be made is a worse run, not a failed one.
+ * own copy) is left alone, a link of this package's that points nowhere is made again, and a link
+ * that cannot be made is a worse run, not a failed one.
  */
 
 /** A package to link into a checkout: its name, its directory (the one holding its `package.json`), and its commands, each a name and its script. */
@@ -61,9 +62,19 @@ export function linkOwnCommand(repo: string, checkout: string, git: GitRunner = 
   return linkPackage(repo, checkout, OWN_PACKAGE, git)
 }
 
-/** lstat, not stat: a link that is there counts, whatever it points at. */
-function entryExists(path: string): Promise<boolean> {
-  return lstat(path).then(() => true, () => false)
+/**
+ * Whether something is at `path`. lstat, not stat: a link that is there counts, whatever it points
+ * at. One exception is taken away first: a link to an absolute path that is gone. That is a link
+ * this package made to an install that has since moved (the project's own links are relative), and
+ * left there it would keep the place of a working one.
+ */
+export async function entryExists(path: string): Promise<boolean> {
+  const entry = await lstat(path).catch(() => undefined)
+  if (!entry) return false
+  if (!entry.isSymbolicLink()) return true
+  const target = await readlink(path).catch(() => undefined)
+  if (target === undefined || !isAbsolute(target) || (await stat(target).then(() => true, () => false))) return true
+  return unlink(path).then(() => false, () => true)
 }
 
 async function link(repo: string, checkout: string, path: string, target: string, type: 'file' | 'dir' | 'junction', git: GitRunner): Promise<void> {

@@ -15,7 +15,7 @@ describe('AddProjectEffects', () => {
     expect(text).toContain('gives each agent four basic skills in its own copy, hidden from git: branches, logs, question, and github when the project is on GitHub')
     expect(text).toContain('Agents work in their own copies, on their own branches. Your files and your branch stay as they are.')
     expect(text).toContain('A folder with no git, or a repository with no commit yet, gets one empty first commit.')
-    // Three effects, as a list.
-    expect(container.querySelectorAll('li')).toHaveLength(3)
+    // Four effects, as a list.
+    expect(container.querySelectorAll('li')).toHaveLength(4)
   })
 })

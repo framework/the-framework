@@ -383,14 +383,14 @@ async function followUp(repo: string, first: RunOutcome, then: string, opts: Fol
     branch: first.branch,
     branchPr: first.pr,
     driver: opts.nextDriver ? opts.nextDriver(id) : opts.driver,
-    ...pick(opts, ['model', 'host', 'pid', 'isAlive', 'now', 'git', 'gitHost', 'logs', 'log']),
+    ...pick(opts, ['model', 'host', 'pid', 'isAlive', 'now', 'git', 'gitHost', 'skills', 'logs', 'log']),
   })
   if (next.status !== 'done') return { ...first, then: next }
   return { ...first, then: { ...next, merge: await (opts.gitHost ?? projectGitHost).mergeRequest(repo, first.pr.number) } }
 }
 
 /** What a follow-up run shares with the run before it: where it runs and how, never what it is for. */
-type FollowUpContext = Pick<RunOptions, 'driver' | 'nextDriver' | 'model' | 'host' | 'pid' | 'isAlive' | 'now' | 'git' | 'gitHost' | 'logs' | 'log'>
+type FollowUpContext = Pick<RunOptions, 'driver' | 'nextDriver' | 'model' | 'host' | 'pid' | 'isAlive' | 'now' | 'git' | 'gitHost' | 'skills' | 'logs' | 'log'>
 
 function pick<T extends object, K extends keyof T>(from: T, keys: readonly K[]): Partial<Pick<T, K>> {
   const picked: Partial<Pick<T, K>> = {}

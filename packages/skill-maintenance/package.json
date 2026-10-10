@@ -1,6 +1,6 @@
 {
   "name": "@openagt/skill-maintenance",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "The maintenance command for coding agents: find the parts of the code that need refactoring and put their maintainability and security work on the agent queue. Queues only. A skill file only, no code.",
   "license": "MIT",
   "repository": {

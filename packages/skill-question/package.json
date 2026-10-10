@@ -1,6 +1,6 @@
 {
   "name": "@openagt/skill-question",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "How a coding agent asks the person to decide: end the reply with one await-choices block and wait for the answer. A skill file only, no code.",
   "license": "MIT",
   "repository": {

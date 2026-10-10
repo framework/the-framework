@@ -9,14 +9,14 @@ The project's pull requests and issues are on GitHub. This skill is how you reac
 
 ## The command
 
-`github` is a dependency of this repository (`@openagt/skill-github`). If `node_modules` is missing, install with the lockfile's package manager (`npm install` for `package-lock.json`). Then run `npx github` inside your checkout. It prints JSON; a refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
+Run the `github` command inside your checkout, always by its full name: `npx @openagt/skill-github@0.1`. It prints JSON; a refusal exits 1 with a line on stderr; a wrong command line exits 2 with the usage.
 
 ## Your pull request
 
 Open a pull request only when your task or the person asks for one, or asks you to publish your work. Push your branch first (your branches skill says how), then:
 
 ```
-npx github open --title "<one line naming what the change does>" --body "<what changed, and why>"
+npx @openagt/skill-github@0.1 open --title "<one line naming what the change does>" --body "<what changed, and why>"
 ```
 
 It opens the pull request for the branch you are on and prints it in `request` (`number`, `url`). A branch that already has an open pull request gets no second one: that one is answered, with `existing` true. Add `--merge` when the work may land on its own: the pull request then merges once its checks pass, also where the repository does not allow auto-merge (`merge` in the answer says `auto-armed`, `merged` or `watching`). Add `--draft` instead for a pull request a person should look at first; with `--merge` too, `--draft` is dropped.
@@ -26,7 +26,7 @@ A pull request whose body has a line `Closes #<number>` closes that issue when i
 ## Reading pull requests and issues
 
 ```
-npx github requests [--branch <b>] [--state open|merged|all] [--since <iso>]
+npx @openagt/skill-github@0.1 requests [--branch <b>] [--state open|merged|all] [--since <iso>]
 ```
 
 The project's newest 50 pull requests, newest first, all states unless `--state`, only `<b>`'s with `--branch`; `--since` keeps those created since, or merged since with `--state merged`. Each has `number`, `url`, `state` (`open`, `merged`, `closed`), `title`, `draft`, `branch`, `head`, `createdAt`, and for a merged one `mergedAt` and `mergeCommit` (the commit it landed as).
@@ -36,7 +36,7 @@ For a pull request's discussion and diff, and for the project's issues, use `gh`
 ## Landing a pull request for a person
 
 ```
-npx github merge <number>
+npx @openagt/skill-github@0.1 merge <number>
 ```
 
 A draft is marked ready, then the merge is armed as `--merge` arms it: `outcome` says `auto-armed`, `merged` or `watching`; a request no longer open is refused as `not-open`. Only when whoever started you asked you to land it.

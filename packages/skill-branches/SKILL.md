@@ -9,12 +9,12 @@ Your work goes on a branch named `agent-<name>`, unless whoever started you cont
 
 ## The command
 
-`branches` is a dependency of this repository (`@openagt/skill-branches`). If `node_modules` is missing, install with the lockfile's package manager (`npm install` for `package-lock.json`). Then run `npx branches` inside your checkout, never a bare `branches`: a fresh clone has none. `status`, `name` and `push` (with no flag) are yours; the rest are the caller's.
+Run the `branches` command inside your checkout, always by its full name: `npx @openagt/skill-branches@0.1`. `status`, `name` and `push` (with no flag) are yours; the rest are the caller's.
 
 ## Where you are
 
 ```
-npx branches status
+npx @openagt/skill-branches@0.1 status
 ```
 
 It prints JSON; `branch` is the branch you are on.
@@ -24,7 +24,7 @@ It prints JSON; `branch` is the branch you are on.
 Before your first change, name the session with `[a-z0-9-]+`, starting with a letter or digit, saying what the work is, unless your branch already differs from `path`'s last segment: then it is named, keep it.
 
 ```
-npx branches name <name>
+npx @openagt/skill-branches@0.1 name <name>
 ```
 
 It renames your branch to `agent-<name>` and prints it in `branch`: `agent-<name>-2`, `-3`, … when `<name>` was taken; a name outside `[a-z0-9-]+` is refused as `invalid-name`.
@@ -44,7 +44,7 @@ Nothing is committed for you.
 ## Before you finish
 
 ```
-npx branches status
+npx @openagt/skill-branches@0.1 status
 ```
 
 It must report `"clean": true`. `clean` is false while anything is uncommitted or untracked: commit or delete what you added; if what remains is not yours, say so and finish.
@@ -54,7 +54,7 @@ It must report `"clean": true`. `clean` is false while anything is uncommitted o
 Only when your task or the person asks you to push or publish your work, and once clean:
 
 ```
-npx branches push
+npx @openagt/skill-branches@0.1 push
 ```
 
 It pushes your branch to origin and prints it in `branch`. `clean` false is refused as `dirty`: commit or delete first.
@@ -64,7 +64,7 @@ It pushes your branch to origin and prints it in `branch`. `clean` false is refu
 Only when the person asks you to merge your work into the project's main branch, and once clean:
 
 ```
-npx branches merge <your branch>
+npx @openagt/skill-branches@0.1 merge <your branch>
 ```
 
 It merges your branch into the main branch, in the project's own folder. A conflict changes nothing and names the files in `files`: say so and stop. Your checkout and your branch stay.

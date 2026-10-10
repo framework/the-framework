@@ -1,6 +1,6 @@
 {
   "name": "@openagt/skill-maintainability",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "The maintainability command for coding agents: refactor a part of the code to make it as maintainable as possible. A skill file only, no code.",
   "license": "MIT",
   "repository": {

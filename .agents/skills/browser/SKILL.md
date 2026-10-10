@@ -5,24 +5,24 @@ description: A real browser you drive from the shell, to see or act on a web pag
 
 # The browser
 
-A headless Chrome of your own, on an empty profile: nobody's logins are in it. Drive it with the `browser` command, a dependency of this repository (`@openagt/skill-browser`), run as `npx browser`. When that fails for a missing `node_modules`, install with the lockfile's package manager (`npm install` for `package-lock.json`) and run it again. It needs Chrome on the machine, or `CHROME_PATH` set to a Chrome or Chromium executable.
+A headless Chrome of your own, on an empty profile: nobody's logins are in it. Drive it with the `browser` command, always run by its full name: `npx @openagt/skill-browser@0.1`. It needs Chrome on the machine, or `CHROME_PATH` set to a Chrome or Chromium executable.
 
 ```
-npx browser open <address>       open the address, starting the browser if none is open
-npx browser read                 print the page again
-npx browser click <n>            click element n
-npx browser type <n> <text>      replace what element n holds with the text; on a select, pick that option;
-                                 on a date or time field, give the value as 2024-01-31, 13:45, 2024-01
-npx browser press <key>          Enter, Tab, Escape, Backspace, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight
-npx browser screenshot [file]    save what the page shows as a PNG and print its path (a temporary file
-                                 when none is named; never name one inside the repository)
-npx browser eval <script>        run a JavaScript expression in the page and print its value, as JSON
-                                 (`document.title`, not `return document.title`; `await` works; an
-                                 element prints as `{}`, so ask for its properties)
-npx browser close                close the browser
+npx @openagt/skill-browser@0.1 open <address>       open the address, starting the browser if none is open
+npx @openagt/skill-browser@0.1 read                 print the page again
+npx @openagt/skill-browser@0.1 click <n>            click element n
+npx @openagt/skill-browser@0.1 type <n> <text>      replace what element n holds with the text; on a select, pick that option;
+                                                    on a date or time field, give the value as 2024-01-31, 13:45, 2024-01
+npx @openagt/skill-browser@0.1 press <key>          Enter, Tab, Escape, Backspace, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight
+npx @openagt/skill-browser@0.1 screenshot [file]    save what the page shows as a PNG and print its path (a temporary file
+                                                    when none is named; never name one inside the repository)
+npx @openagt/skill-browser@0.1 eval <script>        run a JavaScript expression in the page and print its value, as JSON
+                                                    (`document.title`, not `return document.title`; `await` works; an
+                                                    element prints as `{}`, so ask for its properties)
+npx @openagt/skill-browser@0.1 close                close the browser
 ```
 
-Quote a `<text>` or `<script>` with spaces as one argument: `npx browser type 2 'Ada Lovelace'`.
+Quote a `<text>` or `<script>` with spaces as one argument: `npx @openagt/skill-browser@0.1 type 2 'Ada Lovelace'`.
 
 `open`, `read`, `click`, `type` and `press` print the page once it has loaded (or after 10 seconds, as it stands): its title, its address, its text (the first 10,000 characters), then its elements (links, buttons, fields; the first 300) numbered `[n]`. What is inside an iframe or a shadow root is not printed; reach it with `eval`. `click` and `type` take that number, from the last print: when the page changes, the numbers do too. The numbers are written on the page's elements as `data-browser-ref` attributes. An address without `http://` or `https://` gets `http://`; no other kind opens. A dialog the page opens (alert, confirm, prompt) is accepted at once, and the next print begins with a `Dialog, accepted:` line naming it.
 

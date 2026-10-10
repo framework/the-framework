@@ -50,7 +50,7 @@ already made, and lists it in its pull request; for anything else it proposes an
   branch head (every commit was a start, most of them empty), over the tool reading the
   queue (the tool would know a skill), and over a bare clock (empty runs). A `schedule` the
   tool cannot read is skipped and named, never guessed.
-- A skill's check may name the commands of other skills (`npx queue`, `npx tickets`),
+- A skill's check may name the commands of other skills (the queue's, the tickets'),
   though the words a command skill gives the agent name none. The scheduler runs the check;
   the agent is never given the shell line, only what it printed. Picked over keeping the
   checks in a file of the project, away from the skill they belong to.

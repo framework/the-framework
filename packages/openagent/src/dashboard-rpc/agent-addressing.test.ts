@@ -395,10 +395,8 @@ test('sendOpenPullRequest opens the pull request as a draft when asked to, and a
     const remote = join(ctx.dir, 'remote.git')
     await git(['init', '-q', '--bare', remote], ctx.dir)
     await git(['remote', 'add', 'origin', remote], ctx.dir)
-    // The project's git host: a package that declares the command, beside the branches one.
-    const manifestPath = join(ctx.dir, 'package.json')
-    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { devDependencies: Record<string, string> }
-    await writeFile(manifestPath, JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, host: '*' } }))
+    // The project's git host: a package the project installed, which declares the command.
+    await writeFile(join(ctx.dir, 'package.json'), JSON.stringify({ devDependencies: { host: '*' } }))
     const host = join(ctx.dir, 'node_modules', 'host')
     await mkdir(host, { recursive: true })
     await writeFile(join(host, 'package.json'), JSON.stringify({ name: 'host', bin: { host: 'provider.cjs' }, openagent: { 'git-host': 'host' } }))

@@ -34,9 +34,6 @@ already made, and lists it in its pull request; for anything else it proposes an
   outside git, so this one tick is per person and per machine. Every automation starts
   switched off, so a ticked scheduler starts no agent by itself. Picked over a scheduler
   that comes with the dashboard for every project.
-- Switching the scheduler on in a folder no dashboard knows yet makes the folder a
-  project first, exactly as a dashboard's "Add project" does, since the hooks file lives
-  in the project's hidden folder.
 
 ## The commit
 - After writing, init asks "Commit these files now?". On a yes it makes one commit on
@@ -48,9 +45,3 @@ already made, and lists it in its pull request; for anything else it proposes an
 - When a skill in the project has a newer text, the person is told, and it is written
   only on their word. Picked over saying nothing until asked, and over every run of init
   writing every text again, which wrote over a text changed by hand.
-- A written text carries the version it is from, as `metadata.version` in its front
-  matter. So a later init, or a dashboard, can tell three cases apart when the project's
-  text is not the one it carries: the project's is older (a newer text is there), the
-  project's was changed by hand since it was written (it is named and left, and written
-  over only when the person names it), or the reader itself is the older one (it says
-  nothing).

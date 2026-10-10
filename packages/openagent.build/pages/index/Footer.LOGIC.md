@@ -1,1 +1,0 @@
-The footer shown on every page: the logo with the name "OpenAgent" and three links, "Discord", "GitHub" and "npm", to the community's Discord server, the product's GitHub repository and the `@openagt/dashboard` package on npm (the addresses live in `ui.tsx`). On screens narrower than 480 pixels the footer stacks and centers (the rule lives in `styles.css`).

@@ -1,7 +1,0 @@
-Decides whether an agent [1] gets an "Open session" link, and what it reads as. A link is only offered when its address actually contains the agent's session id, which is what makes it open that one driver session [2] rather than a product's front page: an agent's link comes from a template the user configured with a placeholder for the session id, and the default for Claude Code is the generic entry address, which opens the product and not the conversation. An agent whose link is generic, whose link is missing, or which has no session id at all gets no link at all, since an action that promises the session and lands somewhere else is worse than none — the session id itself is still visible in the agent's events [3]. When there is a link, it reads as "Open session (<session id>) ↗", so the user sees which conversation it opens before clicking.
-
-## Glossary
-
-[1] agent: the unit of work: one task worked by a coding agent in its own checkout, on its own branch, started through the project's start hook and shown in the dashboard from the files its tool keeps.
-[2] driver session: the coding agent's own conversation for one agent, which the driver can resume by its session id. Say "session id" and "session link" for its id and URL.
-[3] event / event stream: everything an agent does, in order, read off the agent's diary: the file its tool writes one line at a time, in the agent's checkout while it has one and on the data branch once it is recorded; every surface is a projection of it.
